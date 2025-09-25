@@ -1,0 +1,45 @@
+{
+  "name": "whatsapp-ai-chatbot",
+  "version": "1.0.0",
+  "description": "WhatsApp AI Chatbot dengan LangChain dan Gemini",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "test": "node test.js"
+  },
+  "keywords": [
+    "whatsapp",
+    "chatbot",
+    "ai",
+    "langchain",
+    "gemini"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "@langchain/google-genai": "^0.0.20",
+    "@wppconnect-team/wppconnect": "^1.25.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "firebase-admin": "^12.0.0",
+    "helmet": "^7.1.0",
+    "js-levenshtein": "^1.1.6",
+    "langchain": "^0.3.0",
+    "morgan": "^1.10.0",
+    "node-fetch": "^2.7.0",
+    "@google/generative-ai": "^0.11.3",
+    "zod": "^3.23.8",
+    "luxon": "^3.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "nodemon": "^3.0.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
