@@ -22,8 +22,12 @@ const { createBookingTool } = require('./src/ai/tools/createBookingTool.js');
 const { getCurrentDateTimeTool } = require('./src/ai/tools/getCurrentDateTimeTool.js');
 const { updateBookingTool } = require('./src/ai/tools/updateBookingTool.js');
 const { triggerBosMatTool } = require('./src/ai/tools/triggerBosMatTool.js');
+const { calculateHomeServiceFeeTool } = require('./src/ai/tools/calculateHomeServiceFeeTool.js');
 const { startBookingReminderScheduler } = require('./src/ai/utils/bookingReminders.js');
+const { isSnoozeActive, setSnoozeMode, clearSnoozeMode, getSnoozeInfo } = require('./src/ai/utils/humanHandover.js');
+const { getLangSmithCallbacks } = require('./src/ai/utils/langsmith.js');
 const { generateVisionAnalysis } = require('./src/ai/vision/geminiVision.js');
+const { saveCustomerLocation } = require('./src/ai/utils/customerLocations.js');
 
 const app = express();
 const server = http.createServer(app);
@@ -67,7 +71,8 @@ const availableTools = {
     createBooking: createBookingTool.implementation,
     getCurrentDateTime: getCurrentDateTimeTool.implementation,
     updateBooking: updateBookingTool.implementation,
-    triggerBosMatTool: triggerBosMatTool.implementation
+    triggerBosMatTool: triggerBosMatTool.implementation,
+    calculateHomeServiceFee: calculateHomeServiceFeeTool.implementation,
 };
 
 const toolDefinitions = [
@@ -79,7 +84,8 @@ const toolDefinitions = [
     createBookingTool.toolDefinition,
     getCurrentDateTimeTool.toolDefinition,
     updateBookingTool.toolDefinition,
-    triggerBosMatTool.toolDefinition
+    triggerBosMatTool.toolDefinition,
+    calculateHomeServiceFeeTool.toolDefinition,
 ];
 
 console.log('🔧 [STARTUP] Tool Registry Initialized:');
@@ -148,8 +154,9 @@ const SYSTEM_PROMPT = `Anda adalah **Zoya**, asisten AI Bosmat Repainting and De
 6. **Repaint**: updateRepaintDetailsTool untuk warna/bagian
 7. **Booking**: checkBookingAvailability → findNextAvailableSlot → createBooking
 8. **Edit Booking**: updateBooking jika user ingin mengganti jadwal/layanan/status booking yang sudah ada.
-9. **Tanggal/Waktu**: getCurrentDateTime jika butuh informasi waktu aktual.
-10. **Ragu**: triggerBosMatTool untuk eskalasi ke BosMat (handover manual).
+9. **Home Service**: calculateHomeServiceFee untuk menghitung jarak & biaya tambahan jika pelanggan minta servis ke lokasi (butuh share location).
+10. **Tanggal/Waktu**: getCurrentDateTime jika butuh informasi waktu aktual.
+11. **Ragu**: triggerBosMatTool untuk eskalasi ke BosMat (handover manual).
 
 ## Layanan Utama
 **Repaint**: Bodi Halus/Kasar, Velg, Cover CVT/Arm
@@ -162,11 +169,14 @@ DP: Rp100.000 ke BCA 1662515412 a.n Muhammad Tauhid Haryadesa
 ## Rules
 - Hanya bahas topik Bosmat
 - Repaint: tawarkan promo bundling dulu
+- Jika jenis motor belum diketahui, tanyakan terlebih dahulu jenis motornya.
+- Ada perbedaan layanan untuk jenis cat motor, jadi baiknya tanyakan motornya cat doff atau glossy.
 - Pertanyaan di luar konteks → triggerBosMatTool
 - Bingung pilih warna: tawarkan konsultasi Bosmat atau pilih di studio
 - TIDAK mengarang info, gunakan tools
 - Pertanyaan lokasi/jam/kontak/booking → panggil getStudioInfo (tambahkan searchKnowledgeBase bila butuh verifikasi tambahan)
 - Jika user meminta harga/ukuran layanan, WAJIB gunakan getMotorSizeDetails lalu getSpecificServicePrice sebelum menjawab.
+- Jangan menunda dengan kalimat seperti "sebentar". Setelah tool pertama memberikan data (mis. ukuran motor), langsung panggil tool lanjutan yang dibutuhkan (mis. harga) pada iterasi yang sama sebelum memberi jawaban akhir.
 - Jika user minta jadwal/booking slot, cek dengan checkBookingAvailability sebelum menawarkan waktu.
 - Setelah user setuju dengan jadwal, panggil createBooking untuk mencatat detail booking.
 - Jika butuh tanggal/hari/jam saat ini, panggil getCurrentDateTime.
@@ -177,8 +187,31 @@ DP: Rp100.000 ke BCA 1662515412 a.n Muhammad Tauhid Haryadesa
 
 Output: Pesan WhatsApp natural hasil reasoning (reasoning tidak ditampilkan). Jika tool dibutuhkan, panggil tool dulu, tunggu hasil, lalu beri jawaban final berdasarkan data tool.`;
 
+const ADMIN_MESSAGE_REWRITE_ENABLED = process.env.ADMIN_MESSAGE_REWRITE === 'false' ? false : true;
+const ADMIN_MESSAGE_REWRITE_STYLE_PROMPT = `Kamu adalah Zoya, asisten Bosmat yang ramah dan profesional. Tugasmu adalah menulis ulang pesan admin berikut agar gaya bahasa konsisten dengan gaya Zoya:
+- Gunakan bahasa Indonesia santai namun sopan.
+- Panggil pelanggan dengan "mas" atau "mbak" jika relevan.
+- Pertahankan maksud dan janji yang sudah dibuat admin, jangan menambah atau mengubah fakta.
+- Gunakan gaya WhatsApp: maksimal 2-6 kalimat, bullet jika perlu, huruf tebal *...* bila menekankan istilah penting.
+- Jangan mengubah angka/harga/jadwal yang disebutkan.
+- Jangan menyebutkan kamu sedang menulis ulang pesan admin.`;
+
+function getTracingConfig(label) {
+    const callbacks = getLangSmithCallbacks(label);
+    if (!callbacks || callbacks.length === 0) {
+        return undefined;
+    }
+    return {
+        runName: label,
+        callbacks,
+    };
+}
+
 // --- Message Buffering & Debouncing ---
-const messageBuffers = new Map();
+const { DebounceQueue } = require('./src/ai/utils/debounceQueue.js');
+
+const pendingMessages = new Map();
+const DEBOUNCE_DELAY_MS = parseInt(process.env.DEBOUNCE_DELAY_MS || '10000', 10);
 
 // --- Memory Configuration ---
 const MEMORY_CONFIG = {
@@ -231,7 +264,7 @@ function buildLangChainHistory(history) {
         const text = (entry.text || '').trim();
         if (!text) return;
 
-        if (entry.sender === 'ai') {
+        if (entry.sender === 'ai' || entry.sender === 'admin') {
             formatted.push(new AIMessage(text));
         } else {
             formatted.push(new HumanMessage(text));
@@ -239,6 +272,13 @@ function buildLangChainHistory(history) {
     });
 
     return formatted;
+}
+
+function toSenderNumberWithSuffix(id) {
+    if (!id) return id;
+    const trimmed = id.trim();
+    if (!trimmed) return trimmed;
+    return trimmed.endsWith('@c.us') ? trimmed : `${trimmed}@c.us`;
 }
 
 async function executeToolCall(toolName, args, metadata = {}) {
@@ -400,7 +440,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
         console.log(`🔧 [AI_PROCESSING] Tools registered: ${toolDefinitions.map(t => t.function.name).join(', ')}`);
         console.log(`🚀 [AI_PROCESSING] Sending request to AI model...`);
 
-        let response = await aiModel.invoke(messages);
+        let response = await aiModel.invoke(messages, getTracingConfig('chat-response-initial'));
 
         let toolCalls = getToolCallsFromResponse(response);
         let iteration = 0;
@@ -444,7 +484,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
             }
 
             console.log('🔄 [AI_PROCESSING] Sending tool results back to AI model...');
-            response = await aiModel.invoke(messages);
+            response = await aiModel.invoke(messages, getTracingConfig(`chat-response-iteration-${iteration}`));
             toolCalls = getToolCallsFromResponse(response);
         }
 
@@ -463,12 +503,62 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
     }
 }
 
+async function rewriteAdminMessage(originalMessage, senderNumber) {
+    if (!ADMIN_MESSAGE_REWRITE_ENABLED) {
+        return {
+            text: originalMessage,
+            rewritten: false,
+        };
+    }
+
+    const trimmed = (originalMessage || '').trim();
+    if (!trimmed) {
+        return {
+            text: originalMessage,
+            rewritten: false,
+        };
+    }
+
+    try {
+        const history = senderNumber ? await getConversationHistory(senderNumber, 6) : [];
+        const recentDialogue = history
+            .map((entry) => {
+                const speaker = entry.sender === 'ai' ? 'Zoya' : entry.sender === 'admin' ? 'Admin' : 'User';
+                return `${speaker}: ${entry.text}`;
+            })
+            .join('\n');
+
+        const prompt = `Riwayat percakapan terbaru (paling lama di atas):\n${recentDialogue || '(belum ada riwayat)'}\n\nPesan admin yang perlu ditulis ulang:\n"""${trimmed}"""\n`;
+
+        const response = await baseModel.invoke([
+            new SystemMessage(ADMIN_MESSAGE_REWRITE_STYLE_PROMPT),
+            new HumanMessage(prompt),
+        ], getTracingConfig('admin-message-rewrite'));
+
+        const rewrittenRaw = extractTextFromAIContent(response.content);
+        const rewritten = typeof rewrittenRaw === 'string' ? rewrittenRaw.trim() : '';
+        if (rewritten) {
+            return {
+                text: rewritten,
+                rewritten: rewritten !== trimmed,
+            };
+        }
+    } catch (error) {
+        console.error('[Rewrite] Gagal menulis ulang pesan admin:', error);
+    }
+
+    return {
+        text: originalMessage,
+        rewritten: false,
+    };
+}
+
 async function processBufferedMessages(senderNumber, client) {
-    const bufferEntry = messageBuffers.get(senderNumber);
+    const bufferEntry = pendingMessages.get(senderNumber);
     if (!bufferEntry) return;
 
-    messageBuffers.delete(senderNumber);
-    
+    pendingMessages.delete(senderNumber);
+
     const senderName = bufferEntry.senderName;
 
     const messageParts = bufferEntry.messages
@@ -497,7 +587,7 @@ async function processBufferedMessages(senderNumber, client) {
         console.log(`[DEBOUNCED] ✓ Analisis gambar tersedia untuk ${senderName}`);
         console.log(`[DEBOUNCED] Analisis (internal):\n${analysisContext}`);
     }
-    
+
     try {
         const typingDelay = 500 + Math.random() * 1000;
         await delay(typingDelay);
@@ -537,6 +627,11 @@ ${analysisContext}`
 
 // --- WhatsApp Event Handlers ---
 function start(client) {
+    const debounceQueue = new DebounceQueue(DEBOUNCE_DELAY_MS, async (senderNumber) => {
+        await processBufferedMessages(senderNumber, client);
+    });
+    client.__debounceQueue = debounceQueue;
+
     client.onMessage(async (msg) => {
         if (msg.from === 'status@broadcast' || msg.fromMe) {
             return;
@@ -547,11 +642,14 @@ function start(client) {
         let messageContent = msg.body;
         const isMedia = msg.isMedia || msg.type === 'image' || msg.type === 'document';
         const isImage = msg.type === 'image';
-        
-        if (!messageContent && !isMedia) return;
+        const isLocation = msg.type === 'location';
+
+        if (!messageContent && !isMedia && !isLocation) return;
 
         // Log different types of messages
-        if (isImage) {
+        if (isLocation) {
+            console.log(`[BUFFER] 📍 Location received from ${senderName}. Lat: ${msg.lat || msg.latitude}, Lng: ${msg.lng || msg.longitude}`);
+        } else if (isImage) {
             console.log(`[BUFFER] 📸 Image received from ${senderName}. Caption: "${msg.caption || 'No caption'}"`);
         } else if (isMedia) {
             console.log(`[BUFFER] 📎 Media received from ${senderName}. Type: ${msg.type}`);
@@ -561,6 +659,78 @@ function start(client) {
         
         // Save sender metadata
         await saveSenderMeta(senderNumber, senderName);
+
+        let locationContext = null;
+
+        if (isLocation) {
+            const latitude = typeof msg.lat === 'number' ? msg.lat : parseFloat(msg.lat || msg.latitude);
+            const longitude = typeof msg.lng === 'number' ? msg.lng : parseFloat(msg.lng || msg.longitude);
+            const label = msg.loc || msg.address || msg.description || null;
+            const address = msg.address || null;
+
+            if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+                locationContext = {
+                    latitude,
+                    longitude,
+                    label,
+                    address,
+                };
+
+                const locationTextParts = [
+                    '📍 Lokasi dibagikan pelanggan:',
+                    label || 'Tanpa label',
+                    `Koordinat: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
+                ];
+                if (address) {
+                    locationTextParts.push(`Alamat: ${address}`);
+                }
+                messageContent = locationTextParts.join('\n');
+
+                try {
+                    await saveCustomerLocation(senderNumber, {
+                        latitude,
+                        longitude,
+                        address,
+                        label,
+                        raw: {
+                            latitude,
+                            longitude,
+                            address,
+                            label,
+                            from: 'whatsapp-share-location',
+                        },
+                        source: 'whatsapp-share-location',
+                    });
+                } catch (error) {
+                    console.warn('[Location] Gagal menyimpan lokasi pelanggan:', error);
+                }
+            } else {
+                messageContent = '📍 Lokasi dibagikan, namun koordinat tidak terbaca.';
+            }
+        }
+
+        if (await isSnoozeActive(senderNumber)) {
+            const storedContent = (() => {
+                if (messageContent && messageContent.trim()) {
+                    return messageContent.trim();
+                }
+                if (isImage) {
+                    const captionText = (msg.caption || '').trim();
+                    return captionText || '[Gambar diterima]';
+                }
+                if (isMedia) {
+                    return `[${msg.type}]`;
+                }
+                return '[Pesan kosong]';
+            })();
+
+            await saveMessageToFirestore(senderNumber, storedContent, 'user');
+            console.log(`[SNOOZE] Pesan dari ${senderName} disimpan tanpa respons AI (handover aktif).`);
+            return;
+        }
+
+        const entry = pendingMessages.get(senderNumber) || { senderName, messages: [] };
+        entry.senderName = senderName;
 
         let analysisResult = null;
 
@@ -586,8 +756,6 @@ function start(client) {
             messageContent = captionText || '[Gambar diterima]';
         }
 
-        const existingEntry = messageBuffers.get(senderNumber);
-        const messages = existingEntry?.messages || [];
         const messageEntry = {
             content: messageContent || (isImage ? '[Gambar diterima]' : `[${msg.type}]`),
             isMedia,
@@ -599,13 +767,14 @@ function start(client) {
             messageEntry.analysis = analysisResult;
         }
 
-        messages.push(messageEntry);
-        messageBuffers.set(senderNumber, {
-            messages,
-            senderName
-        });
+        if (locationContext) {
+            messageEntry.location = locationContext;
+        }
 
-        await processBufferedMessages(senderNumber, client);
+        entry.messages.push(messageEntry);
+        pendingMessages.set(senderNumber, entry);
+
+        debounceQueue.schedule(senderNumber, messageEntry);
     });
 
     client.onStateChange((state) => {
@@ -622,11 +791,21 @@ async function saveMessageToFirestore(senderNumber, message, senderType) {
     try {
         const docId = senderNumber.replace('@c.us', '');
         const messagesRef = db.collection('directMessages').doc(docId).collection('messages');
+        const serverTimestamp = admin.firestore.FieldValue.serverTimestamp();
+
         await messagesRef.add({
             text: message,
-            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            timestamp: serverTimestamp,
             sender: senderType,
         });
+
+        await db.collection('directMessages').doc(docId).set({
+            lastMessage: message,
+            lastMessageSender: senderType,
+            lastMessageAt: serverTimestamp,
+            updatedAt: serverTimestamp,
+            messageCount: admin.firestore.FieldValue.increment(1),
+        }, { merge: true });
     } catch (error) {
         console.error('Error saving to Firestore:', error);
     }
@@ -647,6 +826,60 @@ async function saveSenderMeta(senderNumber, displayName) {
     }
 }
 
+function serializeTimestamp(timestamp) {
+    if (!timestamp) return null;
+    if (typeof timestamp.toDate === 'function') {
+        return timestamp.toDate().toISOString();
+    }
+    if (timestamp instanceof Date) {
+        return timestamp.toISOString();
+    }
+    return null;
+}
+
+async function listConversations(limit = 100) {
+    if (!db) return [];
+
+    try {
+        const snapshot = await db.collection('directMessages').get();
+        const conversations = await Promise.all(snapshot.docs.map(async (doc) => {
+            const data = doc.data() || {};
+            const senderNumberFull = toSenderNumberWithSuffix(doc.id);
+            const snoozeInfo = await getSnoozeInfo(senderNumberFull);
+
+            return {
+                id: doc.id,
+                senderNumber: doc.id,
+                name: data.name || null,
+                lastMessage: data.lastMessage || null,
+                lastMessageSender: data.lastMessageSender || null,
+                lastMessageAt: serializeTimestamp(data.lastMessageAt),
+                updatedAt: serializeTimestamp(data.updatedAt),
+                messageCount: typeof data.messageCount === 'number' ? data.messageCount : null,
+                aiPaused: snoozeInfo.active,
+                aiPausedUntil: snoozeInfo.expiresAt,
+                aiPausedManual: snoozeInfo.manual,
+                aiPausedReason: snoozeInfo.reason,
+            };
+        }));
+
+        conversations.sort((a, b) => {
+            const timeA = a.updatedAt ? Date.parse(a.updatedAt) : 0;
+            const timeB = b.updatedAt ? Date.parse(b.updatedAt) : 0;
+            return timeB - timeA;
+        });
+
+        if (limit && conversations.length > limit) {
+            return conversations.slice(0, limit);
+        }
+
+        return conversations;
+    } catch (error) {
+        console.error('Error listing conversations:', error);
+        return [];
+    }
+}
+
 // --- API Endpoints ---
 app.get('/health', (req, res) => {
     res.json({
@@ -656,6 +889,21 @@ app.get('/health', (req, res) => {
         uptime: process.uptime(),
         timestamp: new Date().toISOString()
     });
+});
+
+app.get('/conversations', async (req, res) => {
+    try {
+        const limit = req.query.limit ? parseInt(req.query.limit, 10) : 100;
+        const conversations = await listConversations(limit);
+        res.json({
+            conversations,
+            count: conversations.length,
+            status: 'success',
+        });
+    } catch (error) {
+        console.error('[API] Error fetching conversations:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 app.post('/send-message', async (req, res) => {
@@ -668,10 +916,17 @@ app.post('/send-message', async (req, res) => {
         if (!global.whatsappClient) {
             throw new Error('WhatsApp client not initialized.');
         }
-        
-        await global.whatsappClient.sendText(`${number}@c.us`, message);
+        const senderNumber = `${number}@c.us`;
+
+        const { text: finalMessage, rewritten } = await rewriteAdminMessage(message, senderNumber);
+        if (rewritten) {
+            console.log('[API] Admin message rewritten for consistent tone.');
+        }
+
+        await global.whatsappClient.sendText(senderNumber, finalMessage);
+        await saveMessageToFirestore(senderNumber, finalMessage, 'admin');
         console.log(`[API] Successfully sent message to ${number}`);
-        res.status(200).json({ success: true });
+        res.status(200).json({ success: true, rewritten });
     } catch (e) {
         console.error('[API] Error sending message:', e);
         res.status(500).json({ error: e.message });
@@ -731,12 +986,15 @@ app.get('/conversation-history/:number', async (req, res) => {
         const historyLimit = limit ? parseInt(limit) : MEMORY_CONFIG.maxMessages;
         
         const history = await getConversationHistory(senderNumber, historyLimit);
+        const snoozeInfo = await getSnoozeInfo(senderNumber);
         
         res.json({
             senderNumber: senderNumber,
             messageCount: history.length,
             history: history,
             memoryConfig: MEMORY_CONFIG,
+            aiPaused: snoozeInfo.active,
+            aiPauseInfo: snoozeInfo,
             status: 'success'
         });
     } catch (error) {
@@ -751,11 +1009,57 @@ app.get('/memory-config', (req, res) => {
     });
 });
 
+app.post('/conversation/:number/ai-state', async (req, res) => {
+    try {
+        const { number } = req.params;
+        const { enabled, durationMinutes, reason } = req.body || {};
+
+        if (!number) {
+            return res.status(400).json({ error: 'Number is required.' });
+        }
+
+        if (typeof enabled !== 'boolean') {
+            return res.status(400).json({ error: 'enabled (boolean) is required.' });
+        }
+
+        const numeric = number.replace(/[^0-9]/g, '');
+        if (!numeric) {
+            return res.status(400).json({ error: 'Number is invalid.' });
+        }
+        const senderNumber = `${numeric}@c.us`;
+
+        if (enabled) {
+            await clearSnoozeMode(senderNumber);
+        } else {
+            const hasDuration = typeof durationMinutes === 'number' && durationMinutes > 0;
+            const manual = !hasDuration;
+            const effectiveDuration = hasDuration ? durationMinutes : 60;
+            await setSnoozeMode(senderNumber, effectiveDuration, {
+                manual,
+                reason: reason || (manual ? 'manual-toggle' : 'timed-toggle'),
+            });
+        }
+
+        const info = await getSnoozeInfo(senderNumber);
+
+        res.json({
+            senderNumber,
+            aiEnabled: !info.active,
+            aiPaused: info.active,
+            aiPauseInfo: info,
+            status: 'success',
+        });
+    } catch (error) {
+        console.error('[API] Error updating AI state:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // --- Server Startup ---
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 WhatsApp AI Chatbot listening on http://0.0.0.0:${PORT}`);
     console.log(`🤖 AI Model: ${process.env.AI_MODEL || 'gemini-1.5-flash'}`);
-    console.log('⏱️  Debounce Delay: disabled (messages processed immediately)');
+    console.log(`⏱️  Debounce Delay: ${DEBOUNCE_DELAY_MS}ms`);
     console.log(`🧠 Memory Config: Max ${MEMORY_CONFIG.maxMessages} messages, ${MEMORY_CONFIG.maxAgeHours}h retention`);
     
     // Initialize WhatsApp connection
@@ -793,6 +1097,11 @@ server.listen(PORT, '0.0.0.0', () => {
 process.on('SIGINT', () => {
     console.log('👋 Shutting down gracefully...');
     if (global.whatsappClient) {
+        if (typeof global.whatsappClient.__debounceQueue?.flushAll === 'function') {
+            global.whatsappClient.__debounceQueue.flushAll().catch(err => {
+                console.error('[Shutdown] Gagal flush debounce queue:', err);
+            });
+        }
         global.whatsappClient.close();
     }
     process.exit(0);
@@ -801,6 +1110,11 @@ process.on('SIGINT', () => {
 process.on('SIGTERM', () => {
     console.log('👋 Shutting down gracefully...');
     if (global.whatsappClient) {
+        if (typeof global.whatsappClient.__debounceQueue?.flushAll === 'function') {
+            global.whatsappClient.__debounceQueue.flushAll().catch(err => {
+                console.error('[Shutdown] Gagal flush debounce queue:', err);
+            });
+        }
         global.whatsappClient.close();
     }
     process.exit(0);

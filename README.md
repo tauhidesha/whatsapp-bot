@@ -14,6 +14,8 @@ WhatsApp AI Chatbot dengan LangChain dan Google Gemini. Arsitektur JavaScript ya
 - ✅ **REST API** - Endpoint untuk kontrol eksternal
 - ✅ **Docker Ready** - Siap deploy ke AWS
 - ✅ **Health Monitoring** - Built-in health checks
+- ✅ **Admin Console** - UI Vercel dengan notifikasi real-time & penulisan ulang gaya pesan admin
+- ✅ **Home Service Calculator** - Otomatis hitung jarak & biaya tambahan di atas 5 km (Google Distance Matrix)
 
 ## 📋 Prerequisites
 
@@ -145,9 +147,20 @@ WHATSAPP_AUTO_CLOSE=false
 
 # AI
 GOOGLE_API_KEY=your_key_here
+GOOGLE_MAPS_API_KEY=${GOOGLE_API_KEY}         # Bisa reuse key yang sama
 AI_MODEL=gemini-1.5-flash
 AI_TEMPERATURE=0.7
 AI_MAX_TOKENS=1000
+
+# Home service (opsional)
+STUDIO_LATITUDE=-6.373921
+STUDIO_LONGITUDE=106.84513
+HOME_SERVICE_FREE_RADIUS_KM=5
+HOME_SERVICE_FEE_PER_KM=10000
+HOME_SERVICE_BASE_FEE=0
+
+# Admin message rewrite
+ADMIN_MESSAGE_REWRITE=true            # Ubah ke false jika tidak ingin AI menata ulang pesan admin
 
 # Server
 PORT=4000
@@ -170,6 +183,12 @@ BOOKING_REMINDER_WINDOW=30             # Batas menit setelah jam reminder
 BOOKING_REMINDER_INTERVAL=15           # Interval scheduler (menit)
 APP_TIMEZONE=Asia/Jakarta              # Timezone default aplikasi
 
+# LangSmith tracing (opsional)
+LANGSMITH_TRACING_V2=true              # Aktifkan tracing LangSmith
+LANGSMITH_API_KEY=your_langsmith_key
+LANGSMITH_PROJECT=WhatsApp AI Chatbot
+# LANGSMITH_ENDPOINT=https://api.smith.langchain.com
+
 # Vision model (opsional)
 VISION_MODEL=gemini-2.5-flash          # Gemini multimodal untuk analisis gambar
 VISION_FALLBACK_MODEL=gemini-1.5-flash-vision
@@ -179,6 +198,20 @@ VISION_FALLBACK_MODEL=gemini-1.5-flash-vision
 - `gemini-1.5-flash` - Fast and efficient
 - `gemini-1.5-pro` - More capable
 - `gemini-1.5-flash-8b` - Smaller model
+
+## 🚚 Home Service Fee Calculation
+
+- Bot otomatis menyimpan koordinat saat pelanggan mengirim *Share Location* di WhatsApp.
+- Tool `calculateHomeServiceFee` akan:
+  1. Menghitung jarak dari studio ke rumah pelanggan via Google Distance Matrix.
+  2. Menambahkan biaya jika jarak > `HOME_SERVICE_FREE_RADIUS_KM` (default 5 km).
+  3. Menyimpan ringkasan biaya ke Firestore agar admin bisa melihat di dashboard.
+- Saat booking home service dibuat (`createBooking` tool), biaya tambahan langsung dihitung dan disertakan pada notifikasi admin.
+- Sesuaikan tarif lewat environment variables:
+  - `HOME_SERVICE_FREE_RADIUS_KM`
+  - `HOME_SERVICE_FEE_PER_KM`
+  - `HOME_SERVICE_BASE_FEE` (opsional biaya dasar di luar radius)
+
 
 ## 🚀 AWS Deployment
 
@@ -263,6 +296,13 @@ tail -f logs/app.log
 3. Notifikasi WhatsApp berisi detail pertanyaan dikirim ke `BOSMAT_ADMIN_NUMBER`.
 4. Admin bisa lanjut menanggapi pelanggan secara manual.
 
+## 📈 LangSmith Tracing
+
+- Set environment `LANGSMITH_TRACING_V2=true` dan `LANGSMITH_API_KEY` untuk mengaktifkan tracing.
+- Opsional: `LANGSMITH_PROJECT` dan `LANGSMITH_ENDPOINT` untuk menyesuaikan project/endpoint.
+- Seluruh panggilan `ChatGoogleGenerativeAI.invoke` secara otomatis dikirim ke LangSmith sebagai run baru.
+- Sampling dapat dimatikan kapan saja dengan `LANGSMITH_TRACING=false`.
+
 ## 🔍 Troubleshooting
 
 ### Common Issues:
@@ -293,6 +333,12 @@ Edit `app.js` line 45:
 ```javascript
 const SYSTEM_PROMPT = `Your custom prompt here...`;
 ```
+
+### Penulisan Ulang Pesan Admin:
+```env
+ADMIN_MESSAGE_REWRITE=true  # biarkan true agar pesan manual admin diselaraskan dengan gaya Zoya
+```
+Setel ke `false` bila ingin pesan admin dikirim apa adanya.
 
 ### Custom Debounce Time:
 Edit `.env`:

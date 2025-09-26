@@ -10,3 +10,4 @@ export { checkBookingAvailabilityTool } from './checkBookingAvailabilityTool';
 export { createBookingTool } from './createBookingTool';
 export { getCurrentDateTimeTool } from './getCurrentDateTimeTool';
 export { updateBookingTool } from './updateBookingTool';
+export { calculateHomeServiceFeeTool } from './calculateHomeServiceFeeTool';

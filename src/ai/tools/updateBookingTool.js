@@ -7,6 +7,8 @@ const { getFirebaseAdmin } = require('../../lib/firebaseAdmin.js');
 const { parseDateTime } = require('../utils/dateTime.js');
 const { getServiceCategory } = require('./createBookingTool.js');
 const { normalizeWhatsappNumber } = require('../utils/humanHandover.js');
+const { calculateHomeServiceFee } = require('../utils/distanceMatrix.js');
+const { saveCustomerLocation, saveHomeServiceQuote, getCustomerLocation } = require('../utils/customerLocations.js');
 
 const STATUS_ALLOWLIST = ['pending', 'confirmed', 'in progress', 'completed', 'cancelled'];
 
@@ -21,6 +23,20 @@ const UpdateBookingSchema = z.object({
   vehicleInfo: z.string().optional(),
   notes: z.string().optional(),
   estimatedDurationMinutes: z.number().int().positive().optional(),
+  subtotal: z.number().optional(),
+  homeService: z
+    .object({
+      requested: z.boolean().optional(),
+      latitude: z.number().optional(),
+      longitude: z.number().optional(),
+      address: z.string().optional(),
+      label: z.string().optional(),
+      subtotal: z.number().optional(),
+      freeRadiusKm: z.number().optional(),
+      feePerKm: z.number().optional(),
+      baseFee: z.number().optional(),
+    })
+    .optional(),
 });
 
 function ensureFirestore() {
@@ -89,14 +105,106 @@ const updateBookingTool = {
       const existingData = snapshot.data() || {};
 
       if (parsed.customerName) updatePayload.customerName = parsed.customerName;
+      let updatedNormalizedPhone = null;
       if (parsed.customerPhone) {
         updatePayload.customerPhone = parsed.customerPhone;
-        updatePayload.customerPhoneNormalized = normalizeWhatsappNumber(parsed.customerPhone);
+        updatedNormalizedPhone = normalizeWhatsappNumber(parsed.customerPhone);
+        updatePayload.customerPhoneNormalized = updatedNormalizedPhone;
       }
       if (parsed.vehicleInfo) updatePayload.vehicleInfo = parsed.vehicleInfo;
       if (parsed.notes !== undefined) updatePayload.notes = parsed.notes;
       if (typeof parsed.estimatedDurationMinutes === 'number') {
         updatePayload.estimatedDurationMinutes = parsed.estimatedDurationMinutes;
+      }
+
+      const effectiveNormalizedPhone =
+        updatedNormalizedPhone || existingData.customerPhoneNormalized || normalizeWhatsappNumber(existingData.customerPhone);
+
+      if (parsed.homeService) {
+        const homeServiceInput = parsed.homeService;
+        const target = { ...existingData.homeService };
+
+        if (typeof homeServiceInput.requested === 'boolean') {
+          target.requested = homeServiceInput.requested;
+        }
+
+        let lat = homeServiceInput.latitude;
+        let lng = homeServiceInput.longitude;
+        let address = homeServiceInput.address;
+        let label = homeServiceInput.label;
+        const subtotalOverride = homeServiceInput.subtotal ?? parsed.subtotal;
+
+        if ((!Number.isFinite(lat) || !Number.isFinite(lng)) && effectiveNormalizedPhone) {
+          const storedLocation = await getCustomerLocation(effectiveNormalizedPhone);
+          if (storedLocation) {
+            lat = lat ?? storedLocation.latitude;
+            lng = lng ?? storedLocation.longitude;
+            address = address || storedLocation.address || null;
+            label = label || storedLocation.label || null;
+          }
+        }
+
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+          const calculation = await calculateHomeServiceFee({
+            latitude: Number(lat),
+            longitude: Number(lng),
+            subtotal: subtotalOverride,
+            freeRadiusKm: homeServiceInput.freeRadiusKm,
+            feePerKm: homeServiceInput.feePerKm,
+            baseFee: homeServiceInput.baseFee,
+          });
+
+          if (!calculation.success) {
+            return {
+              success: false,
+              error: calculation.error || 'home_service_fee_failed',
+              message: calculation.message || 'Gagal menghitung biaya home service saat update booking.',
+            };
+          }
+
+          const merged = {
+            ...target,
+            requested: target.requested !== false,
+            latitude: Number(lat),
+            longitude: Number(lng),
+            address: address || null,
+            label: label || null,
+            distanceKm: calculation.distanceKm,
+            distanceText: calculation.distanceText,
+            durationText: calculation.durationText,
+            additionalFee: calculation.additionalFee,
+            freeRadiusKm: calculation.freeRadiusKm,
+            extraDistanceKm: calculation.extraDistanceKm,
+            feePerKm: calculation.feePerKm,
+            baseFee: calculation.baseFee,
+            subtotal: calculation.subtotal,
+            totalWithFee: calculation.totalWithFee,
+            summary: calculation.summary,
+          };
+
+          updatePayload.homeService = merged;
+
+          if (effectiveNormalizedPhone) {
+            try {
+              await saveCustomerLocation(effectiveNormalizedPhone, {
+                latitude: Number(lat),
+                longitude: Number(lng),
+                address: address || null,
+                label: label || null,
+                raw: homeServiceInput,
+                source: 'booking-update',
+              }, { skipHistory: false });
+              await saveHomeServiceQuote(effectiveNormalizedPhone, merged);
+            } catch (error) {
+              console.warn('[updateBookingTool] Gagal menyimpan info home service ke Firestore:', error);
+            }
+          }
+        } else if (typeof homeServiceInput.requested === 'boolean') {
+          updatePayload.homeService = {
+            ...target,
+            requested: homeServiceInput.requested,
+          };
+        }
       }
 
       if (parsed.serviceName) {

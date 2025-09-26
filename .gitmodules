@@ -1,0 +1,3 @@
+[submodule "admin-ui"]
+	path = admin-ui
+	url = https://github.com/tauhidesha/admin-ui.git

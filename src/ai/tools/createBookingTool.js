@@ -5,6 +5,8 @@ const { z } = require('zod');
 const admin = require('firebase-admin');
 const { getFirebaseAdmin } = require('../../lib/firebaseAdmin.js');
 const { notifyNewBooking, normalizeWhatsappNumber } = require('../utils/humanHandover.js');
+const { calculateHomeServiceFee, formatCurrency } = require('../utils/distanceMatrix.js');
+const { saveCustomerLocation, getCustomerLocation, saveHomeServiceQuote } = require('../utils/customerLocations.js');
 
 function stringSimilarity(a, b) {
   a = (a || '').toLowerCase();
@@ -43,6 +45,13 @@ function formatTime(date) {
   return `${hours}:${minutes}`;
 }
 
+const LocationSchema = z.object({
+  latitude: z.number(),
+  longitude: z.number(),
+  address: z.string().optional(),
+  label: z.string().optional(),
+});
+
 const BookingArgsSchema = z.object({
   customerPhone: z.string(),
   customerName: z.string(),
@@ -51,6 +60,10 @@ const BookingArgsSchema = z.object({
   bookingTime: z.string(),
   vehicleInfo: z.string(),
   clientId: z.string().optional(),
+  notes: z.string().optional(),
+  subtotal: z.number().optional(),
+  homeService: z.boolean().optional(),
+  customerLocation: LocationSchema.optional(),
 });
 
 const createBookingTool = {
@@ -83,6 +96,10 @@ const createBookingTool = {
         bookingDate,
         bookingTime,
         vehicleInfo,
+        notes,
+        subtotal,
+        homeService,
+        customerLocation,
       } = parsed;
 
       const servicesArray = serviceName.split(',').map(s => s.trim()).filter(Boolean);
@@ -122,15 +139,103 @@ const createBookingTool = {
         reminderSent: false,
       };
 
+      if (notes) {
+        bookingData.notes = notes;
+      }
+
+      let homeServiceDetails = null;
+      const normalizedPhone = normalizeWhatsappNumber(customerPhone);
+
+      if (homeService || customerLocation) {
+        const effectiveLocation = customerLocation || (normalizedPhone ? await getCustomerLocation(normalizedPhone) : null);
+
+        if (!effectiveLocation) {
+          return {
+            success: false,
+            error: 'home_service_location_missing',
+            message: 'Lokasi pelanggan belum tersedia untuk menghitung biaya home service. Minta pelanggan kirim share location.',
+          };
+        }
+
+        const { latitude, longitude } = effectiveLocation;
+        if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+          return {
+            success: false,
+            error: 'invalid_coordinates',
+            message: 'Koordinat lokasi pelanggan tidak valid.',
+          };
+        }
+
+        if (normalizedPhone) {
+          await saveCustomerLocation(normalizedPhone, {
+            latitude,
+            longitude,
+            address: effectiveLocation.address || customerLocation?.address || null,
+            label: effectiveLocation.label || customerLocation?.label || null,
+            raw: effectiveLocation.raw || customerLocation || { latitude, longitude },
+            source: 'booking-tool',
+          }, { skipHistory: Boolean(effectiveLocation.raw) });
+        }
+
+        const calculation = await calculateHomeServiceFee({
+          latitude,
+          longitude,
+          subtotal,
+        });
+
+        if (!calculation.success) {
+          return {
+            success: false,
+            error: calculation.error || 'home_service_fee_failed',
+            message: calculation.message || 'Gagal menghitung biaya home service.',
+          };
+        }
+
+        homeServiceDetails = {
+          requested: true,
+          latitude,
+          longitude,
+          address: effectiveLocation.address || customerLocation?.address || null,
+          label: effectiveLocation.label || customerLocation?.label || null,
+          distanceKm: calculation.distanceKm,
+          distanceText: calculation.distanceText,
+          durationText: calculation.durationText,
+          additionalFee: calculation.additionalFee,
+          freeRadiusKm: calculation.freeRadiusKm,
+          extraDistanceKm: calculation.extraDistanceKm,
+          feePerKm: calculation.feePerKm,
+          baseFee: calculation.baseFee,
+          subtotal: calculation.subtotal,
+          totalWithFee: calculation.totalWithFee,
+          summary: calculation.summary,
+        };
+
+        bookingData.homeService = homeServiceDetails;
+
+        if (normalizedPhone) {
+          await saveHomeServiceQuote(normalizedPhone, homeServiceDetails);
+        }
+      } else if (homeService === false) {
+        bookingData.homeService = {
+          requested: false,
+        };
+      }
+
       const bookingRef = await firestore.collection('bookings').add(bookingData);
       console.log(`[createBookingTool] Booking berhasil dibuat dengan ID: ${bookingRef.id}`);
 
       await notifyNewBooking(bookingData);
 
+      let successMessage = `Booking untuk ${customerName} pada ${bookingData.bookingDate} jam ${bookingData.bookingTime} berhasil dibuat.`;
+      if (homeServiceDetails && homeServiceDetails.additionalFee > 0) {
+        successMessage += ` Biaya home service tambahan: ${formatCurrency(homeServiceDetails.additionalFee)}.`;
+      }
+
       return {
         success: true,
         bookingId: bookingRef.id,
-        message: `Booking untuk ${customerName} pada ${bookingData.bookingDate} jam ${bookingData.bookingTime} berhasil dibuat.`,
+        message: successMessage,
+        homeService: homeServiceDetails,
       };
     } catch (error) {
       console.error('[createBookingTool] Gagal menyimpan booking:', error);
