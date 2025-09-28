@@ -4,6 +4,8 @@
  */
 
 require('dotenv').config();
+const fs = require('fs');
+const path = require('path');
 const wppconnect = require('@wppconnect-team/wppconnect');
 const express = require('express');
 const http = require('http');
@@ -255,6 +257,48 @@ const PUPPETEER_VIEWPORT = {
     width: Number.isFinite(DEFAULT_VIEWPORT_WIDTH) ? DEFAULT_VIEWPORT_WIDTH : 800,
     height: Number.isFinite(DEFAULT_VIEWPORT_HEIGHT) ? DEFAULT_VIEWPORT_HEIGHT : 600,
 };
+
+async function cleanupChromiumProfileLocks(sessionName, sessionDataPath = './tokens') {
+    try {
+        if (!sessionName) return;
+        const baseDir = path.resolve(__dirname, sessionDataPath);
+        const profileDir = path.join(baseDir, sessionName);
+
+        await fs.promises.access(profileDir); // throws if not exists
+
+        const entries = await fs.promises.readdir(profileDir);
+        const lockNames = new Set([
+            'SingletonCookie',
+            'SingletonLock',
+            'SingletonSocket',
+            'LOCK',
+            'DevToolsActivePort',
+        ]);
+
+        const targets = entries
+            .filter((name) => lockNames.has(name) || name.toLowerCase().endsWith('.lock'))
+            .map((name) => path.join(profileDir, name));
+
+        if (!targets.length) {
+            return;
+        }
+
+        await Promise.all(
+            targets.map(async (target) => {
+                try {
+                    await fs.promises.rm(target, { force: true });
+                    console.log(`[Browser] Removed stale lock file: ${target}`);
+                } catch (error) {
+                    console.warn(`[Browser] Failed to remove lock file ${target}:`, error.message);
+                }
+            })
+        );
+    } catch (error) {
+        if (error.code !== 'ENOENT') {
+            console.warn('[Browser] Cleanup skipped:', error.message);
+        }
+    }
+}
 
 // --- Memory Configuration ---
 const MEMORY_CONFIG = {
@@ -1099,7 +1143,7 @@ app.post('/conversation/:number/ai-state', async (req, res) => {
 });
 
 // --- Server Startup ---
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, '0.0.0.0', async () => {
     console.log(`🚀 WhatsApp AI Chatbot listening on http://0.0.0.0:${PORT}`);
     console.log(`🤖 AI Model: ${process.env.AI_MODEL || 'gemini-1.5-flash'}`);
     console.log(`⏱️  Debounce Delay: ${DEBOUNCE_DELAY_MS}ms`);
@@ -1107,9 +1151,16 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log(`🖥️  Chromium launch args: ${PUPPETEER_CHROME_ARGS.join(' ')}`);
     console.log(`🖥️  Chromium viewport: ${PUPPETEER_VIEWPORT.width}x${PUPPETEER_VIEWPORT.height}`);
     
+    const sessionName = process.env.WHATSAPP_SESSION || 'ai-chatbot';
+    const sessionDataPath = './tokens';
+
+    await cleanupChromiumProfileLocks(sessionName, sessionDataPath).catch((error) => {
+        console.warn('[Browser] Failed to clean up Chromium profile locks:', error.message);
+    });
+
     // Initialize WhatsApp connection
     wppconnect.create({
-        session: process.env.WHATSAPP_SESSION || 'ai-chatbot',
+        session: sessionName,
         catchQR: (base64Qr, asciiQR) => { 
             console.log('📱 WhatsApp QR Code:');
             console.log(asciiQR); 
@@ -1121,7 +1172,7 @@ server.listen(PORT, '0.0.0.0', () => {
         headless: process.env.WHATSAPP_HEADLESS === 'true',
         logQR: true,
         autoClose: process.env.WHATSAPP_AUTO_CLOSE === 'true',
-        sessionDataPath: './tokens',
+        sessionDataPath,
         puppeteerOptions: {
             timeout: 120000,
             args: PUPPETEER_CHROME_ARGS,
