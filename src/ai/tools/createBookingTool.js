@@ -59,8 +59,8 @@ const PickupSchema = z.object({
 });
 
 const BookingArgsSchema = z.object({
-  customerPhone: z.string(),
-  customerName: z.string(),
+  customerPhone: z.string().optional(),
+  customerName: z.string().optional(),
   serviceName: z.string(),
   bookingDate: z.string(),
   bookingTime: z.string(),
@@ -72,6 +72,8 @@ const BookingArgsSchema = z.object({
   customerLocation: LocationSchema.optional(),
   pickup: z.union([PickupSchema, z.boolean()]).optional(),
   inspection: z.string().optional(),
+  senderNumber: z.string().optional(),
+  senderName: z.string().optional(),
 });
 
 const createBookingTool = {
@@ -96,7 +98,18 @@ const createBookingTool = {
   },
   implementation: async (args) => {
     try {
-      const parsed = BookingArgsSchema.parse(args);
+      const workingArgs = { ...args };
+
+      if (!workingArgs.customerPhone && typeof workingArgs.senderNumber === 'string') {
+        const cleaned = workingArgs.senderNumber.replace(/@c\.us$/i, '').replace(/[^0-9+]/g, '');
+        workingArgs.customerPhone = cleaned || workingArgs.senderNumber;
+      }
+
+      if (!workingArgs.customerName && typeof workingArgs.senderName === 'string') {
+        workingArgs.customerName = workingArgs.senderName;
+      }
+
+      const parsed = BookingArgsSchema.parse(workingArgs);
       const {
         customerName,
         customerPhone,
@@ -112,11 +125,58 @@ const createBookingTool = {
         inspection,
       } = parsed;
 
-      const servicesArray = serviceName.split(',').map(s => s.trim()).filter(Boolean);
-      if (servicesArray.length === 0) {
+      const rawServices = serviceName.split(',').map(s => s.trim()).filter(Boolean);
+      if (rawServices.length === 0) {
         return {
           success: false,
           error: 'Nama layanan tidak boleh kosong.',
+        };
+      }
+
+      const primaryServices = [];
+      let detectedHomeService = false;
+      let detectedPickup = false;
+      let detectedInspection = null;
+
+      for (const entry of rawServices) {
+        const lower = entry.toLowerCase();
+        if (lower.includes('jemput') || lower.includes('antar') || lower.includes('pickup')) {
+          detectedPickup = true;
+          continue;
+        }
+        if (lower.includes('home service') || lower.includes('home-service') || lower.includes('onsite')) {
+          detectedHomeService = true;
+          continue;
+        }
+        if (lower.includes('inspeksi') || lower.includes('survey') || lower.includes('cek lokasi')) {
+          detectedInspection = entry;
+          continue;
+        }
+        primaryServices.push(entry);
+      }
+
+      if (primaryServices.length === 0) {
+        return {
+          success: false,
+          error: 'Mohon sebutkan minimal satu layanan utama (contoh: Coating Motor Glossy, Repaint Bodi Halus).'
+        };
+      }
+
+      const servicesArray = primaryServices;
+
+      if (!customerName) {
+        return {
+          success: false,
+          error: 'customer_name_missing',
+          message: 'Nama pelanggan belum tersedia untuk membuat booking.',
+        };
+      }
+
+      if (!customerPhone) {
+        return {
+          success: false,
+          error: 'customer_phone_missing',
+          message: 'Nomor telepon pelanggan belum tersedia untuk membuat booking.',
         };
       }
 
@@ -144,8 +204,8 @@ const createBookingTool = {
         bookingTime: formatTime(bookingDateTime),
         status: 'pending',
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        services: servicesArray,
-        category: getServiceCategory(servicesArray[0]),
+        services: primaryServices,
+        category: getServiceCategory(primaryServices[0]),
         reminderSent: false,
       };
 
@@ -153,13 +213,17 @@ const createBookingTool = {
         bookingData.notes = notes;
       }
 
-      const inspectionLabel = typeof inspection === 'string' && inspection.trim() ? inspection.trim() : null;
+      const inspectionLabel = typeof inspection === 'string' && inspection.trim()
+        ? inspection.trim()
+        : detectedInspection;
 
       const pickupIsObject = pickup && typeof pickup === 'object' && !Array.isArray(pickup);
+      const pickupExplicitFalse = pickup === false;
+      const effectiveHomeService = homeService === true || (homeService === undefined && detectedHomeService);
 
-      if (homeService === true) {
+      if (effectiveHomeService) {
         bookingData.additionalService = 'Home Service';
-      } else if (!homeService && pickupIsObject) {
+      } else if (!effectiveHomeService && !pickupExplicitFalse && (pickupIsObject || detectedPickup)) {
         bookingData.additionalService = 'Jemput-Antar';
       } else if (inspectionLabel) {
         bookingData.additionalService = inspectionLabel;
@@ -169,7 +233,7 @@ const createBookingTool = {
       let pickupDetails = null;
       const normalizedPhone = normalizeWhatsappNumber(customerPhone);
 
-      if (homeService || customerLocation) {
+      if (effectiveHomeService || customerLocation) {
         const effectiveLocation = customerLocation || (normalizedPhone ? await getCustomerLocation(normalizedPhone) : null);
 
         if (!effectiveLocation) {
@@ -247,26 +311,23 @@ const createBookingTool = {
         };
       }
 
-      if (pickupIsObject) {
-        const pickupAddress = pickup.address || customerLocation?.address || null;
+      if (!pickupExplicitFalse && (pickupIsObject || detectedPickup)) {
+        const pickupSource = pickupIsObject ? pickup : {};
+        const pickupAddress = pickupSource.address || customerLocation?.address || null;
         pickupDetails = {
           requested: true,
           address: pickupAddress,
-          shareLocationUrl: pickup.shareLocationUrl || null,
-          notes: pickup.notes || null,
+          shareLocationUrl: pickupSource.shareLocationUrl || null,
+          notes: pickupSource.notes || (detectedPickup ? 'Auto-detected dari layanan tambahan.' : null),
           type: 'Jemput-Antar',
         };
 
-        if (pickupDetails.address) {
-          bookingData.pickupService = pickupDetails;
-        } else if (pickupDetails.shareLocationUrl) {
-          bookingData.pickupService = pickupDetails;
-        }
+        bookingData.pickupService = pickupDetails;
 
         if (!bookingData.additionalService) {
           bookingData.additionalService = 'Jemput-Antar';
         }
-      } else if (pickup === false) {
+      } else if (pickupExplicitFalse) {
         bookingData.pickupService = {
           requested: false,
         };
@@ -295,6 +356,12 @@ const createBookingTool = {
 
       if (pickupDetails?.shareLocationUrl) {
         successMessage += ` Share lokasi jemput: ${pickupDetails.shareLocationUrl}`;
+      } else if (pickupDetails?.requested) {
+        successMessage += ' Jemput-antar dijadwalkan.';
+      }
+
+      if (inspectionLabel) {
+        successMessage += ` Inspeksi: ${inspectionLabel}.`;
       }
 
       return {
