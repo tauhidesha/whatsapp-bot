@@ -103,10 +103,10 @@ console.log(`🤖 [STARTUP] Model: ${process.env.AI_MODEL || 'gemini-1.5-flash'}
 console.log(`🤖 [STARTUP] Temperature: ${parseFloat(process.env.AI_TEMPERATURE) || 0.7}`);
 console.log(`🤖 [STARTUP] Tools available: ${toolDefinitions.length} tools`);
 
-const ACTIVE_AI_MODEL = process.env.AI_MODEL || 'gemini-1.5-flash';
-// Vision default: gunakan Gemini 2.5 Flash (multimodal). Bisa override via VISION_MODEL/IMAGE_MODEL.
-const ACTIVE_VISION_MODEL = process.env.VISION_MODEL || process.env.IMAGE_MODEL || 'gemini-2.5-flash';
-const FALLBACK_VISION_MODEL = process.env.VISION_FALLBACK_MODEL || 'gemini-1.5-flash-vision';
+const ACTIVE_AI_MODEL = process.env.AI_MODEL || 'gemini-2.5-pro';
+// Vision default: gunakan Gemini 2.5 Pro (multimodal). Bisa override via VISION_MODEL/IMAGE_MODEL.
+const ACTIVE_VISION_MODEL = process.env.VISION_MODEL || process.env.IMAGE_MODEL || 'gemini-2.5-pro';
+const FALLBACK_VISION_MODEL = process.env.VISION_FALLBACK_MODEL || 'gemini-2.5-flash';
 
 const baseModel = new ChatGoogleGenerativeAI({
     model: ACTIVE_AI_MODEL,
