@@ -12,13 +12,14 @@ services:
       - WHATSAPP_SESSION=ai-chatbot
       - WHATSAPP_HEADLESS=true
       - WHATSAPP_AUTO_CLOSE=false
-      - AI_MODEL=gemini-1.5-flash
+      - AI_MODEL=${AI_MODEL}
       - AI_TEMPERATURE=0.7
       - DEBOUNCE_DELAY_MS=10000
       - FIREBASE_SERVICE_ACCOUNT_BASE64=${FIREBASE_SERVICE_ACCOUNT_BASE64}
     volumes:
-      - ./tokens:/app/tokens
-      - ./logs:/app/logs
+      - /home/ec2-user/whatsapp-bot/tokens:/app/tokens
+      - /home/ec2-user/whatsapp-bot/logs:/app/logs
+
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
@@ -26,4 +27,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-
