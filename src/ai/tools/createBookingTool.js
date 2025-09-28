@@ -52,6 +52,12 @@ const LocationSchema = z.object({
   label: z.string().optional(),
 });
 
+const PickupSchema = z.object({
+  address: z.string().optional(),
+  shareLocationUrl: z.string().optional(),
+  notes: z.string().optional(),
+});
+
 const BookingArgsSchema = z.object({
   customerPhone: z.string(),
   customerName: z.string(),
@@ -64,6 +70,8 @@ const BookingArgsSchema = z.object({
   subtotal: z.number().optional(),
   homeService: z.boolean().optional(),
   customerLocation: LocationSchema.optional(),
+  pickup: z.union([PickupSchema, z.boolean()]).optional(),
+  inspection: z.string().optional(),
 });
 
 const createBookingTool = {
@@ -100,6 +108,8 @@ const createBookingTool = {
         subtotal,
         homeService,
         customerLocation,
+        pickup,
+        inspection,
       } = parsed;
 
       const servicesArray = serviceName.split(',').map(s => s.trim()).filter(Boolean);
@@ -143,12 +153,16 @@ const createBookingTool = {
         bookingData.notes = notes;
       }
 
+      const inspectionLabel = typeof inspection === 'string' && inspection.trim() ? inspection.trim() : null;
+
+      const pickupIsObject = pickup && typeof pickup === 'object' && !Array.isArray(pickup);
+
       if (homeService === true) {
         bookingData.additionalService = 'Home Service';
-      } else if (homeService === false && pickup === true) {
+      } else if (!homeService && pickupIsObject) {
         bookingData.additionalService = 'Jemput-Antar';
-      } else if (typeof inspection === 'string') {
-        bookingData.additionalService = inspection;
+      } else if (inspectionLabel) {
+        bookingData.additionalService = inspectionLabel;
       }
 
       let homeServiceDetails = null;
@@ -233,7 +247,7 @@ const createBookingTool = {
         };
       }
 
-      if (pickup) {
+      if (pickupIsObject) {
         const pickupAddress = pickup.address || customerLocation?.address || null;
         pickupDetails = {
           requested: true,
@@ -258,14 +272,14 @@ const createBookingTool = {
         };
       }
 
-      if (inspection) {
+      if (inspectionLabel) {
         bookingData.inspectionService = {
-          requested: inspection === 'Inspeksi di Rumah' || inspection === 'Inspeksi di Workshop',
-          type: inspection,
+          requested: true,
+          type: inspectionLabel,
         };
 
         if (!bookingData.additionalService) {
-          bookingData.additionalService = inspection;
+          bookingData.additionalService = inspectionLabel;
         }
       }
 

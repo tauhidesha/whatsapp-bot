@@ -3,6 +3,7 @@
 
 const daftarUkuranMotor = require('../../data/daftarUkuranMotor.js');
 const levenshtein = require('js-levenshtein');
+const { setMotorSizeForSender } = require('../utils/motorSizeMemory.js');
 
 const SIMILARITY_THRESHOLD = 0.75;
 
@@ -109,6 +110,19 @@ async function implementation(input) {
     };
   }
 
+  const senderNumber = typeof input?.senderNumber === 'string'
+    ? input.senderNumber
+    : typeof input?.sender_number === 'string'
+      ? input.sender_number
+      : null;
+
+  if (senderNumber) {
+    setMotorSizeForSender(senderNumber, {
+      serviceSize: bestMatch.service_size,
+      repaintSize: bestMatch.repaint_size,
+    });
+  }
+
   return {
     success: true,
     motor_query,
@@ -131,6 +145,14 @@ const getMotorSizeDetailsTool = {
           motor_query: {
             type: 'string',
             description: 'Nama motor dari user, misalnya "vario", "nmax", "vespa", dll.',
+          },
+          senderNumber: {
+            type: 'string',
+            description: 'Nomor WhatsApp pelanggan (opsional) untuk menyimpan ukuran motor sementara.',
+          },
+          sender_number: {
+            type: 'string',
+            description: 'Alias untuk senderNumber.',
           },
         },
         required: ['motor_query'],

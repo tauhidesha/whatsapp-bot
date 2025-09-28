@@ -2,6 +2,12 @@
 // JavaScript version untuk mendapatkan harga layanan spesifik
 
 const hargaLayanan = require('../../data/hargaLayanan.js');
+const {
+  getMotorSizesForSender,
+  getPreferredSizeForService,
+  setPreferredSizeForService,
+  setMotorSizeForSender,
+} = require('../utils/motorSizeMemory.js');
 
 // --- Helper Types ---
 // ServiceVariant = { name: 'S' | 'M' | 'L' | 'XL', price: number }
@@ -67,6 +73,56 @@ function formatDuration(minutesStr) {
   return result;
 }
 
+// --- Helpers ---
+const VALID_SIZES = new Set(['S', 'M', 'L', 'XL']);
+
+function normalizeSizeInput(value) {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toUpperCase();
+  return VALID_SIZES.has(normalized) ? normalized : null;
+}
+
+function inferCategory(name) {
+  const lower = (name || '').toLowerCase();
+  if (lower.includes('repaint')) return 'repaint';
+  if (lower.includes('coating')) return 'coating';
+  if (lower.includes('detailing') || lower.includes('poles')) return 'detailing';
+  return 'other';
+}
+
+function resolveSizeForService({ service, sizeArg, senderNumber, cachedSizes }) {
+  const category = (service.category || inferCategory(service.name)).toLowerCase();
+
+  let finalSize = sizeArg;
+
+  const cachedPreferred = senderNumber
+    ? getPreferredSizeForService(senderNumber, category)
+    : null;
+
+  if (cachedPreferred && finalSize && cachedPreferred !== finalSize) {
+    console.log(
+      '[getSpecificServicePriceTool] Overriding provided size with cached value:',
+      'provided =', finalSize,
+      '| cached =', cachedPreferred
+    );
+    finalSize = cachedPreferred;
+  }
+
+  if (!finalSize && cachedPreferred) {
+    finalSize = cachedPreferred;
+  }
+
+  if (!finalSize && cachedSizes) {
+    if (category === 'repaint') {
+      finalSize = cachedSizes.repaintSize || cachedSizes.serviceSize || null;
+    } else {
+      finalSize = cachedSizes.serviceSize || cachedSizes.repaintSize || null;
+    }
+  }
+
+  return { finalSize, category };
+}
+
 // --- Implementation ---
 async function implementation(input) {
   try {
@@ -81,8 +137,16 @@ async function implementation(input) {
       };
     }
 
-    const { service_name: parsedServiceName, size: sizeFromArgs } = input;
-    
+    const { service_name: parsedServiceName } = input;
+    const senderNumber = typeof input.senderNumber === 'string'
+      ? input.senderNumber
+      : typeof input.sender_number === 'string'
+        ? input.sender_number
+        : null;
+
+    const sizeFromArgs = normalizeSizeInput(input.size);
+    const cachedSizes = senderNumber ? getMotorSizesForSender(senderNumber) : null;
+
     if (!parsedServiceName || typeof parsedServiceName !== 'string') {
       return {
         success: false,
@@ -91,16 +155,7 @@ async function implementation(input) {
       };
     }
 
-    if (!sizeFromArgs || !['S', 'M', 'L', 'XL'].includes(sizeFromArgs)) {
-      return {
-        success: false,
-        error: 'generic_error',
-        message: 'size harus S, M, L, atau XL'
-      };
-    }
-
-    let finalSize = sizeFromArgs;
-    console.log('[getSpecificServicePriceTool] Parsed service_name:', parsedServiceName, '| size:', sizeFromArgs);
+    console.log('[getSpecificServicePriceTool] Parsed service_name:', parsedServiceName, '| raw size arg:', sizeFromArgs);
 
     // Handle session logic (simplified for now)
     // TODO: Implement session handling if needed
@@ -108,28 +163,48 @@ async function implementation(input) {
     // Special case for coating
     if (parsedServiceName.trim().toLowerCase() === 'coating') {
       const names = ['Coating Motor Doff', 'Coating Motor Glossy'];
-      const results = hargaLayanan
-        .filter(s => names.includes(s.name))
+      const services = hargaLayanan.filter(s => names.includes(s.name));
+
+      const results = services
         .map(service => {
+          const { finalSize } = resolveSizeForService({
+            service,
+            sizeArg: sizeFromArgs,
+            senderNumber,
+            cachedSizes,
+          });
+
+          if (!finalSize) {
+            return null;
+          }
+
           const variant = service.variants?.find(v => v.name === finalSize);
           const basePrice = variant?.price ?? service.price;
           if (basePrice === undefined) return null;
-          return { 
-            service_name: service.name, 
-            motor_size: finalSize, 
-            price: basePrice, 
-            estimated_duration: formatDuration(service.estimatedDuration), 
-            similarity: 1 
+          return {
+            service_name: service.name,
+            motor_size: finalSize,
+            price: basePrice,
+            estimated_duration: formatDuration(service.estimatedDuration),
+            similarity: 1,
           };
         })
-        .filter(x => x !== null);
-      
+        .filter(Boolean);
+
+      if (results.length === 0) {
+        return {
+          success: false,
+          error: 'generic_error',
+          message: 'Ukuran motor belum diketahui. Jalankan getMotorSizeDetails terlebih dahulu.',
+        };
+      }
+
       console.log('[getSpecificServicePriceTool] Coating special case, results:', results);
-      return { 
-        success: true, 
-        multiple_candidates: true, 
-        candidates: results, 
-        message: `Ditemukan 2 layanan utama untuk "coating": Coating Motor Doff & Coating Motor Glossy.` 
+      return {
+        success: true,
+        multiple_candidates: true,
+        candidates: results,
+        message: 'Ditemukan 2 layanan utama untuk "coating": Coating Motor Doff & Coating Motor Glossy.',
       };
     }
 
@@ -153,9 +228,24 @@ async function implementation(input) {
     // If perfect match, return single result
     if (candidates[0].similarity === 1) {
       const service = candidates[0];
+      const { finalSize, category } = resolveSizeForService({
+        service,
+        sizeArg: sizeFromArgs,
+        senderNumber,
+        cachedSizes,
+      });
+
+      if (!finalSize) {
+        return {
+          success: false,
+          error: 'generic_error',
+          message: 'Ukuran motor belum diketahui. Jalankan getMotorSizeDetails terlebih dahulu.',
+        };
+      }
+
       const variant = service.variants?.find(v => v.name === finalSize);
       const basePrice = variant?.price ?? service.price;
-      
+
       if (basePrice === undefined) {
         console.warn(`[getSpecificServicePriceTool] Harga tidak tersedia untuk size ${finalSize} pada layanan "${service.name}"`);
         return { 
@@ -171,7 +261,7 @@ async function implementation(input) {
         (service.estimatedDuration ? ` Estimasi pengerjaan: ${formatDuration(service.estimatedDuration)}.` : '');
       
       console.log('[getSpecificServicePriceTool] Perfect match:', service.name, '| Harga:', basePrice);
-      return { 
+      const response = { 
         success: true, 
         service_name: service.name, 
         motor_size: finalSize, 
@@ -179,14 +269,39 @@ async function implementation(input) {
         estimated_duration: formatDuration(service.estimatedDuration), 
         summary 
       };
+
+      if (senderNumber) {
+        setPreferredSizeForService(senderNumber, category, finalSize);
+        setMotorSizeForSender(senderNumber, {
+          serviceSize: category === 'repaint' ? null : finalSize,
+          repaintSize: category === 'repaint' ? finalSize : null,
+        });
+      }
+
+      return response;
     }
 
     // Single candidate
     if (candidates.length === 1) {
       const service = candidates[0];
+      const { finalSize, category } = resolveSizeForService({
+        service,
+        sizeArg: sizeFromArgs,
+        senderNumber,
+        cachedSizes,
+      });
+
+      if (!finalSize) {
+        return {
+          success: false,
+          error: 'generic_error',
+          message: 'Ukuran motor belum diketahui. Jalankan getMotorSizeDetails terlebih dahulu.',
+        };
+      }
+
       const variant = service.variants?.find(v => v.name === finalSize);
       const basePrice = variant?.price ?? service.price;
-      
+
       if (basePrice === undefined) {
         console.warn(`[getSpecificServicePriceTool] Harga tidak tersedia untuk size ${finalSize} pada layanan "${service.name}"`);
         return { 
@@ -202,7 +317,7 @@ async function implementation(input) {
         (service.estimatedDuration ? ` Estimasi pengerjaan: ${formatDuration(service.estimatedDuration)}.` : '');
       
       console.log('[getSpecificServicePriceTool] Single candidate:', service.name, '| Harga:', basePrice);
-      return { 
+      const response = { 
         success: true, 
         service_name: service.name, 
         motor_size: finalSize, 
@@ -210,11 +325,32 @@ async function implementation(input) {
         estimated_duration: formatDuration(service.estimatedDuration), 
         summary 
       };
+
+      if (senderNumber) {
+        setPreferredSizeForService(senderNumber, category, finalSize);
+        setMotorSizeForSender(senderNumber, {
+          serviceSize: category === 'repaint' ? null : finalSize,
+          repaintSize: category === 'repaint' ? finalSize : null,
+        });
+      }
+
+      return response;
     }
 
     // Multiple candidates
     const results = candidates
       .map(service => {
+        const { finalSize } = resolveSizeForService({
+          service,
+          sizeArg: sizeFromArgs,
+          senderNumber,
+          cachedSizes,
+        });
+
+        if (!finalSize) {
+          return null;
+        }
+
         const variant = service.variants?.find(v => v.name === finalSize);
         const basePrice = variant?.price ?? service.price;
         if (basePrice === undefined) return null;
@@ -229,6 +365,13 @@ async function implementation(input) {
       .filter(x => x !== null);
 
     console.log('[getSpecificServicePriceTool] Multiple candidates:', results);
+    if (results.length === 0) {
+      return {
+        success: false,
+        error: 'generic_error',
+        message: 'Ukuran motor belum diketahui. Jalankan getMotorSizeDetails terlebih dahulu.',
+      };
+    }
     return { 
       success: true, 
       multiple_candidates: true, 
@@ -264,6 +407,14 @@ const getSpecificServicePriceTool = {
             type: "string",
             enum: ["S", "M", "L", "XL"],
             description: "Ukuran motor berdasarkan hasil dari getMotorSizeDetails."
+          },
+          senderNumber: {
+            type: "string",
+            description: "Nomor WhatsApp pelanggan (opsional) untuk mengambil ukuran motor yang sudah tersimpan.",
+          },
+          sender_number: {
+            type: "string",
+            description: "Alias untuk senderNumber.",
           }
         },
         required: ["service_name", "size"],
