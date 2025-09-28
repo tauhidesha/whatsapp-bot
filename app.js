@@ -213,6 +213,56 @@ const { DebounceQueue } = require('./src/ai/utils/debounceQueue.js');
 const pendingMessages = new Map();
 const DEBOUNCE_DELAY_MS = parseInt(process.env.DEBOUNCE_DELAY_MS || '10000', 10);
 
+const DEFAULT_CHROME_ARGS = [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--disable-gpu',
+    '--single-process',
+    '--no-zygote',
+    '--renderer-process-limit=1',
+    '--disable-accelerated-2d-canvas',
+    '--disable-background-networking',
+    '--disable-background-timer-throttling',
+    '--disable-breakpad',
+    '--disable-client-side-phishing-detection',
+    '--disable-component-update',
+    '--disable-default-apps',
+    '--disable-extensions',
+    '--disable-features=TranslateUI,BlinkGenPropertyTrees',
+    '--disable-ipc-flooding-protection',
+    '--disable-popup-blocking',
+    '--disable-print-preview',
+    '--disable-prompt-on-repost',
+    '--disable-renderer-backgrounding',
+    '--disable-sync',
+    '--disable-web-security',
+    '--disable-webgl',
+    '--metrics-recording-only',
+    '--mute-audio',
+    '--no-default-browser-check',
+    '--no-first-run',
+    '--password-store=basic',
+    '--use-mock-keychain',
+    '--disk-cache-size=0',
+    '--hide-scrollbars',
+];
+
+const ADDITIONAL_CHROME_ARGS = (process.env.CHROMIUM_ADDITIONAL_ARGS || '')
+    .split(/[\s,]+/)
+    .map((flag) => flag.trim())
+    .filter(Boolean);
+
+const PUPPETEER_CHROME_ARGS = Array.from(new Set([...DEFAULT_CHROME_ARGS, ...ADDITIONAL_CHROME_ARGS]));
+
+const DEFAULT_VIEWPORT_WIDTH = parseInt(process.env.PUPPETEER_VIEWPORT_WIDTH || '800', 10);
+const DEFAULT_VIEWPORT_HEIGHT = parseInt(process.env.PUPPETEER_VIEWPORT_HEIGHT || '600', 10);
+
+const PUPPETEER_VIEWPORT = {
+    width: Number.isFinite(DEFAULT_VIEWPORT_WIDTH) ? DEFAULT_VIEWPORT_WIDTH : 800,
+    height: Number.isFinite(DEFAULT_VIEWPORT_HEIGHT) ? DEFAULT_VIEWPORT_HEIGHT : 600,
+};
+
 // --- Memory Configuration ---
 const MEMORY_CONFIG = {
     maxMessages: parseInt(process.env.MEMORY_MAX_MESSAGES) || 10,
@@ -1061,6 +1111,8 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log(`🤖 AI Model: ${process.env.AI_MODEL || 'gemini-1.5-flash'}`);
     console.log(`⏱️  Debounce Delay: ${DEBOUNCE_DELAY_MS}ms`);
     console.log(`🧠 Memory Config: Max ${MEMORY_CONFIG.maxMessages} messages, ${MEMORY_CONFIG.maxAgeHours}h retention`);
+    console.log(`🖥️  Chromium launch args: ${PUPPETEER_CHROME_ARGS.join(' ')}`);
+    console.log(`🖥️  Chromium viewport: ${PUPPETEER_VIEWPORT.width}x${PUPPETEER_VIEWPORT.height}`);
     
     // Initialize WhatsApp connection
     wppconnect.create({
@@ -1079,7 +1131,8 @@ server.listen(PORT, '0.0.0.0', () => {
         sessionDataPath: './tokens',
         puppeteerOptions: {
             timeout: 120000,
-            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+            args: PUPPETEER_CHROME_ARGS,
+            defaultViewport: PUPPETEER_VIEWPORT,
         },
     })
     .then((client) => {

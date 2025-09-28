@@ -14,7 +14,7 @@ services:
       - WHATSAPP_AUTO_CLOSE=false
       - AI_MODEL=gemini-1.5-flash
       - AI_TEMPERATURE=0.7
-      - DEBOUNCE_DELAY_MS=15000
+      - DEBOUNCE_DELAY_MS=10000
       - FIREBASE_SERVICE_ACCOUNT_BASE64=${FIREBASE_SERVICE_ACCOUNT_BASE64}
     volumes:
       - ./tokens:/app/tokens
