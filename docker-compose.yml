@@ -5,17 +5,8 @@ services:
     build: .
     ports:
       - "4000:4000"
-    environment:
-      - NODE_ENV=production
-      - PORT=4000
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - WHATSAPP_SESSION=ai-chatbot
-      - WHATSAPP_HEADLESS=true
-      - WHATSAPP_AUTO_CLOSE=false
-      - AI_MODEL=${AI_MODEL}
-      - AI_TEMPERATURE=0.7
-      - DEBOUNCE_DELAY_MS=10000
-      - FIREBASE_SERVICE_ACCOUNT_BASE64=${FIREBASE_SERVICE_ACCOUNT_BASE64}
+    env_file:
+      - .env
     volumes:
       - /home/ec2-user/whatsapp-bot/tokens:/app/tokens
       - /home/ec2-user/whatsapp-bot/logs:/app/logs
