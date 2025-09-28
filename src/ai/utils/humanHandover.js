@@ -7,6 +7,7 @@ const { getFirebaseAdmin } = require('../../lib/firebaseAdmin.js');
 
 const BOSMAT_ADMIN_NUMBER = process.env.BOSMAT_ADMIN_NUMBER || process.env.ADMIN_WHATSAPP_NUMBER;
 const NOTIFY_BOOKING_CREATION = process.env.NOTIFY_BOOKING_CREATION !== 'true';
+const DEFAULT_ADDITIONAL_SERVICE = process.env.BOOKING_DEFAULT_ADDITIONAL_SERVICE || null;
 
 function ensureFirestore() {
   if (!admin.apps.length) {
@@ -82,6 +83,10 @@ async function notifyNewBooking(bookingData) {
     return;
   }
 
+  const additionalService = bookingData.additionalService
+    || bookingData.homeService?.requested && bookingData.homeService?.type
+    || DEFAULT_ADDITIONAL_SERVICE;
+
   const lines = [
     '🆕 *Booking Baru*',
     `👤 Nama: ${bookingData.customerName || '-'}`,
@@ -90,6 +95,10 @@ async function notifyNewBooking(bookingData) {
     `🕒 Jadwal: ${bookingData.bookingDate || '-'} ${bookingData.bookingTime || '-'}`,
     `🛠️ Layanan: ${Array.isArray(bookingData.services) ? bookingData.services.join(', ') : '-'}`,
   ];
+
+  if (additionalService) {
+    lines.push(`➕ Layanan Tambahan: ${additionalService}`);
+  }
 
   if (bookingData.homeService?.requested) {
     const formatter = new Intl.NumberFormat('id-ID', {
@@ -109,6 +118,17 @@ async function notifyNewBooking(bookingData) {
       lines.push(`   • Alamat: ${bookingData.homeService.address}`);
     } else if (bookingData.homeService.label) {
       lines.push(`   • Lokasi: ${bookingData.homeService.label}`);
+    }
+    if (bookingData.homeService.shareLocationUrl) {
+      lines.push(`   • Share Lokasi: ${bookingData.homeService.shareLocationUrl}`);
+    }
+  } else if (bookingData.pickupService?.requested) {
+    lines.push('', '🚚 Jemput-Antar: Ya');
+    if (bookingData.pickupService.address) {
+      lines.push(`   • Alamat: ${bookingData.pickupService.address}`);
+    }
+    if (bookingData.pickupService.shareLocationUrl) {
+      lines.push(`   • Share Lokasi: ${bookingData.pickupService.shareLocationUrl}`);
     }
   }
 

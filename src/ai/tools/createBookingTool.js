@@ -143,7 +143,16 @@ const createBookingTool = {
         bookingData.notes = notes;
       }
 
+      if (homeService === true) {
+        bookingData.additionalService = 'Home Service';
+      } else if (homeService === false && pickup === true) {
+        bookingData.additionalService = 'Jemput-Antar';
+      } else if (typeof inspection === 'string') {
+        bookingData.additionalService = inspection;
+      }
+
       let homeServiceDetails = null;
+      let pickupDetails = null;
       const normalizedPhone = normalizeWhatsappNumber(customerPhone);
 
       if (homeService || customerLocation) {
@@ -210,7 +219,10 @@ const createBookingTool = {
           summary: calculation.summary,
         };
 
-        bookingData.homeService = homeServiceDetails;
+        bookingData.homeService = {
+          ...homeServiceDetails,
+          type: 'Home Service',
+        };
 
         if (normalizedPhone) {
           await saveHomeServiceQuote(normalizedPhone, homeServiceDetails);
@@ -219,6 +231,42 @@ const createBookingTool = {
         bookingData.homeService = {
           requested: false,
         };
+      }
+
+      if (pickup) {
+        const pickupAddress = pickup.address || customerLocation?.address || null;
+        pickupDetails = {
+          requested: true,
+          address: pickupAddress,
+          shareLocationUrl: pickup.shareLocationUrl || null,
+          notes: pickup.notes || null,
+          type: 'Jemput-Antar',
+        };
+
+        if (pickupDetails.address) {
+          bookingData.pickupService = pickupDetails;
+        } else if (pickupDetails.shareLocationUrl) {
+          bookingData.pickupService = pickupDetails;
+        }
+
+        if (!bookingData.additionalService) {
+          bookingData.additionalService = 'Jemput-Antar';
+        }
+      } else if (pickup === false) {
+        bookingData.pickupService = {
+          requested: false,
+        };
+      }
+
+      if (inspection) {
+        bookingData.inspectionService = {
+          requested: inspection === 'Inspeksi di Rumah' || inspection === 'Inspeksi di Workshop',
+          type: inspection,
+        };
+
+        if (!bookingData.additionalService) {
+          bookingData.additionalService = inspection;
+        }
       }
 
       const bookingRef = await firestore.collection('bookings').add(bookingData);
@@ -231,11 +279,17 @@ const createBookingTool = {
         successMessage += ` Biaya home service tambahan: ${formatCurrency(homeServiceDetails.additionalFee)}.`;
       }
 
+      if (pickupDetails?.shareLocationUrl) {
+        successMessage += ` Share lokasi jemput: ${pickupDetails.shareLocationUrl}`;
+      }
+
       return {
         success: true,
         bookingId: bookingRef.id,
         message: successMessage,
         homeService: homeServiceDetails,
+        pickupService: pickupDetails,
+        additionalService: bookingData.additionalService,
       };
     } catch (error) {
       console.error('[createBookingTool] Gagal menyimpan booking:', error);
