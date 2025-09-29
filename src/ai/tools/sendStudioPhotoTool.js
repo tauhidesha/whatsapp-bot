@@ -10,8 +10,8 @@ const sendStudioPhotoSchema = z.object({
   senderNumber: z.string().optional(),
 });
 
-const DEFAULT_CAPTION = 'Studio Bosmat: rumah hijau No. B3/2 dekat portal Jl. Menda. Silakan masuk ke garasi depan.';
-const STUDIO_PHOTO_PATH = path.resolve(__dirname, '../../data/45e8f69d-f540-41c4-b6c6-9d65463007f8.JPG');
+const DEFAULT_CAPTION = 'Studio Bosmat: rumah hijau No. B3/2 dekat portal Jl. Medan. Silakan masuk ke garasi depan.';
+const STUDIO_PHOTO_PATH = path.resolve(__dirname, '../../../data/45e8f69d-f540-41c4-b6c6-9d65463007f8.JPG');
 
 function normalizeWhatsappId(value) {
   if (!value) return value;
