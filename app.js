@@ -25,6 +25,7 @@ const { getCurrentDateTimeTool } = require('./src/ai/tools/getCurrentDateTimeToo
 const { updateBookingTool } = require('./src/ai/tools/updateBookingTool.js');
 const { triggerBosMatTool } = require('./src/ai/tools/triggerBosMatTool.js');
 const { calculateHomeServiceFeeTool } = require('./src/ai/tools/calculateHomeServiceFeeTool.js');
+const { createMetaWebhookRouter } = require('./src/server/metaWebhook.js');
 const { startBookingReminderScheduler } = require('./src/ai/utils/bookingReminders.js');
 const { isSnoozeActive, setSnoozeMode, clearSnoozeMode, getSnoozeInfo } = require('./src/ai/utils/humanHandover.js');
 const { getLangSmithCallbacks } = require('./src/ai/utils/langsmith.js');
@@ -317,8 +318,12 @@ const MEMORY_CONFIG = {
 async function getConversationHistory(senderNumber, limit = MEMORY_CONFIG.maxMessages) {
     if (!db) return [];
     
+    const { docId } = parseSenderIdentity(senderNumber);
+    if (!docId) {
+        return [];
+    }
+
     try {
-        const docId = senderNumber.replace('@c.us', '');
         const messagesRef = db.collection('directMessages').doc(docId).collection('messages');
         
         // Calculate cutoff time for memory
@@ -367,11 +372,45 @@ function buildLangChainHistory(history) {
     return formatted;
 }
 
+const WHATSAPP_SUFFIX = '@c.us';
+
+function parseSenderIdentity(rawValue) {
+    const trimmed = (rawValue || '').trim();
+    if (!trimmed) {
+        return {
+            docId: '',
+            channel: 'unknown',
+            platformId: null,
+            normalizedAddress: '',
+        };
+    }
+
+    const hasWhatsappSuffix = trimmed.endsWith(WHATSAPP_SUFFIX);
+    const baseId = hasWhatsappSuffix ? trimmed.slice(0, -WHATSAPP_SUFFIX.length) : trimmed;
+
+    let channel = 'whatsapp';
+    let platformId = baseId;
+
+    if (baseId.includes(':')) {
+        const [channelPart, ...rest] = baseId.split(':');
+        channel = channelPart || 'unknown';
+        platformId = rest.length ? rest.join(':') : null;
+    }
+
+    const normalizedAddress = channel === 'whatsapp'
+        ? `${baseId}${WHATSAPP_SUFFIX}`
+        : baseId;
+
+    return {
+        docId: baseId,
+        channel,
+        platformId,
+        normalizedAddress,
+    };
+}
+
 function toSenderNumberWithSuffix(id) {
-    if (!id) return id;
-    const trimmed = id.trim();
-    if (!trimmed) return trimmed;
-    return trimmed.endsWith('@c.us') ? trimmed : `${trimmed}@c.us`;
+    return parseSenderIdentity(id).normalizedAddress;
 }
 
 async function executeToolCall(toolName, args, metadata = {}) {
@@ -881,8 +920,12 @@ function start(client) {
 async function saveMessageToFirestore(senderNumber, message, senderType) {
     if (!db) return;
     
+    const { docId, channel, platformId } = parseSenderIdentity(senderNumber);
+    if (!docId) {
+        return;
+    }
+
     try {
-        const docId = senderNumber.replace('@c.us', '');
         const messagesRef = db.collection('directMessages').doc(docId).collection('messages');
         const serverTimestamp = admin.firestore.FieldValue.serverTimestamp();
 
@@ -898,6 +941,9 @@ async function saveMessageToFirestore(senderNumber, message, senderType) {
             lastMessageAt: serverTimestamp,
             updatedAt: serverTimestamp,
             messageCount: admin.firestore.FieldValue.increment(1),
+            channel,
+            platform: channel,
+            platformId: platformId || docId,
         }, { merge: true });
     } catch (error) {
         console.error('Error saving to Firestore:', error);
@@ -907,11 +953,18 @@ async function saveMessageToFirestore(senderNumber, message, senderType) {
 async function saveSenderMeta(senderNumber, displayName) {
     if (!db) return;
     
+    const { docId, channel, platformId } = parseSenderIdentity(senderNumber);
+    if (!docId) {
+        return;
+    }
+
     try {
-        const docId = senderNumber.replace('@c.us', '');
         const metaRef = db.collection('directMessages').doc(docId);
         await metaRef.set({
             name: displayName,
+            channel,
+            platform: channel,
+            platformId: platformId || docId,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });
     } catch (error) {
@@ -937,7 +990,8 @@ async function listConversations(limit = 100) {
         const snapshot = await db.collection('directMessages').get();
         const conversations = await Promise.all(snapshot.docs.map(async (doc) => {
             const data = doc.data() || {};
-            const senderNumberFull = toSenderNumberWithSuffix(doc.id);
+            const identity = parseSenderIdentity(doc.id);
+            const senderNumberFull = identity.normalizedAddress;
             const snoozeInfo = await getSnoozeInfo(senderNumberFull);
 
             return {
@@ -949,6 +1003,8 @@ async function listConversations(limit = 100) {
                 lastMessageAt: serializeTimestamp(data.lastMessageAt),
                 updatedAt: serializeTimestamp(data.updatedAt),
                 messageCount: typeof data.messageCount === 'number' ? data.messageCount : null,
+                channel: (data.channel || identity.channel || 'whatsapp'),
+                platformId: data.platformId || identity.platformId || doc.id,
                 aiPaused: snoozeInfo.active,
                 aiPausedUntil: snoozeInfo.expiresAt,
                 aiPausedManual: snoozeInfo.manual,
@@ -974,6 +1030,15 @@ async function listConversations(limit = 100) {
 }
 
 // --- API Endpoints ---
+const metaWebhookRouter = createMetaWebhookRouter({
+    getAIResponse,
+    saveMessageToFirestore,
+    saveSenderMeta,
+    logger: console,
+});
+
+app.use('/webhooks/meta', metaWebhookRouter);
+
 app.get('/health', (req, res) => {
     res.json({
         status: 'healthy',
@@ -1074,15 +1139,22 @@ app.get('/conversation-history/:number', async (req, res) => {
         if (!number) {
             return res.status(400).json({ error: 'Number is required.' });
         }
-        
-        const senderNumber = `${number}@c.us`;
+
+        const identity = parseSenderIdentity(number);
+        if (!identity.docId) {
+            return res.status(404).json({ error: 'Conversation not found.' });
+        }
+
+        const senderKey = identity.normalizedAddress || number;
         const historyLimit = limit ? parseInt(limit) : MEMORY_CONFIG.maxMessages;
-        
-        const history = await getConversationHistory(senderNumber, historyLimit);
-        const snoozeInfo = await getSnoozeInfo(senderNumber);
-        
+
+        const history = await getConversationHistory(senderKey, historyLimit);
+        const snoozeInfo = await getSnoozeInfo(senderKey);
+
         res.json({
-            senderNumber: senderNumber,
+            senderNumber: identity.docId,
+            channel: identity.channel,
+            platformId: identity.platformId || identity.docId,
             messageCount: history.length,
             history: history,
             memoryConfig: MEMORY_CONFIG,
