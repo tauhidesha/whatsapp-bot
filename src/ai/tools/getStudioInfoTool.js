@@ -18,9 +18,10 @@ async function implementation(input) {
     const studioInfo = {
       location: {
         address: 'Bukit Cengkeh 1, Jl. Medan No. B3/2, Cimanggis – Depok, Jawa Barat',
-        landmark: 'Dekat dari jalan raya Bogor atau tol Cijago',
+        landmark: 'Rumah hijau No. B3/2 dekat portal Jl. Menda (masuk gang sebelah portal utama Bukit Cengkeh 1)',
         googleMaps: 'https://maps.app.goo.gl/do4DBYiMntyV7oqc7',
         description: 'Lokasi Bosmat – Detailing & Repainting Studio',
+        exteriorPhoto: 'data/45e8f69d-f540-41c4-b6c6-9d65463007f8.JPG',
       },
       contact: {
         phone: '0895-4015-27556',

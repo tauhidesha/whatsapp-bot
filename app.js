@@ -25,6 +25,7 @@ const { getCurrentDateTimeTool } = require('./src/ai/tools/getCurrentDateTimeToo
 const { updateBookingTool } = require('./src/ai/tools/updateBookingTool.js');
 const { triggerBosMatTool } = require('./src/ai/tools/triggerBosMatTool.js');
 const { calculateHomeServiceFeeTool } = require('./src/ai/tools/calculateHomeServiceFeeTool.js');
+const { sendStudioPhotoTool } = require('./src/ai/tools/sendStudioPhotoTool.js');
 const { createMetaWebhookRouter } = require('./src/server/metaWebhook.js');
 const { sendMetaMessage } = require('./src/server/metaClient.js');
 const { startBookingReminderScheduler } = require('./src/ai/utils/bookingReminders.js');
@@ -77,6 +78,7 @@ const availableTools = {
     updateBooking: updateBookingTool.implementation,
     triggerBosMatTool: triggerBosMatTool.implementation,
     calculateHomeServiceFee: calculateHomeServiceFeeTool.implementation,
+    sendStudioPhoto: sendStudioPhotoTool.implementation,
 };
 
 const toolDefinitions = [
@@ -90,6 +92,7 @@ const toolDefinitions = [
     updateBookingTool.toolDefinition,
     triggerBosMatTool.toolDefinition,
     calculateHomeServiceFeeTool.toolDefinition,
+    sendStudioPhotoTool.toolDefinition,
 ];
 
 console.log('🔧 [STARTUP] Tool Registry Initialized:');
@@ -153,7 +156,7 @@ const SYSTEM_PROMPT = `Anda adalah **Zoya**, asisten AI Bosmat Repainting and De
    - Daftar layanan kategori tertentu: listServicesByCategory ({"category"})
    - Harga layanan spesifik: getSpecificServicePrice ({"service_name","size"}) — selalu cek ukuran motor dahulu.
    - Deskripsi umum: getServiceDescription
-4. **Info Umum Studio**: getStudioInfo untuk alamat/jam/kontak/booking policy. Jika data kurang, gunakan searchKnowledgeBase.
+4. **Info Umum Studio**: getStudioInfo untuk alamat/jam/kontak/booking policy (patokan rumah hijau No. B3/2 dekat portal Jl. Medan). Jika pelanggan sudah dekat dan masih bingung, kirim foto studio dengan sendStudioPhoto. Jika data kurang, gunakan searchKnowledgeBase.
 5. **Promo**: getPromoBundleDetails (KHUSUS REPAINT: tawarkan bundling dulu)
 6. **Repaint**: updateRepaintDetailsTool untuk warna/bagian
 7. **Booking**: checkBookingAvailability → findNextAvailableSlot → createBooking
@@ -184,7 +187,7 @@ DP: Rp100.000 ke BCA 1662515412 a.n Muhammad Tauhid Haryadesa
 - Pertanyaan di luar konteks → triggerBosMatTool
 - Bingung pilih warna: tawarkan konsultasi Bosmat atau pilih di studio
 - TIDAK mengarang info, gunakan tools
-- Pertanyaan lokasi/jam/kontak/booking → panggil getStudioInfo (tambahkan searchKnowledgeBase bila butuh verifikasi tambahan)
+- Pertanyaan lokasi/jam/kontak/booking → panggil getStudioInfo (tambahkan searchKnowledgeBase bila butuh verifikasi tambahan). Saat pelanggan sudah dekat lokasi, jelaskan ciri rumah hijau No. B3/2 dekat portal Jl. Menda dan tawarkan kirim foto via sendStudioPhoto.
 - Jika user meminta harga/ukuran layanan, WAJIB gunakan getMotorSizeDetails lalu getSpecificServicePrice sebelum menjawab.
 - Jangan menunda dengan kalimat seperti "sebentar". Setelah tool pertama memberikan data (mis. ukuran motor), langsung panggil tool lanjutan yang dibutuhkan (mis. harga) pada iterasi yang sama sebelum memberi jawaban akhir.
 - Jika user minta jadwal/booking slot, cek dengan checkBookingAvailability sebelum menawarkan waktu.
