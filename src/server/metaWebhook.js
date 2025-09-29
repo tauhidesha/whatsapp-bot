@@ -1,5 +1,5 @@
 const express = require('express');
-const fetch = require('node-fetch');
+const { sendMetaMessage, resolveSenderProfile } = require('./metaClient.js');
 
 function createMetaWebhookRouter(deps = {}) {
     const {
@@ -7,10 +7,6 @@ function createMetaWebhookRouter(deps = {}) {
         saveMessageToFirestore,
         saveSenderMeta,
         logger = console,
-        messengerAccessToken = process.env.META_MESSENGER_ACCESS_TOKEN || process.env.META_PAGE_ACCESS_TOKEN,
-        instagramAccessToken = process.env.META_INSTAGRAM_ACCESS_TOKEN || process.env.META_IG_ACCESS_TOKEN,
-        instagramBusinessId = process.env.META_INSTAGRAM_BUSINESS_ID || process.env.META_IG_BUSINESS_ID,
-        graphAPIBaseUrl = process.env.META_GRAPH_API_BASE_URL || 'https://graph.facebook.com/v19.0',
     } = deps;
 
     const VERIFY_TOKEN = process.env.META_WEBHOOK_VERIFY_TOKEN;
@@ -107,7 +103,7 @@ function createMetaWebhookRouter(deps = {}) {
         let displayName = event?.sender?.name || event?.sender?.username || normalizedSenderId;
 
         if (displayName === normalizedSenderId) {
-            const resolvedProfile = await resolveSenderProfile(channel, senderId);
+            const resolvedProfile = await resolveSenderProfile(channel, senderId, logger);
             if (resolvedProfile?.displayName) {
                 displayName = resolvedProfile.displayName;
             }
@@ -133,7 +129,7 @@ function createMetaWebhookRouter(deps = {}) {
             try {
                 const aiResponse = await getAIResponse(text, displayName, normalizedSenderId);
                 log('AI response ready for outbound delivery', { channel, senderId });
-                await sendMetaMessage(channel, senderId, aiResponse);
+                await sendMetaMessage(channel, senderId, aiResponse, logger);
 
                 if (typeof saveMessageToFirestore === 'function' && aiResponse) {
                     try {
@@ -147,109 +143,6 @@ function createMetaWebhookRouter(deps = {}) {
             }
         } else if (!text) {
             log('Attachments received without text. TODO: handle media payloads', { channel, senderId, attachmentCount: attachments.length });
-        }
-    }
-
-    async function sendMetaMessage(channel, senderId, text) {
-        const trimmed = (text || '').trim();
-        if (!trimmed) {
-            log('Skipping empty AI response', { channel, senderId });
-            return;
-        }
-
-        const accessToken = channel === 'instagram' ? instagramAccessToken : messengerAccessToken;
-        if (!accessToken) {
-            log('Access token not configured for channel', { channel });
-            return;
-        }
-
-        try {
-            const basePath = channel === 'instagram'
-                ? (instagramBusinessId || 'me')
-                : 'me';
-
-            if (channel === 'instagram' && !instagramBusinessId) {
-                log('Instagram business ID not configured; attempting fallback to /me/messages', { channel });
-            }
-
-            const url = `${graphAPIBaseUrl.replace(/\/$/, '')}/${basePath}/messages?access_token=${encodeURIComponent(accessToken)}`;
-            const payload = {
-                recipient: { id: senderId },
-                message: { text: trimmed },
-                messaging_type: 'RESPONSE',
-            };
-
-            if (channel === 'instagram') {
-                payload.messaging_product = 'instagram';
-            }
-
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload),
-            });
-
-            const result = await response.json();
-
-            if (!response.ok || result.error) {
-                log('Failed to deliver AI response via Graph API', {
-                    channel,
-                    senderId,
-                    status: response.status,
-                    error: result.error || null,
-                });
-                return;
-            }
-
-            log('AI response delivered', { channel, senderId, messageId: result?.message_id || null });
-        } catch (error) {
-            log('Graph API call failed', { channel, senderId, error: error.message });
-        }
-    }
-
-    async function resolveSenderProfile(channel, senderId) {
-        const accessToken = channel === 'instagram' ? instagramAccessToken : messengerAccessToken;
-        if (!accessToken) {
-            return null;
-        }
-
-        try {
-            let fields;
-            if (channel === 'instagram') {
-                fields = 'username,name';
-            } else if (channel === 'messenger') {
-                fields = 'name,first_name,last_name';
-            } else {
-                return null;
-            }
-
-            const url = `${graphAPIBaseUrl.replace(/\/$/, '')}/${senderId}?fields=${encodeURIComponent(fields)}&access_token=${encodeURIComponent(accessToken)}`;
-            const response = await fetch(url, { method: 'GET' });
-            const data = await response.json();
-
-            if (!response.ok || data.error) {
-                log('Failed resolving sender profile', {
-                    channel,
-                    senderId,
-                    status: response.status,
-                    error: data.error || null,
-                });
-                return null;
-            }
-
-            if (channel === 'instagram') {
-                const username = data.username || data.name || null;
-                return username ? { displayName: username } : null;
-            }
-
-            const candidates = [data.name, [data.first_name, data.last_name].filter(Boolean).join(' ')].filter(Boolean);
-            const displayName = candidates.length ? candidates[0] : null;
-            return displayName ? { displayName } : null;
-        } catch (error) {
-            log('Error resolving sender profile', { channel, senderId, error: error.message });
-            return null;
         }
     }
 

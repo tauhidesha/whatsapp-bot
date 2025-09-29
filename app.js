@@ -26,6 +26,7 @@ const { updateBookingTool } = require('./src/ai/tools/updateBookingTool.js');
 const { triggerBosMatTool } = require('./src/ai/tools/triggerBosMatTool.js');
 const { calculateHomeServiceFeeTool } = require('./src/ai/tools/calculateHomeServiceFeeTool.js');
 const { createMetaWebhookRouter } = require('./src/server/metaWebhook.js');
+const { sendMetaMessage } = require('./src/server/metaClient.js');
 const { startBookingReminderScheduler } = require('./src/ai/utils/bookingReminders.js');
 const { isSnoozeActive, setSnoozeMode, clearSnoozeMode, getSnoozeInfo } = require('./src/ai/utils/humanHandover.js');
 const { getLangSmithCallbacks } = require('./src/ai/utils/langsmith.js');
@@ -1070,26 +1071,41 @@ app.get('/conversations', async (req, res) => {
 });
 
 app.post('/send-message', async (req, res) => {
-    const { number, message } = req.body;
+    const { number, message, channel: channelOverride, platformId: platformOverride } = req.body || {};
     if (!number || !message) {
         return res.status(400).json({ error: 'Number and message are required.' });
     }
-    
-    try {
-        if (!global.whatsappClient) {
-            throw new Error('WhatsApp client not initialized.');
-        }
-        const senderNumber = `${number}@c.us`;
 
-        const { text: finalMessage, rewritten } = await rewriteAdminMessage(message, senderNumber);
+    try {
+        const identity = parseSenderIdentity(number);
+        const channel = (channelOverride || identity.channel || 'whatsapp').toLowerCase();
+        const platformId = platformOverride || identity.platformId;
+
+        const { text: finalMessage, rewritten } = await rewriteAdminMessage(message, identity.normalizedAddress || number);
         if (rewritten) {
             console.log('[API] Admin message rewritten for consistent tone.');
         }
 
-        await global.whatsappClient.sendText(senderNumber, finalMessage);
-        await saveMessageToFirestore(senderNumber, finalMessage, 'admin');
-        console.log(`[API] Successfully sent message to ${number}`);
-        res.status(200).json({ success: true, rewritten });
+        if (channel === 'whatsapp' || channel === 'wa') {
+            if (!global.whatsappClient) {
+                throw new Error('WhatsApp client not initialized.');
+            }
+
+            const targetNumber = identity.normalizedAddress || toSenderNumberWithSuffix(number);
+            await global.whatsappClient.sendText(targetNumber, finalMessage);
+            await saveMessageToFirestore(targetNumber, finalMessage, 'admin');
+            console.log(`[API] Successfully sent WhatsApp message to ${targetNumber}`);
+            return res.status(200).json({ success: true, channel: 'whatsapp', rewritten });
+        }
+
+        if (!platformId) {
+            throw new Error(`Platform ID is required to send ${channel} messages.`);
+        }
+
+        await sendMetaMessage(channel, platformId, finalMessage, console);
+        await saveMessageToFirestore(identity.docId, finalMessage, 'admin');
+        console.log(`[API] Successfully sent ${channel} message to ${platformId}`);
+        return res.status(200).json({ success: true, channel, rewritten });
     } catch (e) {
         console.error('[API] Error sending message:', e);
         res.status(500).json({ error: e.message });
