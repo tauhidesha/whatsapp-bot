@@ -18,3 +18,15 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    restart: unless-stopped
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    command:
+      - "http"
+      - "--domain=${NGROK_DOMAIN}"
+      - "whatsapp-ai-chatbot:4000"
+    depends_on:
+      - whatsapp-ai-chatbot

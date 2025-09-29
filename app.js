@@ -994,6 +994,11 @@ async function listConversations(limit = 100) {
             const senderNumberFull = identity.normalizedAddress;
             const snoozeInfo = await getSnoozeInfo(senderNumberFull);
 
+            const storedChannel = typeof data.channel === 'string' ? data.channel.toLowerCase() : null;
+            const effectiveChannel = storedChannel && storedChannel !== 'unknown'
+                ? storedChannel
+                : identity.channel || 'whatsapp';
+
             return {
                 id: doc.id,
                 senderNumber: doc.id,
@@ -1003,7 +1008,7 @@ async function listConversations(limit = 100) {
                 lastMessageAt: serializeTimestamp(data.lastMessageAt),
                 updatedAt: serializeTimestamp(data.updatedAt),
                 messageCount: typeof data.messageCount === 'number' ? data.messageCount : null,
-                channel: (data.channel || identity.channel || 'whatsapp'),
+                channel: effectiveChannel,
                 platformId: data.platformId || identity.platformId || doc.id,
                 aiPaused: snoozeInfo.active,
                 aiPausedUntil: snoozeInfo.expiresAt,
