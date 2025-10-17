@@ -453,6 +453,48 @@ const daftarUkuranMotor = [
     "aliases": ["ktm 390 adventure", "adventure 390"]
   },
   {
+    "model": "cb150x",
+    "service_size": "L",
+    "repaint_size": "XL",
+    "aliases": ["honda cb150x", "cb 150x"]
+  },
+  {
+    "model": "cb500x",
+    "service_size": "XL",
+    "repaint_size": "XL",
+    "aliases": ["honda cb500x", "cb 500x"]
+  },
+  {
+    "model": "cbr500r",
+    "service_size": "XL",
+    "repaint_size": "XL",
+    "aliases": ["honda cbr500r", "cbr 500r"]
+  },
+  {
+    "model": "cbr500x",
+    "service_size": "XL",
+    "repaint_size": "XL",
+    "aliases": ["honda cbr500x", "cbr 500x"]
+  },
+  {
+    "model": "rebel 500",
+    "service_size": "XL",
+    "repaint_size": "XL",
+    "aliases": ["honda rebel 500"]
+  },
+  {
+    "model": "forza 250",
+    "service_size": "L",
+    "repaint_size": "XL",
+    "aliases": ["honda forza 250"]
+  },
+  {
+    "model": "forza 350",
+    "service_size": "L",
+    "repaint_size": "L",
+    "aliases": ["honda forza 350"]
+  },
+  {
     "model": "d-tracker 150",
     "service_size": "L",
     "repaint_size": "XL",
