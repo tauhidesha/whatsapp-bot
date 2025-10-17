@@ -275,8 +275,76 @@ async function resolveSenderProfile(channel, senderId, logger = console) {
     }
 }
 
+async function acceptInstagramMessageRequest(participantId, logger = console) {
+    const log = getLogger(logger);
+    const normalizedParticipant = (participantId || '').trim();
+    if (!normalizedParticipant) {
+        log.warn('[MetaClient] Cannot accept request: participantId empty');
+        return { skipped: true };
+    }
+
+    const accessToken = getInstagramAccessToken();
+    if (!accessToken) {
+        log.warn('[MetaClient] Cannot accept request: missing Instagram access token');
+        return { skipped: true };
+    }
+
+    const instagramBusinessId = getInstagramBusinessId();
+    if (!instagramBusinessId) {
+        log.warn('[MetaClient] Cannot accept request: missing Instagram business ID');
+        return { skipped: true };
+    }
+
+    const graphBaseUrl = getGraphBaseUrl();
+    const url = `${graphBaseUrl}/${instagramBusinessId}/message_requests`;
+
+    const payload = {
+        messaging_product: 'instagram',
+        participant_id: normalizedParticipant,
+        status: 'APPROVED',
+    };
+
+    try {
+        const response = await fetch(`${url}?access_token=${encodeURIComponent(accessToken)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+
+        let result = null;
+        try {
+            result = await response.json();
+        } catch (parseError) {
+            log.warn('[MetaClient] Failed parsing message request response', { error: parseError.message });
+        }
+
+        if (!response.ok || result?.error) {
+            log.warn('[MetaClient] Failed approving message request', {
+                participantId: normalizedParticipant,
+                status: response.status,
+                error: result?.error || null,
+            });
+            return { error: result?.error || response.statusText };
+        }
+
+        log.log('[MetaClient] Message request approved', {
+            participantId: normalizedParticipant,
+            result,
+        });
+
+        return result;
+    } catch (error) {
+        log.error('[MetaClient] acceptInstagramMessageRequest error', {
+            participantId: normalizedParticipant,
+            error: error.message,
+        });
+        return { error: error.message };
+    }
+}
+
 module.exports = {
     sendMetaMessage,
     sendMetaAttachment,
+    acceptInstagramMessageRequest,
     resolveSenderProfile,
 };

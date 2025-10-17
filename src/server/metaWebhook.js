@@ -1,5 +1,5 @@
 const express = require('express');
-const { sendMetaMessage, resolveSenderProfile } = require('./metaClient.js');
+const { sendMetaMessage, resolveSenderProfile, acceptInstagramMessageRequest } = require('./metaClient.js');
 
 const PROCESSED_MESSAGE_RETENTION_MS = 10 * 60 * 1000; // 10 minutes
 const processedMetaMessageIds = new Map();
@@ -96,6 +96,8 @@ function createMetaWebhookRouter(deps = {}) {
             try {
                 if (event.message) {
                     await handleMessageEvent(channel, event);
+                } else if (event.postback) {
+                    await handlePostbackEvent(channel, event);
                 } else {
                     log('Unhandled event type', { channel, keys: Object.keys(event || {}) });
                 }
@@ -179,6 +181,45 @@ function createMetaWebhookRouter(deps = {}) {
         } else if (!text) {
             log('Attachments received without text. TODO: handle media payloads', { channel, senderId, attachmentCount: attachments.length });
         }
+    }
+
+    async function handlePostbackEvent(channel, event) {
+        const senderId = event?.sender?.id;
+        if (!senderId) {
+            log('Postback without sender id ignored', { channel });
+            return;
+        }
+
+        const postback = event.postback || {};
+        const syntheticMid = postback.mid || postback.payload || `${event.timestamp || Date.now()}`;
+        const textCandidate = (postback.title || postback.payload || '').trim();
+
+        if (!textCandidate) {
+            log('Postback without text or payload ignored', { channel, senderId });
+            return;
+        }
+
+        if (channel === 'instagram' && typeof acceptInstagramMessageRequest === 'function') {
+            try {
+                await acceptInstagramMessageRequest(senderId, logger);
+            } catch (error) {
+                log('Failed to accept Instagram message request', {
+                    channel,
+                    senderId,
+                    error: error?.message || error,
+                });
+            }
+        }
+
+        const syntheticEvent = {
+            ...event,
+            message: {
+                mid: syntheticMid,
+                text: textCandidate,
+            },
+        };
+
+        await handleMessageEvent(channel, syntheticEvent);
     }
 
     return router;
