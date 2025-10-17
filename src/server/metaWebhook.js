@@ -1,6 +1,35 @@
 const express = require('express');
 const { sendMetaMessage, resolveSenderProfile } = require('./metaClient.js');
 
+const PROCESSED_MESSAGE_RETENTION_MS = 10 * 60 * 1000; // 10 minutes
+const processedMetaMessageIds = new Map();
+
+function registerProcessedMessage(messageId) {
+    if (!messageId) {
+        return true;
+    }
+
+    const now = Date.now();
+    const lastSeen = processedMetaMessageIds.get(messageId);
+
+    if (lastSeen && (now - lastSeen) < PROCESSED_MESSAGE_RETENTION_MS) {
+        return false;
+    }
+
+    processedMetaMessageIds.set(messageId, now);
+
+    if (processedMetaMessageIds.size > 5000) {
+        const cutoff = now - PROCESSED_MESSAGE_RETENTION_MS;
+        for (const [id, ts] of processedMetaMessageIds.entries()) {
+            if (ts < cutoff) {
+                processedMetaMessageIds.delete(id);
+            }
+        }
+    }
+
+    return true;
+}
+
 function createMetaWebhookRouter(deps = {}) {
     const {
         getAIResponse,
@@ -88,6 +117,12 @@ function createMetaWebhookRouter(deps = {}) {
         const message = event.message;
         if (!message || message.is_echo) {
             log('Echo or empty message ignored', { channel, senderId, isEcho: message?.is_echo });
+            return;
+        }
+
+        const messageId = message?.mid || message?.id || null;
+        if (messageId && !registerProcessedMessage(messageId)) {
+            log('Duplicate message ignored', { channel, senderId, messageId });
             return;
         }
 
