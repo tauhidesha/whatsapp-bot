@@ -312,7 +312,13 @@ const daftarUkuranMotor = [
     "model": "vixion",
     "service_size": "L",
     "repaint_size": "XL",
-    "aliases": ["yamaha vixion", "v-ixion"]
+    "aliases": ["yamaha vixion", "v-ixion", "new vixion", "vixion lightning", "vixion advance", "vixion r"]
+  },
+  {
+    "model": "scorpio",
+    "service_size": "L",
+    "repaint_size": "XL",
+    "aliases": ["yamaha scorpio", "scorpio z", "scorpio z 225"]
   },
   {
     "model": "byson",
@@ -397,6 +403,54 @@ const daftarUkuranMotor = [
     "service_size": "L",
     "repaint_size": "XL",
     "aliases": ["kawasaki klx 250"]
+  },
+  {
+    "model": "ktm duke 200",
+    "service_size": "L",
+    "repaint_size": "XL",
+    "aliases": ["ktm 200 duke", "duke 200"]
+  },
+  {
+    "model": "ktm duke 250",
+    "service_size": "L",
+    "repaint_size": "XL",
+    "aliases": ["ktm 250 duke", "duke 250"]
+  },
+  {
+    "model": "ktm duke 390",
+    "service_size": "XL",
+    "repaint_size": "XL",
+    "aliases": ["ktm 390 duke", "duke 390"]
+  },
+  {
+    "model": "ktm rc 200",
+    "service_size": "L",
+    "repaint_size": "XL",
+    "aliases": ["ktm rc200", "rc 200"]
+  },
+  {
+    "model": "ktm rc 250",
+    "service_size": "L",
+    "repaint_size": "XL",
+    "aliases": ["ktm rc250", "rc 250"]
+  },
+  {
+    "model": "ktm rc 390",
+    "service_size": "XL",
+    "repaint_size": "XL",
+    "aliases": ["ktm rc390", "rc 390"]
+  },
+  {
+    "model": "ktm adventure 250",
+    "service_size": "L",
+    "repaint_size": "XL",
+    "aliases": ["ktm 250 adventure", "adventure 250"]
+  },
+  {
+    "model": "ktm adventure 390",
+    "service_size": "XL",
+    "repaint_size": "XL",
+    "aliases": ["ktm 390 adventure", "adventure 390"]
   },
   {
     "model": "d-tracker 150",
