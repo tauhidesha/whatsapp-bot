@@ -1,4 +1,7 @@
 const fetch = require('node-fetch');
+const fs = require('fs');
+const path = require('path');
+const FormData = require('form-data');
 
 const DEFAULT_GRAPH_BASE_URL = 'https://graph.facebook.com/v19.0';
 
@@ -95,6 +98,137 @@ async function sendMetaMessage(channel, recipientId, text, logger = console) {
     return result;
 }
 
+async function sendMetaAttachment(channel, recipientId, filePath, options = {}, logger = console) {
+    const effectiveChannel = (channel || '').toLowerCase();
+    const log = getLogger(logger);
+
+    if (!effectiveChannel) {
+        throw new Error('Channel is required to deliver attachments');
+    }
+
+    if (!recipientId) {
+        throw new Error(`Recipient ID is required to deliver ${effectiveChannel} attachments`);
+    }
+
+    if (!filePath) {
+        throw new Error('File path is required to deliver attachments');
+    }
+
+    const resolvedPath = path.resolve(filePath);
+
+    try {
+        await fs.promises.access(resolvedPath, fs.constants.R_OK);
+    } catch (error) {
+        throw new Error(`Attachment file not accessible: ${resolvedPath}`);
+    }
+
+    const accessToken = getAccessToken(effectiveChannel);
+    if (!accessToken) {
+        log.warn('[MetaClient] Missing access token', { channel: effectiveChannel });
+        throw new Error(`Access token for ${effectiveChannel} not configured`);
+    }
+
+    const graphBaseUrl = getGraphBaseUrl();
+    const instagramBusinessId = getInstagramBusinessId();
+
+    const basePath = effectiveChannel === 'instagram'
+        ? (instagramBusinessId || 'me')
+        : 'me';
+
+    if (effectiveChannel === 'instagram' && !instagramBusinessId) {
+        log.warn('[MetaClient] Instagram business ID not configured; using /me/messages fallback');
+    }
+
+    const url = `${graphBaseUrl}/${basePath}/messages?access_token=${encodeURIComponent(accessToken)}`;
+    const form = new FormData();
+
+    form.append('recipient', JSON.stringify({ id: recipientId }));
+    form.append('messaging_type', options.messagingType || 'RESPONSE');
+
+    if (effectiveChannel === 'instagram') {
+        form.append('messaging_product', 'instagram');
+    }
+
+    const attachmentPayload = {
+        ...(options.payload || {}),
+    };
+
+    if (options.isReusable) {
+        attachmentPayload.is_reusable = true;
+    }
+
+    const message = {
+        attachment: {
+            type: options.type || 'image',
+            payload: attachmentPayload,
+        },
+    };
+
+    form.append('message', JSON.stringify(message));
+
+    const filename = options.filename || path.basename(resolvedPath);
+    form.append('filedata', fs.createReadStream(resolvedPath), {
+        filename,
+        contentType: options.mimetype || 'image/jpeg',
+    });
+
+    const headers = form.getHeaders();
+    const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: form,
+    });
+
+    let result;
+    try {
+        result = await response.json();
+    } catch (error) {
+        log.error('[MetaClient] Failed to parse attachment response', {
+            channel: effectiveChannel,
+            recipientId,
+            error: error.message,
+        });
+        throw new Error('Failed to parse attachment response from Graph API');
+    }
+
+    if (!response.ok || result.error) {
+        log.error('[MetaClient] Failed to deliver attachment', {
+            channel: effectiveChannel,
+            recipientId,
+            status: response.status,
+            error: result.error || null,
+            result,
+        });
+        throw new Error(result?.error?.message || `Graph API responded with status ${response.status}`);
+    }
+
+    log.log('[MetaClient] Attachment delivered', {
+        channel: effectiveChannel,
+        recipientId,
+        attachmentId: result?.attachment_id || null,
+        messageId: result?.message_id || null,
+    });
+
+    const caption = typeof options.caption === 'string' ? options.caption.trim() : '';
+    if (caption) {
+        try {
+            await sendMetaMessage(effectiveChannel, recipientId, caption, logger);
+        } catch (error) {
+            log.warn('[MetaClient] Attachment delivered but caption delivery failed', {
+                channel: effectiveChannel,
+                recipientId,
+                error: error.message,
+            });
+            return {
+                ...result,
+                captionDeliveryFailed: true,
+            };
+        }
+    }
+
+    return result;
+}
+
 async function resolveSenderProfile(channel, senderId, logger = console) {
     const accessToken = getAccessToken(channel);
     if (!accessToken) {
@@ -143,5 +277,6 @@ async function resolveSenderProfile(channel, senderId, logger = console) {
 
 module.exports = {
     sendMetaMessage,
+    sendMetaAttachment,
     resolveSenderProfile,
 };

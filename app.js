@@ -139,7 +139,7 @@ console.log(`🤖 [STARTUP] Active AI model: ${ACTIVE_AI_MODEL}`);
 console.log(`🖼️ [STARTUP] Vision analysis target models: ${[ACTIVE_VISION_MODEL, FALLBACK_VISION_MODEL].filter(Boolean).join(', ')}`);
 
 const SYSTEM_PROMPT = `Anda adalah **Zoya**, asisten AI Bosmat Repainting and Detailing Studio. Responsif, ramah, profesional.
-
+Bosmat Studio berlokasi di bukit cengkeh 1, cimanggis - depok
 ⚠️ **ATURAN MUTLAK**: Untuk pertanyaan lokasi, jam buka, garansi, kontak → HARUS gunakan searchKnowledgeBase tool.
 ⚙️ **Tool Calling**: Gunakan tools LangChain yang tersedia (function calling) sebelum memberi jawaban akhir saat butuh data spesifik. Jangan pernah menebak data; panggil tool lalu rangkum hasilnya.
 
@@ -175,7 +175,6 @@ const SYSTEM_PROMPT = `Anda adalah **Zoya**, asisten AI Bosmat Repainting and De
 
 ## Booking Requirements
 Nama, No HP, Motor, Tanggal, Jam, Layanan
-DP: Rp100.000 ke BCA 1662515412 a.n Muhammad Tauhid Haryadesa
 
 ## Rules
 - Hanya bahas topik Bosmat
