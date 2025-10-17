@@ -512,6 +512,60 @@ function getToolCallsFromResponse(response) {
     return [];
 }
 
+function parseToolDirectiveFromText(text) {
+    if (!text) return null;
+    const trimmed = text.trim();
+    if (!trimmed.toLowerCase().startsWith('tool_code')) {
+        return null;
+    }
+
+    const directiveMatch = trimmed.match(/tool_code\s*print\((\w+)\(([\s\S]*?)\)\)\s*$/i);
+    if (!directiveMatch) {
+        return null;
+    }
+
+    const toolName = directiveMatch[1];
+    const argsSegment = directiveMatch[2] || '';
+    const args = {};
+
+    const argRegex = /(\w+)\s*=\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g;
+    let argMatch;
+    while ((argMatch = argRegex.exec(argsSegment)) !== null) {
+        const key = argMatch[1];
+        let value = argMatch[2];
+        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+            value = value.slice(1, -1);
+        }
+        value = value
+            .replace(/\\n/g, '\n')
+            .replace(/\\t/g, '\t')
+            .replace(/\\"/g, '"')
+            .replace(/\\'/g, "'");
+        args[key] = value;
+    }
+
+    if (!Object.keys(args).length) {
+        const jsonCandidate = argsSegment.trim();
+        if (jsonCandidate) {
+            try {
+                const parsed = JSON.parse(jsonCandidate);
+                if (parsed && typeof parsed === 'object') {
+                    return { toolName, args: parsed };
+                }
+            } catch (error) {
+                console.warn('[AI_PROCESSING] Failed to parse tool_code directive JSON segment:', error.message);
+            }
+        }
+    }
+
+    return { toolName, args };
+}
+
+function sanitizeToolDirectiveOutput(text) {
+    if (!text) return '';
+    return text.replace(/tool_code[\s\S]*$/i, '').trim();
+}
+
 async function analyzeImageWithGemini(imageBuffer, mimeType = 'image/jpeg', caption = '', senderName = 'User') {
     const base64Image = imageBuffer.toString('base64');
     const systemPrompt = 'Anda adalah Zoya, asisten Bosmat. Analisis foto motor pengguna, jelaskan kondisi, kerusakan, kebersihan, dan rekomendasi perawatan secara singkat dalam bahasa Indonesia. Fokus pada hal yang benar-benar terlihat dan hindari asumsi. ## Layanan Utama Repaint**: Bodi Halus/Kasar, Velg, Cover CVT/Arm Detailing/Coating**: Detailing Mesin, Cuci Komplit, Poles Bodi Glossy, Full Detailing Glossy, Coating Motor Doff/Glossy, Complete Service Doff/Glossy';
@@ -582,14 +636,70 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
         ];
 
         console.log(`🔧 [AI_PROCESSING] Tools registered: ${toolDefinitions.map(t => t.function.name).join(', ')}`);
-        console.log(`🚀 [AI_PROCESSING] Sending request to AI model...`);
-
-        let response = await aiModel.invoke(messages, getTracingConfig('chat-response-initial'));
-
-        let toolCalls = getToolCallsFromResponse(response);
         let iteration = 0;
+        const MAX_ITERATIONS = 8;
 
-        while (toolCalls.length > 0) {
+        let response;
+
+        while (iteration < MAX_ITERATIONS) {
+            const traceLabel = iteration === 0 ? 'chat-response-initial' : `chat-response-iteration-${iteration}`;
+            console.log(`🚀 [AI_PROCESSING] Sending request to AI model... (iteration ${iteration + 1})`);
+            response = await aiModel.invoke(messages, getTracingConfig(traceLabel));
+
+            const toolCalls = getToolCallsFromResponse(response);
+
+            if (toolCalls.length === 0) {
+                const finalTextRaw = extractTextFromAIContent(response.content);
+                const finalText = typeof finalTextRaw === 'string' ? finalTextRaw.trim() : '';
+
+                console.log(`📥 [AI_PROCESSING] AI Response received`);
+                console.log(`📥 [AI_PROCESSING] Response type: ${typeof response.content}`);
+                console.log(`📥 [AI_PROCESSING] Response content: "${finalText}"`);
+
+                const directive = parseToolDirectiveFromText(finalText);
+                if (directive) {
+                    const { toolName, args } = directive;
+                    console.log(`[AI_PROCESSING] Detected textual tool directive: ${toolName}`);
+
+                    if (!availableTools[toolName]) {
+                        console.warn(`[AI_PROCESSING] Tool ${toolName} from textual directive not found. Returning sanitized output.`);
+                        const safeText = sanitizeToolDirectiveOutput(finalText);
+                        console.log(`🎯 [AI_PROCESSING] ===== AI PROCESSING COMPLETED =====\n`);
+                        return safeText || 'Baik mas, Zoya akan bantu cek ke tim Bosmat.';
+                    }
+
+                    messages.push(response);
+
+                    const enrichedArgs = { ...args };
+                    if (senderNumber && !enrichedArgs.senderNumber) {
+                        enrichedArgs.senderNumber = senderNumber;
+                    }
+                    if (senderName && !enrichedArgs.senderName) {
+                        enrichedArgs.senderName = senderName;
+                    }
+
+                    const toolCallId = `${toolName}-directive-${Date.now()}`;
+                    console.log(`⚡ [AI_PROCESSING] Executing directive tool ${toolName} dengan args: ${JSON.stringify(enrichedArgs, null, 2)}`);
+                    const toolResult = await executeToolCall(toolName, enrichedArgs, {
+                        senderNumber,
+                        senderName,
+                    });
+                    console.log(`✅ [AI_PROCESSING] Directive tool ${toolName} completed`);
+                    console.log(`📊 [AI_PROCESSING] Directive tool result: ${JSON.stringify(toolResult, null, 2)}`);
+
+                    messages.push(new ToolMessage({
+                        tool_call_id: toolCallId,
+                        content: JSON.stringify(toolResult),
+                    }));
+
+                    iteration += 1;
+                    continue;
+                }
+
+                console.log(`🎯 [AI_PROCESSING] ===== AI PROCESSING COMPLETED =====\n`);
+                return finalText || 'Maaf, saya belum bisa memberikan jawaban.';
+            }
+
             iteration += 1;
             console.log(`🔧 [AI_PROCESSING] ===== TOOL CALLS DETECTED (iteration ${iteration}) =====`);
             console.log(`🔧 [AI_PROCESSING] Number of tool calls: ${toolCalls.length}`);
@@ -626,20 +736,10 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                     content: JSON.stringify(toolResult)
                 }));
             }
-
-            console.log('🔄 [AI_PROCESSING] Sending tool results back to AI model...');
-            response = await aiModel.invoke(messages, getTracingConfig(`chat-response-iteration-${iteration}`));
-            toolCalls = getToolCallsFromResponse(response);
         }
 
-        const finalText = extractTextFromAIContent(response.content).trim();
-
-        console.log(`📥 [AI_PROCESSING] AI Response received`);
-        console.log(`📥 [AI_PROCESSING] Response type: ${typeof response.content}`);
-        console.log(`📥 [AI_PROCESSING] Response content: "${finalText}"`);
-        console.log(`🎯 [AI_PROCESSING] ===== AI PROCESSING COMPLETED =====\n`);
-
-        return finalText || 'Maaf, saya belum bisa memberikan jawaban.';
+        console.warn('⚠️ [AI_PROCESSING] Maximum iteration reached without final response.');
+        return 'Maaf, saya belum bisa memberikan jawaban.';
     } catch (error) {
         console.error('❌ [AI_PROCESSING] Error getting AI response:', error);
         console.error('❌ [AI_PROCESSING] Error stack:', error.stack);
