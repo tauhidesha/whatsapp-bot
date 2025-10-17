@@ -26,6 +26,7 @@ const { updateBookingTool } = require('./src/ai/tools/updateBookingTool.js');
 const { triggerBosMatTool } = require('./src/ai/tools/triggerBosMatTool.js');
 const { calculateHomeServiceFeeTool } = require('./src/ai/tools/calculateHomeServiceFeeTool.js');
 const { sendStudioPhotoTool } = require('./src/ai/tools/sendStudioPhotoTool.js');
+const { notifyVisitIntentTool } = require('./src/ai/tools/notifyVisitIntentTool.js');
 const { createMetaWebhookRouter } = require('./src/server/metaWebhook.js');
 const { sendMetaMessage } = require('./src/server/metaClient.js');
 const { startBookingReminderScheduler } = require('./src/ai/utils/bookingReminders.js');
@@ -79,6 +80,7 @@ const availableTools = {
     triggerBosMatTool: triggerBosMatTool.implementation,
     calculateHomeServiceFee: calculateHomeServiceFeeTool.implementation,
     sendStudioPhoto: sendStudioPhotoTool.implementation,
+    notifyVisitIntent: notifyVisitIntentTool.implementation,
 };
 
 const toolDefinitions = [
@@ -93,6 +95,7 @@ const toolDefinitions = [
     triggerBosMatTool.toolDefinition,
     calculateHomeServiceFeeTool.toolDefinition,
     sendStudioPhotoTool.toolDefinition,
+    notifyVisitIntentTool.toolDefinition,
 ];
 
 console.log('🔧 [STARTUP] Tool Registry Initialized:');
@@ -175,6 +178,12 @@ Bosmat Studio berlokasi di bukit cengkeh 1, cimanggis - depok
 
 ## Booking Requirements
 Nama, No HP, Motor, Tanggal, Jam, Layanan
+
+## Studio Visit Policy
+- Semua pengerjaan layanan Bosmat wajib melalui booking resmi sebelum eksekusi.
+- Jika pelanggan hanya mau konsultasi di studio tanpa booking, jelaskan bahwa harus kabari jadwal kedatangannya terlebih dahulu karena BosMat bisa saja tidak ada di tempat.
+- Kumpulkan estimasi hari/jam kedatangan dan tujuan konsultasi. Setelah pelanggan mengonfirmasi, panggil notifyVisitIntent tool (sertakan detail waktu/tujuan) untuk mengirim notifikasi ke BosMat agar bisa standby.
+- Bila konsultasi butuh tindak lanjut manual atau ada hal di luar template, gunakan triggerBosMatTool setelah notifikasi dikirim.
 
 ## Rules
 - Hanya bahas topik Bosmat

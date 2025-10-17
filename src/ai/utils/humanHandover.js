@@ -78,6 +78,35 @@ async function notifyBosMat(senderNumber, customerQuestion, reason) {
   await sendWhatsappNotification(messageLines.join('\n'));
 }
 
+async function notifyVisitIntent({ senderNumber, senderName, visitTime, purpose, additionalNotes }) {
+  if (!senderNumber) {
+    throw new Error('[humanHandover] senderNumber wajib untuk notifikasi kunjungan.');
+  }
+
+  const displayName = senderName && senderName.trim() ? senderName.trim() : senderNumber;
+  const lines = [
+    '👋 *Info Konsultasi di Studio*',
+    `👤 Pelanggan: ${displayName}`,
+    `📞 Kontak: ${senderNumber}`,
+  ];
+
+  if (visitTime && visitTime.trim()) {
+    lines.push(`🕒 Rencana Datang: ${visitTime.trim()}`);
+  }
+
+  if (purpose && purpose.trim()) {
+    lines.push(`🎯 Keperluan: ${purpose.trim()}`);
+  }
+
+  if (additionalNotes && additionalNotes.trim()) {
+    lines.push('', additionalNotes.trim());
+  }
+
+  lines.push('', '⚠️ Pastikan studio siap menyambut.');
+
+  await sendWhatsappNotification(lines.join('\n'));
+}
+
 async function notifyNewBooking(bookingData) {
   if (!NOTIFY_BOOKING_CREATION) {
     return;
@@ -240,6 +269,7 @@ async function isSnoozeActive(senderNumber) {
 
 module.exports = {
   notifyBosMat,
+  notifyVisitIntent,
   notifyNewBooking,
   setSnoozeMode,
   clearSnoozeMode,
