@@ -12,7 +12,8 @@ const sendStudioPhotoSchema = z.object({
 });
 
 const DEFAULT_CAPTION = 'Bosmat kini beroperasi di GARASI 54 Moto Division, Jl. R. Sanim No.99 Tanah Baru – Beji, Depok. Mohon kabari sebelum tiba agar tim siap menyambut.';
-const STUDIO_PHOTO_PATH = path.resolve(__dirname, '../../../data/45e8f69d-f540-41c4-b6c6-9d65463007f8.JPG');
+const STUDIO_PHOTO_PATH = path.resolve(__dirname, '../../../data/Screenshot 2025-11-18 at 21.39.30.png');
+const STUDIO_PHOTO_FILENAME = 'bosmat-studio.png';
 const SUPPORTED_META_CHANNELS = new Set(['instagram', 'messenger']);
 
 function parseRecipientIdentity(rawValue) {
@@ -69,7 +70,7 @@ async function implementation(input = {}) {
       throw new Error('[sendStudioPhoto] WhatsApp client belum siap.');
     }
 
-    await client.sendImage(identity.recipientId, STUDIO_PHOTO_PATH, 'bosmat-studio.jpg', caption);
+    await client.sendImage(identity.recipientId, STUDIO_PHOTO_PATH, STUDIO_PHOTO_FILENAME, caption);
 
     return {
       success: true,
@@ -90,8 +91,8 @@ async function implementation(input = {}) {
       STUDIO_PHOTO_PATH,
       {
         caption,
-        filename: 'bosmat-studio.jpg',
-        mimetype: 'image/jpeg',
+        filename: STUDIO_PHOTO_FILENAME,
+        mimetype: 'image/png',
         type: 'image',
       },
       console,
