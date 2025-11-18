@@ -32,35 +32,35 @@ type Output = SuccessResponse | FailResponse;
 
 const studioInfoData = {
   location: {
-    address: 'Bukit Cengkeh 1, Jl. Medan No. B3/2, Cimanggis – Depok, Jawa Barat',
-    landmark: 'Dekat dari jalan raya Bogor atau tol Cijago',
-    googleMaps: 'https://maps.app.goo.gl/do4DBYiMntyV7oqc7',
-    description: 'Lokasi Bosmat – Detailing & Repainting Studio',
+    address: 'Jl. R. Sanim No.99, Tanah Baru, Kecamatan Beji, Kota Depok, Jawa Barat 16426',
+    landmark: 'Bertempat di area GARASI 54 Moto Division – patokan jalur Margonda / pintu Tol Cijago',
+    googleMaps: 'https://maps.app.goo.gl/garasi54moto',
+    description: 'Lokasi Bosmat (beroperasi di GARASI 54 Moto Division)',
   },
   contact: {
     phone: '0895-4015-27556',
     whatsapp: '0895-4015-27556',
   },
   hours: {
-    senin: '09.00–17.00',
-    selasa: '09.00–17.00',
-    rabu: '09.00–17.00',
-    kamis: '09.00–17.00',
+    senin: '08.00–17.00',
+    selasa: '08.00–17.00',
+    rabu: '08.00–17.00',
+    kamis: '08.00–17.00',
     jumat: 'Tutup',
-    sabtu: '09.00–17.00',
-    minggu: '09.00–17.00',
+    sabtu: '08.00–17.00',
+    minggu: '08.00–17.00',
   },
   bookingPolicy: {
-    walkIn: false,
-    appointmentRequired: true,
-    description: 'Wajib janjian atau booking, no walk-in',
+    walkIn: true,
+    appointmentRequired: false,
+    description: 'Walk-in diperbolehkan, namun disarankan booking dulu agar slot aman',
   },
 };
 
 function buildResponse(infoType: Input['infoType']): string {
   switch (infoType) {
     case 'location':
-      return `📍 *Lokasi Bosmat Detailing & Repainting Studio:*
+      return `📍 *Lokasi Bosmat Repainting & Detailing Studio:*
 
 ${studioInfoData.location.address}
 ${studioInfoData.location.landmark}
@@ -101,7 +101,7 @@ Untuk datang ke studio, mas harus:
 Kontak booking: ${studioInfoData.contact.phone}`;
     case 'all':
     default:
-      return `🏢 *Info Lengkap Bosmat Detailing & Repainting Studio*
+      return `🏢 *Info Lengkap Bosmat Repainting & Detailing Studio*
 
 📍 *Alamat:*
 ${studioInfoData.location.address}
@@ -158,7 +158,7 @@ export const getStudioInfoTool = {
     type: 'function' as const,
     function: {
       name: 'getStudioInfo',
-      description: 'Dapatkan informasi lengkap tentang studio Bosmat: alamat, jam buka, kontak, dan kebijakan booking',
+      description: 'Dapatkan informasi lengkap tentang Bosmat: alamat terbaru, jam buka, kontak, dan kebijakan booking',
       parameters: {
         type: 'object',
         properties: {

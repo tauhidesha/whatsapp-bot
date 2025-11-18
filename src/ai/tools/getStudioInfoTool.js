@@ -17,10 +17,10 @@ async function implementation(input) {
 
     const studioInfo = {
       location: {
-        address: 'Bukit Cengkeh 1, Jl. Medan No. B3/2, Cimanggis – Depok, Jawa Barat',
-        landmark: 'Rumah hijau No. B3/2 dekat portal Jl. Medan (masuk gang sebelah kiri setelah gerbang utama Bukit Cengkeh 1)',
-        googleMaps: 'https://maps.app.goo.gl/do4DBYiMntyV7oqc7',
-        description: 'Lokasi Bosmat – Detailing & Repainting Studio',
+        address: 'Jl. R. Sanim No.99, Tanah Baru, Kecamatan Beji, Kota Depok, Jawa Barat 16426',
+        landmark: 'Bertempat di area GARASI 54  Tanah Baru',
+        googleMaps: 'https://maps.app.goo.gl/6ZTh7Drq3EfPF4Bt8',
+        description: 'Lokasi Bosmat (beroperasi di GARASI 54 ',
         exteriorPhoto: 'data/45e8f69d-f540-41c4-b6c6-9d65463007f8.JPG',
       },
       contact: {
@@ -28,18 +28,18 @@ async function implementation(input) {
         whatsapp: '0895-4015-27556',
       },
       hours: {
-        senin: '09.00–17.00',
-        selasa: '09.00–17.00',
-        rabu: '09.00–17.00',
-        kamis: '09.00–17.00',
+        senin: '08.00–17.00',
+        selasa: '08.00–17.00',
+        rabu: '08.00–17.00',
+        kamis: '08.00–17.00',
         jumat: 'Tutup',
-        sabtu: '09.00–17.00',
-        minggu: '09.00–17.00',
+        sabtu: '08.00–17.00',
+        minggu: '08.00–17.00',
       },
       bookingPolicy: {
-        walkIn: false,
-        appointmentRequired: true,
-        description: 'Wajib janjian atau booking, no walk-in',
+        walkIn: true,
+        appointmentRequired: false,
+        description: 'Walk-in diterima, tetapi disarankan booking terlebih dahulu agar slot aman',
       },
     };
 
@@ -47,14 +47,14 @@ async function implementation(input) {
 
     switch (infoType) {
       case 'location':
-        response = `📍 *Lokasi Bosmat Detailing & Repainting Studio:*
+        response = `📍 *Lokasi Bosmat Repainting & Detailing Studio:*
 
 ${studioInfo.location.address}
 ${studioInfo.location.landmark}
 
 Google Maps: ${studioInfo.location.googleMaps}
 
-⚠️ *Penting:* ${studioInfo.bookingPolicy.description}`;
+        ⚠️ *Penting:* ${studioInfo.bookingPolicy.description}`;
         break;
       case 'hours':
         response = `🕒 *Jam Operasional Bosmat Studio:*
@@ -92,7 +92,7 @@ Kontak booking: ${studioInfo.contact.phone}`;
         break;
       case 'all':
       default:
-        response = `🏢 *Info Lengkap Bosmat Detailing & Repainting Studio*
+        response = `🏢 *Info Lengkap Bosmat Repainting & Detailing Studio*
 
 📍 *Alamat:*
 ${studioInfo.location.address}
@@ -143,7 +143,7 @@ const getStudioInfoTool = {
     type: 'function',
     function: {
       name: 'getStudioInfo',
-      description: 'Dapatkan informasi lengkap tentang studio Bosmat: alamat, jam buka, kontak, dan kebijakan booking',
+      description: 'Dapatkan informasi lengkap tentang Bosmat: alamat terkini, jam buka, kontak, dan kebijakan booking',
       parameters: {
         type: 'object',
         properties: {

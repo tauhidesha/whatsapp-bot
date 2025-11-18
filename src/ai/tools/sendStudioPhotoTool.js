@@ -1,5 +1,5 @@
 // File: src/ai/tools/sendStudioPhotoTool.js
-// Mengirim foto eksterior studio Bosmat ke pelanggan melalui WhatsApp.
+// Mengirim foto eksterior Bosmat (lokasi di GARASI 54 Moto Division) ke pelanggan melalui WhatsApp.
 
 const path = require('path');
 const fs = require('fs');
@@ -11,7 +11,7 @@ const sendStudioPhotoSchema = z.object({
   senderNumber: z.string().optional(),
 });
 
-const DEFAULT_CAPTION = 'Studio Bosmat: rumah hijau No. B3/2 dekat portal Jl. Medan. Silakan masuk ke garasi depan.';
+const DEFAULT_CAPTION = 'Bosmat kini beroperasi di GARASI 54 Moto Division, Jl. R. Sanim No.99 Tanah Baru – Beji, Depok. Mohon kabari sebelum tiba agar tim siap menyambut.';
 const STUDIO_PHOTO_PATH = path.resolve(__dirname, '../../../data/45e8f69d-f540-41c4-b6c6-9d65463007f8.JPG');
 const SUPPORTED_META_CHANNELS = new Set(['instagram', 'messenger']);
 
@@ -117,7 +117,7 @@ const sendStudioPhotoTool = {
     type: 'function',
     function: {
       name: 'sendStudioPhoto',
-      description: 'Kirim foto eksterior Bosmat Studio (rumah hijau B3/2 dekat portal Jl. Menda) ke pelanggan via WhatsApp. Gunakan saat pelanggan sulit menemukan lokasi.',
+      description: 'Kirim foto eksterior Bosmat (berlokasi di GARASI 54 Moto Division, Jl. R. Sanim No.99 Tanah Baru, Beji - Depok) ke pelanggan via WhatsApp. Gunakan saat pelanggan sulit menemukan lokasi.',
       parameters: {
         type: 'object',
         properties: {

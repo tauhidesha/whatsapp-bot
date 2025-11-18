@@ -37,7 +37,7 @@ async function sendReminderMessage(booking) {
   const customerName = booking.customerName || 'BosMat Friend';
   const layanan = Array.isArray(booking.services) && booking.services.length > 0
     ? booking.services.join(', ')
-    : booking.serviceName || 'Layanan BosMat';
+    : booking.serviceName || 'Layanan Bosmat';
   const message = [
     `Halo ${customerName}! 👋`,
     '',

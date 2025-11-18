@@ -84,6 +84,7 @@ export const calculateHomeServiceFeeTool = {
       }
 
       const responsePayload = {
+        success: true as const,
         ...calculation,
         address: address || null,
         label: label || null,
@@ -113,7 +114,6 @@ export const calculateHomeServiceFeeTool = {
       }
 
       return {
-        success: true as const,
         ...responsePayload,
         message: messageParts.join(' '),
       };
