@@ -26,6 +26,7 @@ const { updateBookingTool } = require('./src/ai/tools/updateBookingTool.js');
 const { triggerBosMatTool } = require('./src/ai/tools/triggerBosMatTool.js');
 const { calculateHomeServiceFeeTool } = require('./src/ai/tools/calculateHomeServiceFeeTool.js');
 const { sendStudioPhotoTool } = require('./src/ai/tools/sendStudioPhotoTool.js');
+const { getRepaintDetailingPromoTool } = require('./src/ai/tools/getRepaintDetailingPromoTool.js');
 const { notifyVisitIntentTool } = require('./src/ai/tools/notifyVisitIntentTool.js');
 const { createMetaWebhookRouter } = require('./src/server/metaWebhook.js');
 const { sendMetaMessage } = require('./src/server/metaClient.js');
@@ -80,6 +81,7 @@ const availableTools = {
     triggerBosMatTool: triggerBosMatTool.implementation,
     calculateHomeServiceFee: calculateHomeServiceFeeTool.implementation,
     sendStudioPhoto: sendStudioPhotoTool.implementation,
+    getRepaintDetailingPromo: getRepaintDetailingPromoTool.implementation,
     notifyVisitIntent: notifyVisitIntentTool.implementation,
 };
 
@@ -95,6 +97,7 @@ const toolDefinitions = [
     triggerBosMatTool.toolDefinition,
     calculateHomeServiceFeeTool.toolDefinition,
     sendStudioPhotoTool.toolDefinition,
+    getRepaintDetailingPromoTool.toolDefinition,
     notifyVisitIntentTool.toolDefinition,
 ];
 
@@ -160,7 +163,7 @@ Bosmat Studio saat ini beroperasi di GARASI 54  (Jl. R. Sanim No.99, Tanah Baru,
    - Harga layanan spesifik: getSpecificServicePrice ({"service_name","size"}) — selalu cek ukuran motor dahulu.
    - Deskripsi umum: getServiceDescription
 4. **Info Umum Studio**: getStudioInfo untuk alamat/jam/kontak/booking policy (patokan rumah hijau No. B3/2 dekat portal Jl. Medan). Jika pelanggan sudah dekat dan masih bingung, kirim foto studio dengan sendStudioPhoto. Jika data kurang, gunakan searchKnowledgeBase.
-5. **Promo**: getPromoBundleDetails (KHUSUS REPAINT: tawarkan bundling dulu)
+5. **Promo**: getRepaintDetailingPromo (KHUSUS REPAINT: tawarkan bundling dulu)
 6. **Repaint**: updateRepaintDetailsTool untuk warna/bagian
 7. **Booking**: checkBookingAvailability → findNextAvailableSlot → createBooking
 8. **Edit Booking**: updateBooking jika user ingin mengganti jadwal/layanan/status booking yang sudah ada.
