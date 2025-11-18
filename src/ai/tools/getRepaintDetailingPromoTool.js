@@ -1,9 +1,13 @@
 const { z } = require('zod');
+const { getPreferredSizeForService, getMotorSizesForSender } = require('../utils/motorSizeMemory.js');
 
-const sizeSchema = z
-  .enum(['S', 'M', 'L', 'XL'])
-  .optional()
-  .describe('Ukuran motor yang ingin dicek promosinya (S/M/L/XL). Opsi, jika kosong bot kirim semua paket.');
+const inputSchema = z.object({
+  size: z
+    .enum(['S', 'M', 'L', 'XL'])
+    .optional()
+    .describe('Ukuran motor yang ingin difokuskan (S/M/L/XL). Opsi, jika kosong bot kirim semua paket.'),
+  senderNumber: z.string().optional(),
+});
 
 const PROMO_INFO = {
   headline: 'Promo Bundling Repaint + Full Detailing (Update 2025)',
@@ -30,7 +34,7 @@ const PROMO_INFO = {
     },
     L: {
       promoPrice: 1850000,
-      normalPrice: 1950000,
+      normalPrice: null,
       services: 'Repaint Bodi Halus (L) + Full Detailing (M)',
     },
     XL: {
@@ -50,9 +54,6 @@ function buildPackageText(size) {
   if (!data) return '';
 
   const lines = [`**${size}**`];
-  if (data.normalPrice) {
-    lines.push(`- Normal Price: ${formatCurrency(data.normalPrice)}`);
-  }
   lines.push(`- Promo Price: **${formatCurrency(data.promoPrice)}**`);
   lines.push(`- Isi Layanan: ${data.services}`);
   return lines.join('\n');
@@ -73,8 +74,13 @@ function buildResponse(size) {
 }
 
 async function implementation(input = {}) {
-  const parsedSize = sizeSchema.parse(input.size ?? input.motorSize);
-  const sizeKey = parsedSize || null;
+  const { size: providedSize, senderNumber } = inputSchema.parse(input);
+  let sizeKey = providedSize || null;
+
+  if (!sizeKey && senderNumber) {
+    const preferred = getPreferredSizeForService(senderNumber, 'repaint');
+    sizeKey = preferred || getMotorSizesForSender(senderNumber)?.repaintSize || null;
+  }
 
   return {
     success: true,
