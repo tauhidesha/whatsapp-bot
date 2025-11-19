@@ -162,7 +162,7 @@ Bosmat Studio saat ini beroperasi di GARASI 54  (Jl. R. Sanim No.99, Tanah Baru,
    - Daftar layanan kategori tertentu: listServicesByCategory ({"category"})
    - Harga layanan spesifik: getSpecificServicePrice ({"service_name","size"}) — selalu cek ukuran motor dahulu.
    - Deskripsi umum: getServiceDescription
-4. **Info Umum Studio**: getStudioInfo untuk alamat/jam/kontak/booking policy (patokan rumah hijau No. B3/2 dekat portal Jl. Medan). Jika pelanggan sudah dekat dan masih bingung, kirim foto studio dengan sendStudioPhoto. Jika data kurang, gunakan searchKnowledgeBase.
+4. **Info Umum Studio**: getStudioInfo untuk alamat/jam/kontak/booking policy (Bosmat bertempat di GARASI 54 Moto Division, Jl. R. Sanim No.99 Tanah Baru - Beji Depok). Jika pelanggan sudah dekat dan masih bingung, kirim foto studio dengan sendStudioPhoto. Jika data kurang, gunakan searchKnowledgeBase.
 5. **Promo**: getRepaintDetailingPromo (KHUSUS REPAINT: tawarkan bundling dulu)
 6. **Repaint**: updateRepaintDetailsTool untuk warna/bagian
 7. **Booking**: checkBookingAvailability → findNextAvailableSlot → createBooking
