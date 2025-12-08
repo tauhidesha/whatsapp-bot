@@ -26,7 +26,7 @@ const { updateBookingTool } = require('./src/ai/tools/updateBookingTool.js');
 const { triggerBosMatTool } = require('./src/ai/tools/triggerBosMatTool.js');
 const { calculateHomeServiceFeeTool } = require('./src/ai/tools/calculateHomeServiceFeeTool.js');
 const { sendStudioPhotoTool } = require('./src/ai/tools/sendStudioPhotoTool.js');
-const { getRepaintDetailingPromoTool } = require('./src/ai/tools/getRepaintDetailingPromoTool.js');
+const { getRepaintColorSurchargeTool } = require('./src/ai/tools/getRepaintColorSurchargeTool.js');
 const { notifyVisitIntentTool } = require('./src/ai/tools/notifyVisitIntentTool.js');
 const { createMetaWebhookRouter } = require('./src/server/metaWebhook.js');
 const { sendMetaMessage } = require('./src/server/metaClient.js');
@@ -81,7 +81,7 @@ const availableTools = {
     triggerBosMatTool: triggerBosMatTool.implementation,
     calculateHomeServiceFee: calculateHomeServiceFeeTool.implementation,
     sendStudioPhoto: sendStudioPhotoTool.implementation,
-    getRepaintDetailingPromo: getRepaintDetailingPromoTool.implementation,
+    getRepaintColorSurcharge: getRepaintColorSurchargeTool.implementation,
     notifyVisitIntent: notifyVisitIntentTool.implementation,
 };
 
@@ -97,7 +97,7 @@ const toolDefinitions = [
     triggerBosMatTool.toolDefinition,
     calculateHomeServiceFeeTool.toolDefinition,
     sendStudioPhotoTool.toolDefinition,
-    getRepaintDetailingPromoTool.toolDefinition,
+    getRepaintColorSurchargeTool.toolDefinition,
     notifyVisitIntentTool.toolDefinition,
 ];
 
@@ -163,13 +163,12 @@ Bosmat Studio saat ini beroperasi di GARASI 54  (Jl. R. Sanim No.99, Tanah Baru,
    - Harga layanan spesifik: getSpecificServicePrice ({"service_name","size"}) — selalu cek ukuran motor dahulu.
    - Deskripsi umum: getServiceDescription
 4. **Info Umum Studio**: getStudioInfo untuk alamat/jam/kontak/booking policy (Bosmat bertempat di GARASI 54 Moto Division, Jl. R. Sanim No.99 Tanah Baru - Beji Depok). Jika pelanggan sudah dekat dan masih bingung, kirim foto studio dengan sendStudioPhoto. Jika data kurang, gunakan searchKnowledgeBase.
-5. **Promo**: getRepaintDetailingPromo (KHUSUS REPAINT: tawarkan bundling dulu)
-6. **Repaint**: updateRepaintDetailsTool untuk warna/bagian
-7. **Booking**: checkBookingAvailability → findNextAvailableSlot → createBooking
-8. **Edit Booking**: updateBooking jika user ingin mengganti jadwal/layanan/status booking yang sudah ada.
-9. **Home Service**: calculateHomeServiceFee untuk menghitung jarak & biaya tambahan jika pelanggan minta servis ke lokasi (butuh share location).
-10. **Tanggal/Waktu**: getCurrentDateTime jika butuh informasi waktu aktual.
-11. **Ragu**: triggerBosMatTool untuk eskalasi ke BosMat (handover manual).
+5. **Repaint**: updateRepaintDetailsTool untuk warna/bagian
+6. **Booking**: checkBookingAvailability → findNextAvailableSlot → createBooking
+7. **Edit Booking**: updateBooking jika user ingin mengganti jadwal/layanan/status booking yang sudah ada.
+8. **Home Service**: calculateHomeServiceFee untuk menghitung jarak & biaya tambahan jika pelanggan minta servis ke lokasi (butuh share location).
+9. **Tanggal/Waktu**: getCurrentDateTime jika butuh informasi waktu aktual.
+10. **Ragu**: triggerBosMatTool untuk eskalasi ke BosMat (handover manual).
 
 ## Layanan Utama
 **Repaint**: Bodi Halus/Kasar, Velg, Cover CVT/Arm
@@ -191,6 +190,7 @@ Nama, No HP, Motor, Tanggal, Jam, Layanan
 ## Rules
 - Hanya bahas topik Bosmat
 - Repaint: tawarkan promo bundling dulu. Tekankan bahwa pengerjaan repaint wajib di workshop (tidak ada home service) tetapi tersedia layanan jemput-antar. Saat user bingung memilih paket, gali kondisi motor (cat kusam, baret, jamur, dsb), minta kirim foto jika memungkinkan, lalu bandingkan opsi berdasarkan kondisi tersebut. Selalu sebutkan pilihan jemput-antar jika user tidak bisa datang sendiri.
+- Jika pelanggan menanyakan warna khusus (candy/bunglon/moonlight/xyrallic/lembayung/velg), gunakan getRepaintColorSurcharge untuk menghitung biaya tambahannya.
 - Jika jenis motor belum diketahui, tanyakan terlebih dahulu jenis motornya.
 - Ada perbedaan layanan untuk jenis cat motor, jadi baiknya tanyakan motornya cat doff atau glossy.
 - Saat pelanggan bilang masih bingung, bantu analisis: tanya gejala/kondisi motor atau minta foto. Jika masih ragu, tawarkan inspeksi gratis (datang ke workshop atau home visit jika area tercover) sebelum menawarkan konsultasi tim Bosmat.
