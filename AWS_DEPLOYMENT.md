@@ -259,11 +259,59 @@ APP_TIMEZONE=Asia/Jakarta
 META_WEBHOOK_VERIFY_TOKEN=your_verify_token
 META_PAGE_ACCESS_TOKEN=your_page_access_token
 META_INSTAGRAM_ACCESS_TOKEN=your_ig_access_token
+
+# Ngrok (untuk expose aplikasi ke internet)
+NGROK_AUTHTOKEN=your_ngrok_authtoken_here
+NGROK_DOMAIN=your-ngrok-domain.ngrok-free.app
 ```
 
 **Simpan dengan `Ctrl+O`, `Enter`, `Ctrl+X`**
 
-### 3. Setup Direktori untuk Session & Logs
+### 3. Setup Ngrok (Opsional - untuk Webhook)
+
+Ngrok digunakan untuk expose aplikasi ke internet, terutama untuk webhook Meta (Facebook/Instagram Messenger).
+
+#### 3.1. Dapatkan Ngrok Auth Token
+
+1. Daftar/Login di [ngrok.com](https://ngrok.com)
+2. Buka [Dashboard](https://dashboard.ngrok.com/get-started/your-authtoken)
+3. Copy **Authtoken** Anda
+4. Tambahkan ke `.env`: `NGROK_AUTHTOKEN=your_authtoken_here`
+
+#### 3.2. Setup Ngrok Domain (Opsional - untuk Static URL)
+
+**Gratis (Random URL setiap restart):**
+- Tidak perlu setup domain, ngrok akan generate random URL
+- Hapus `NGROK_DOMAIN` dari `.env` atau biarkan kosong
+
+**Paid Plan (Static Domain):**
+1. Buka [ngrok Dashboard → Domains](https://dashboard.ngrok.com/cloud-edge/domains)
+2. Reserve domain (contoh: `your-app.ngrok-free.app`)
+3. Tambahkan ke `.env`: `NGROK_DOMAIN=your-app.ngrok-free.app`
+
+**Note:** 
+- Domain gratis akan berubah setiap restart container
+- Untuk production, gunakan paid plan untuk static domain
+- Atau gunakan domain sendiri dengan custom domain di ngrok
+
+#### 3.3. Verify Ngrok Setup
+
+Setelah container running, cek ngrok URL:
+
+```bash
+# Check ngrok logs untuk melihat public URL
+docker-compose logs ngrok
+
+# Atau check ngrok dashboard
+# https://dashboard.ngrok.com/status/tunnels
+```
+
+**Ngrok URL akan digunakan untuk:**
+- Webhook Meta: `https://your-ngrok-domain.ngrok-free.app/webhooks/meta`
+- Health check: `https://your-ngrok-domain.ngrok-free.app/health`
+- API endpoints: `https://your-ngrok-domain.ngrok-free.app/api/...`
+
+### 4. Setup Direktori untuk Session & Logs
 
 ```bash
 # Buat direktori untuk WhatsApp session tokens
@@ -275,7 +323,7 @@ chmod 755 ~/whatsapp-bot/tokens
 chmod 755 ~/whatsapp-bot/logs
 ```
 
-### 4. Build & Run dengan Docker Compose
+### 5. Build & Run dengan Docker Compose
 
 ```bash
 cd ~/whatsapp-bot
@@ -290,7 +338,7 @@ docker-compose logs -f whatsapp-ai-chatbot
 docker-compose ps
 ```
 
-### 5. Atau Build & Run dengan Docker Manual
+### 6. Atau Build & Run dengan Docker Manual (Tanpa Ngrok)
 
 ```bash
 cd ~/whatsapp-bot
@@ -370,12 +418,61 @@ docker logs -f whatsapp-ai-chatbot
 ### 3. Verify Connection
 
 ```bash
-# Check health endpoint
+# Check health endpoint (local)
 curl http://localhost:4000/health
 
-# Atau dari luar server
+# Check health endpoint (via ngrok)
+curl https://your-ngrok-domain.ngrok-free.app/health
+
+# Atau dari luar server (tanpa ngrok)
 curl http://YOUR_EC2_PUBLIC_IP:4000/health
 ```
+
+## 🔗 Setup Meta Webhook (Facebook/Instagram Messenger)
+
+Jika menggunakan Meta Webhook untuk Facebook Messenger atau Instagram, setup webhook dengan ngrok URL:
+
+### 1. Dapatkan Ngrok URL
+
+```bash
+# Check ngrok logs untuk melihat public URL
+docker-compose logs ngrok | grep "started tunnel"
+
+# Atau check di ngrok dashboard
+# https://dashboard.ngrok.com/status/tunnels
+```
+
+URL akan terlihat seperti: `https://xxxx-xxxx-xxxx.ngrok-free.app`
+
+### 2. Setup Webhook di Meta Developer Console
+
+1. Buka [Meta for Developers](https://developers.facebook.com/)
+2. Pilih App Anda
+3. Settings → Basic → Add Platform → Webhooks
+4. **Callback URL**: `https://your-ngrok-domain.ngrok-free.app/webhooks/meta`
+5. **Verify Token**: Sama dengan `META_WEBHOOK_VERIFY_TOKEN` di `.env`
+6. Subscribe to events yang diperlukan (messages, messaging_postbacks, dll)
+
+### 3. Verify Webhook
+
+Setelah setup, Meta akan mengirim GET request ke webhook URL untuk verifikasi. Pastikan:
+- Container sudah running
+- Ngrok tunnel aktif
+- `META_WEBHOOK_VERIFY_TOKEN` di `.env` sesuai dengan yang di-set di Meta Console
+
+### 4. Test Webhook
+
+```bash
+# Test webhook endpoint
+curl https://your-ngrok-domain.ngrok-free.app/webhooks/meta?hub.mode=subscribe&hub.verify_token=YOUR_TOKEN&hub.challenge=test123
+
+# Should return: test123
+```
+
+**Note:** 
+- Jika menggunakan ngrok free plan, URL akan berubah setiap restart container
+- Update webhook URL di Meta Console setiap kali restart
+- Untuk production, gunakan ngrok paid plan dengan static domain
 
 ---
 
@@ -567,6 +664,54 @@ netstat -tulpn | grep 4000
 docker logs whatsapp-ai-chatbot
 ```
 
+### 7. Ngrok Tidak Connect
+
+```bash
+# Check ngrok logs
+docker-compose logs ngrok
+
+# Check apakah ngrok container running
+docker-compose ps ngrok
+
+# Verify NGROK_AUTHTOKEN di .env
+grep NGROK_AUTHTOKEN .env
+
+# Restart ngrok container
+docker-compose restart ngrok
+
+# Check ngrok URL
+docker-compose logs ngrok | grep "started tunnel"
+```
+
+### 8. Ngrok URL Berubah Setiap Restart
+
+**Masalah:** Dengan ngrok free plan, URL berubah setiap restart.
+
+**Solusi:**
+1. **Gunakan ngrok paid plan** dengan static domain
+2. **Atau update webhook URL** di Meta Console setiap restart
+3. **Atau gunakan script** untuk auto-update webhook URL
+
+```bash
+# Script untuk get ngrok URL dan update webhook
+NGROK_URL=$(docker-compose logs ngrok | grep -oP 'https://[a-z0-9-]+\.ngrok-free\.app' | head -1)
+echo "Ngrok URL: $NGROK_URL"
+# Gunakan URL ini untuk update webhook di Meta Console
+```
+
+### 9. Webhook Meta Tidak Menerima Request
+
+```bash
+# Check webhook endpoint
+curl https://your-ngrok-domain.ngrok-free.app/webhooks/meta
+
+# Check ngrok tunnel status
+curl http://localhost:4040/api/tunnels  # Ngrok local API
+
+# Verify webhook di Meta Console
+# Settings → Webhooks → Test webhook
+```
+
 ---
 
 ## 🔒 Security Best Practices
@@ -587,11 +732,16 @@ docker logs whatsapp-ai-chatbot
 - [ ] Security group configured
 - [ ] Docker installed
 - [ ] Repository cloned
-- [ ] `.env` file configured
+- [ ] `.env` file configured (termasuk NGROK_AUTHTOKEN)
+- [ ] Ngrok authtoken obtained dan ditambahkan ke `.env`
+- [ ] Ngrok domain setup (jika menggunakan paid plan)
 - [ ] Directories created (tokens, logs)
 - [ ] Container built and running
+- [ ] Ngrok tunnel active (check logs)
 - [ ] QR code scanned
-- [ ] Health check passed
+- [ ] Health check passed (local & via ngrok)
+- [ ] Meta webhook configured (jika menggunakan)
+- [ ] Webhook verified di Meta Console
 - [ ] Logs monitored
 - [ ] Auto-restart configured (optional)
 - [ ] Monitoring setup (optional)
