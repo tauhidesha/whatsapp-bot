@@ -8,10 +8,10 @@ const hargaLayanan = [
     "price": 0,
     "estimatedDuration": "2400",
     "variants": [
-      { "name": "S", "price": 1000000 },
+      { "name": "S", "price": 900000 },
       { "name": "M", "price": 1250000 },
       { "name": "L", "price": 1400000 },
-      { "name": "XL", "price": 1900000 }
+      { "name": "XL", "price": 1800000 }
     ]
   },
   {
