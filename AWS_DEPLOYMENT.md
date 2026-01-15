@@ -129,6 +129,45 @@ sudo yum update -y
 curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
 sudo apt-get install -y nodejs
 
+# Install Chrome/Puppeteer dependencies
+sudo apt-get install -y \
+    ca-certificates \
+    fonts-liberation \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libc6 \
+    libcairo2 \
+    libcups2 \
+    libdbus-1-3 \
+    libexpat1 \
+    libfontconfig1 \
+    libgbm1 \
+    libgcc1 \
+    libglib2.0-0 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libstdc++6 \
+    libx11-6 \
+    libx11-xcb1 \
+    libxcb1 \
+    libxcomposite1 \
+    libxcursor1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxi6 \
+    libxrandr2 \
+    libxrender1 \
+    libxss1 \
+    libxtst6 \
+    lsb-release \
+    wget \
+    xdg-utils
+
 # Verify installation
 node --version
 npm --version
@@ -140,6 +179,29 @@ npm --version
 # Install Node.js 18.x
 curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
 sudo yum install -y nodejs
+
+# Install Chrome/Puppeteer dependencies
+sudo yum install -y \
+    alsa-lib \
+    atk \
+    cups-libs \
+    gtk3 \
+    ipa-gothic-fonts \
+    libXcomposite \
+    libXcursor \
+    libXdamage \
+    libXext \
+    libXi \
+    libXrandr \
+    libXScrnSaver \
+    libXtst \
+    pango \
+    xorg-x11-fonts-100dpi \
+    xorg-x11-fonts-75dpi \
+    xorg-x11-utils \
+    xorg-x11-fonts-cyrillic \
+    xorg-x11-fonts-Type1 \
+    xorg-x11-fonts-misc
 
 # Verify installation
 node --version
@@ -441,12 +503,54 @@ aws ssm put-parameter \
 Setelah service running, QR code akan muncul di logs:
 
 ```bash
-# View logs untuk QR code
+# View logs real-time untuk QR code
 sudo journalctl -u whatsapp-ai -f
 
 # Atau view last 100 lines
 sudo journalctl -u whatsapp-ai -n 100
+
+# Filter untuk mencari QR code
+sudo journalctl -u whatsapp-ai | grep -i "qr\|whatsapp"
+
+# Atau cek semua logs dengan format yang lebih readable
+sudo journalctl -u whatsapp-ai --no-pager | tail -50
 ```
+
+**Jika QR code tidak muncul:**
+
+1. **Cek apakah service sudah fully started:**
+   ```bash
+   sudo systemctl status whatsapp-ai
+   # Pastikan status: active (running)
+   ```
+
+2. **Cek apakah session sudah ada (jika sudah ada, tidak perlu QR):**
+   ```bash
+   ls -la ~/whatsapp-bot/tokens/
+   # Jika ada folder session, hapus untuk force QR baru:
+   rm -rf ~/whatsapp-bot/tokens/ai-chatbot
+   sudo systemctl restart whatsapp-ai
+   ```
+
+3. **Cek apakah WhatsApp client sudah initialize:**
+   ```bash
+   sudo journalctl -u whatsapp-ai | grep -i "whatsapp\|initialized\|error"
+   ```
+
+4. **Cek apakah ada error di initialization:**
+   ```bash
+   sudo journalctl -u whatsapp-ai | grep -i "error\|failed"
+   ```
+
+5. **Test run manual untuk lihat QR code:**
+   ```bash
+   cd ~/whatsapp-bot
+   # Stop service dulu
+   sudo systemctl stop whatsapp-ai
+   # Run manual
+   node app.js
+   # QR code akan muncul di terminal
+   ```
 
 ### 2. Scan QR Code dengan WhatsApp
 
