@@ -1372,6 +1372,11 @@ server.listen(PORT, '0.0.0.0', async () => {
     });
 
     // Initialize WhatsApp connection
+    const whatsappAutoClose = process.env.WHATSAPP_AUTO_CLOSE === 'true';
+    const whatsappHeadless = process.env.WHATSAPP_HEADLESS === 'true';
+    
+    console.log(`🔧 WhatsApp Config: AUTO_CLOSE=${whatsappAutoClose} (env: "${process.env.WHATSAPP_AUTO_CLOSE}"), HEADLESS=${whatsappHeadless}`);
+    
     wppconnect.create({
         session: sessionName,
         catchQR: (base64Qr, asciiQR) => { 
@@ -1382,9 +1387,9 @@ server.listen(PORT, '0.0.0.0', async () => {
         statusFind: (statusSession, session) => {
             console.log('📱 WhatsApp Status:', statusSession, 'Session:', session);
         },
-        headless: process.env.WHATSAPP_HEADLESS === 'true',
+        headless: whatsappHeadless,
         logQR: true,
-        autoClose: process.env.WHATSAPP_AUTO_CLOSE === 'true',
+        autoClose: whatsappAutoClose,
         sessionDataPath,
         puppeteerOptions: {
             timeout: 120000,
