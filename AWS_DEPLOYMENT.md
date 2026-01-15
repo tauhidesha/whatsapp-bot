@@ -120,45 +120,50 @@ sudo apt update && sudo apt upgrade -y
 sudo yum update -y
 ```
 
-### 2. Install Docker
+### 2. Install Node.js
 
 **Ubuntu:**
 
 ```bash
-# Install Docker
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-
-# Install Docker Compose
-sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
-
-# Add user to docker group
-sudo usermod -aG docker $USER
-newgrp docker
+# Install Node.js 18.x
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
 
 # Verify installation
-docker --version
-docker-compose --version
+node --version
+npm --version
 ```
 
 **Amazon Linux:**
 
 ```bash
-# Install Docker
-sudo yum install docker -y
-sudo systemctl start docker
-sudo systemctl enable docker
-sudo usermod -aG docker ec2-user
+# Install Node.js 18.x
+curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
+sudo yum install -y nodejs
 
-# Install Docker Compose
-sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
-
-# Logout dan login lagi untuk apply group changes
+# Verify installation
+node --version
+npm --version
 ```
 
-### 3. Install Git & Node.js (untuk build, opsional)
+### 3. Install Ngrok (Opsional - untuk Webhook)
+
+```bash
+# Download dan install ngrok
+curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
+sudo apt update && sudo apt install ngrok
+
+# Atau manual download
+# wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
+# tar -xzf ngrok-v3-stable-linux-amd64.tgz
+# sudo mv ngrok /usr/local/bin/
+
+# Verify
+ngrok version
+```
+
+### 4. Install Git
 
 ```bash
 # Ubuntu
@@ -172,7 +177,7 @@ curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
 sudo apt-get install -y nodejs
 ```
 
-### 4. Setup Firewall (jika menggunakan UFW)
+### 5. Setup Firewall (jika menggunakan UFW)
 
 ```bash
 sudo ufw allow 22/tcp
@@ -296,14 +301,17 @@ Ngrok digunakan untuk expose aplikasi ke internet, terutama untuk webhook Meta (
 
 #### 3.3. Verify Ngrok Setup
 
-Setelah container running, cek ngrok URL:
+Setelah service running, cek ngrok URL:
 
 ```bash
 # Check ngrok logs untuk melihat public URL
-docker-compose logs ngrok
+sudo journalctl -u ngrok -f
 
 # Atau check ngrok dashboard
 # https://dashboard.ngrok.com/status/tunnels
+
+# Atau check ngrok local API
+curl http://localhost:4040/api/tunnels
 ```
 
 **Ngrok URL akan digunakan untuk:**
@@ -323,41 +331,65 @@ chmod 755 ~/whatsapp-bot/tokens
 chmod 755 ~/whatsapp-bot/logs
 ```
 
-### 5. Build & Run dengan Docker Compose
+### 5. Install Dependencies
 
 ```bash
 cd ~/whatsapp-bot
 
-# Build dan start containers
-docker-compose up -d
-
-# Check logs
-docker-compose logs -f whatsapp-ai-chatbot
-
-# Check status
-docker-compose ps
+# Install Node.js dependencies
+npm install --production
 ```
 
-### 6. Atau Build & Run dengan Docker Manual (Tanpa Ngrok)
+### 6. Setup Systemd Service
 
 ```bash
 cd ~/whatsapp-bot
 
-# Build image
-docker build -t whatsapp-ai-chatbot .
+# Copy service file ke systemd
+sudo cp whatsapp-ai.service /etc/systemd/system/
 
-# Run container
-docker run -d \
-  --name whatsapp-ai-chatbot \
-  --restart unless-stopped \
-  -p 4000:4000 \
-  --env-file .env \
-  -v $(pwd)/tokens:/app/tokens \
-  -v $(pwd)/logs:/app/logs \
-  whatsapp-ai-chatbot
+# Edit service file jika perlu (sesuaikan user dan path)
+sudo nano /etc/systemd/system/whatsapp-ai.service
 
-# Check logs
-docker logs -f whatsapp-ai-chatbot
+# Reload systemd
+sudo systemctl daemon-reload
+
+# Enable service (auto-start on boot)
+sudo systemctl enable whatsapp-ai
+
+# Start service
+sudo systemctl start whatsapp-ai
+
+# Check status
+sudo systemctl status whatsapp-ai
+
+# View logs
+sudo journalctl -u whatsapp-ai -f
+```
+
+### 7. Setup Ngrok Service (Opsional)
+
+Jika menggunakan ngrok:
+
+```bash
+cd ~/whatsapp-bot
+
+# Copy ngrok service file
+sudo cp ngrok.service /etc/systemd/system/
+
+# Edit service file jika perlu
+sudo nano /etc/systemd/system/ngrok.service
+
+# Reload dan enable
+sudo systemctl daemon-reload
+sudo systemctl enable ngrok
+sudo systemctl start ngrok
+
+# Check status
+sudo systemctl status ngrok
+
+# View logs
+sudo journalctl -u ngrok -f
 ```
 
 ---
@@ -398,14 +430,14 @@ aws ssm put-parameter \
 
 ### 1. Scan QR Code
 
-Setelah container running, QR code akan muncul di logs:
+Setelah service running, QR code akan muncul di logs:
 
 ```bash
 # View logs untuk QR code
-docker-compose logs -f whatsapp-ai-chatbot
+sudo journalctl -u whatsapp-ai -f
 
-# Atau
-docker logs -f whatsapp-ai-chatbot
+# Atau view last 100 lines
+sudo journalctl -u whatsapp-ai -n 100
 ```
 
 ### 2. Scan QR Code dengan WhatsApp
@@ -436,7 +468,10 @@ Jika menggunakan Meta Webhook untuk Facebook Messenger atau Instagram, setup web
 
 ```bash
 # Check ngrok logs untuk melihat public URL
-docker-compose logs ngrok | grep "started tunnel"
+sudo journalctl -u ngrok | grep "started tunnel"
+
+# Atau check ngrok local API
+curl http://localhost:4040/api/tunnels | jq '.tunnels[0].public_url'
 
 # Atau check di ngrok dashboard
 # https://dashboard.ngrok.com/status/tunnels
@@ -476,42 +511,44 @@ curl https://your-ngrok-domain.ngrok-free.app/webhooks/meta?hub.mode=subscribe&h
 
 ---
 
-## 🔄 Setup Auto-Restart dengan Systemd (Opsional)
+## 🔄 Management Service
 
-Buat service untuk auto-restart:
-
-```bash
-sudo nano /etc/systemd/system/whatsapp-ai.service
-```
-
-**Isi:**
-
-```ini
-[Unit]
-Description=WhatsApp AI Chatbot
-After=docker.service
-Requires=docker.service
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-WorkingDirectory=/home/ubuntu/whatsapp-bot
-ExecStart=/usr/local/bin/docker-compose up -d
-ExecStop=/usr/local/bin/docker-compose down
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-```
-
-**Enable & Start:**
+### Start/Stop/Restart Service
 
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable whatsapp-ai
+# Start service
 sudo systemctl start whatsapp-ai
+
+# Stop service
+sudo systemctl stop whatsapp-ai
+
+# Restart service
+sudo systemctl restart whatsapp-ai
+
+# Check status
 sudo systemctl status whatsapp-ai
+
+# Enable auto-start on boot (sudah dilakukan di step 6)
+sudo systemctl enable whatsapp-ai
+
+# Disable auto-start
+sudo systemctl disable whatsapp-ai
+```
+
+### View Logs
+
+```bash
+# Real-time logs
+sudo journalctl -u whatsapp-ai -f
+
+# Last 100 lines
+sudo journalctl -u whatsapp-ai -n 100
+
+# Logs dengan timestamp
+sudo journalctl -u whatsapp-ai --since "1 hour ago"
+
+# Ngrok logs
+sudo journalctl -u ngrok -f
 ```
 
 ---
@@ -521,31 +558,38 @@ sudo systemctl status whatsapp-ai
 ### 1. View Logs
 
 ```bash
-# Docker Compose
-docker-compose logs -f whatsapp-ai-chatbot
-
-# Docker
-docker logs -f whatsapp-ai-chatbot
+# Real-time logs
+sudo journalctl -u whatsapp-ai -f
 
 # Last 100 lines
-docker logs --tail 100 whatsapp-ai-chatbot
+sudo journalctl -u whatsapp-ai -n 100
+
+# Logs dengan filter
+sudo journalctl -u whatsapp-ai --since "1 hour ago" | grep ERROR
 ```
 
-### 2. Check Container Status
+### 2. Check Service Status
 
 ```bash
-docker ps
-docker-compose ps
+# Check service status
+sudo systemctl status whatsapp-ai
+
+# Check if running
+systemctl is-active whatsapp-ai
+
+# Check if enabled
+systemctl is-enabled whatsapp-ai
 ```
 
-### 3. Restart Container
+### 3. Restart Service
 
 ```bash
-# Docker Compose
-docker-compose restart whatsapp-ai-chatbot
+# Restart service
+sudo systemctl restart whatsapp-ai
 
-# Docker
-docker restart whatsapp-ai-chatbot
+# Reload service (jika config berubah)
+sudo systemctl daemon-reload
+sudo systemctl restart whatsapp-ai
 ```
 
 ### 4. Update Application
@@ -556,21 +600,32 @@ cd ~/whatsapp-bot
 # Pull latest code
 git pull origin main
 
-# Rebuild dan restart
-docker-compose down
-docker-compose build --no-cache
-docker-compose up -d
+# Install dependencies (jika ada perubahan)
+npm install --production
+
+# Restart service
+sudo systemctl restart whatsapp-ai
+
+# Check status
+sudo systemctl status whatsapp-ai
 ```
 
 ### 5. Monitor Resources
 
 ```bash
 # CPU & Memory usage
-docker stats whatsapp-ai-chatbot
+top -p $(pgrep -f "node.*app.js")
+
+# Atau gunakan htop (install: sudo apt install htop)
+htop
 
 # Disk usage
 df -h
 du -sh ~/whatsapp-bot/tokens
+du -sh ~/whatsapp-bot/node_modules
+
+# Process info
+ps aux | grep node
 ```
 
 ### 6. Setup CloudWatch Logs (Opsional)
@@ -588,17 +643,21 @@ sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-config-wizard
 
 ## 🐛 Troubleshooting
 
-### 1. Container Tidak Start
+### 1. Service Tidak Start
 
 ```bash
-# Check logs
-docker-compose logs whatsapp-ai-chatbot
+# Check logs untuk error
+sudo journalctl -u whatsapp-ai -n 50
 
-# Check environment variables
-docker-compose config
+# Check service status
+sudo systemctl status whatsapp-ai
 
-# Test build
-docker-compose build --no-cache
+# Check jika port sudah digunakan
+sudo netstat -tulpn | grep 4000
+
+# Check permissions
+ls -la ~/whatsapp-bot/
+ls -la ~/whatsapp-bot/.env
 ```
 
 ### 2. WhatsApp Tidak Connect
@@ -609,7 +668,10 @@ ls -la ~/whatsapp-bot/tokens/
 
 # Delete session dan restart (akan minta scan QR lagi)
 rm -rf ~/whatsapp-bot/tokens/*
-docker-compose restart whatsapp-ai-chatbot
+sudo systemctl restart whatsapp-ai
+
+# Check logs untuk QR code
+sudo journalctl -u whatsapp-ai -f
 ```
 
 ### 3. Port 4000 Tidak Accessible
@@ -644,11 +706,15 @@ sudo swapon /swapfile
 # Check disk usage
 df -h
 
-# Clean Docker
-docker system prune -a
-
 # Clean old logs
-docker-compose logs --tail=0 -f whatsapp-ai-chatbot > /dev/null
+sudo journalctl --vacuum-time=7d
+
+# Clean npm cache
+npm cache clean --force
+
+# Remove old node_modules dan reinstall
+rm -rf node_modules
+npm install --production
 ```
 
 ### 6. Health Check Failed
@@ -668,19 +734,23 @@ docker logs whatsapp-ai-chatbot
 
 ```bash
 # Check ngrok logs
-docker-compose logs ngrok
+sudo journalctl -u ngrok -n 50
 
-# Check apakah ngrok container running
-docker-compose ps ngrok
+# Check apakah ngrok service running
+sudo systemctl status ngrok
 
 # Verify NGROK_AUTHTOKEN di .env
-grep NGROK_AUTHTOKEN .env
+grep NGROK_AUTHTOKEN ~/whatsapp-bot/.env
 
-# Restart ngrok container
-docker-compose restart ngrok
+# Verify ngrok installed
+which ngrok
+ngrok version
+
+# Restart ngrok service
+sudo systemctl restart ngrok
 
 # Check ngrok URL
-docker-compose logs ngrok | grep "started tunnel"
+curl http://localhost:4040/api/tunnels
 ```
 
 ### 8. Ngrok URL Berubah Setiap Restart
@@ -706,7 +776,13 @@ echo "Ngrok URL: $NGROK_URL"
 curl https://your-ngrok-domain.ngrok-free.app/webhooks/meta
 
 # Check ngrok tunnel status
-curl http://localhost:4040/api/tunnels  # Ngrok local API
+curl http://localhost:4040/api/tunnels
+
+# Check if app is running
+curl http://localhost:4000/health
+
+# Check ngrok service
+sudo systemctl status ngrok
 
 # Verify webhook di Meta Console
 # Settings → Webhooks → Test webhook
@@ -730,20 +806,23 @@ curl http://localhost:4040/api/tunnels  # Ngrok local API
 
 - [ ] EC2 instance created
 - [ ] Security group configured
-- [ ] Docker installed
+- [ ] Node.js 18+ installed
+- [ ] Ngrok installed (jika menggunakan webhook)
 - [ ] Repository cloned
 - [ ] `.env` file configured (termasuk NGROK_AUTHTOKEN)
 - [ ] Ngrok authtoken obtained dan ditambahkan ke `.env`
 - [ ] Ngrok domain setup (jika menggunakan paid plan)
+- [ ] Dependencies installed (`npm install`)
 - [ ] Directories created (tokens, logs)
-- [ ] Container built and running
+- [ ] Systemd service configured dan enabled
+- [ ] Service started dan running
+- [ ] Ngrok service started (jika menggunakan)
 - [ ] Ngrok tunnel active (check logs)
 - [ ] QR code scanned
 - [ ] Health check passed (local & via ngrok)
 - [ ] Meta webhook configured (jika menggunakan)
 - [ ] Webhook verified di Meta Console
 - [ ] Logs monitored
-- [ ] Auto-restart configured (optional)
 - [ ] Monitoring setup (optional)
 
 ---

@@ -1,0 +1,23 @@
+[Unit]
+Description=Ngrok Tunnel for WhatsApp AI Chatbot
+After=network.target whatsapp-ai.service
+Requires=whatsapp-ai.service
+
+[Service]
+Type=simple
+# Ganti 'ubuntu' dengan user yang sesuai
+User=ubuntu
+# Ganti path sesuai lokasi aplikasi Anda
+WorkingDirectory=/home/ubuntu/whatsapp-bot
+EnvironmentFile=/home/ubuntu/whatsapp-bot/.env
+# Gunakan 'which ngrok' untuk cek path ngrok
+# Jika NGROK_DOMAIN kosong, hapus --domain=${NGROK_DOMAIN}
+ExecStart=/usr/local/bin/ngrok http --domain=${NGROK_DOMAIN} localhost:4000
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ngrok
+
+[Install]
+WantedBy=multi-user.target
