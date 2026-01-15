@@ -1386,6 +1386,15 @@ server.listen(PORT, '0.0.0.0', async () => {
         },
         statusFind: (statusSession, session) => {
             console.log('📱 WhatsApp Status:', statusSession, 'Session:', session);
+            if (statusSession === 'isLogged') {
+                console.log('✅ WhatsApp sudah login, tidak perlu QR code');
+            } else if (statusSession === 'notLogged') {
+                console.log('⚠️ WhatsApp belum login, menunggu QR code...');
+            } else if (statusSession === 'qrReadSuccess') {
+                console.log('✅ QR code berhasil di-scan!');
+            } else if (statusSession === 'autocloseCalled') {
+                console.error('❌ ERROR: Auto close dipanggil! Pastikan WHATSAPP_AUTO_CLOSE=false');
+            }
         },
         headless: whatsappHeadless,
         logQR: true,
