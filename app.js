@@ -1372,10 +1372,14 @@ server.listen(PORT, '0.0.0.0', async () => {
     });
 
     // Initialize WhatsApp connection
-    const whatsappAutoClose = process.env.WHATSAPP_AUTO_CLOSE === 'true';
+    // ⚠️ PENTING: Set autoClose ke false secara eksplisit untuk production
+    const whatsappAutoClose = process.env.WHATSAPP_AUTO_CLOSE !== 'false'; // Default false jika tidak di-set
     const whatsappHeadless = process.env.WHATSAPP_HEADLESS === 'true';
     
-    console.log(`🔧 WhatsApp Config: AUTO_CLOSE=${whatsappAutoClose} (env: "${process.env.WHATSAPP_AUTO_CLOSE}"), HEADLESS=${whatsappHeadless}`);
+    // Force false untuk production (jika env tidak di-set atau bukan 'true', maka false)
+    const shouldAutoClose = process.env.WHATSAPP_AUTO_CLOSE === 'true';
+    
+    console.log(`🔧 WhatsApp Config: AUTO_CLOSE=${shouldAutoClose} (env: "${process.env.WHATSAPP_AUTO_CLOSE}"), HEADLESS=${whatsappHeadless}`);
     
     wppconnect.create({
         session: sessionName,
@@ -1394,11 +1398,14 @@ server.listen(PORT, '0.0.0.0', async () => {
                 console.log('✅ QR code berhasil di-scan!');
             } else if (statusSession === 'autocloseCalled') {
                 console.error('❌ ERROR: Auto close dipanggil! Pastikan WHATSAPP_AUTO_CLOSE=false');
+                console.error('⚠️ Mencoba reconnect...');
+                // Jangan throw error, biarkan retry
             }
         },
         headless: whatsappHeadless,
         logQR: true,
-        autoClose: whatsappAutoClose,
+        autoClose: shouldAutoClose, // Hanya true jika env var eksplisit 'true'
+        disableWelcome: true, // Disable welcome message
         sessionDataPath,
         puppeteerOptions: {
             timeout: 120000,
