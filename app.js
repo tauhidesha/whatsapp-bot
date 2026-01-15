@@ -647,7 +647,40 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
         while (iteration < MAX_ITERATIONS) {
             const traceLabel = iteration === 0 ? 'chat-response-initial' : `chat-response-iteration-${iteration}`;
             console.log(`🚀 [AI_PROCESSING] Sending request to AI model... (iteration ${iteration + 1})`);
-            response = await aiModel.invoke(messages, getTracingConfig(traceLabel));
+            try {
+                response = await aiModel.invoke(messages, getTracingConfig(traceLabel));
+            } catch (error) {
+                // Handle quota exceeded error with fallback
+                if (error?.message?.includes('Quota exceeded') || error?.message?.includes('429')) {
+                    console.error('❌ [AI_PROCESSING] Quota exceeded for current model, trying fallback...');
+                    const fallbackModels = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-2.5-flash'];
+                    let fallbackSuccess = false;
+                    
+                    for (const fallbackModel of fallbackModels) {
+                        if (fallbackModel === ACTIVE_AI_MODEL) continue; // Skip current model
+                        try {
+                            console.log(`🔄 [AI_PROCESSING] Trying fallback model: ${fallbackModel}`);
+                            const fallbackModelInstance = new ChatGoogleGenerativeAI({
+                                model: fallbackModel,
+                                temperature: parseFloat(process.env.AI_TEMPERATURE) || 0.7,
+                                apiKey: process.env.GOOGLE_API_KEY
+                            });
+                            response = await fallbackModelInstance.invoke(messages, getTracingConfig(traceLabel));
+                            console.log(`✅ [AI_PROCESSING] Fallback model ${fallbackModel} succeeded!`);
+                            fallbackSuccess = true;
+                            break;
+                        } catch (fallbackError) {
+                            console.error(`❌ [AI_PROCESSING] Fallback model ${fallbackModel} also failed:`, fallbackError.message);
+                        }
+                    }
+                    
+                    if (!fallbackSuccess) {
+                        throw new Error('All models failed due to quota issues. Please check your API quota or billing status.');
+                    }
+                } else {
+                    throw error; // Re-throw if not quota error
+                }
+            }
 
             const toolCalls = getToolCallsFromResponse(response);
 
