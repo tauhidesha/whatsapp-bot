@@ -293,7 +293,7 @@ AI_MAX_TOKENS=1000
 # WhatsApp Configuration
 WHATSAPP_SESSION=ai-chatbot
 WHATSAPP_HEADLESS=true
-WHATSAPP_AUTO_CLOSE=false
+WHATSAPP_AUTO_CLOSE=false  # ⚠️ PENTING: Harus false untuk production, jika true browser akan auto close
 
 # Firebase (Optional)
 FIREBASE_SERVICE_ACCOUNT_BASE64=your_firebase_base64_key_here

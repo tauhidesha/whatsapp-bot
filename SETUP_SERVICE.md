@@ -222,6 +222,74 @@ node app.js
    npm install --production
    ```
 
+6. **"libatk-1.0.so.0: cannot open shared object file" (Puppeteer/Chrome error)**
+   ```bash
+   # Amazon Linux - Install Chrome dependencies
+   sudo yum install -y \
+       alsa-lib \
+       atk \
+       cups-libs \
+       gtk3 \
+       ipa-gothic-fonts \
+       libXcomposite \
+       libXcursor \
+       libXdamage \
+       libXext \
+       libXi \
+       libXrandr \
+       libXScrnSaver \
+       libXtst \
+       pango \
+       xorg-x11-fonts-100dpi \
+       xorg-x11-fonts-75dpi \
+       xorg-x11-utils \
+       xorg-x11-fonts-cyrillic \
+       xorg-x11-fonts-Type1 \
+       xorg-x11-fonts-misc
+   
+   # Ubuntu - Install Chrome dependencies
+   sudo apt-get install -y \
+       ca-certificates \
+       fonts-liberation \
+       libasound2 \
+       libatk-bridge2.0-0 \
+       libatk1.0-0 \
+       libc6 \
+       libcairo2 \
+       libcups2 \
+       libdbus-1-3 \
+       libexpat1 \
+       libfontconfig1 \
+       libgbm1 \
+       libgcc1 \
+       libglib2.0-0 \
+       libgtk-3-0 \
+       libnspr4 \
+       libnss3 \
+       libpango-1.0-0 \
+       libpangocairo-1.0-0 \
+       libstdc++6 \
+       libx11-6 \
+       libx11-xcb1 \
+       libxcb1 \
+       libxcomposite1 \
+       libxcursor1 \
+       libxdamage1 \
+       libxext6 \
+       libxfixes3 \
+       libxi6 \
+       libxrandr2 \
+       libxrender1 \
+       libxss1 \
+       libxtst6 \
+       lsb-release \
+       wget \
+       xdg-utils
+   
+   # Setelah install, restart service
+   sudo systemctl restart whatsapp-ai
+   ```
+
 ### Error: "Permission denied"
 
 ```bash
@@ -243,4 +311,45 @@ sudo systemctl is-enabled whatsapp-ai
 
 # Jika tidak enabled, enable lagi
 sudo systemctl enable whatsapp-ai
+```
+
+### Error: "Auto Close Called" atau Browser langsung close
+
+**Masalah:** `WHATSAPP_AUTO_CLOSE=true` di `.env` menyebabkan browser langsung close.
+
+**Solusi:**
+```bash
+# Edit .env file
+nano ~/whatsapp-bot/.env
+
+# Pastikan:
+WHATSAPP_AUTO_CLOSE=false  # ⚠️ Harus false untuk production
+
+# Hapus session lama
+rm -rf ~/whatsapp-bot/tokens/ai-chatbot
+
+# Restart service
+sudo systemctl restart whatsapp-ai
+
+# Check logs
+sudo journalctl -u whatsapp-ai -f
+```
+
+### QR Code tidak muncul setelah "Auto Close Called"
+
+**Masalah:** Session mungkin corrupt atau browser auto close sebelum QR muncul.
+
+**Solusi:**
+```bash
+# 1. Pastikan WHATSAPP_AUTO_CLOSE=false
+grep WHATSAPP_AUTO_CLOSE ~/whatsapp-bot/.env
+
+# 2. Hapus session folder
+rm -rf ~/whatsapp-bot/tokens/ai-chatbot
+
+# 3. Restart service
+sudo systemctl restart whatsapp-ai
+
+# 4. Tunggu beberapa detik, lalu cek logs
+sudo journalctl -u whatsapp-ai -f | grep -i "qr\|whatsapp"
 ```
