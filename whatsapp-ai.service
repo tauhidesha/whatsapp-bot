@@ -5,13 +5,18 @@ After=network.target
 [Service]
 Type=simple
 # Ganti 'ubuntu' dengan user yang sesuai (ubuntu untuk Ubuntu, ec2-user untuk Amazon Linux)
-User=ubuntu
+User=ec2-user
 # Ganti path sesuai lokasi aplikasi Anda
-WorkingDirectory=/home/ubuntu/whatsapp-bot
+WorkingDirectory=/home/ec2-user/whatsapp-bot
 Environment="NODE_ENV=production"
-EnvironmentFile=/home/ubuntu/whatsapp-bot/.env
+# ⚠️ PENTING: Hardcode WHATSAPP_AUTO_CLOSE=false untuk memastikan tidak auto close
+Environment="WHATSAPP_AUTO_CLOSE=false"
+Environment="WHATSAPP_HEADLESS=true"
+Environment="WHATSAPP_KEEP_ONLINE=true"
+# Load env vars lainnya dari file
+EnvironmentFile=/home/ec2-user/whatsapp-bot/.env
 # Gunakan 'which node' untuk cek path node
-ExecStart=/usr/bin/node /home/ubuntu/whatsapp-bot/app.js
+ExecStart=/usr/bin/node /home/ec2-user/whatsapp-bot/app.js
 Restart=always
 RestartSec=10
 StandardOutput=journal
