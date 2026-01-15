@@ -345,10 +345,18 @@ npm install --production
 ```bash
 cd ~/whatsapp-bot
 
+# Cek username yang sedang digunakan (bukan hostname!)
+whoami
+# Output: ubuntu (untuk Ubuntu) atau ec2-user (untuk Amazon Linux)
+
+# Cek home directory
+echo $HOME
+# Output: /home/ubuntu atau /home/ec2-user
+
 # Copy service file ke systemd
 sudo cp whatsapp-ai.service /etc/systemd/system/
 
-# Edit service file jika perlu (sesuaikan user dan path)
+# Edit service file - SESUAIKAN USER DAN PATH!
 sudo nano /etc/systemd/system/whatsapp-ai.service
 
 # Reload systemd
