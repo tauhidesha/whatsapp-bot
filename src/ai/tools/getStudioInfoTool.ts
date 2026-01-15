@@ -32,14 +32,14 @@ type Output = SuccessResponse | FailResponse;
 
 const studioInfoData = {
   location: {
-    address: 'Jl. R. Sanim No.99, Tanah Baru, Kecamatan Beji, Kota Depok, Jawa Barat 16426',
-    landmark: 'Bertempat di area GARASI 54 Moto Division – patokan jalur Margonda / pintu Tol Cijago',
-    googleMaps: 'https://maps.app.goo.gl/garasi54moto',
-    description: 'Lokasi Bosmat (beroperasi di GARASI 54 Moto Division)',
+    address: 'Bukit Cengkeh 1, Jl. Medan No.B3/2, Kota Depok, Jawa Barat 16451',
+    landmark: 'Bosmat Repaint Detailing Motor',
+    googleMaps: 'https://maps.app.goo.gl/JrH7TxyfPtGxBjW19',
+    description: 'Lokasi Bosmat Repaint Detailing Motor',
   },
   contact: {
-    phone: '0895-4015-27556',
-    whatsapp: '0895-4015-27556',
+    phone: '0895401527556',
+    whatsapp: '0895401527556',
   },
   hours: {
     senin: '08.00–17.00',

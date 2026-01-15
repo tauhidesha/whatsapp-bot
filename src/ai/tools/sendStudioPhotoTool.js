@@ -1,5 +1,5 @@
 // File: src/ai/tools/sendStudioPhotoTool.js
-// Mengirim foto eksterior Bosmat (lokasi di GARASI 54 Moto Division) ke pelanggan melalui WhatsApp.
+// Mengirim foto eksterior Bosmat (lokasi di Bukit Cengkeh 1, Jl. Medan No.B3/2, Kota Depok, Jawa Barat 16451) ke pelanggan melalui WhatsApp.
 
 const path = require('path');
 const fs = require('fs');
@@ -11,9 +11,9 @@ const sendStudioPhotoSchema = z.object({
   senderNumber: z.string().optional(),
 });
 
-const DEFAULT_CAPTION = 'Bosmat kini beroperasi di GARASI 54 Moto Division, Jl. R. Sanim No.99 Tanah Baru – Beji, Depok. Mohon kabari sebelum tiba agar tim siap menyambut.';
-const STUDIO_PHOTO_PATH = path.resolve(__dirname, '../../../data/Screenshot 2025-11-18 at 21.39.30.png');
-const STUDIO_PHOTO_FILENAME = 'bosmat-studio.png';
+const DEFAULT_CAPTION = 'Bosmat Repaint Detailing Motor, Bukit Cengkeh 1, Jl. Medan No.B3/2, Kota Depok, Jawa Barat 16451. Mohon kabari sebelum tiba agar tim siap menyambut.';
+const STUDIO_PHOTO_PATH = path.resolve(__dirname, '../../../data/c46dbcbe-7d71-45b7-bdd6-5eeb99b4c2f4.jpg');
+const STUDIO_PHOTO_FILENAME = 'bosmat-studio.jpg';
 const SUPPORTED_META_CHANNELS = new Set(['instagram', 'messenger']);
 
 function parseRecipientIdentity(rawValue) {
@@ -92,7 +92,7 @@ async function implementation(input = {}) {
       {
         caption,
         filename: STUDIO_PHOTO_FILENAME,
-        mimetype: 'image/png',
+        mimetype: 'image/jpeg',
         type: 'image',
       },
       console,
@@ -118,7 +118,7 @@ const sendStudioPhotoTool = {
     type: 'function',
     function: {
       name: 'sendStudioPhoto',
-      description: 'Kirim foto eksterior Bosmat (berlokasi di GARASI 54 Moto Division, Jl. R. Sanim No.99 Tanah Baru, Beji - Depok) ke pelanggan via WhatsApp. Gunakan saat pelanggan sulit menemukan lokasi.',
+      description: 'Kirim foto eksterior Bosmat (berlokasi di Bukit Cengkeh 1, Jl. Medan No.B3/2, Kota Depok, Jawa Barat 16451) ke pelanggan via WhatsApp. Gunakan saat pelanggan sulit menemukan lokasi.',
       parameters: {
         type: 'object',
         properties: {

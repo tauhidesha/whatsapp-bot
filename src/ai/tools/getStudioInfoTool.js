@@ -17,15 +17,15 @@ async function implementation(input) {
 
     const studioInfo = {
       location: {
-        address: 'Jl. R. Sanim No.99, Tanah Baru, Kecamatan Beji, Kota Depok, Jawa Barat 16426',
-        landmark: 'Bertempat di area GARASI 54  Tanah Baru',
-        googleMaps: 'https://maps.app.goo.gl/6ZTh7Drq3EfPF4Bt8',
-        description: 'Lokasi Bosmat (beroperasi di GARASI 54 ',
-        exteriorPhoto: 'data/45e8f69d-f540-41c4-b6c6-9d65463007f8.JPG',
+        address: 'Bukit Cengkeh 1, Jl. Medan No.B3/2, Kota Depok, Jawa Barat 16451',
+        landmark: 'Bosmat Repaint Detailing Motor',
+        googleMaps: 'https://maps.app.goo.gl/JrH7TxyfPtGxBjW19',
+        description: 'Lokasi Bosmat Repaint Detailing Motor',
+        exteriorPhoto: 'data/c46dbcbe-7d71-45b7-bdd6-5eeb99b4c2f4.jpg',
       },
       contact: {
-        phone: '0895-4015-27556',
-        whatsapp: '0895-4015-27556',
+        phone: '0895401527556',
+        whatsapp: '0895401527556',
       },
       hours: {
         senin: '08.00–17.00',
