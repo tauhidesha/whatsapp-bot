@@ -215,21 +215,53 @@ VISION_FALLBACK_MODEL=gemini-1.5-flash-vision
 
 ## 🚀 AWS Deployment
 
-### 1. EC2 Instance
+**📚 Tutorial Lengkap:** Lihat [AWS_DEPLOYMENT.md](./AWS_DEPLOYMENT.md) untuk panduan step-by-step lengkap.
+
+### Quick Start dengan Script
+
 ```bash
-# Launch EC2 instance (Ubuntu 22.04)
+# Setup EC2 dan deploy otomatis
+./deploy-ec2.sh ec2-user@your-ec2-ip
+
+# Atau manual:
+# 1. Launch EC2 instance (Ubuntu 22.04 atau Amazon Linux)
+# 2. Install Docker & Docker Compose
+# 3. Clone repository
+# 4. Setup .env file
+# 5. Run: docker-compose up -d
+```
+
+### 1. EC2 Instance (Recommended)
+
+Cara termudah untuk deploy WhatsApp bot karena perlu persistent session:
+
+```bash
 # Install Docker
-sudo apt update
-sudo apt install docker.io docker-compose
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+
+# Install Docker Compose
+sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
 
 # Clone and deploy
 git clone <your-repo>
 cd whatsapp-ai-chatbot
+cp .env.example .env  # Edit dengan credentials Anda
 docker-compose up -d
 ```
 
+**Lihat [AWS_DEPLOYMENT.md](./AWS_DEPLOYMENT.md) untuk tutorial lengkap.**
+
 ### 2. ECS (Elastic Container Service)
+
+Untuk production dengan auto-scaling:
+
 ```bash
+# Gunakan script yang sudah ada
+./deploy-aws.sh
+
+# Atau manual:
 # Build and push to ECR
 aws ecr create-repository --repository-name whatsapp-ai-chatbot
 docker build -t whatsapp-ai-chatbot .
@@ -237,12 +269,7 @@ docker tag whatsapp-ai-chatbot:latest <account>.dkr.ecr.<region>.amazonaws.com/w
 docker push <account>.dkr.ecr.<region>.amazonaws.com/whatsapp-ai-chatbot:latest
 ```
 
-### 3. Lambda (Serverless)
-```bash
-# Package for Lambda
-npm run build
-zip -r whatsapp-ai-chatbot.zip .
-```
+**Note:** ECS Fargate tidak cocok untuk WhatsApp bot karena session tidak persistent. Gunakan EC2 dengan ECS atau standalone Docker.
 
 ## 📊 Monitoring
 
