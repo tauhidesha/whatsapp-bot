@@ -18,6 +18,7 @@ const { HumanMessage, SystemMessage, ToolMessage, AIMessage } = require('@langch
 const { getMotorSizeDetailsTool } = require('./src/ai/tools/getMotorSizeDetailsTool.js');
 const { getSpecificServicePriceTool } = require('./src/ai/tools/getSpecificServicePriceTool.js');
 const { listServicesByCategoryTool } = require('./src/ai/tools/listServicesByCategoryTool.js');
+const { getServiceDescriptionTool } = require('./src/ai/tools/getServiceDescriptionTool.js');
 const { getStudioInfoTool } = require('./src/ai/tools/getStudioInfoTool.js');
 const { checkBookingAvailabilityTool } = require('./src/ai/tools/checkBookingAvailabilityTool.js');
 const { createBookingTool } = require('./src/ai/tools/createBookingTool.js');
@@ -73,6 +74,7 @@ const availableTools = {
     getMotorSizeDetails: getMotorSizeDetailsTool.implementation,
     getSpecificServicePrice: getSpecificServicePriceTool.implementation,
     listServicesByCategory: listServicesByCategoryTool.implementation,
+    getServiceDescription: getServiceDescriptionTool.implementation,
     getStudioInfo: getStudioInfoTool.implementation,
     checkBookingAvailability: checkBookingAvailabilityTool.implementation,
     createBooking: createBookingTool.implementation,
@@ -89,6 +91,7 @@ const toolDefinitions = [
     getMotorSizeDetailsTool.toolDefinition,
     getSpecificServicePriceTool.toolDefinition,
     listServicesByCategoryTool.toolDefinition,
+    getServiceDescriptionTool.toolDefinition,
     getStudioInfoTool.toolDefinition,
     checkBookingAvailabilityTool.toolDefinition,
     createBookingTool.toolDefinition,
