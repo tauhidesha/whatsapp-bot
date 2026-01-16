@@ -649,10 +649,25 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
             console.log(`🚀 [AI_PROCESSING] Sending request to AI model... (iteration ${iteration + 1})`);
             try {
                 response = await aiModel.invoke(messages, getTracingConfig(traceLabel));
+                
+                // Validate response
+                if (!response || !response.content) {
+                    throw new Error('Invalid response from AI model: empty or undefined content');
+                }
             } catch (error) {
+                console.error(`❌ [AI_PROCESSING] Error with model ${ACTIVE_AI_MODEL}:`, error.message);
+                
                 // Handle quota exceeded error with fallback
-                if (error?.message?.includes('Quota exceeded') || error?.message?.includes('429')) {
-                    console.error('❌ [AI_PROCESSING] Quota exceeded for current model, trying fallback...');
+                const isQuotaError = error?.message?.includes('Quota exceeded') || 
+                                   error?.message?.includes('429') ||
+                                   error?.message?.includes('quota');
+                
+                // Handle response format errors (undefined reading '0')
+                const isResponseError = error?.message?.includes('Cannot read properties') ||
+                                      error?.message?.includes('undefined');
+                
+                if (isQuotaError || isResponseError) {
+                    console.error(`❌ [AI_PROCESSING] ${isQuotaError ? 'Quota' : 'Response format'} error detected, trying fallback...`);
                     const fallbackModels = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-2.5-flash'];
                     let fallbackSuccess = false;
                     
@@ -665,7 +680,19 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                                 temperature: parseFloat(process.env.AI_TEMPERATURE) || 0.7,
                                 apiKey: process.env.GOOGLE_API_KEY
                             });
+                            
+                            // Add delay between retries
+                            if (fallbackModels.indexOf(fallbackModel) > 0) {
+                                await new Promise(resolve => setTimeout(resolve, 1000));
+                            }
+                            
                             response = await fallbackModelInstance.invoke(messages, getTracingConfig(traceLabel));
+                            
+                            // Validate fallback response
+                            if (!response || !response.content) {
+                                throw new Error('Invalid response from fallback model');
+                            }
+                            
                             console.log(`✅ [AI_PROCESSING] Fallback model ${fallbackModel} succeeded!`);
                             fallbackSuccess = true;
                             break;
@@ -675,10 +702,10 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                     }
                     
                     if (!fallbackSuccess) {
-                        throw new Error('All models failed due to quota issues. Please check your API quota or billing status.');
+                        throw new Error('All models failed. Please check your API quota, billing status, or try again later.');
                     }
                 } else {
-                    throw error; // Re-throw if not quota error
+                    throw error; // Re-throw if not quota/response error
                 }
             }
 
