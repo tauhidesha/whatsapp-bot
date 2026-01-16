@@ -668,41 +668,31 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                 
                 if (isQuotaError || isResponseError) {
                     console.error(`❌ [AI_PROCESSING] ${isQuotaError ? 'Quota' : 'Response format'} error detected, trying fallback...`);
-                    const fallbackModels = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-2.5-flash'];
-                    let fallbackSuccess = false;
+                    const fallbackModel = 'gemini-2.5-flash';
                     
-                    for (const fallbackModel of fallbackModels) {
-                        if (fallbackModel === ACTIVE_AI_MODEL) continue; // Skip current model
-                        try {
-                            console.log(`🔄 [AI_PROCESSING] Trying fallback model: ${fallbackModel}`);
-                            const fallbackModelInstance = new ChatGoogleGenerativeAI({
-                                model: fallbackModel,
-                                temperature: parseFloat(process.env.AI_TEMPERATURE) || 0.7,
-                                apiKey: process.env.GOOGLE_API_KEY
-                            });
-                            
-                            // Add delay between retries
-                            if (fallbackModels.indexOf(fallbackModel) > 0) {
-                                await new Promise(resolve => setTimeout(resolve, 1000));
-                            }
-                            
-                            response = await fallbackModelInstance.invoke(messages, getTracingConfig(traceLabel));
-                            
-                            // Validate fallback response
-                            if (!response || !response.content) {
-                                throw new Error('Invalid response from fallback model');
-                            }
-                            
-                            console.log(`✅ [AI_PROCESSING] Fallback model ${fallbackModel} succeeded!`);
-                            fallbackSuccess = true;
-                            break;
-                        } catch (fallbackError) {
-                            console.error(`❌ [AI_PROCESSING] Fallback model ${fallbackModel} also failed:`, fallbackError.message);
-                        }
+                    if (fallbackModel === ACTIVE_AI_MODEL) {
+                        throw error; // Don't retry with same model
                     }
                     
-                    if (!fallbackSuccess) {
-                        throw new Error('All models failed. Please check your API quota, billing status, or try again later.');
+                    try {
+                        console.log(`🔄 [AI_PROCESSING] Trying fallback model: ${fallbackModel}`);
+                        const fallbackModelInstance = new ChatGoogleGenerativeAI({
+                            model: fallbackModel,
+                            temperature: parseFloat(process.env.AI_TEMPERATURE) || 0.7,
+                            apiKey: process.env.GOOGLE_API_KEY
+                        });
+                        
+                        response = await fallbackModelInstance.invoke(messages, getTracingConfig(traceLabel));
+                        
+                        // Validate fallback response
+                        if (!response || !response.content) {
+                            throw new Error('Invalid response from fallback model');
+                        }
+                        
+                        console.log(`✅ [AI_PROCESSING] Fallback model ${fallbackModel} succeeded!`);
+                    } catch (fallbackError) {
+                        console.error(`❌ [AI_PROCESSING] Fallback model ${fallbackModel} also failed:`, fallbackError.message);
+                        throw new Error('Fallback model failed. Please check your API quota, billing status, or try again later.');
                     }
                 } else {
                     throw error; // Re-throw if not quota/response error
