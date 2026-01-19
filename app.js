@@ -153,9 +153,17 @@ const groqToolSpecifications = toolDefinitions.map(tool => {
         if (parameters.properties) {
             delete parameters.properties.senderNumber;
             delete parameters.properties.senderName;
+            // Also remove snake_case versions which seem to be causing the issue
+            delete parameters.properties.sender_number;
+            delete parameters.properties.sender_name;
         }
         if (parameters.required && Array.isArray(parameters.required)) {
-            parameters.required = parameters.required.filter(p => p !== 'senderNumber' && p !== 'senderName');
+            parameters.required = parameters.required.filter(p => 
+                p !== 'senderNumber' && 
+                p !== 'senderName' &&
+                p !== 'sender_number' &&
+                p !== 'sender_name'
+            );
         }
 
         return {
@@ -547,9 +555,11 @@ async function executeToolCall(toolName, args, metadata = {}) {
             // Force overwrite metadata to prevent hallucinations like "nomor mas"
             if (metadata.senderNumber) {
                 preparedArgs.senderNumber = metadata.senderNumber;
+                preparedArgs.sender_number = metadata.senderNumber; // Support snake_case tools
             }
             if (metadata.senderName) {
                 preparedArgs.senderName = metadata.senderName;
+                preparedArgs.sender_name = metadata.senderName; // Support snake_case tools
             }
         }
 
