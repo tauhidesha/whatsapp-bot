@@ -472,10 +472,11 @@ async function executeToolCall(toolName, args, metadata = {}) {
         }
 
         if (preparedArgs && typeof preparedArgs === 'object') {
-            if (metadata.senderNumber && !preparedArgs.senderNumber) {
+            // Force overwrite metadata to prevent hallucinations like "nomor mas"
+            if (metadata.senderNumber) {
                 preparedArgs.senderNumber = metadata.senderNumber;
             }
-            if (metadata.senderName && !preparedArgs.senderName) {
+            if (metadata.senderName) {
                 preparedArgs.senderName = metadata.senderName;
             }
         }
@@ -537,6 +538,24 @@ function getToolCallsFromResponse(response) {
 function parseToolDirectiveFromText(text) {
     if (!text) return null;
     const trimmed = text.trim();
+
+    // 1. Check for XML-style tag: <function=toolName>jsonArgs</function>
+    // This handles cases where the model outputs raw tags instead of native tool calls
+    const xmlMatch = text.match(/<function=(\w+)>(.*?)<\/function>/s);
+    if (xmlMatch) {
+        const toolName = xmlMatch[1];
+        const jsonContent = xmlMatch[2];
+        try {
+            // Clean up potential HTML entities or newlines in JSON
+            const cleanJson = jsonContent.replace(/&quot;/g, '"').trim();
+            const args = JSON.parse(cleanJson);
+            return { toolName, args };
+        } catch (error) {
+            console.warn('[AI_PROCESSING] Failed to parse JSON from XML tool directive:', error.message);
+        }
+    }
+
+    // 2. Check for Python-style: tool_code print(...)
     if (!trimmed.toLowerCase().startsWith('tool_code')) {
         return null;
     }
@@ -585,7 +604,9 @@ function parseToolDirectiveFromText(text) {
 
 function sanitizeToolDirectiveOutput(text) {
     if (!text) return '';
-    return text.replace(/tool_code[\s\S]*$/i, '').trim();
+    let clean = text.replace(/tool_code[\s\S]*$/i, '');
+    clean = clean.replace(/<function=\w+>[\s\S]*?<\/function>/gi, '');
+    return clean.trim();
 }
 
 async function analyzeImageWithGemini(imageBuffer, mimeType = 'image/jpeg', caption = '', senderName = 'User') {
