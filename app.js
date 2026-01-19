@@ -13,6 +13,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const admin = require('firebase-admin');
+const fetch = require('node-fetch');
 const { ChatGroq } = require('@langchain/groq');
 const { HumanMessage, SystemMessage, ToolMessage, AIMessage } = require('@langchain/core/messages');
 const { getMotorSizeDetailsTool } = require('./src/ai/tools/getMotorSizeDetailsTool.js');
@@ -34,7 +35,6 @@ const { sendMetaMessage } = require('./src/server/metaClient.js');
 const { startBookingReminderScheduler } = require('./src/ai/utils/bookingReminders.js');
 const { isSnoozeActive, setSnoozeMode, clearSnoozeMode, getSnoozeInfo } = require('./src/ai/utils/humanHandover.js');
 const { getLangSmithCallbacks } = require('./src/ai/utils/langsmith.js');
-const { generateVisionAnalysis } = require('./src/ai/vision/groqVision.js');
 const { saveCustomerLocation } = require('./src/ai/utils/customerLocations.js');
 
 const app = express();
@@ -716,15 +716,49 @@ async function analyzeImageWithGemini(imageBuffer, mimeType = 'image/jpeg', capt
                     ? `[VISION] 🔍 Analysing image using ${modelName}...`
                     : `[VISION] 🔄 Trying ${modelName} with ${apiKeyLabel} API key...`;
                 console.log(logPrefix);
-                
-                const { text } = await generateVisionAnalysis({
-                    model: modelName,
-                    apiKey: currentApiKey,
-                    base64Image,
-                    mimeType,
-                    systemPrompt,
-                    userPrompt: textPrompt,
+
+                // Direct API Call to Groq to bypass LangChain "Non string message content" error
+                const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${currentApiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: modelName,
+                        messages: [
+                            {
+                                role: "system",
+                                content: systemPrompt
+                            },
+                            {
+                                role: "user",
+                                content: [
+                                    {
+                                        type: "text",
+                                        text: textPrompt
+                                    },
+                                    {
+                                        type: "image_url",
+                                        image_url: {
+                                            url: `data:${mimeType};base64,${base64Image}`
+                                        }
+                                    }
+                                ]
+                            }
+                        ],
+                        temperature: 0.5,
+                        max_tokens: 1024
+                    })
                 });
+
+                if (!response.ok) {
+                    const errorBody = await response.text();
+                    throw new Error(`Groq API Error (${response.status}): ${errorBody}`);
+                }
+
+                const data = await response.json();
+                const text = data.choices?.[0]?.message?.content;
 
                 if (text) {
                     const successMsg = apiKeyIndex === 0
