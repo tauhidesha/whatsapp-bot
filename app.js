@@ -117,6 +117,21 @@ console.log(`🤖 [STARTUP] Model: ${process.env.AI_MODEL || 'gemini-1.5-flash'}
 console.log(`🤖 [STARTUP] Temperature: ${parseFloat(process.env.AI_TEMPERATURE) || 0.7}`);
 console.log(`🤖 [STARTUP] Tools available: ${toolDefinitions.length} tools`);
 
+// API Keys configuration with fallback support
+const API_KEYS = [
+    process.env.GOOGLE_API_KEY,
+    process.env.GOOGLE_API_KEY_FALLBACK,
+].filter(Boolean);
+
+if (API_KEYS.length === 0) {
+    throw new Error('At least one GOOGLE_API_KEY must be configured');
+}
+
+console.log(`🔑 [STARTUP] API Keys configured: ${API_KEYS.length} key(s) available`);
+if (API_KEYS.length > 1) {
+    console.log(`🔄 [STARTUP] Fallback API key configured - will auto-retry on failures`);
+}
+
 const ACTIVE_AI_MODEL = process.env.AI_MODEL || 'gemini-2.5-pro';
 // Vision default: gunakan Gemini 2.5 Pro (multimodal). Bisa override via VISION_MODEL/IMAGE_MODEL.
 const ACTIVE_VISION_MODEL = process.env.VISION_MODEL || process.env.IMAGE_MODEL || 'gemini-2.5-pro';
@@ -125,7 +140,7 @@ const FALLBACK_VISION_MODEL = process.env.VISION_FALLBACK_MODEL || 'gemini-2.5-f
 const baseModel = new ChatGoogleGenerativeAI({
     model: ACTIVE_AI_MODEL,
     temperature: parseFloat(process.env.AI_TEMPERATURE) || 0.7,
-    apiKey: process.env.GOOGLE_API_KEY
+    apiKey: API_KEYS[0]
 });
 
 const geminiToolSpecifications = toolDefinitions.map(tool => {
@@ -586,24 +601,52 @@ async function analyzeImageWithGemini(imageBuffer, mimeType = 'image/jpeg', capt
         ].filter(Boolean))
     );
 
+    // Try each model with each API key
     for (const modelName of modelsToTry) {
-        try {
-            console.log(`[VISION] 🔍 Analysing image using ${modelName}...`);
-            const { text } = await generateVisionAnalysis({
-                model: modelName,
-                apiKey: process.env.GOOGLE_API_KEY,
-                base64Image,
-                mimeType,
-                systemPrompt,
-                userPrompt: textPrompt,
-            });
+        for (let apiKeyIndex = 0; apiKeyIndex < API_KEYS.length; apiKeyIndex++) {
+            const currentApiKey = API_KEYS[apiKeyIndex];
+            const apiKeyLabel = apiKeyIndex === 0 ? 'primary' : `fallback #${apiKeyIndex}`;
+            
+            try {
+                const logPrefix = apiKeyIndex === 0 
+                    ? `[VISION] 🔍 Analysing image using ${modelName}...`
+                    : `[VISION] 🔄 Trying ${modelName} with ${apiKeyLabel} API key...`;
+                console.log(logPrefix);
+                
+                const { text } = await generateVisionAnalysis({
+                    model: modelName,
+                    apiKey: currentApiKey,
+                    base64Image,
+                    mimeType,
+                    systemPrompt,
+                    userPrompt: textPrompt,
+                });
 
-            if (text) {
-                console.log(`[VISION] ✅ Analysis complete with ${modelName}`);
-                return text;
+                if (text) {
+                    const successMsg = apiKeyIndex === 0
+                        ? `[VISION] ✅ Analysis complete with ${modelName}`
+                        : `[VISION] ✅ Analysis complete with ${modelName} using ${apiKeyLabel} API key`;
+                    console.log(successMsg);
+                    return text;
+                }
+            } catch (error) {
+                const isQuotaError = error?.message?.includes('Quota exceeded') || 
+                                   error?.message?.includes('429') ||
+                                   error?.message?.includes('quota') ||
+                                   error?.message?.includes('RESOURCE_EXHAUSTED');
+                
+                const errorLabel = apiKeyIndex === 0 
+                    ? `[VISION] ❌ ${modelName} failed`
+                    : `[VISION] ❌ ${modelName} with ${apiKeyLabel} API key failed`;
+                console.error(`${errorLabel}:`, error?.message || error);
+                
+                // If quota error and more API keys available, try next key with same model
+                if (isQuotaError && apiKeyIndex < API_KEYS.length - 1) {
+                    continue;
+                }
+                // Otherwise try next model
+                break;
             }
-        } catch (error) {
-            console.error(`[VISION] ❌ ${modelName} failed:`, error?.message || error);
         }
     }
 
@@ -650,56 +693,107 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
         while (iteration < MAX_ITERATIONS) {
             const traceLabel = iteration === 0 ? 'chat-response-initial' : `chat-response-iteration-${iteration}`;
             console.log(`🚀 [AI_PROCESSING] Sending request to AI model... (iteration ${iteration + 1})`);
-            try {
-                response = await aiModel.invoke(messages, getTracingConfig(traceLabel));
+            
+            let lastError = null;
+            let responseReceived = false;
+            
+            // Try each API key in sequence
+            for (let apiKeyIndex = 0; apiKeyIndex < API_KEYS.length; apiKeyIndex++) {
+                const currentApiKey = API_KEYS[apiKeyIndex];
+                const isFirstKey = apiKeyIndex === 0;
+                const apiKeyLabel = isFirstKey ? 'primary' : `fallback #${apiKeyIndex}`;
                 
-                // Validate response
-                if (!response || !response.content) {
-                    throw new Error('Invalid response from AI model: empty or undefined content');
-                }
-            } catch (error) {
-                console.error(`❌ [AI_PROCESSING] Error with model ${ACTIVE_AI_MODEL}:`, error.message);
-                
-                // Handle quota exceeded error with fallback
-                const isQuotaError = error?.message?.includes('Quota exceeded') || 
-                                   error?.message?.includes('429') ||
-                                   error?.message?.includes('quota');
-                
-                // Handle response format errors (undefined reading '0')
-                const isResponseError = error?.message?.includes('Cannot read properties') ||
-                                      error?.message?.includes('undefined');
-                
-                if (isQuotaError || isResponseError) {
-                    console.error(`❌ [AI_PROCESSING] ${isQuotaError ? 'Quota' : 'Response format'} error detected, trying fallback...`);
-                    const fallbackModel = 'gemini-2.5-flash';
-                    
-                    if (fallbackModel === ACTIVE_AI_MODEL) {
-                        throw error; // Don't retry with same model
+                try {
+                    if (!isFirstKey) {
+                        console.log(`🔄 [AI_PROCESSING] Trying ${apiKeyLabel} API key...`);
                     }
                     
-                    try {
-                        console.log(`🔄 [AI_PROCESSING] Trying fallback model: ${fallbackModel}`);
-                        const fallbackModelInstance = new ChatGoogleGenerativeAI({
-                            model: fallbackModel,
-                            temperature: parseFloat(process.env.AI_TEMPERATURE) || 0.7,
-                            apiKey: process.env.GOOGLE_API_KEY
-                        });
-                        
-                        response = await fallbackModelInstance.invoke(messages, getTracingConfig(traceLabel));
-                        
-                        // Validate fallback response
-                        if (!response || !response.content) {
-                            throw new Error('Invalid response from fallback model');
+                    // Create model instance with current API key
+                    const modelInstance = apiKeyIndex === 0 ? aiModel : new ChatGoogleGenerativeAI({
+                        model: ACTIVE_AI_MODEL,
+                        temperature: parseFloat(process.env.AI_TEMPERATURE) || 0.7,
+                        apiKey: currentApiKey
+                    }).bindTools(geminiToolSpecifications);
+                    
+                    response = await modelInstance.invoke(messages, getTracingConfig(traceLabel));
+                    
+                    // Validate response
+                    if (!response || !response.content) {
+                        throw new Error('Invalid response from AI model: empty or undefined content');
+                    }
+                    
+                    if (!isFirstKey) {
+                        console.log(`✅ [AI_PROCESSING] ${apiKeyLabel} API key succeeded!`);
+                    }
+                    
+                    responseReceived = true;
+                    break; // Success - exit API key retry loop
+                    
+                } catch (error) {
+                    lastError = error;
+                    
+                    // Check if this is a retryable error
+                    const isQuotaError = error?.message?.includes('Quota exceeded') || 
+                                       error?.message?.includes('429') ||
+                                       error?.message?.includes('quota') ||
+                                       error?.message?.includes('RESOURCE_EXHAUSTED');
+                    
+                    const isAuthError = error?.message?.includes('API key not valid') ||
+                                      error?.message?.includes('authentication') ||
+                                      error?.message?.includes('401');
+                    
+                    const isResponseError = error?.message?.includes('Cannot read properties') ||
+                                          error?.message?.includes('undefined');
+                    
+                    const isRetryableError = isQuotaError || isResponseError || isAuthError;
+                    
+                    console.error(`❌ [AI_PROCESSING] Error with ${apiKeyLabel} API key:`, error.message);
+                    
+                    // If this is the last API key or non-retryable error, try model fallback
+                    if (apiKeyIndex === API_KEYS.length - 1 || !isRetryableError) {
+                        if (isRetryableError && (isQuotaError || isResponseError)) {
+                            console.error(`❌ [AI_PROCESSING] All API keys exhausted, trying model fallback...`);
+                            const fallbackModel = 'gemini-2.5-flash';
+                            
+                            if (fallbackModel === ACTIVE_AI_MODEL) {
+                                break; // No point in model fallback
+                            }
+                            
+                            try {
+                                console.log(`🔄 [AI_PROCESSING] Trying fallback model: ${fallbackModel} with primary API key`);
+                                const fallbackModelInstance = new ChatGoogleGenerativeAI({
+                                    model: fallbackModel,
+                                    temperature: parseFloat(process.env.AI_TEMPERATURE) || 0.7,
+                                    apiKey: API_KEYS[0]
+                                });
+                                
+                                response = await fallbackModelInstance.invoke(messages, getTracingConfig(traceLabel));
+                                
+                                // Validate fallback response
+                                if (!response || !response.content) {
+                                    throw new Error('Invalid response from fallback model');
+                                }
+                                
+                                console.log(`✅ [AI_PROCESSING] Fallback model ${fallbackModel} succeeded!`);
+                                responseReceived = true;
+                                break;
+                            } catch (fallbackError) {
+                                console.error(`❌ [AI_PROCESSING] Fallback model ${fallbackModel} also failed:`, fallbackError.message);
+                                lastError = fallbackError;
+                            }
                         }
-                        
-                        console.log(`✅ [AI_PROCESSING] Fallback model ${fallbackModel} succeeded!`);
-                    } catch (fallbackError) {
-                        console.error(`❌ [AI_PROCESSING] Fallback model ${fallbackModel} also failed:`, fallbackError.message);
-                        throw new Error('Fallback model failed. Please check your API quota, billing status, or try again later.');
+                        break; // Exit API key retry loop
                     }
-                } else {
-                    throw error; // Re-throw if not quota/response error
+                    
+                    // Continue to next API key
+                    continue;
                 }
+            }
+            
+            // If we still don't have a response after trying all options, throw error
+            if (!responseReceived) {
+                console.error(`❌ [AI_PROCESSING] All retry attempts failed`);
+                throw lastError || new Error('Failed to get AI response after all retry attempts');
             }
 
             const toolCalls = getToolCallsFromResponse(response);
@@ -830,10 +924,36 @@ async function rewriteAdminMessage(originalMessage, senderNumber) {
 
         const prompt = `Riwayat percakapan terbaru (paling lama di atas):\n${recentDialogue || '(belum ada riwayat)'}\n\nPesan admin yang perlu ditulis ulang:\n"""${trimmed}"""\n`;
 
-        const response = await baseModel.invoke([
-            new SystemMessage(ADMIN_MESSAGE_REWRITE_STYLE_PROMPT),
-            new HumanMessage(prompt),
-        ], getTracingConfig('admin-message-rewrite'));
+        let response = null;
+        let lastError = null;
+        
+        // Try each API key for admin message rewrite
+        for (let apiKeyIndex = 0; apiKeyIndex < API_KEYS.length; apiKeyIndex++) {
+            try {
+                const modelInstance = apiKeyIndex === 0 ? baseModel : new ChatGoogleGenerativeAI({
+                    model: ACTIVE_AI_MODEL,
+                    temperature: parseFloat(process.env.AI_TEMPERATURE) || 0.7,
+                    apiKey: API_KEYS[apiKeyIndex]
+                });
+                
+                response = await modelInstance.invoke([
+                    new SystemMessage(ADMIN_MESSAGE_REWRITE_STYLE_PROMPT),
+                    new HumanMessage(prompt),
+                ], getTracingConfig('admin-message-rewrite'));
+                
+                break; // Success
+            } catch (error) {
+                lastError = error;
+                if (apiKeyIndex < API_KEYS.length - 1) {
+                    console.warn(`[Rewrite] API key #${apiKeyIndex + 1} failed, trying next...`);
+                    continue;
+                }
+            }
+        }
+        
+        if (!response) {
+            throw lastError || new Error('Failed to rewrite admin message');
+        }
 
         const rewrittenRaw = extractTextFromAIContent(response.content);
         const rewritten = typeof rewrittenRaw === 'string' ? rewrittenRaw.trim() : '';

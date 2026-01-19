@@ -1,0 +1,124 @@
+# Gemini API Fallback Configuration
+
+## Overview
+Sistem ini mendukung multiple API keys untuk Gemini AI dengan automatic fallback. Jika API key pertama gagal (quota exceeded, rate limit, authentication error), sistem akan otomatis mencoba API key berikutnya.
+
+## Configuration
+
+### Environment Variables
+
+Tambahkan API keys di file `.env`:
+
+```env
+# Primary API Key (Required)
+GOOGLE_API_KEY=your_primary_api_key_here
+
+# Fallback API Key (Optional)
+GOOGLE_API_KEY_FALLBACK=your_fallback_api_key_here
+```
+
+### How It Works
+
+1. **Primary Key**: Sistem akan selalu mencoba menggunakan `GOOGLE_API_KEY` terlebih dahulu
+2. **Automatic Fallback**: Jika primary key gagal dengan error berikut, sistem otomatis switch ke fallback key:
+   - Quota exceeded errors (429, RESOURCE_EXHAUSTED)
+   - Authentication errors (401, API key not valid)
+   - Response format errors
+
+3. **Model Fallback**: Jika semua API keys gagal, sistem akan mencoba model yang lebih ringan (`gemini-2.5-flash`)
+
+## Supported Scenarios
+
+### ✅ Chat AI Processing
+- Automatic fallback untuk semua chat requests
+- Mencoba semua API keys sebelum mengembalikan error
+- Logs menunjukkan API key mana yang berhasil
+
+### ✅ Vision Analysis
+- Fallback untuk analisis gambar motor
+- Mencoba kombinasi model + API key
+- Prioritas: model terbaik dengan API key tersedia
+
+### ✅ Admin Message Rewrite
+- Fallback untuk penulisan ulang pesan admin
+- Transparent switching between API keys
+
+## Example Logs
+
+### Successful Primary Key
+```
+🚀 [AI_PROCESSING] Sending request to AI model... (iteration 1)
+✅ [AI_PROCESSING] Response received
+```
+
+### Fallback to Secondary Key
+```
+🚀 [AI_PROCESSING] Sending request to AI model... (iteration 1)
+❌ [AI_PROCESSING] Error with primary API key: Quota exceeded
+🔄 [AI_PROCESSING] Trying fallback #1 API key...
+✅ [AI_PROCESSING] fallback #1 API key succeeded!
+```
+
+### Vision Analysis Fallback
+```
+[VISION] 🔍 Analysing image using gemini-2.5-pro...
+[VISION] ❌ gemini-2.5-pro failed: Quota exceeded
+[VISION] 🔄 Trying gemini-2.5-pro with fallback #1 API key...
+[VISION] ✅ Analysis complete with gemini-2.5-pro using fallback #1 API key
+```
+
+## Startup Logs
+
+Saat aplikasi start, akan muncul informasi jumlah API keys yang dikonfigurasi:
+
+```
+🔑 [STARTUP] API Keys configured: 2 key(s) available
+🔄 [STARTUP] Fallback API key configured - will auto-retry on failures
+```
+
+## Best Practices
+
+1. **Gunakan API keys dari project yang berbeda** untuk menghindari shared quota
+2. **Monitor logs** untuk melihat seberapa sering fallback terjadi
+3. **Set up billing alerts** di Google Cloud Console untuk kedua API keys
+4. **Jangan commit API keys** ke repository (gunakan `.env` file)
+
+## Troubleshooting
+
+### Semua API Keys Gagal
+Jika semua API keys gagal, periksa:
+- Quota limits di [Google Cloud Console](https://console.cloud.google.com/apis/api/generativelanguage.googleapis.com/quotas)
+- Billing status untuk kedua projects
+- Validity dari API keys
+
+### Fallback Tidak Berfungsi
+Pastikan:
+- `GOOGLE_API_KEY_FALLBACK` sudah di-set di `.env`
+- Restart aplikasi setelah menambahkan fallback key
+- Check startup logs untuk konfirmasi jumlah keys
+
+## API Key Management
+
+### Mendapatkan API Key Baru
+1. Buka [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Create new project (untuk API key baru di project terpisah)
+3. Generate API key
+4. Copy ke `.env` file
+
+### Rotating Keys
+Untuk mengganti API keys tanpa downtime:
+1. Tambahkan key baru sebagai `GOOGLE_API_KEY_FALLBACK`
+2. Restart aplikasi
+3. Monitor logs untuk memastikan fallback berfungsi
+4. Update `GOOGLE_API_KEY` dengan key baru
+5. Restart aplikasi lagi
+6. Hapus/rotate `GOOGLE_API_KEY_FALLBACK`
+
+## Security Notes
+
+⚠️ **PENTING**: 
+- Jangan pernah commit API keys ke git repository
+- Tambahkan `.env` ke `.gitignore`
+- Gunakan environment variables untuk production deployment
+- Rotate API keys secara berkala
+- Set IP restrictions di Google Cloud Console jika memungkinkan
