@@ -721,7 +721,9 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                     response = await modelInstance.invoke(messages, getTracingConfig(traceLabel));
                     
                     // Validate response
-                    if (!response || !response.content) {
+                    const hasToolCalls = getToolCallsFromResponse(response).length > 0;
+                    if (!response || (!response.content && !hasToolCalls)) {
+                        console.error('❌ [AI_PROCESSING] Invalid response structure:', JSON.stringify(response, null, 2));
                         throw new Error('Invalid response from AI model: empty or undefined content');
                     }
                     
@@ -773,7 +775,9 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                                 response = await fallbackModelInstance.invoke(messages, getTracingConfig(traceLabel));
                                 
                                 // Validate fallback response
-                                if (!response || !response.content) {
+                                const hasFallbackToolCalls = getToolCallsFromResponse(response).length > 0;
+                                if (!response || (!response.content && !hasFallbackToolCalls)) {
+                                    console.error('❌ [AI_PROCESSING] Invalid fallback response structure:', JSON.stringify(response, null, 2));
                                     throw new Error('Invalid response from fallback model');
                                 }
                                 
