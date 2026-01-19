@@ -1,5 +1,5 @@
 /**
- * WhatsApp AI Chatbot dengan LangChain dan Gemini
+ * WhatsApp AI Chatbot dengan LangChain dan Groq
  * Arsitektur JavaScript yang konsisten
  */
 
@@ -13,7 +13,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const admin = require('firebase-admin');
-const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
+const { ChatGroq } = require('@langchain/groq');
 const { HumanMessage, SystemMessage, ToolMessage, AIMessage } = require('@langchain/core/messages');
 const { getMotorSizeDetailsTool } = require('./src/ai/tools/getMotorSizeDetailsTool.js');
 const { getSpecificServicePriceTool } = require('./src/ai/tools/getSpecificServicePriceTool.js');
@@ -34,7 +34,7 @@ const { sendMetaMessage } = require('./src/server/metaClient.js');
 const { startBookingReminderScheduler } = require('./src/ai/utils/bookingReminders.js');
 const { isSnoozeActive, setSnoozeMode, clearSnoozeMode, getSnoozeInfo } = require('./src/ai/utils/humanHandover.js');
 const { getLangSmithCallbacks } = require('./src/ai/utils/langsmith.js');
-const { generateVisionAnalysis } = require('./src/ai/vision/geminiVision.js');
+const { generateVisionAnalysis } = require('./src/ai/vision/groqVision.js');
 const { saveCustomerLocation } = require('./src/ai/utils/customerLocations.js');
 
 const app = express();
@@ -113,18 +113,18 @@ toolDefinitions.forEach((tool, index) => {
 
 // --- AI Configuration ---
 console.log('🤖 [STARTUP] Initializing AI Model...');
-console.log(`🤖 [STARTUP] Model: ${process.env.AI_MODEL || 'gemini-1.5-flash'}`);
+console.log(`🤖 [STARTUP] Model: ${process.env.AI_MODEL || 'llama-3.3-70b-versatile'}`);
 console.log(`🤖 [STARTUP] Temperature: ${parseFloat(process.env.AI_TEMPERATURE) || 0.7}`);
 console.log(`🤖 [STARTUP] Tools available: ${toolDefinitions.length} tools`);
 
 // API Keys configuration with fallback support
 const API_KEYS = [
-    process.env.GOOGLE_API_KEY,
-    process.env.GOOGLE_API_KEY_FALLBACK,
+    process.env.GROQ_API_KEY,
+    process.env.GROQ_API_KEY_FALLBACK,
 ].filter(Boolean);
 
 if (API_KEYS.length === 0) {
-    throw new Error('At least one GOOGLE_API_KEY must be configured');
+    throw new Error('At least one GROQ_API_KEY must be configured');
 }
 
 console.log(`🔑 [STARTUP] API Keys configured: ${API_KEYS.length} key(s) available`);
@@ -132,30 +132,33 @@ if (API_KEYS.length > 1) {
     console.log(`🔄 [STARTUP] Fallback API key configured - will auto-retry on failures`);
 }
 
-const ACTIVE_AI_MODEL = process.env.AI_MODEL || 'gemini-2.5-pro';
-// Vision default: gunakan Gemini 2.5 Pro (multimodal). Bisa override via VISION_MODEL/IMAGE_MODEL.
-const ACTIVE_VISION_MODEL = process.env.VISION_MODEL || process.env.IMAGE_MODEL || 'gemini-2.5-pro';
-const FALLBACK_VISION_MODEL = process.env.VISION_FALLBACK_MODEL || 'gemini-2.5-flash';
+const ACTIVE_AI_MODEL = process.env.AI_MODEL || 'llama-3.3-70b-versatile';
+// Vision default: llama-3.2-90b-vision-preview (multimodal). Bisa override via VISION_MODEL/IMAGE_MODEL.
+const ACTIVE_VISION_MODEL = process.env.VISION_MODEL || process.env.IMAGE_MODEL || 'llama-3.2-90b-vision-preview';
+const FALLBACK_VISION_MODEL = process.env.VISION_FALLBACK_MODEL || 'llama-3.2-11b-vision-preview';
 
-const baseModel = new ChatGoogleGenerativeAI({
+const baseModel = new ChatGroq({
     model: ACTIVE_AI_MODEL,
     temperature: parseFloat(process.env.AI_TEMPERATURE) || 0.7,
     apiKey: API_KEYS[0]
 });
 
-const geminiToolSpecifications = toolDefinitions.map(tool => {
+const groqToolSpecifications = toolDefinitions.map(tool => {
     if (tool.function) {
         return {
-            name: tool.function.name,
-            description: tool.function.description,
-            parameters: tool.function.parameters
+            type: 'function',
+            function: {
+                name: tool.function.name,
+                description: tool.function.description,
+                parameters: tool.function.parameters
+            }
         };
     }
 
     return tool;
 });
 
-const aiModel = baseModel.bindTools(geminiToolSpecifications);
+const aiModel = baseModel.bindTools(groqToolSpecifications);
 
 console.log('✅ [STARTUP] AI Model initialized with native tool calling support');
 console.log(`🤖 [STARTUP] Active AI model: ${ACTIVE_AI_MODEL}`);
@@ -592,7 +595,7 @@ async function analyzeImageWithGemini(imageBuffer, mimeType = 'image/jpeg', capt
     const systemPrompt = 'Anda adalah Zoya, asisten Bosmat. Analisis foto motor pengguna, jelaskan kondisi, kerusakan, kebersihan, dan rekomendasi perawatan secara singkat dalam bahasa Indonesia. Fokus pada hal yang benar-benar terlihat dan hindari asumsi. ## Layanan Utama Repaint**: Bodi Halus/Kasar, Velg, Cover CVT/Arm Detailing/Coating**: Detailing Mesin, Cuci Komplit, Poles Bodi Glossy, Full Detailing Glossy, Coating Motor Doff/Glossy, Complete Service Doff/Glossy';
     const textPrompt = `Analisis foto motor dari ${senderName}. ${caption ? `Caption pengguna: ${caption}.` : ''} Sebutkan poin penting dalam 2-3 kalimat. Jika ada noda/baret/kerusakan, jelaskan singkat dan rekomendasikan treatment Bosmat yang relevan.`;
 
-    const fallbackChain = ['gemini-2.5-flash', 'gemini-1.5-flash-vision'];
+    const fallbackChain = ['llama-3.2-11b-vision-preview'];
     const modelsToTry = Array.from(
         new Set([
             ACTIVE_VISION_MODEL,
@@ -709,11 +712,11 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                     }
                     
                     // Create model instance with current API key
-                    const modelInstance = apiKeyIndex === 0 ? aiModel : new ChatGoogleGenerativeAI({
+                    const modelInstance = apiKeyIndex === 0 ? aiModel : new ChatGroq({
                         model: ACTIVE_AI_MODEL,
                         temperature: parseFloat(process.env.AI_TEMPERATURE) || 0.7,
                         apiKey: currentApiKey
-                    }).bindTools(geminiToolSpecifications);
+                    }).bindTools(groqToolSpecifications);
                     
                     response = await modelInstance.invoke(messages, getTracingConfig(traceLabel));
                     
@@ -753,7 +756,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                     if (apiKeyIndex === API_KEYS.length - 1 || !isRetryableError) {
                         if (isRetryableError && (isQuotaError || isResponseError)) {
                             console.error(`❌ [AI_PROCESSING] All API keys exhausted, trying model fallback...`);
-                            const fallbackModel = 'gemini-2.5-flash';
+                            const fallbackModel = 'llama-3.1-70b-versatile';
                             
                             if (fallbackModel === ACTIVE_AI_MODEL) {
                                 break; // No point in model fallback
@@ -761,7 +764,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                             
                             try {
                                 console.log(`🔄 [AI_PROCESSING] Trying fallback model: ${fallbackModel} with primary API key`);
-                                const fallbackModelInstance = new ChatGoogleGenerativeAI({
+                                const fallbackModelInstance = new ChatGroq({
                                     model: fallbackModel,
                                     temperature: parseFloat(process.env.AI_TEMPERATURE) || 0.7,
                                     apiKey: API_KEYS[0]
@@ -930,7 +933,7 @@ async function rewriteAdminMessage(originalMessage, senderNumber) {
         // Try each API key for admin message rewrite
         for (let apiKeyIndex = 0; apiKeyIndex < API_KEYS.length; apiKeyIndex++) {
             try {
-                const modelInstance = apiKeyIndex === 0 ? baseModel : new ChatGoogleGenerativeAI({
+                const modelInstance = apiKeyIndex === 0 ? baseModel : new ChatGroq({
                     model: ACTIVE_AI_MODEL,
                     temperature: parseFloat(process.env.AI_TEMPERATURE) || 0.7,
                     apiKey: API_KEYS[apiKeyIndex]
@@ -1336,7 +1339,9 @@ app.get('/health', (req, res) => {
     res.json({
         status: 'healthy',
         service: 'WhatsApp AI Chatbot',
-        model: process.env.AI_MODEL || 'gemini-1.5-flash',
+        provider: 'Groq',
+        model: process.env.AI_MODEL || 'llama-3.3-70b-versatile',
+        visionModel: ACTIVE_VISION_MODEL,
         uptime: process.uptime(),
         timestamp: new Date().toISOString()
     });
@@ -1531,7 +1536,9 @@ app.post('/conversation/:number/ai-state', async (req, res) => {
 // --- Server Startup ---
 server.listen(PORT, '0.0.0.0', async () => {
     console.log(`🚀 WhatsApp AI Chatbot listening on http://0.0.0.0:${PORT}`);
-    console.log(`🤖 AI Model: ${process.env.AI_MODEL || 'gemini-1.5-flash'}`);
+    console.log(`🤖 AI Provider: Groq`);
+    console.log(`🤖 AI Model: ${process.env.AI_MODEL || 'llama-3.3-70b-versatile'}`);
+    console.log(`🖼️  Vision Model: ${ACTIVE_VISION_MODEL}`);
     console.log(`⏱️  Debounce Delay: ${DEBOUNCE_DELAY_MS}ms`);
     console.log(`🧠 Memory Config: Max ${MEMORY_CONFIG.maxMessages} messages, ${MEMORY_CONFIG.maxAgeHours}h retention`);
     console.log(`🖥️  Chromium launch args: ${PUPPETEER_CHROME_ARGS.join(' ')}`);

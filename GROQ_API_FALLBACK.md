@@ -1,7 +1,7 @@
-# Gemini API Fallback Configuration
+# Groq API Fallback Configuration
 
 ## Overview
-Sistem ini mendukung multiple API keys untuk Gemini AI dengan automatic fallback. Jika API key pertama gagal (quota exceeded, rate limit, authentication error), sistem akan otomatis mencoba API key berikutnya.
+Sistem ini mendukung multiple API keys untuk Groq AI dengan automatic fallback. Jika API key pertama gagal (quota exceeded, rate limit, authentication error), sistem akan otomatis mencoba API key berikutnya.
 
 ## Configuration
 
@@ -11,10 +11,10 @@ Tambahkan API keys di file `.env`:
 
 ```env
 # Primary API Key (Required)
-GOOGLE_API_KEY=your_primary_api_key_here
+GROQ_API_KEY=your_primary_api_key_here
 
 # Fallback API Key (Optional)
-GOOGLE_API_KEY_FALLBACK=your_fallback_api_key_here
+GROQ_API_KEY_FALLBACK=your_fallback_api_key_here
 ```
 
 ### How It Works
@@ -54,17 +54,17 @@ GOOGLE_API_KEY_FALLBACK=your_fallback_api_key_here
 ### Fallback to Secondary Key
 ```
 🚀 [AI_PROCESSING] Sending request to AI model... (iteration 1)
-❌ [AI_PROCESSING] Error with primary API key: Quota exceeded
+❌ [AI_PROCESSING] Error with primary API key: Rate limit exceeded
 🔄 [AI_PROCESSING] Trying fallback #1 API key...
 ✅ [AI_PROCESSING] fallback #1 API key succeeded!
 ```
 
 ### Vision Analysis Fallback
 ```
-[VISION] 🔍 Analysing image using gemini-2.5-pro...
-[VISION] ❌ gemini-2.5-pro failed: Quota exceeded
-[VISION] 🔄 Trying gemini-2.5-pro with fallback #1 API key...
-[VISION] ✅ Analysis complete with gemini-2.5-pro using fallback #1 API key
+[VISION] 🔍 Analysing image using llama-3.2-90b-vision-preview...
+[VISION] ❌ llama-3.2-90b-vision-preview failed: Rate limit exceeded
+[VISION] 🔄 Trying llama-3.2-90b-vision-preview with fallback #1 API key...
+[VISION] ✅ Analysis complete with llama-3.2-90b-vision-preview using fallback #1 API key
 ```
 
 ## Startup Logs
@@ -87,32 +87,33 @@ Saat aplikasi start, akan muncul informasi jumlah API keys yang dikonfigurasi:
 
 ### Semua API Keys Gagal
 Jika semua API keys gagal, periksa:
-- Quota limits di [Google Cloud Console](https://console.cloud.google.com/apis/api/generativelanguage.googleapis.com/quotas)
-- Billing status untuk kedua projects
+- Rate limits di [Groq Console](https://console.groq.com/)
+- Account status dan tier
 - Validity dari API keys
 
 ### Fallback Tidak Berfungsi
 Pastikan:
-- `GOOGLE_API_KEY_FALLBACK` sudah di-set di `.env`
+- `GROQ_API_KEY_FALLBACK` sudah di-set di `.env`
 - Restart aplikasi setelah menambahkan fallback key
 - Check startup logs untuk konfirmasi jumlah keys
 
 ## API Key Management
 
 ### Mendapatkan API Key Baru
-1. Buka [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Create new project (untuk API key baru di project terpisah)
-3. Generate API key
-4. Copy ke `.env` file
+1. Buka [Groq Console](https://console.groq.com/)
+2. Sign up atau login
+3. Navigate to API Keys section
+4. Create new API key
+5. Copy ke `.env` file
 
 ### Rotating Keys
 Untuk mengganti API keys tanpa downtime:
-1. Tambahkan key baru sebagai `GOOGLE_API_KEY_FALLBACK`
+1. Tambahkan key baru sebagai `GROQ_API_KEY_FALLBACK`
 2. Restart aplikasi
 3. Monitor logs untuk memastikan fallback berfungsi
-4. Update `GOOGLE_API_KEY` dengan key baru
+4. Update `GROQ_API_KEY` dengan key baru
 5. Restart aplikasi lagi
-6. Hapus/rotate `GOOGLE_API_KEY_FALLBACK`
+6. Hapus/rotate `GROQ_API_KEY_FALLBACK`
 
 ## Security Notes
 
@@ -121,4 +122,4 @@ Untuk mengganti API keys tanpa downtime:
 - Tambahkan `.env` ke `.gitignore`
 - Gunakan environment variables untuk production deployment
 - Rotate API keys secara berkala
-- Set IP restrictions di Google Cloud Console jika memungkinkan
+- Monitor usage di Groq Console untuk mendeteksi anomali

@@ -1,7 +1,7 @@
 {
   "name": "whatsapp-ai-chatbot",
-  "version": "1.0.0",
-  "description": "WhatsApp AI Chatbot dengan LangChain dan Gemini",
+  "version": "2.0.0",
+  "description": "WhatsApp AI Chatbot dengan LangChain dan Groq",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
@@ -13,12 +13,13 @@
     "chatbot",
     "ai",
     "langchain",
-    "gemini"
+    "groq",
+    "llama"
   ],
   "author": "Your Name",
   "license": "MIT",
   "dependencies": {
-    "@langchain/google-genai": "^0.0.20",
+    "@langchain/groq": "^1.0.3",
     "@wppconnect-team/wppconnect": "^1.25.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
@@ -28,11 +29,10 @@
     "helmet": "^7.1.0",
     "js-levenshtein": "^1.1.6",
     "langchain": "^0.3.0",
+    "langsmith": "^0.3.71",
+    "luxon": "^3.5.0",
     "morgan": "^1.10.0",
     "node-fetch": "^2.7.0",
-    "@google/generative-ai": "^0.11.3",
-    "luxon": "^3.5.0",
-    "langsmith": "^0.3.71",
     "zod": "^3.23.8"
   },
   "devDependencies": {
