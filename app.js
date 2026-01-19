@@ -722,8 +722,9 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                     
                     // Validate response
                     const hasToolCalls = getToolCallsFromResponse(response).length > 0;
-                    if (!response || (!response.content && !hasToolCalls)) {
-                        console.error('❌ [AI_PROCESSING] Invalid response structure:', JSON.stringify(response, null, 2));
+                    // Relaxed validation: Allow empty string content. Only fail if strictly null/undefined.
+                    if (!response || ((response.content === null || response.content === undefined) && !hasToolCalls)) {
+                        console.error('❌ [AI_PROCESSING] Invalid response structure:', response ? Object.keys(response) : 'null');
                         throw new Error('Invalid response from AI model: empty or undefined content');
                     }
                     
@@ -776,8 +777,9 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                                 
                                 // Validate fallback response
                                 const hasFallbackToolCalls = getToolCallsFromResponse(response).length > 0;
-                                if (!response || (!response.content && !hasFallbackToolCalls)) {
-                                    console.error('❌ [AI_PROCESSING] Invalid fallback response structure:', JSON.stringify(response, null, 2));
+                                // Relaxed validation: Allow empty string content. Only fail if strictly null/undefined.
+                                if (!response || ((response.content === null || response.content === undefined) && !hasFallbackToolCalls)) {
+                                    console.error('❌ [AI_PROCESSING] Invalid fallback response structure:', response ? Object.keys(response) : 'null');
                                     throw new Error('Invalid response from fallback model');
                                 }
                                 
