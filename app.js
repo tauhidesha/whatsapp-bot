@@ -145,12 +145,25 @@ const baseModel = new ChatGroq({
 
 const groqToolSpecifications = toolDefinitions.map(tool => {
     if (tool.function) {
+        // Clone parameters to avoid mutating original
+        const parameters = tool.function.parameters ? JSON.parse(JSON.stringify(tool.function.parameters)) : {};
+
+        // Remove system-injected parameters from the schema sent to AI
+        // This prevents the AI from hallucinating null/invalid values for these fields
+        if (parameters.properties) {
+            delete parameters.properties.senderNumber;
+            delete parameters.properties.senderName;
+        }
+        if (parameters.required && Array.isArray(parameters.required)) {
+            parameters.required = parameters.required.filter(p => p !== 'senderNumber' && p !== 'senderName');
+        }
+
         return {
             type: 'function',
             function: {
                 name: tool.function.name,
                 description: tool.function.description,
-                parameters: tool.function.parameters
+                parameters: parameters
             }
         };
     }
