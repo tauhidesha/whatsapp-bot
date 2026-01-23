@@ -13,7 +13,7 @@ function toDocId(senderNumber) {
   if (!senderNumber) return null;
   const normalized = normalizeWhatsappNumber(senderNumber);
   if (!normalized) return null;
-  return normalized.replace(/@c\.us$/, '');
+  return normalized.replace(/@c\.us$/, '').replace(/@lid$/, '');
 }
 
 async function saveCustomerLocation(senderNumber, location, options = {}) {

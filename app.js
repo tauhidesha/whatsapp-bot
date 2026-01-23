@@ -487,6 +487,17 @@ function parseSenderIdentity(rawValue) {
         };
     }
 
+    // Handle @lid suffix (Meta Business / Linked Devices)
+    if (trimmed.endsWith('@lid')) {
+        const baseId = trimmed.slice(0, -4);
+        return {
+            docId: baseId,
+            channel: 'whatsapp',
+            platformId: baseId,
+            normalizedAddress: `${baseId}@c.us`,
+        };
+    }
+
     const hasWhatsappSuffix = trimmed.endsWith(WHATSAPP_SUFFIX);
     const baseId = hasWhatsappSuffix ? trimmed.slice(0, -WHATSAPP_SUFFIX.length) : trimmed;
 
@@ -1161,11 +1172,12 @@ ${analysisContext}`
 
         // Send response back to user
         if (aiResponse) {
+            const targetNumber = toSenderNumberWithSuffix(senderNumber);
             const chunks = aiResponse.split('\n\n');
             for (const chunk of chunks) {
                 if (chunk.trim()) {
                     await delay(1500 + Math.random() * 1000);
-                    await client.sendText(senderNumber, chunk.trim());
+                    await client.sendText(targetNumber, chunk.trim());
                 }
             }
         }
@@ -1261,7 +1273,8 @@ function start(client) {
             }
         }
 
-        if (await isSnoozeActive(senderNumber)) {
+        const { normalizedAddress } = parseSenderIdentity(senderNumber);
+        if (await isSnoozeActive(normalizedAddress)) {
             const storedContent = (() => {
                 if (messageContent && messageContent.trim()) {
                     return messageContent.trim();
@@ -1327,6 +1340,18 @@ function start(client) {
         pendingMessages.set(senderNumber, entry);
 
         debounceQueue.schedule(senderNumber, messageEntry);
+    });
+
+    // --- Handle Incoming Calls ---
+    client.onIncomingCall(async (call) => {
+        console.log(`[CALL] Panggilan masuk dari ${call.peerJid}`);
+        try {
+            // Zoya tidak bisa angkat telepon, kirim pesan otomatis yang ramah
+            const message = "Waduh, maaf ya Mas, Zoya nggak bisa angkat telepon 😅.\n\nKetik aja pertanyaannya di sini, nanti Zoya bantu jawab kok! 👇";
+            await client.sendText(call.peerJid, message);
+        } catch (e) {
+            console.error('[CALL] Error handling incoming call:', e);
+        }
     });
 
     client.onStateChange((state) => {
@@ -1546,8 +1571,9 @@ app.post('/send-media', async (req, res) => {
             throw new Error('WhatsApp client not initialized.');
         }
         
+        const targetNumber = toSenderNumberWithSuffix(number);
         const dataUri = `data:${mimetype};base64,${base64}`;
-        await global.whatsappClient.sendFile(`${number}@c.us`, dataUri, filename || 'file', caption || '');
+        await global.whatsappClient.sendFile(targetNumber, dataUri, filename || 'file', caption || '');
         console.log(`[API] Successfully sent media to ${number}`);
         res.status(200).json({ success: true });
     } catch (e) {

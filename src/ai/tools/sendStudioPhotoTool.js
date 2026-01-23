@@ -32,6 +32,9 @@ function parseRecipientIdentity(rawValue) {
     }
 
     if (channelRaw === 'wa' || channelRaw === 'whatsapp') {
+      if (identifier.endsWith('@lid')) {
+        return { channel: 'whatsapp', recipientId: identifier.replace('@lid', '@c.us'), raw: trimmed };
+      }
       const normalized = identifier.endsWith('@c.us') ? identifier : `${identifier}@c.us`;
       return { channel: 'whatsapp', recipientId: normalized, raw: trimmed };
     }
@@ -39,6 +42,9 @@ function parseRecipientIdentity(rawValue) {
     return { channel: channelRaw, recipientId: identifier, raw: trimmed };
   }
 
+  if (trimmed.endsWith('@lid')) {
+    return { channel: 'whatsapp', recipientId: trimmed.replace('@lid', '@c.us'), raw: trimmed };
+  }
   const normalized = trimmed.endsWith('@c.us') ? trimmed : `${trimmed}@c.us`;
   return { channel: 'whatsapp', recipientId: normalized, raw: trimmed };
 }
