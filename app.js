@@ -1364,6 +1364,7 @@ async function saveMessageToFirestore(senderNumber, message, senderType) {
             channel,
             platform: channel,
             platformId: platformId || docId,
+            fullSenderId: senderNumber,
         }, { merge: true });
     } catch (error) {
         console.error('Error saving to Firestore:', error);
@@ -1385,6 +1386,7 @@ async function saveSenderMeta(senderNumber, displayName) {
             channel,
             platform: channel,
             platformId: platformId || docId,
+            fullSenderId: senderNumber,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });
     } catch (error) {
@@ -1410,10 +1412,10 @@ async function listConversations(limit = 100) {
         const snapshot = await db.collection('directMessages').get();
         const conversations = await Promise.all(snapshot.docs.map(async (doc) => {
             const data = doc.data() || {};
-            const identity = parseSenderIdentity(doc.id);
-            const senderNumberFull = identity.normalizedAddress;
+            const senderNumberFull = data.fullSenderId || toSenderNumberWithSuffix(doc.id);
             const snoozeInfo = await getSnoozeInfo(senderNumberFull);
 
+            const identity = parseSenderIdentity(senderNumberFull);
             const storedChannel = typeof data.channel === 'string' ? data.channel.toLowerCase() : null;
             const effectiveChannel = storedChannel && storedChannel !== 'unknown'
                 ? storedChannel
@@ -1421,7 +1423,7 @@ async function listConversations(limit = 100) {
 
             return {
                 id: doc.id,
-                senderNumber: doc.id,
+                senderNumber: senderNumberFull,
                 name: data.name || null,
                 lastMessage: data.lastMessage || null,
                 lastMessageSender: data.lastMessageSender || null,
@@ -1629,11 +1631,12 @@ app.post('/conversation/:number/ai-state', async (req, res) => {
             return res.status(400).json({ error: 'enabled (boolean) is required.' });
         }
 
-        const numeric = number.replace(/[^0-9]/g, '');
-        if (!numeric) {
+        const identity = parseSenderIdentity(number);
+        const senderNumber = identity.normalizedAddress;
+
+        if (!senderNumber) {
             return res.status(400).json({ error: 'Number is invalid.' });
         }
-        const senderNumber = `${numeric}@c.us`;
 
         if (enabled) {
             await clearSnoozeMode(senderNumber);
