@@ -1,0 +1,230 @@
+// File: src/ai/tools/getServiceDetailsTool.js
+// Tool gabungan untuk mendapatkan deskripsi, SOP, harga, dan estimasi waktu layanan.
+
+const masterLayanan = require('../../data/masterLayanan.js');
+const {
+  getMotorSizesForSender,
+  getPreferredSizeForService,
+  setPreferredSizeForService,
+  setMotorSizeForSender,
+} = require('../utils/motorSizeMemory.js');
+
+// --- Helper Functions ---
+
+function levenshtein(a, b) {
+  const dp = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
+  for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+  for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]) + 1;
+    }
+  }
+  return dp[a.length][b.length];
+}
+
+function stringSimilarity(a, b) {
+  const distance = levenshtein(a.toLowerCase(), b.toLowerCase());
+  const maxLen = Math.max(a.length, b.length);
+  return maxLen === 0 ? 1 : 1 - distance / maxLen;
+}
+
+function formatDuration(minutesStr) {
+  if (!minutesStr) return 'Segera';
+  
+  const durationInMinutes = parseInt(minutesStr, 10);
+  if (isNaN(durationInMinutes) || durationInMinutes <= 0) {
+    return 'Segera';
+  }
+
+  const WORKDAY_HOURS = 8;
+  const totalHours = Math.round(durationInMinutes / 60);
+
+  if (totalHours < WORKDAY_HOURS) {
+    if (totalHours < 1) return `${durationInMinutes} menit`;
+    return `${totalHours} jam`;
+  }
+
+  const days = Math.floor(totalHours / WORKDAY_HOURS);
+  const remainingHours = totalHours % WORKDAY_HOURS;
+
+  let result = `${days} hari kerja`;
+  if (remainingHours > 0) {
+    result += ` ${remainingHours} jam`;
+  }
+
+  return result;
+}
+
+const VALID_SIZES = new Set(['S', 'M', 'L', 'XL']);
+
+function normalizeSizeInput(value) {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toUpperCase();
+  return VALID_SIZES.has(normalized) ? normalized : null;
+}
+
+function inferCategory(name) {
+  const lower = (name || '').toLowerCase();
+  if (lower.includes('repaint')) return 'repaint';
+  if (lower.includes('coating')) return 'coating';
+  if (lower.includes('detailing') || lower.includes('poles')) return 'detailing';
+  return 'other';
+}
+
+function resolveSizeForService({ service, sizeArg, senderNumber, cachedSizes }) {
+  const category = (service.category || inferCategory(service.name)).toLowerCase();
+  let finalSize = sizeArg;
+
+  const cachedPreferred = senderNumber
+    ? getPreferredSizeForService(senderNumber, category)
+    : null;
+
+  if (cachedPreferred && finalSize && cachedPreferred !== finalSize) {
+    finalSize = cachedPreferred;
+  }
+
+  if (!finalSize && cachedPreferred) {
+    finalSize = cachedPreferred;
+  }
+
+  if (!finalSize && cachedSizes) {
+    if (category === 'repaint') {
+      finalSize = cachedSizes.repaintSize || cachedSizes.serviceSize || null;
+    } else {
+      finalSize = cachedSizes.serviceSize || cachedSizes.repaintSize || null;
+    }
+  }
+
+  return { finalSize, category };
+}
+
+// --- Implementation ---
+async function implementation(input) {
+  try {
+    console.log('[getServiceDetailsTool] Input:', input);
+    
+    if (!input || typeof input !== 'object') {
+      return { success: false, error: 'generic_error', message: 'Input tidak valid' };
+    }
+
+    const { service_name: parsedServiceName } = input;
+    const senderNumber = typeof input.senderNumber === 'string'
+      ? input.senderNumber
+      : typeof input.sender_number === 'string'
+        ? input.sender_number
+        : null;
+
+    const sizeFromArgs = normalizeSizeInput(input.size);
+    const cachedSizes = senderNumber ? getMotorSizesForSender(senderNumber) : null;
+
+    if (!parsedServiceName || typeof parsedServiceName !== 'string') {
+      return { success: false, error: 'generic_error', message: 'service_name tidak valid atau kosong' };
+    }
+
+    // Special case for "coating" generic query
+    if (parsedServiceName.trim().toLowerCase() === 'coating') {
+      const names = ['Coating Motor Doff', 'Coating Motor Glossy'];
+      const services = masterLayanan.filter(s => names.includes(s.name));
+      
+      const results = services.map(service => {
+        const { finalSize } = resolveSizeForService({ service, sizeArg: sizeFromArgs, senderNumber, cachedSizes });
+        const variant = service.variants?.find(v => v.name === finalSize);
+        const basePrice = variant?.price ?? service.price;
+        
+        return {
+          name: service.name,
+          summary: service.summary,
+          price: basePrice || 'Tergantung ukuran',
+          size: finalSize || 'Belum diketahui'
+        };
+      });
+
+      return {
+        success: true,
+        multiple_candidates: true,
+        candidates: results,
+        message: 'Ditemukan 2 layanan utama untuk "coating". Silakan pilih Doff atau Glossy.'
+      };
+    }
+
+    // Fuzzy matching
+    const candidates = masterLayanan
+      .map(s => ({ ...s, similarity: stringSimilarity(parsedServiceName, s.name) }))
+      .filter(s => s.similarity >= 0.4) // Threshold agak longgar untuk menangkap variasi
+      .sort((a, b) => b.similarity - a.similarity);
+
+    if (candidates.length === 0) {
+      return { success: false, error: 'not_found', message: `Layanan "${parsedServiceName}" tidak ditemukan.` };
+    }
+
+    const service = candidates[0];
+    const { finalSize, category } = resolveSizeForService({
+      service,
+      sizeArg: sizeFromArgs,
+      senderNumber,
+      cachedSizes,
+    });
+
+    const variant = service.variants?.find(v => v.name === finalSize);
+    const basePrice = variant?.price ?? service.price;
+    const durationFormatted = formatDuration(service.estimatedDuration);
+
+    const result = {
+      success: true,
+      service_name: service.name,
+      category: service.category,
+      summary: service.summary,
+      description: service.description,
+      estimated_duration: durationFormatted,
+      motor_size: finalSize || null,
+      price: basePrice || null,
+      price_formatted: basePrice ? `Rp${basePrice.toLocaleString('id-ID')}` : 'Harga perlu ukuran motor',
+    };
+
+    if (senderNumber && finalSize) {
+      setPreferredSizeForService(senderNumber, category, finalSize);
+      setMotorSizeForSender(senderNumber, {
+        serviceSize: category === 'repaint' ? null : finalSize,
+        repaintSize: category === 'repaint' ? finalSize : null,
+      });
+    }
+
+    return result;
+
+  } catch (err) {
+    console.error('[getServiceDetailsTool] Error:', err);
+    return { success: false, error: 'internal_error', message: err.message };
+  }
+}
+
+const getServiceDetailsTool = {
+  toolDefinition: {
+    type: 'function',
+    function: {
+      name: "getServiceDetails",
+      description: "Dapatkan informasi LENGKAP layanan: deskripsi, SOP, harga, dan estimasi waktu. Wajib dipanggil saat user tanya harga atau detail layanan.",
+      parameters: {
+        type: "object",
+        properties: {
+          service_name: {
+            type: "string",
+            description: "Nama layanan, misal: 'Coating Motor Doff', 'Full Detailing', 'Repaint Bodi Halus'."
+          },
+          size: {
+            type: "string",
+            enum: ["S", "M", "L", "XL"],
+            description: "Ukuran motor (S/M/L/XL) jika sudah diketahui dari getMotorSizeDetails."
+          },
+          senderNumber: { type: "string", description: "Nomor WA pelanggan (otomatis)." }
+        },
+        required: ["service_name"],
+      },
+    },
+  },
+  implementation,
+};
+
+module.exports = { getServiceDetailsTool };

@@ -2,7 +2,7 @@
 // JavaScript runtime implementation to list services by category
 
 const { z } = require('zod');
-const deskripsiLayanan = require('../../data/deskripsiLayanan.js');
+const masterLayanan = require('../../data/masterLayanan.js');
 
 // Schema validation to ensure input integrity
 const InputSchema = z.object({
@@ -23,7 +23,7 @@ async function implementation(input) {
       };
     }
 
-    const matchedServices = (Array.isArray(deskripsiLayanan) ? deskripsiLayanan : []).filter(
+    const matchedServices = (Array.isArray(masterLayanan) ? masterLayanan : []).filter(
       (service) => service.category?.toLowerCase() === categoryQuery
     );
 

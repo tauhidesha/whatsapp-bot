@@ -17,9 +17,8 @@ const fetch = require('node-fetch');
 const { ChatGroq } = require('@langchain/groq');
 const { HumanMessage, SystemMessage, ToolMessage, AIMessage } = require('@langchain/core/messages');
 const { getMotorSizeDetailsTool } = require('./src/ai/tools/getMotorSizeDetailsTool.js');
-const { getSpecificServicePriceTool } = require('./src/ai/tools/getSpecificServicePriceTool.js');
 const { listServicesByCategoryTool } = require('./src/ai/tools/listServicesByCategoryTool.js');
-const { getServiceDescriptionTool } = require('./src/ai/tools/getServiceDescriptionTool.js');
+const { getServiceDetailsTool } = require('./src/ai/tools/getServiceDetailsTool.js');
 const { getStudioInfoTool } = require('./src/ai/tools/getStudioInfoTool.js');
 const { checkBookingAvailabilityTool } = require('./src/ai/tools/checkBookingAvailabilityTool.js');
 const { createBookingTool } = require('./src/ai/tools/createBookingTool.js');
@@ -72,9 +71,8 @@ const db = admin.firestore();
 // --- Tool Registry ---
 const availableTools = {
     getMotorSizeDetails: getMotorSizeDetailsTool.implementation,
-    getSpecificServicePrice: getSpecificServicePriceTool.implementation,
     listServicesByCategory: listServicesByCategoryTool.implementation,
-    getServiceDescription: getServiceDescriptionTool.implementation,
+    getServiceDetails: getServiceDetailsTool.implementation,
     getStudioInfo: getStudioInfoTool.implementation,
     checkBookingAvailability: checkBookingAvailabilityTool.implementation,
     createBooking: createBookingTool.implementation,
@@ -89,9 +87,8 @@ const availableTools = {
 
 const toolDefinitions = [
     getMotorSizeDetailsTool.toolDefinition,
-    getSpecificServicePriceTool.toolDefinition,
     listServicesByCategoryTool.toolDefinition,
-    getServiceDescriptionTool.toolDefinition,
+    getServiceDetailsTool.toolDefinition,
     getStudioInfoTool.toolDefinition,
     checkBookingAvailabilityTool.toolDefinition,
     createBookingTool.toolDefinition,
@@ -199,8 +196,8 @@ Panggilan ke User: "Mas".
 
 # Core Rules (Strict Logic - Zero Trust)
 1.  **HARGA & SOP (PAKET LENGKAP)**:
-    * Saat cek harga, Anda **WAJIB** memanggil tool deskripsi (\`getServiceDescription\`) juga.
-    * Tujuannya agar Anda tahu SOP layanan (misal: apakah bongkar bodi? apakah garansi?) dan **TIDAK MENGARANG BEBAS**.
+    * Gunakan tool \`getServiceDetails\` untuk mendapatkan informasi lengkap (deskripsi, SOP, harga, dan durasi) dalam satu kali panggil.
+    * Jangan pernah menebak harga atau SOP layanan.
 2.  **LOKASI**:
     * Jangan mengarang rute. Ambil link maps dari \`getStudioInfo\`.
 
@@ -209,8 +206,8 @@ Panggilan ke User: "Mas".
 ## LANGKAH 1: ANALISA & DIAGNOSA (Kepo Dulu!)
 Cek apa yang diminta user:
 
-**A. Jika User Tanya INFO / PENJELASAN (Contoh: "Detailing ngapain aja?")**
-* **ACTION:** Langsung panggil \`getServiceDescription\` atau \`listServicesByCategory\`.
+**A. Jika User Tanya INFO / PENJELASAN (Contoh: "Detailing ngapain aja?", "Bedanya doff sama glossy?")**
+* **ACTION:** Langsung panggil \`getServiceDetails\` atau \`listServicesByCategory\`.
 * **RESPONSE:** Jelaskan isi layanan dari hasil tool.
 
 **B. Jika User Tanya HARGA / LAYANAN (Contoh: "Repaint Nmax berapa?")**
@@ -228,8 +225,7 @@ Lakukan pengecekan data sebelum panggil tool harga:
 
 3.  **Eksekusi Tool (Hanya jika poin 1 & 2 lengkap)**:
     * Panggil \`getMotorSizeDetails\` (untuk tau ukuran).
-    * Panggil \`getSpecificServicePrice\` (untuk tau harga).
-    * **WAJIB:** Panggil \`getServiceDescription\` (untuk tau SOP layanan, misal: bongkar bodi atau tidak).
+    * Panggil \`getServiceDetails\` (untuk tau harga, durasi, dan deskripsi sekaligus).
 
 **C. Jika User Berniat DATANG / VISIT**
 * **ACTION:**
@@ -238,10 +234,10 @@ Lakukan pengecekan data sebelum panggil tool harga:
 * **RESPONSE:** "Siap Mas, saya kabarin tim. Ini maps-nya biar gak nyasar: [Link Maps]"
 
 ## LANGKAH 2: PRESENTASI HARGA & VALUE (Gunakan Data Tool)
-1.  **Jelaskan Value (Dari tool \`getServiceDescription\`)**:
-    * Jelaskan apa yang didapat. *Contoh:* "Ini udah termasuk bongkar bodi ya Mas (sesuai data tool)." Jangan ngarang!
-2.  **Rincian Harga (Dari tool \`getSpecificServicePrice\`)**:
-    * "Harganya kena *X rupiah* Mas."
+1.  **Jelaskan Value & Harga (Dari tool \`getServiceDetails\`)**:
+    * Jelaskan apa yang didapat (deskripsi/SOP).
+    * Sebutkan harga dan estimasi pengerjaan.
+    * *Contoh:* "Harganya *X rupiah* Mas. Itu udah termasuk bongkar bodi dan garansi (sesuai data tool)."
 3.  **Closing**: "Gimana Mas, harganya masuk?" (Jangan langsung todong booking).
 
 ## LANGKAH 3: BOOKING (Jika user setuju harga)
@@ -251,8 +247,7 @@ Lakukan pengecekan data sebelum panggil tool harga:
 
 # Tools Capabilities
 - \`getMotorSizeDetails\`: Cek kategori ukuran motor (Wajib sebelum cek harga).
-- \`getSpecificServicePrice\`: Cek harga fix.
-- \`getServiceDescription\`: Penjelasan layanan.
+- \`getServiceDetails\`: Cek harga, deskripsi, SOP, dan estimasi waktu layanan.
 - \`listServicesByCategory\`: Daftar menu layanan.
 - \`calculateHomeServiceFee\`: Hitung transport.
 - \`getRepaintColorSurcharge\`: Cek biaya warna khusus.
@@ -263,8 +258,8 @@ Lakukan pengecekan data sebelum panggil tool harga:
 # Tone & Style Examples (Few-Shot)
 
 User: "Cuci komplit nmax berapa?"
-Assistant: (Calls: getMotorSizeDetails -> getSpecificServicePrice -> getServiceDescription)
-(Tool Description Output: "Cuci detail rangka, mesin, bongkar bodi halus, poles wax")
+Assistant: (Calls: getMotorSizeDetails -> getServiceDetails)
+(Tool Output: { price: 275000, description: "Cuci detail rangka, mesin, bongkar bodi halus...", estimated_duration: "3 jam" })
 "Buat Nmax (Medium) kena *275rb* Mas.
 Itu udah paket lengkap:
 • Bongkar bodi halus (kita bersihin rangka dalem)
@@ -279,7 +274,7 @@ Assistant: (Call getStudioInfo)
 Ini link maps-nya: [Link Maps dari Tool]"
 
 User: "Mas, detailing itu diapain aja sih?"
-Assistant: (Call getServiceDescription -> input: "detailing")
+Assistant: (Call getServiceDetails -> input: "detailing")
 "Detailing itu perawatan menyeluruh Mas. Kita bersihin kerak mesin, jamur bodi, sampai sela-sela rangka. Terus finishingnya kita poles biar kinclong.
 Ngomong-ngomong motornya apa nih Mas? Biar saya cek harganya."
 
@@ -288,7 +283,7 @@ Assistant: (Call getMotorSizeDetails -> NMAX is Medium)
 "Siap, buat Nmax ya. Kondisi motornya sekarang gimana Mas? Cuma kotor debu atau ada jamur/baret halus yang mau diilangin?"
 
 User: "Mas, cat velg nmax berapa?"
-Assistant: (Call getMotorSizeDetails -> Call getSpecificServicePrice)
+Assistant: (Call getMotorSizeDetails -> Call getServiceDetails)
 "Buat Nmax (Medium) repaint velg polos kena *350rb* Mas. Pengerjaan estimasi 1 hari ya. Mau warna apa Mas?"
 
 User: "Masih asli sih udah baret2 parah. Rencana mau ganti warna merah candy kak."
