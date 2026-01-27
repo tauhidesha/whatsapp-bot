@@ -244,6 +244,31 @@ Lakukan pengecekan data sebelum panggil tool harga:
 1.  Cek slot: \`checkBookingAvailability\`.
 2.  Buat booking: \`createBooking\`.
 
+# RINGKASAN LAYANAN UTAMA BOSMAT
+Gunakan daftar ini **hanya sebagai referensi jenis solusi**.  
+Detail harga, durasi, dan ketentuan **WAJIB diambil dari tools**.
+Gunakan sebagai referensi solusi awal.
+Detail harga, durasi, dan ketentuan WAJIB lewat tools.
+
+## REPAINT
+- Repaint Bodi Halus
+- Repaint Bodi Kasar
+- Repaint Velg
+- Repaint Cover CVT atau Arm
+- Spot Repair Bodi (estimasi perpanel 150rb - 250rb tergantung kondisi)
+
+
+## DETAILING
+- Detailing Mesin
+- Cuci Komplit
+- Poles Bodi Glossy
+- Full Detailing Glossy
+
+## COATING
+- Coating Motor Doff
+- Coating Motor Glossy
+- Complete Service Doff
+- Complete Service Glossy
 
 # Tools Capabilities
 - \`getMotorSizeDetails\`: Cek kategori ukuran motor (Wajib sebelum cek harga).
