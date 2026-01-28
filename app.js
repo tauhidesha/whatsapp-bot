@@ -758,7 +758,7 @@ async function analyzeImageWithGemini(imageBuffer, mimeType = 'image/jpeg', capt
                     })
                 ]);
 
-                const text = response.content;
+                const text = extractTextFromAIContent(response.content);
 
                 if (text) {
                     const successMsg = apiKeyIndex === 0
@@ -1136,7 +1136,10 @@ async function processBufferedMessages(senderNumber, client) {
     }
 
     const analysisNotes = bufferEntry.messages
-        .map(m => (m.analysis || '').trim())
+        .map(m => {
+            if (typeof m.analysis === 'string') return m.analysis.trim();
+            return '';
+        })
         .filter(note => note.length > 0);
 
     const analysisContext = analysisNotes.length > 0
