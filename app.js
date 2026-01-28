@@ -132,7 +132,7 @@ if (API_KEYS.length > 1) {
 const ACTIVE_AI_MODEL = process.env.AI_MODEL || 'gemini-1.5-flash-latest';
 // Vision default: gemini-1.5-flash-latest (multimodal). Bisa override via VISION_MODEL/IMAGE_MODEL.
 const ACTIVE_VISION_MODEL = process.env.VISION_MODEL || process.env.IMAGE_MODEL || 'gemini-1.5-flash-latest';
-const FALLBACK_VISION_MODEL = process.env.VISION_FALLBACK_MODEL || 'gemini-pro-vision';
+const FALLBACK_VISION_MODEL = process.env.VISION_FALLBACK_MODEL || 'gemini-1.5-flash';
 
 const baseModel = new ChatGoogleGenerativeAI({
     model: ACTIVE_AI_MODEL,
@@ -720,7 +720,7 @@ async function analyzeImageWithGemini(imageBuffer, mimeType = 'image/jpeg', capt
     const systemPrompt = 'Anda adalah Zoya, asisten Bosmat. Analisis foto motor pengguna, jelaskan kondisi, kerusakan, kebersihan, dan rekomendasi perawatan secara singkat dalam bahasa Indonesia. Fokus pada hal yang benar-benar terlihat dan hindari asumsi. ## Layanan Utama Repaint**: Bodi Halus/Kasar, Velg, Cover CVT/Arm Detailing/Coating**: Detailing Mesin, Cuci Komplit, Poles Bodi Glossy, Full Detailing Glossy, Coating Motor Doff/Glossy, Complete Service Doff/Glossy';
     const textPrompt = `Analisis foto motor dari ${senderName}. ${caption ? `Caption pengguna: ${caption}.` : ''} Sebutkan poin penting dalam 2-3 kalimat. Jika ada noda/baret/kerusakan, jelaskan singkat dan rekomendasikan treatment Bosmat yang relevan.`;
 
-    const fallbackChain = ['gemini-1.5-flash'];
+    const fallbackChain = ['gemini-1.5-flash-latest', 'gemini-1.5-flash-001'];
     const modelsToTry = Array.from(
         new Set([
             ACTIVE_VISION_MODEL,
@@ -894,7 +894,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                     if (apiKeyIndex === API_KEYS.length - 1 || !isRetryableError) {
                         if (isRetryableError && (isQuotaError || isResponseError)) {
                             console.error(`❌ [AI_PROCESSING] All API keys exhausted, trying model fallback...`);
-                            const fallbackModel = 'gemini-1.5-flash';
+                            const fallbackModel = 'gemini-1.5-flash-latest';
                             
                             if (fallbackModel === ACTIVE_AI_MODEL) {
                                 break; // No point in model fallback

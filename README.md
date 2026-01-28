@@ -190,8 +190,8 @@ LANGSMITH_PROJECT=WhatsApp AI Chatbot
 # LANGSMITH_ENDPOINT=https://api.smith.langchain.com
 
 # Vision model (opsional)
-VISION_MODEL=gemini-2.5-flash          # Gemini multimodal untuk analisis gambar
-VISION_FALLBACK_MODEL=gemini-1.5-flash-vision
+VISION_MODEL=gemini-1.5-flash          # Gemini multimodal untuk analisis gambar
+VISION_FALLBACK_MODEL=gemini-1.5-pro
 ```
 
 ### AI Model Options:
