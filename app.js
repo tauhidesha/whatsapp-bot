@@ -715,10 +715,10 @@ function sanitizeToolDirectiveOutput(text) {
     return clean.trim();
 }
 
-async function analyzeImageWithGemini(imageBuffer, mimeType = 'image/jpeg', caption = '', senderName = 'User') {
+async function analyzeImageWithGemini(imageBuffer, mimeType = 'image/jpeg', caption = '', senderName = 'User', previousContext = '') {
     const base64Image = imageBuffer.toString('base64');
     const systemPrompt = 'Anda adalah Zoya, asisten Bosmat. Analisis foto motor pengguna, jelaskan kondisi, kerusakan, kebersihan, dan rekomendasi perawatan secara singkat dalam bahasa Indonesia. Fokus pada hal yang benar-benar terlihat dan hindari asumsi. ## Layanan Utama Repaint**: Bodi Halus/Kasar, Velg, Cover CVT/Arm Detailing/Coating**: Detailing Mesin, Cuci Komplit, Poles Bodi Glossy, Full Detailing Glossy, Coating Motor Doff/Glossy, Complete Service Doff/Glossy';
-    const textPrompt = `Analisis foto motor dari ${senderName}. ${caption ? `Caption pengguna: ${caption}.` : ''} Sebutkan poin penting dalam 2-3 kalimat. Jika ada noda/baret/kerusakan, jelaskan singkat dan rekomendasikan treatment Bosmat yang relevan.`;
+    const textPrompt = `Analisis foto motor dari ${senderName}. ${caption ? `Caption pengguna: ${caption}.` : ''} ${previousContext ? `Konteks chat sebelumnya: "${previousContext}".` : ''} Sebutkan poin penting dalam 2-3 kalimat. Jika ada noda/baret/kerusakan, jelaskan singkat dan rekomendasikan treatment Bosmat yang relevan.`;
 
     const fallbackChain = ['gemini-1.5-flash-latest', 'gemini-1.5-flash-001'];
     const modelsToTry = Array.from(
@@ -1307,6 +1307,17 @@ function start(client) {
 
         if (isImage) {
             const captionText = (msg.caption || '').trim();
+            let previousContext = '';
+
+            // Ambil 3 pesan terakhir sebagai konteks untuk Vision AI
+            try {
+                const history = await getConversationHistory(senderNumber, 3);
+                previousContext = history
+                    .map(h => `${h.sender === 'user' ? 'User' : 'Zoya'}: ${h.text}`)
+                    .join(' | ');
+            } catch (err) {
+                console.warn('[VISION] Gagal mengambil history chat:', err.message);
+            }
 
             try {
                 console.log(`[VISION] 🔄 Mengunduh gambar dari ${senderName}...`);
@@ -1317,7 +1328,8 @@ function start(client) {
                     imageBuffer,
                     msg.mimetype || 'image/jpeg',
                     captionText,
-                    senderName
+                    senderName,
+                    previousContext
                 );
             } catch (error) {
                 console.error(`[VISION] ❌ Gagal memproses gambar dari ${senderName}:`, error);
