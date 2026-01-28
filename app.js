@@ -519,7 +519,7 @@ function parseSenderIdentity(rawValue) {
             docId: baseId,
             channel: 'whatsapp',
             platformId: baseId,
-            normalizedAddress: `${baseId}@c.us`,
+            normalizedAddress: trimmed,
         };
     }
 
