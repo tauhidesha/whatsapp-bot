@@ -172,7 +172,8 @@ async function notifyNewBooking(bookingData) {
 async function setSnoozeMode(senderNumber, durationMinutes = 60, options = {}) {
   const { reason = null, manual = false } = options;
   const db = ensureFirestore();
-  const docRef = db.collection('handoverSnoozes').doc(senderNumber);
+  const normalizedNumber = normalizeWhatsappNumber(senderNumber) || senderNumber;
+  const docRef = db.collection('handoverSnoozes').doc(normalizedNumber);
 
   let effectiveDuration = null;
   let expiresAtValue = null;
@@ -184,7 +185,7 @@ async function setSnoozeMode(senderNumber, durationMinutes = 60, options = {}) {
   }
 
   const payload = {
-    senderNumber,
+    senderNumber: normalizedNumber,
     durationMinutes: effectiveDuration,
     manual,
     reason: reason || null,
@@ -200,14 +201,15 @@ async function setSnoozeMode(senderNumber, durationMinutes = 60, options = {}) {
 
   await docRef.set(payload, { merge: true });
 
-  console.log('[humanHandover] Snooze mode aktif untuk', senderNumber, manual ? '(manual)' : `(durasi ${effectiveDuration} menit)`);
+  console.log('[humanHandover] Snooze mode aktif untuk', normalizedNumber, manual ? '(manual)' : `(durasi ${effectiveDuration} menit)`);
 }
 
 async function clearSnoozeMode(senderNumber) {
   const db = ensureFirestore();
+  const normalizedNumber = normalizeWhatsappNumber(senderNumber) || senderNumber;
   try {
-    await db.collection('handoverSnoozes').doc(senderNumber).delete();
-    console.log('[humanHandover] Snooze mode dinonaktifkan untuk', senderNumber);
+    await db.collection('handoverSnoozes').doc(normalizedNumber).delete();
+    console.log('[humanHandover] Snooze mode dinonaktifkan untuk', normalizedNumber);
   } catch (error) {
     console.warn('[humanHandover] Gagal menonaktifkan snooze:', error);
   }
@@ -215,7 +217,8 @@ async function clearSnoozeMode(senderNumber) {
 
 async function getSnoozeInfo(senderNumber, { cleanExpired = false } = {}) {
   const db = ensureFirestore();
-  const docRef = db.collection('handoverSnoozes').doc(senderNumber);
+  const normalizedNumber = normalizeWhatsappNumber(senderNumber) || senderNumber;
+  const docRef = db.collection('handoverSnoozes').doc(normalizedNumber);
   const snapshot = await docRef.get();
 
   if (!snapshot.exists) {

@@ -1155,6 +1155,15 @@ async function processBufferedMessages(senderNumber, client) {
         console.log(`[DEBOUNCED] Analisis (internal):\n${analysisContext}`);
     }
 
+    // Cek status AI (Snooze/Handover) sekali lagi sebelum memproses
+    // Ini menangani kasus di mana admin mematikan AI saat pesan sedang dalam buffer debounce
+    const { normalizedAddress } = parseSenderIdentity(senderNumber);
+    if (await isSnoozeActive(normalizedAddress)) {
+        console.log(`[DEBOUNCED] AI skipped for ${senderNumber} (handover active). Saving message only.`);
+        if (db) await saveMessageToFirestore(senderNumber, combinedMessage, 'user');
+        return;
+    }
+
     try {
         // Simulasi perilaku manusia: Baca dulu (mark as read)
         await client.sendSeen(senderNumber);
@@ -1687,7 +1696,9 @@ app.post('/conversation/:number/ai-state', async (req, res) => {
         } else {
             const hasDuration = typeof durationMinutes === 'number' && durationMinutes > 0;
             const manual = !hasDuration;
-            const effectiveDuration = hasDuration ? durationMinutes : 60;
+            // Jika manual (toggle via UI), set durasi sangat panjang (1 tahun) agar tidak auto-ON dalam 60 menit
+            const effectiveDuration = hasDuration ? durationMinutes : (365 * 24 * 60);
+            
             await setSnoozeMode(senderNumber, effectiveDuration, {
                 manual,
                 reason: reason || (manual ? 'manual-toggle' : 'timed-toggle'),
