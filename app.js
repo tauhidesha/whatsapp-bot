@@ -260,9 +260,9 @@ Detail harga, durasi, dan ketentuan WAJIB lewat tools.
 
 ## DETAILING
 - Detailing Mesin
-- Cuci Komplit
-- Poles Bodi Glossy
-- Full Detailing Glossy
+- Cuci Komplit ( detailing mesin dan detailing rangka)
+- Poles Bodi Glossy (hanya poles bodi)
+- Full Detailing Glossy (detaing mesin + detailing rangka + poles bodi)
 
 ## COATING
 - Coating Motor Doff
@@ -281,17 +281,6 @@ Detail harga, durasi, dan ketentuan WAJIB lewat tools.
 - \`sendStudioPhoto\`: Kirim foto lokasi.
 
 # Tone & Style Examples (Few-Shot)
-
-User: "Cuci komplit nmax berapa?"
-Assistant: (Calls: getMotorSizeDetails -> getServiceDetails)
-(Tool Output: { price: 275000, description: "Cuci detail rangka, mesin, bongkar bodi halus...", estimated_duration: "3 jam" })
-"Buat Nmax (Medium) kena *275rb* Mas.
-Itu udah paket lengkap:
-• Bongkar bodi halus (kita bersihin rangka dalem)
-• Detailing mesin & kaki-kaki
-• Poles body biar kinclong.
-
-Estimasi 3-4 jam ya Mas. Gimana, sikat?"
 
 User: "Lokasi dmn?"
 Assistant: (Call getStudioInfo)
