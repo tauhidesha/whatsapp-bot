@@ -123,7 +123,7 @@ const generateDocumentTool = {
     // Ambil info alamat dari tool getStudioInfo
     let studioAddress = 'Jl. Bukit Cengkeh 1, Depok'; // Fallback
     try {
-      const studioInfoResult = await getStudioInfoTool.implementation({});
+      const studioInfoResult = await getStudioInfoTool.implementation({ infoType: 'location' });
       if (typeof studioInfoResult === 'string') {
         studioAddress = studioInfoResult;
       } else if (studioInfoResult && studioInfoResult.address) {
