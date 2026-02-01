@@ -330,8 +330,6 @@ rm -rf ~/whatsapp-bot/tokens/ai-chatbot
 
 # Restart service
 sudo systemctl restart whatsapp-ai
-
-# Check logs
 sudo journalctl -u whatsapp-ai -f
 ```
 

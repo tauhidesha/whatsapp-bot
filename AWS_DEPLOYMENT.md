@@ -211,15 +211,16 @@ npm --version
 ### 3. Install Ngrok (Opsional - untuk Webhook)
 
 ```bash
-# Download dan install ngrok
+# Cara 1: Untuk Ubuntu (APT)
 curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
 echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
 sudo apt update && sudo apt install ngrok
 
-# Atau manual download
-# wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
-# tar -xzf ngrok-v3-stable-linux-amd64.tgz
-# sudo mv ngrok /usr/local/bin/
+# Cara 2: Untuk Amazon Linux / Manual Download (Recommended)
+cd ~
+wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
+tar -xzf ngrok-v3-stable-linux-amd64.tgz
+sudo mv ngrok /usr/local/bin/
 
 # Verify
 ngrok version
@@ -566,7 +567,7 @@ sudo journalctl -u whatsapp-ai --no-pager | tail -50
 curl http://localhost:4000/health
 
 # Check health endpoint (via ngrok)
-curl https://your-ngrok-domain.ngrok-free.app/health
+curl https://unblissful-unverdantly-stan.ngrok-free.dev/health
 
 # Atau dari luar server (tanpa ngrok)
 curl http://YOUR_EC2_PUBLIC_IP:4000/health
