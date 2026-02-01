@@ -23,6 +23,15 @@ function isAdmin(senderNumber) {
   return adminNumbers.some(admin => normalize(admin) === sender);
 }
 
+// Helper untuk membuat garis horizontal
+function generateHr(doc, y) {
+  doc.strokeColor('#aaaaaa')
+    .lineWidth(1)
+    .moveTo(50, y)
+    .lineTo(550, y)
+    .stroke();
+}
+
 const generateDocumentTool = {
   toolDefinition: {
     type: 'function',
@@ -149,9 +158,13 @@ const generateDocumentTool = {
 
     doc.pipe(writeStream);
 
+    // --- STYLING CONSTANTS ---
+    const primaryColor = '#2c3e50'; // Dark Blue/Grey
+    const secondaryColor = '#7f8c8d'; // Grey
+
     // --- HEADER ---
-    // Logo: src/data/bosmat.png (relative: ../../data/bosmat.png)
-    const logoPath = path.join(__dirname, '../../data/bosmat.png');
+    // Logo: data/boS Mat (1000 x 500 px) (1).png
+    const logoPath = path.join(__dirname, '../../../data/boS Mat (1000 x 500 px) (1).png');
     
     if (fs.existsSync(logoPath)) {
       doc.image(logoPath, 50, 45, { width: 60 });
@@ -159,94 +172,160 @@ const generateDocumentTool = {
 
     // Company Info
     doc
+      .fillColor(primaryColor)
       .font('Helvetica-Bold')
       .fontSize(20)
       .text('BOSMAT', 120, 50)
       .fontSize(10)
       .font('Helvetica')
       .text('Repainting & Detailing Studio', 120, 75)
-      .text(studioAddress, 250, 55, { align: 'right', width: 300 })
+      .fillColor(secondaryColor)
+      .text(studioAddress, 200, 50, { align: 'right', width: 350 })
       .moveDown();
 
-    // Divider
-    doc.moveTo(50, 100).lineTo(550, 100).stroke();
-    doc.moveDown(2);
+    // Divider Header
+    generateHr(doc, 95);
 
     // --- DOCUMENT TITLE ---
     let title = '';
     let docCode = '';
 
     if (documentType === 'tanda_terima') {
-      title = 'SURAT TANDA TERIMA KENDARAAN';
+      title = 'TANDA TERIMA';
       docCode = 'STT';
     } else if (documentType === 'invoice') {
-      title = 'INVOICE / TAGIHAN';
+      title = 'INVOICE';
       docCode = 'INV';
     } else if (documentType === 'bukti_bayar') {
-      title = 'BUKTI PEMBAYARAN (LUNAS)';
+      title = 'RECEIPT';
       docCode = 'RCP';
     }
 
     const docNumber = `${docCode}/${now.getFullYear()}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${idSuffix}`;
 
-    doc.fontSize(16).font('Helvetica-Bold').text(title, { align: 'center' });
-    doc.fontSize(10).font('Helvetica').text(`Nomor: ${docNumber}`, { align: 'center' });
-    doc.moveDown(2);
-
-    // --- DETAILS ---
-    const startY = doc.y;
+    // --- INFO SECTION (2 Columns) ---
+    const infoTop = 115;
     
-    doc.text(`Tanggal: ${dateStr} ${timeStr}`, 50, startY);
-    doc.moveDown(0.5);
-    doc.font('Helvetica-Bold').text('Kepada Yth:', 50);
-    doc.font('Helvetica').text(customerName);
-    doc.text(motorDetails);
-    doc.moveDown(2);
+    // Left Column: Document Title & Customer
+    doc
+      .fillColor(primaryColor)
+      .fontSize(20)
+      .font('Helvetica-Bold')
+      .text(title, 50, infoTop);
 
-    // --- ITEMS ---
-    doc.font('Helvetica-Bold').text('Rincian Pekerjaan / Layanan:', 50);
-    doc.moveDown(0.5);
+    doc
+      .fontSize(10)
+      .fillColor('black')
+      .font('Helvetica-Bold')
+      .text('Kepada Yth:', 50, infoTop + 35)
+      .font('Helvetica')
+      .text(customerName, 50, infoTop + 50)
+      .text(motorDetails, 50, infoTop + 65);
+
+    // Right Column: Document Details
+    doc
+      .fontSize(10)
+      .font('Helvetica-Bold')
+      .text('Detail Dokumen:', 350, infoTop + 35)
+      .font('Helvetica')
+      .text(`Nomor: ${docNumber}`, 350, infoTop + 50)
+      .text(`Tanggal: ${dateStr}`, 350, infoTop + 65)
+      .text(`Jam: ${timeStr}`, 350, infoTop + 80);
+
+    // --- TABLE ITEMS ---
+    const tableTop = 230;
+    const itemCodeX = 50;
+    const descriptionX = 90;
+    const priceX = 450;
+
+    // Table Header
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(10)
+      .text('No', itemCodeX, tableTop)
+      .text('Deskripsi Layanan', descriptionX, tableTop)
+      .text('Harga', priceX, tableTop, { align: 'right' });
+
+    generateHr(doc, tableTop + 15);
+
+    // Table Rows
     doc.font('Helvetica');
+    let y = tableTop + 30;
 
-    const itemsList = finalItems.split(/,|\n/).map(i => i.trim()).filter(Boolean);
+    // Split items by newline (preferred) or comma
+    const itemsList = finalItems.split(/\n|,\s*/).map(i => i.trim()).filter(Boolean);
+    
     itemsList.forEach((item, index) => {
-      doc.text(`${index + 1}. ${item}`, { indent: 10 });
-    });
-    doc.moveDown();
+      // Coba pisahkan nama layanan dan harga jika formatnya "Layanan : RpXXX"
+      let desc = item;
+      let priceStr = '-';
+      
+      const lastColonIndex = item.lastIndexOf(':');
+      if (lastColonIndex > -1) {
+         const potentialPrice = item.substring(lastColonIndex + 1).trim();
+         // Cek apakah bagian kanan terlihat seperti harga (ada angka atau Rp)
+         if (potentialPrice.includes('Rp') || /\d/.test(potentialPrice)) {
+             desc = item.substring(0, lastColonIndex).trim();
+             priceStr = potentialPrice;
+         }
+      }
 
-    // --- NOTES ---
-    if (notes && notes !== '-') {
-      doc.moveDown();
-      doc.font('Helvetica-Bold').text('Catatan:', 50);
-      doc.font('Helvetica').text(notes);
-    }
+      doc
+        .fontSize(10)
+        .text(`${index + 1}`, itemCodeX, y)
+        .text(desc, descriptionX, y, { width: 340 })
+        .text(priceStr, priceX, y, { align: 'right' });
+      
+      y += 20;
+    });
+
+    generateHr(doc, y);
+    y += 15;
 
     // --- TOTAL & FOOTER ---
     if (documentType !== 'tanda_terima') {
-      doc.moveDown(2);
-      doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-      doc.moveDown(1);
-      
-      doc.fontSize(14).font('Helvetica-Bold').text(`TOTAL: ${formatCurrency(finalTotal)}`, { align: 'right' });
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(12)
+        .text('TOTAL', 350, y, { width: 90, align: 'right' })
+        .text(formatCurrency(finalTotal), priceX, y, { align: 'right' });
       
       if (documentType === 'bukti_bayar') {
-        doc.fontSize(10).font('Helvetica').text(`Metode Pembayaran: ${paymentMethod}`, { align: 'right' });
-        doc.fillColor('green').text('LUNAS', { align: 'right' });
+        y += 20;
+        doc
+          .fillColor('green')
+          .fontSize(12)
+          .text('LUNAS', priceX, y, { align: 'right' });
         doc.fillColor('black');
-      } else {
-        doc.fontSize(10).font('Helvetica').text('Silakan lakukan pembayaran sesuai total tagihan.', { align: 'right' });
+        
+        y += 15;
+        doc.fontSize(10).font('Helvetica').text(`Metode: ${paymentMethod}`, priceX, y, { align: 'right' });
       }
     } else {
       doc.moveDown(2);
-      doc.font('Helvetica-Oblique').fontSize(10).text('Kendaraan telah diterima untuk dilakukan pengecekan/pengerjaan.', { align: 'center' });
+      y = doc.y;
+      doc.font('Helvetica-Oblique').fontSize(10).text('Kendaraan telah diterima untuk dilakukan pengecekan/pengerjaan.', 50, y, { align: 'center', width: 500 });
+    }
+
+    // --- NOTES ---
+    y += 40;
+    if (notes && notes !== '-') {
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(10)
+        .text('Catatan:', 50, y)
+        .font('Helvetica')
+        .text(notes, 50, y + 15);
+      y += 40;
     }
 
     // Signatures
-    doc.moveDown(4);
-    const signatureY = doc.y;
-    doc.text('Hormat Kami,', 400, signatureY, { align: 'center', width: 150 });
-    doc.moveDown(3);
-    doc.text('( Admin Bosmat )', 400, doc.y, { align: 'center', width: 150 });
+    y += 30;
+    // Pastikan tidak keluar halaman
+    if (y > 700) { doc.addPage(); y = 50; }
+
+    doc.text('Hormat Kami,', 400, y, { align: 'center', width: 150 });
+    doc.text('( Admin Bosmat )', 400, y + 50, { align: 'center', width: 150 });
 
     doc.end();
 
