@@ -50,6 +50,7 @@ const generateDocumentTool = {
           motorDetails: { type: 'string', description: 'Info motor (Merk, Tipe, Nopol).' },
           items: { type: 'string', description: 'Daftar layanan/barang. Contoh: "Ganti Oli, Servis CVT".' },
           totalAmount: { type: 'number', description: 'Total biaya. Jika 0 atau kosong, sistem akan mencoba menghitung otomatis berdasarkan layanan dan ukuran motor.' },
+          amountPaid: { type: 'number', description: 'Jumlah yang sudah dibayar. Isi 0 jika belum bayar. Isi sebagian jika DP. Isi sama dengan total jika Lunas.' },
           paymentMethod: { type: 'string', description: 'Metode pembayaran (Transfer, Tunai, QRIS).' },
           notes: { type: 'string', description: 'Catatan tambahan (keluhan, kondisi fisik, dll).' },
           senderNumber: { type: 'string', description: 'Nomor pengirim (otomatis diisi sistem).' }
@@ -65,6 +66,7 @@ const generateDocumentTool = {
       motorDetails = '-',
       items = '-',
       totalAmount = 0,
+      amountPaid = 0,
       paymentMethod = '-',
       notes = '-',
       senderNumber
@@ -130,15 +132,14 @@ const generateDocumentTool = {
     const idSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
     
     // Ambil info alamat dari tool getStudioInfo
-    let studioAddress = 'Jl. Bukit Cengkeh 1, Depok'; // Fallback
+    let studioAddress = 'Bukit Cengkeh 1, Jl. Medan No.B3/2, Kota Depok, Jawa Barat 16451\nTelp/WA: 0895401527556'; // Default lengkap
     try {
-      const studioInfoResult = await getStudioInfoTool.implementation({ infoType: 'location' });
-      if (typeof studioInfoResult === 'string') {
-        studioAddress = studioInfoResult;
-      } else if (studioInfoResult && studioInfoResult.address) {
-        studioAddress = studioInfoResult.address;
-      } else if (studioInfoResult && studioInfoResult.info) {
-        studioAddress = studioInfoResult.info;
+      const studioInfoResult = await getStudioInfoTool.implementation({ infoType: 'all' });
+      if (studioInfoResult?.data?.studioInfo) {
+        const { location, contact } = studioInfoResult.data.studioInfo;
+        if (location?.address && contact?.phone) {
+          studioAddress = `${location.address}\nTelp/WA: ${contact.phone}`;
+        }
       }
     } catch (err) {
       console.warn('[generateDocument] Gagal mengambil info studio:', err);
@@ -289,17 +290,69 @@ const generateDocumentTool = {
         .fontSize(12)
         .text('TOTAL', 350, y, { width: 90, align: 'right' })
         .text(formatCurrency(finalTotal), priceX, y, { align: 'right' });
+      y += 20;
       
-      if (documentType === 'bukti_bayar') {
-        y += 20;
+      // Logic Status Pembayaran (DP / Lunas / Belum Bayar)
+      const paid = amountPaid || 0;
+      const remaining = finalTotal - paid;
+
+      if (paid > 0) {
+        // Tampilkan baris pembayaran jika ada uang masuk (DP atau Lunas)
         doc
-          .fillColor('green')
+          .font('Helvetica')
+          .fontSize(10)
+          .text('Sudah Dibayar', 350, y, { width: 90, align: 'right' })
+          .text(formatCurrency(paid), priceX, y, { align: 'right' });
+        y += 15;
+
+        if (remaining > 0) {
+          // Kasus DP
+          doc
+            .font('Helvetica-Bold')
+            .fontSize(12)
+            .text('SISA TAGIHAN', 350, y, { width: 90, align: 'right' })
+            .text(formatCurrency(remaining), priceX, y, { align: 'right' });
+          y += 25;
+
+          // Stempel BELUM LUNAS
+          doc.save().rotate(-10, { origin: [420, y] });
+          doc.rect(380, y - 5, 130, 30).stroke('orange');
+          doc.fillColor('orange').fontSize(16).text('BELUM LUNAS', 380, y + 2, { width: 130, align: 'center' });
+          doc.restore();
+        } else {
+          // Kasus Lunas
+          doc.save().rotate(-10, { origin: [420, y] });
+          doc.rect(400, y - 5, 100, 30).stroke('green');
+          doc.fillColor('green').fontSize(16).text('LUNAS', 400, y + 2, { width: 100, align: 'center' });
+          doc.restore();
+        }
+      } else if (documentType === 'bukti_bayar') {
+        // Jika tipe dokumen bukti bayar tapi amountPaid 0, anggap Lunas (default behavior lama)
+        doc.fillColor('green')
           .fontSize(12)
           .text('LUNAS', priceX, y, { align: 'right' });
         doc.fillColor('black');
-        
+      }
+
+      // Info Metode Pembayaran
+      if (paymentMethod !== '-' && paid > 0) {
         y += 15;
-        doc.fontSize(10).font('Helvetica').text(`Metode: ${paymentMethod}`, priceX, y, { align: 'right' });
+        doc.fillColor('black').fontSize(10).font('Helvetica').text(`Metode: ${paymentMethod}`, priceX, y, { align: 'right' });
+      }
+
+      // Info Rekening (Hanya muncul jika masih ada tagihan/invoice)
+      if (documentType === 'invoice' && remaining > 0) {
+        y += 30;
+        doc
+          .fillColor('black')
+          .font('Helvetica-Bold')
+          .fontSize(10)
+          .text('Detail Pembayaran:', 50, y)
+          .font('Helvetica')
+          .text('Bank: BCA', 50, y + 15)
+          .text('No. Rek: 1662515412', 50, y + 30)
+          .text('A.N: Muhammad Tauhid Haryadesa', 50, y + 45);
+        y += 45;
       }
     } else {
       doc.moveDown(2);
