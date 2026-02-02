@@ -168,24 +168,19 @@ const generateDocumentTool = {
     const logoPath = path.join(__dirname, '../../../data/boS Mat (1000 x 500 px) (1).png');
     
     if (fs.existsSync(logoPath)) {
-      doc.image(logoPath, 50, 45, { width: 60 });
+      doc.image(logoPath, 50, 30, { width: 150 });
     }
 
     // Company Info
     doc
-      .fillColor(primaryColor)
-      .font('Helvetica-Bold')
-      .fontSize(20)
-      .text('BOSMAT', 120, 50)
+      .fillColor(secondaryColor)
       .fontSize(10)
       .font('Helvetica')
-      .text('Repainting & Detailing Studio', 120, 75)
-      .fillColor(secondaryColor)
-      .text(studioAddress, 200, 50, { align: 'right', width: 350 })
+      .text(studioAddress, 200, 45, { align: 'right', width: 350 })
       .moveDown();
 
     // Divider Header
-    generateHr(doc, 95);
+    generateHr(doc, 110);
 
     // --- DOCUMENT TITLE ---
     let title = '';
@@ -205,7 +200,7 @@ const generateDocumentTool = {
     const docNumber = `${docCode}/${now.getFullYear()}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${idSuffix}`;
 
     // --- INFO SECTION (2 Columns) ---
-    const infoTop = 115;
+    const infoTop = 130;
     
     // Left Column: Document Title & Customer
     doc
@@ -244,7 +239,7 @@ const generateDocumentTool = {
       .font('Helvetica-Bold')
       .fontSize(10)
       .text('No', itemCodeX, tableTop)
-      .text('Deskripsi Layanan', descriptionX, tableTop)
+      .text('Layanan', descriptionX, tableTop)
       .text('Harga', priceX, tableTop, { align: 'right' });
 
     generateHr(doc, tableTop + 15);
@@ -271,13 +266,33 @@ const generateDocumentTool = {
          }
       }
 
-      doc
-        .fontSize(10)
-        .text(`${index + 1}`, itemCodeX, y)
-        .text(desc, descriptionX, y, { width: 340 })
-        .text(priceStr, priceX, y, { align: 'right' });
+      // Cari deskripsi layanan untuk ditampilkan di bawah nama layanan
+      const cleanName = desc.replace(/\s*\([A-Z]+\)$/i, '').trim();
+      const serviceData = masterLayanan.find(s => 
+        s.name.toLowerCase() === cleanName.toLowerCase() ||
+        cleanName.toLowerCase().includes(s.name.toLowerCase())
+      );
+      const descriptionText = serviceData ? (serviceData.summary || serviceData.description) : '';
+
+      doc.fontSize(10).fillColor('black').font('Helvetica').text(`${index + 1}`, itemCodeX, y);
+      doc.font('Helvetica-Bold').text(desc, descriptionX, y, { width: 340 });
+      doc.font('Helvetica').text(priceStr, priceX, y, { align: 'right' });
       
-      y += 20;
+      if (descriptionText) {
+        const nameHeight = doc.heightOfString(desc, { width: 340 });
+        const descY = y + nameHeight + 2;
+        
+        doc.fontSize(8).fillColor('#555555').font('Helvetica-Oblique')
+           .text(descriptionText, descriptionX, descY, { width: 340 });
+        
+        const descHeight = doc.heightOfString(descriptionText, { width: 340 });
+        y = descY + descHeight + 10;
+        doc.fillColor('black').font('Helvetica');
+      } else {
+        y += 20;
+      }
+      
+      if (y > 700) { doc.addPage(); y = 50; }
     });
 
     generateHr(doc, y);
