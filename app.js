@@ -36,6 +36,7 @@ const { startBookingReminderScheduler } = require('./src/ai/utils/bookingReminde
 const { isSnoozeActive, setSnoozeMode, clearSnoozeMode, getSnoozeInfo } = require('./src/ai/utils/humanHandover.js');
 const { getLangSmithCallbacks } = require('./src/ai/utils/langsmith.js');
 const { saveCustomerLocation } = require('./src/ai/utils/customerLocations.js');
+const masterLayanan = require('./src/data/masterLayanan.js');
 
 const app = express();
 const server = http.createServer(app);
@@ -1807,9 +1808,45 @@ app.get('/bookings', async (req, res) => {
         
         snapshot.forEach(doc => {
             const data = doc.data();
+            
+            // Hitung Estimasi Durasi & Cek Kategori Repaint
+            let maxDurationMinutes = 0;
+            let isRepaint = false;
+            
+            const serviceList = data.services || (data.serviceName ? [data.serviceName] : []);
+            
+            serviceList.forEach(sName => {
+                const cleanName = sName.toLowerCase();
+                const svc = masterLayanan.find(m => 
+                    cleanName.includes(m.name.toLowerCase()) || 
+                    m.name.toLowerCase().includes(cleanName)
+                );
+                
+                if (svc) {
+                    if (svc.category === 'repaint') isRepaint = true;
+                    const dur = parseInt(svc.estimatedDuration || '0', 10);
+                    if (dur > maxDurationMinutes) maxDurationMinutes = dur;
+                }
+            });
+
+            // Konversi menit ke hari kerja (asumsi 8 jam/hari = 480 menit)
+            const durationDays = Math.ceil(maxDurationMinutes / 480) || 1;
+            
+            // Hitung Tanggal Selesai
+            let estimatedEndDate = data.bookingDate;
+            if (data.bookingDate) {
+                const startDate = new Date(data.bookingDate);
+                const endDate = new Date(startDate);
+                endDate.setDate(startDate.getDate() + (durationDays - 1));
+                estimatedEndDate = endDate.toISOString().split('T')[0];
+            }
+
             bookings.push({
                 id: doc.id,
                 ...data,
+                isRepaint,
+                estimatedDurationDays: durationDays,
+                estimatedEndDate,
                 // Pastikan timestamp diserialisasi
                 createdAt: serializeTimestamp(data.createdAt),
                 updatedAt: serializeTimestamp(data.updatedAt)
