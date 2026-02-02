@@ -31,6 +31,7 @@ const { getRepaintColorSurchargeTool } = require('./src/ai/tools/getRepaintColor
 const { notifyVisitIntentTool } = require('./src/ai/tools/notifyVisitIntentTool.js');
 const { generateDocumentTool } = require('./src/ai/tools/generateDocumentTool.js');
 const { readDirectMessagesTool } = require('./src/ai/tools/readDirectMessagesTool.js');
+const { sendMessageTool } = require('./src/ai/tools/sendMessageTool.js');
 const { createMetaWebhookRouter } = require('./src/server/metaWebhook.js');
 const { sendMetaMessage } = require('./src/server/metaClient.js');
 const { startBookingReminderScheduler } = require('./src/ai/utils/bookingReminders.js');
@@ -88,6 +89,7 @@ const availableTools = {
     notifyVisitIntent: notifyVisitIntentTool.implementation,
     generateDocument: generateDocumentTool.implementation,
     readDirectMessages: readDirectMessagesTool.implementation,
+    sendMessage: sendMessageTool.implementation,
 };
 
 const toolDefinitions = [
@@ -106,6 +108,7 @@ const toolDefinitions = [
     notifyVisitIntentTool.toolDefinition,
     generateDocumentTool.toolDefinition,
     readDirectMessagesTool.toolDefinition,
+    sendMessageTool.toolDefinition,
 ];
 
 console.log('🔧 [STARTUP] Tool Registry Initialized:');
@@ -305,6 +308,7 @@ Detail harga, durasi, dan ketentuan WAJIB lewat tools.
 - \`sendStudioPhoto\`: Kirim foto lokasi.
 - \`generateDocument\`: Membuat dokumen PDF (Invoice, Tanda Terima, Bukti Bayar) - KHUSUS ADMIN.
 - \`readDirectMessages\`: Baca database chat (List chat terbaru / Baca detail chat) - KHUSUS ADMIN.
+- \`sendMessage\`: Kirim pesan WhatsApp ke nomor tertentu - KHUSUS ADMIN.
 
 # Tone & Style Examples (Few-Shot)
 
