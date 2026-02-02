@@ -826,8 +826,30 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
             ? `${userMessage}\n\n[Context Internal]\n${context}`
             : userMessage;
 
+        // Cek apakah pengirim adalah admin
+        const adminNumbers = [
+            process.env.BOSMAT_ADMIN_NUMBER,
+            process.env.ADMIN_WHATSAPP_NUMBER
+        ].filter(Boolean);
+
+        const normalize = (n) => n ? n.toString().replace(/\D/g, '') : '';
+        const senderNormalized = normalize(senderNumber);
+        const isAdmin = adminNumbers.some(num => normalize(num) === senderNormalized);
+
+        let effectiveSystemPrompt = SYSTEM_PROMPT;
+        if (isAdmin) {
+            console.log(`👮 [AI_PROCESSING] Admin detected: ${senderNumber}. Switching to Admin Persona.`);
+            effectiveSystemPrompt += `\n\n# 🛡️ ADMIN MODE ACTIVE
+User ini adalah ADMIN/OWNER (Bosmat).
+1. Matikan persona CS. Jangan basa-basi marketing.
+2. Panggil user dengan "Bos".
+3. Langsung jalankan perintah (terutama tools admin seperti generateDocument).
+4. Jika diminta buat invoice/surat, langsung buatkan tanpa banyak tanya detail jika data sudah cukup.
+5. Berikan respon yang padat, teknis, dan to-the-point.`;
+        }
+
         const messages = [
-            new SystemMessage(SYSTEM_PROMPT),
+            new SystemMessage(effectiveSystemPrompt),
             ...conversationHistoryMessages,
             new HumanMessage(userContent)
         ];
