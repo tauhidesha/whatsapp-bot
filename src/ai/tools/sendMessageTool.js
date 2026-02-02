@@ -1,5 +1,7 @@
 // File: src/ai/tools/sendMessageTool.js
 const { z } = require('zod');
+const admin = require('firebase-admin');
+const { getFirebaseAdmin } = require('../../lib/firebaseAdmin.js');
 const { normalizeWhatsappNumber } = require('../utils/humanHandover.js');
 
 // Helper untuk memvalidasi apakah pengirim adalah admin
@@ -75,6 +77,32 @@ const sendMessageTool = {
       }
 
       await client.sendText(target, message);
+
+      // --- Simpan ke Firestore agar AI punya konteks ---
+      try {
+        const db = getFirebaseAdmin().firestore();
+        // Hapus suffix @c.us untuk mendapatkan docId standar
+        const docId = target.replace('@c.us', '');
+        const timestamp = admin.firestore.FieldValue.serverTimestamp();
+
+        // 1. Simpan di subcollection messages
+        await db.collection('directMessages').doc(docId).collection('messages').add({
+          text: message,
+          sender: 'admin', // Ditandai 'admin' karena dikirim manual/via tool
+          timestamp: timestamp,
+        });
+
+        // 2. Update metadata percakapan
+        await db.collection('directMessages').doc(docId).set({
+          lastMessage: message,
+          lastMessageSender: 'admin',
+          lastMessageAt: timestamp,
+          updatedAt: timestamp,
+          messageCount: admin.firestore.FieldValue.increment(1),
+        }, { merge: true });
+      } catch (err) {
+        console.warn('[sendMessageTool] Gagal menyimpan pesan ke Firestore:', err.message);
+      }
 
       return {
         success: true,
