@@ -390,6 +390,9 @@ const DEFAULT_CHROME_ARGS = [
     '--use-mock-keychain',
     '--hide-scrollbars',
     '--remote-debugging-port=0',
+    '--disable-software-rasterizer',
+    '--disable-features=IsolateOrigins,site-per-process',
+    '--disable-web-security',
 ];
 
 const ADDITIONAL_CHROME_ARGS = (process.env.CHROMIUM_ADDITIONAL_ARGS || '')
