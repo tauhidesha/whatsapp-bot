@@ -138,19 +138,12 @@ const generateDocumentTool = {
     const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
     const idSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
     
-    // Ambil info alamat dari tool getStudioInfo
-    let studioAddress = 'Bukit Cengkeh 1, Jl. Medan No.B3/2, Kota Depok, Jawa Barat 16451\nTelp/WA: 0895401527556'; // Default lengkap
-    try {
-      const studioInfoResult = await getStudioInfoTool.implementation({ infoType: 'all' });
-      if (studioInfoResult?.data?.studioInfo) {
-        const { location, contact } = studioInfoResult.data.studioInfo;
-        if (location?.address && contact?.phone) {
-          studioAddress = `${location.address}\nTelp/WA: ${contact.phone}`;
-        }
-      }
-    } catch (err) {
-      console.warn('[generateDocument] Gagal mengambil info studio:', err);
-    }
+    // Info alamat studio
+    const studioAddress = `Bosmat Studio
+Bukit Cengkeh 1
+Jl. Medan No.B3/2
+Kota Depok, Jawa Barat 16451
+Telp/WA 0895 4015 27556`;
 
     // 3. Generate PDF
     const doc = new PDFDocument({ margin: 50, size: 'A4' });
@@ -236,7 +229,7 @@ const generateDocumentTool = {
       .text(`Jam: ${timeStr}`, 350, infoTop + 80);
 
     // --- TABLE ITEMS ---
-    const tableTop = 230;
+    const tableTop = 270;
     const itemCodeX = 50;
     const descriptionX = 90;
     const priceX = 450;
