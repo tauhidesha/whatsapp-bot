@@ -840,7 +840,8 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
         if (isAdmin) {
             console.log(`👮 [AI_PROCESSING] Admin detected: ${senderNumber}. Switching to Admin Persona.`);
             
-            // 1. Override Persona Awal (Hapus Zoya/Mas)
+            // 1. Override Persona Awal (Hapus Zoya/Mas dan ganti jadi Asisten Admin)
+            // Kita replace blok Identity & Persona dengan instruksi Admin
             effectiveSystemPrompt = effectiveSystemPrompt.replace(
                 /# Identity & Persona[\s\S]*?Panggilan ke User: "Mas"\./,
                 `# Identity & Persona (ADMIN MODE)
@@ -850,6 +851,7 @@ Panggilan ke User: "Bos".`
             );
 
             // 2. Hapus Few-Shot Examples Customer (Agar tidak meniru gaya chat ke customer)
+            // Kita potong prompt sebelum masuk ke contoh percakapan customer
             const fewShotMarker = "# Tone & Style Examples (Few-Shot)";
             if (effectiveSystemPrompt.includes(fewShotMarker)) {
                 effectiveSystemPrompt = effectiveSystemPrompt.split(fewShotMarker)[0];
