@@ -19,7 +19,7 @@
   "license": "MIT",
   "dependencies": {
     "@langchain/core": "^0.3.15",
-    "@langchain/google-genai": "^2.1.13",
+    "@langchain/google-genai": "^0.1.0",
     "@langchain/groq": "^0.1.2",
     "@wppconnect-team/wppconnect": "^1.25.0",
     "cors": "^2.8.5",
@@ -34,7 +34,7 @@
     "luxon": "^3.5.0",
     "morgan": "^1.10.0",
     "node-fetch": "^2.7.0",
-    "pdfkit": "^0.17.2",
+    "pdfkit": "^0.15.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {

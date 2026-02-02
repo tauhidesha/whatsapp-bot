@@ -892,7 +892,7 @@ Assistant: (Call checkBookingAvailability)
             new SystemMessage(effectiveSystemPrompt),
             ...conversationHistoryMessages,
             new HumanMessage(userContent)
-        ];
+        ].filter(msg => !!msg); // Filter out null/undefined messages
 
         console.log(`🔧 [AI_PROCESSING] Tools registered: ${toolDefinitions.map(t => t.function.name).join(', ')}`);
         let iteration = 0;
