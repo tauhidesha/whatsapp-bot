@@ -839,13 +839,37 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
         let effectiveSystemPrompt = SYSTEM_PROMPT;
         if (isAdmin) {
             console.log(`👮 [AI_PROCESSING] Admin detected: ${senderNumber}. Switching to Admin Persona.`);
-            effectiveSystemPrompt += `\n\n# 🛡️ ADMIN MODE ACTIVE
-User ini adalah ADMIN/OWNER (Bosmat).
-1. Matikan persona CS. Jangan basa-basi marketing.
-2. Panggil user dengan "Bos".
-3. Langsung jalankan perintah (terutama tools admin seperti generateDocument).
-4. Jika diminta buat invoice/surat, langsung buatkan tanpa banyak tanya detail jika data sudah cukup.
-5. Berikan respon yang padat, teknis, dan to-the-point.`;
+            
+            // 1. Override Persona Awal (Hapus Zoya/Mas)
+            effectiveSystemPrompt = effectiveSystemPrompt.replace(
+                /# Identity & Persona[\s\S]*?Panggilan ke User: "Mas"\./,
+                `# Identity & Persona (ADMIN MODE)
+Anda adalah Asisten Pribadi untuk Owner/Admin Bosmat.
+Karakter: To-the-point, efisien, patuh, teknis.
+Panggilan ke User: "Bos".`
+            );
+
+            // 2. Hapus Few-Shot Examples Customer (Agar tidak meniru gaya chat ke customer)
+            const fewShotMarker = "# Tone & Style Examples (Few-Shot)";
+            if (effectiveSystemPrompt.includes(fewShotMarker)) {
+                effectiveSystemPrompt = effectiveSystemPrompt.split(fewShotMarker)[0];
+            }
+
+            // 3. Tambahkan Rules & Examples Khusus Admin
+            effectiveSystemPrompt += `\n\n# 🛡️ ADMIN MODE RULES
+1. JANGAN gunakan nada marketing/CS. Hapus basa-basi seperti "Gimana Mas, harganya masuk?".
+2. Jika Bos minta "bikinin estimasi", "buat invoice", atau "surat", GUNAKAN tool \`generateDocument\`.
+3. Jika Bos tanya harga/spek, jawab langsung angkanya/datanya.
+4. Prioritaskan kecepatan eksekusi.
+
+# Admin Few-Shot Examples
+Bos: "bikinin estimasi repaint aerox bodi halus warna candy"
+Assistant: (Call tools...)
+"Siap Bos, dokumen estimasi sedang dibuat." (Call generateDocument)
+
+Bos: "Cek slot besok"
+Assistant: (Call checkBookingAvailability)
+"Besok kosong Bos."`;
         }
 
         const messages = [
