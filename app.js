@@ -1376,7 +1376,22 @@ function start(client) {
         entry.messages.push(messageEntry);
         pendingMessages.set(senderNumber, entry);
 
-        debounceQueue.schedule(senderNumber, messageEntry);
+        // Cek apakah pengirim adalah admin untuk bypass buffer time
+        const adminNumbers = [
+            process.env.BOSMAT_ADMIN_NUMBER,
+            process.env.ADMIN_WHATSAPP_NUMBER
+        ].filter(Boolean);
+
+        const normalize = (n) => n ? n.toString().replace(/\D/g, '') : '';
+        const senderNormalized = normalize(senderNumber);
+        const isAdmin = adminNumbers.some(num => normalize(num) === senderNormalized);
+
+        if (isAdmin) {
+            console.log(`[BUFFER] ⚡ Admin detected (${senderNumber}), skipping debounce buffer.`);
+            await processBufferedMessages(senderNumber, client);
+        } else {
+            debounceQueue.schedule(senderNumber, messageEntry);
+        }
     });
 
     // --- Handle Incoming Calls ---
