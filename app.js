@@ -393,6 +393,12 @@ const DEFAULT_CHROME_ARGS = [
     '--disable-software-rasterizer',
     '--disable-features=IsolateOrigins,site-per-process',
     '--disable-web-security',
+    // Additional stability flags for EC2
+    '--disable-breakpad',
+    '--disable-hang-monitor',
+    '--disable-ipc-flooding-protection',
+    '--no-zygote',
+    '--enable-features=NetworkService,NetworkServiceInProcess',
 ];
 
 const ADDITIONAL_CHROME_ARGS = (process.env.CHROMIUM_ADDITIONAL_ARGS || '')
@@ -1949,8 +1955,8 @@ server.listen(PORT, '0.0.0.0', async () => {
         disableWelcome: true, // Disable welcome message
         sessionDataPath,
         puppeteerOptions: {
-            timeout: 120000,
-            protocolTimeout: 240000, // Tambahkan timeout protokol (4 menit) untuk instance lambat
+            timeout: 180000, // Naikkan ke 3 menit
+            protocolTimeout: 360000, // Naikkan ke 6 menit untuk instance lambat/throttled
             args: PUPPETEER_CHROME_ARGS,
             defaultViewport: PUPPETEER_VIEWPORT,
         },

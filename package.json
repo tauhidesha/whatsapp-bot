@@ -34,6 +34,7 @@
     "luxon": "^3.5.0",
     "morgan": "^1.10.0",
     "node-fetch": "^2.7.0",
+    "pdfkit": "^0.17.2",
     "zod": "^3.23.8"
   },
   "devDependencies": {
