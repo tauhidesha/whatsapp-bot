@@ -1793,6 +1793,63 @@ app.post('/conversation/:number/ai-state', async (req, res) => {
     }
 });
 
+app.get('/bookings', async (req, res) => {
+    try {
+        const { start, end } = req.query;
+        let query = db.collection('bookings');
+
+        // Filter sederhana berdasarkan tanggal jika disediakan
+        if (start) query = query.where('bookingDate', '>=', start);
+        if (end) query = query.where('bookingDate', '<=', end);
+
+        const snapshot = await query.orderBy('bookingDate', 'asc').get();
+        const bookings = [];
+        
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            bookings.push({
+                id: doc.id,
+                ...data,
+                // Pastikan timestamp diserialisasi
+                createdAt: serializeTimestamp(data.createdAt),
+                updatedAt: serializeTimestamp(data.updatedAt)
+            });
+        });
+
+        res.json({ bookings, status: 'success' });
+    } catch (error) {
+        console.error('[API] Error fetching bookings:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.patch('/bookings/:id/status', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status, notes } = req.body;
+
+        if (!status) {
+            return res.status(400).json({ error: 'Status is required' });
+        }
+
+        const updateData = {
+            status,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        };
+
+        if (notes) {
+            updateData.adminNotes = notes;
+        }
+
+        await db.collection('bookings').doc(id).update(updateData);
+
+        res.json({ success: true, id, status });
+    } catch (error) {
+        console.error('[API] Error updating booking status:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // --- Server Startup ---
 server.listen(PORT, '0.0.0.0', async () => {
     console.log(`🚀 WhatsApp AI Chatbot listening on http://0.0.0.0:${PORT}`);
