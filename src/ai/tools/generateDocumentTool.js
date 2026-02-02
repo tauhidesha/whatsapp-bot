@@ -83,14 +83,21 @@ const generateDocumentTool = {
     // 1.5 Auto-Calculate Price if totalAmount is 0/missing
     let finalTotal = totalAmount;
     let finalItems = items;
+    let detectedSize = null;
+
+    // Detect Motor Size (needed for auto-price or filling missing row prices)
+    if (documentType !== 'tanda_terima') {
+      try {
+        const sizeRes = await getMotorSizeDetailsTool.implementation({ motor_query: motorDetails });
+        detectedSize = (sizeRes.success && sizeRes.motor_size) ? sizeRes.motor_size : null;
+      } catch (err) {
+        console.warn('[generateDocument] Size detection failed:', err);
+      }
+    }
 
     if ((!finalTotal || finalTotal === 0) && documentType !== 'tanda_terima') {
       try {
-        // Detect Motor Size
-        const sizeRes = await getMotorSizeDetailsTool.implementation({ motor_query: motorDetails });
-        const size = (sizeRes.success && sizeRes.motor_size) ? sizeRes.motor_size : null;
-
-        if (size) {
+        if (detectedSize) {
           let runningTotal = 0;
           const itemList = items.split(/,|\n/).map(i => i.trim()).filter(Boolean);
           const detailedList = [];
@@ -105,11 +112,11 @@ const generateDocumentTool = {
             if (service) {
               let price = service.price;
               if (service.variants && Array.isArray(service.variants)) {
-                const variant = service.variants.find(v => v.name === size);
+                const variant = service.variants.find(v => v.name === detectedSize);
                 if (variant) price = variant.price;
               }
               runningTotal += price;
-              detailedList.push(`${service.name} (${size}): ${formatCurrency(price)}`);
+              detailedList.push(`${service.name} (${detectedSize}): ${formatCurrency(price)}`);
             } else {
               detailedList.push(itemStr);
             }
@@ -273,6 +280,23 @@ const generateDocumentTool = {
         cleanName.toLowerCase().includes(s.name.toLowerCase())
       );
       const descriptionText = serviceData ? (serviceData.summary || serviceData.description) : '';
+
+      // Fallback: Jika harga kosong ('-'), coba cari di master data atau gunakan total jika item tunggal
+      if (priceStr === '-' && documentType !== 'tanda_terima') {
+        if (serviceData && detectedSize) {
+           let price = serviceData.price;
+           if (serviceData.variants && Array.isArray(serviceData.variants)) {
+             const variant = serviceData.variants.find(v => v.name === detectedSize);
+             if (variant) price = variant.price;
+           }
+           if (price > 0) priceStr = formatCurrency(price);
+        }
+        
+        // Jika masih kosong dan ini satu-satunya item, gunakan finalTotal
+        if (priceStr === '-' && itemsList.length === 1 && finalTotal > 0) {
+           priceStr = formatCurrency(finalTotal);
+        }
+      }
 
       doc.fontSize(10).fillColor('black').font('Helvetica').text(`${index + 1}`, itemCodeX, y);
       doc.font('Helvetica-Bold').text(desc, descriptionX, y, { width: 340 });
