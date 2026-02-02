@@ -741,7 +741,7 @@ function sanitizeToolDirectiveOutput(text) {
     return clean.trim();
 }
 
-async function analyzeImageWithGemini(imageBuffer, mimeType = 'image/jpeg', caption = '', senderName = 'User', previousContext = '') {
+async function analyzeImageWithGemini_DEPRECATED(imageBuffer, mimeType = 'image/jpeg', caption = '', senderName = 'User', previousContext = '') {
     const base64Image = imageBuffer.toString('base64');
     const systemPrompt = 'Anda adalah Zoya, asisten Bosmat. Analisis foto motor pengguna, jelaskan kondisi, kerusakan, kebersihan, dan rekomendasi perawatan secara singkat dalam bahasa Indonesia. Fokus pada hal yang benar-benar terlihat dan hindari asumsi. ## Layanan Utama Repaint**: Bodi Halus/Kasar, Velg, Cover CVT/Arm Detailing/Coating**: Detailing Mesin, Cuci Komplit, Poles Bodi Glossy, Full Detailing Glossy, Coating Motor Doff/Glossy, Complete Service Doff/Glossy';
     const textPrompt = `Analisis foto motor dari ${senderName}. ${caption ? `Caption pengguna: ${caption}.` : ''} ${previousContext ? `Konteks chat sebelumnya: "${previousContext}".` : ''} Sebutkan poin penting dalam 2-3 kalimat. Jika ada noda/baret/kerusakan, jelaskan singkat dan rekomendasikan treatment Bosmat yang relevan.`;
@@ -817,7 +817,13 @@ async function analyzeImageWithGemini(imageBuffer, mimeType = 'image/jpeg', capt
     return 'Gambar diterima, namun analisis otomatis gagal dilakukan.';
 }
 
-async function getAIResponse(userMessage, senderName = "User", senderNumber = null, context = "") {
+async function getAIResponse(
+    userMessage, 
+    senderName = "User", 
+    senderNumber = null, 
+    context = "",
+    imagePayload = null // { buffer, mimeType }
+) {
     try {
         console.log('\n🤖 [AI_PROCESSING] ===== STARTING AI PROCESSING =====');
         console.log(`📝 [AI_PROCESSING] User Message: "${userMessage}"`);
@@ -837,10 +843,6 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
         } else {
             console.log(`🧠 [AI_PROCESSING] No conversation history (new user or no DB)`);
         }
-
-        const userContent = context
-            ? `${userMessage}\n\n[Context Internal]\n${context}`
-            : userMessage;
 
         // Cek apakah pengirim adalah admin
         const adminNumbers = [
@@ -890,12 +892,35 @@ Assistant: (Call checkBookingAvailability)
 "Besok kosong Bos."`;
         }
 
+        let userContent;
+        if (imagePayload && imagePayload.buffer) {
+            console.log(`🖼️ [AI_PROCESSING] Image payload detected, constructing multimodal message.`);
+            const base64Image = imagePayload.buffer.toString('base64');
+            userContent = {
+                content: [
+                    { type: "text", text: userMessage },
+                    { type: "image_url", image_url: `data:${imagePayload.mimeType};base64,${base64Image}` }
+                ]
+            };
+            // Gunakan model vision jika ada gambar
+            aiModel.modelName = ACTIVE_VISION_MODEL;
+            console.log(`🖼️ [AI_PROCESSING] Switched to vision model: ${aiModel.modelName}`);
+        } else {
+            userContent = context
+                ? `${userMessage}\n\n[Context Internal]\n${context}`
+                : userMessage;
+            // Pastikan kembali ke model teks standar jika tidak ada gambar
+            aiModel.modelName = ACTIVE_AI_MODEL;
+        }
+
         const messages = [
             new SystemMessage(effectiveSystemPrompt),
             ...conversationHistoryMessages,
             new HumanMessage(userContent)
-        ].filter(msg => !!msg); // Filter out null/undefined messages
+        ];
 
+        const finalMessages = messages.filter(msg => !!msg);
+ 
         console.log(`🔧 [AI_PROCESSING] Tools registered: ${toolDefinitions.map(t => t.function.name).join(', ')}`);
         let iteration = 0;
         const MAX_ITERATIONS = 8;
@@ -927,7 +952,7 @@ Assistant: (Call checkBookingAvailability)
                         apiKey: currentApiKey
                     }).bindTools(geminiToolSpecifications);
                     
-                    response = await modelInstance.invoke(messages, getTracingConfig(traceLabel));
+                    response = await modelInstance.invoke(finalMessages, getTracingConfig(traceLabel));
                     
                     // Validate response
                     const hasToolCalls = getToolCallsFromResponse(response).length > 0;
@@ -982,7 +1007,7 @@ Assistant: (Call checkBookingAvailability)
                                     apiKey: API_KEYS[0]
                                 });
                                 
-                                response = await fallbackModelInstance.invoke(messages, getTracingConfig(traceLabel));
+                                response = await fallbackModelInstance.invoke(finalMessages, getTracingConfig(traceLabel));
                                 
                                 // Validate fallback response
                                 const hasFallbackToolCalls = getToolCallsFromResponse(response).length > 0;
@@ -1036,7 +1061,7 @@ Assistant: (Call checkBookingAvailability)
                         return safeText || 'Baik mas, Zoya akan bantu cek ke tim Bosmat.';
                     }
 
-                    messages.push(response);
+                    finalMessages.push(response);
 
                     const enrichedArgs = { ...args };
                     if (senderNumber && !enrichedArgs.senderNumber) {
@@ -1055,7 +1080,7 @@ Assistant: (Call checkBookingAvailability)
                     console.log(`✅ [AI_PROCESSING] Directive tool ${toolName} completed`);
                     console.log(`📊 [AI_PROCESSING] Directive tool result: ${JSON.stringify(toolResult, null, 2)}`);
 
-                    messages.push(new ToolMessage({
+                    finalMessages.push(new ToolMessage({
                         tool_call_id: toolCallId,
                         content: JSON.stringify(toolResult),
                     }));
@@ -1072,7 +1097,7 @@ Assistant: (Call checkBookingAvailability)
             console.log(`🔧 [AI_PROCESSING] ===== TOOL CALLS DETECTED (iteration ${iteration}) =====`);
             console.log(`🔧 [AI_PROCESSING] Number of tool calls: ${toolCalls.length}`);
 
-            messages.push(response);
+            finalMessages.push(response);
 
             for (let i = 0; i < toolCalls.length; i++) {
                 const toolCall = toolCalls[i];
@@ -1099,7 +1124,7 @@ Assistant: (Call checkBookingAvailability)
                 console.log(`✅ [AI_PROCESSING] Tool ${toolName} completed`);
                 console.log(`📊 [AI_PROCESSING] Tool result: ${JSON.stringify(toolResult, null, 2)}`);
 
-                messages.push(new ToolMessage({
+                finalMessages.push(new ToolMessage({
                     tool_call_id: toolCallId,
                     content: JSON.stringify(toolResult)
                 }));
@@ -1203,31 +1228,15 @@ async function processBufferedMessages(senderNumber, client) {
         .map(m => (m.content || '').trim())
         .filter(part => part.length > 0);
 
+    const imageMessage = bufferEntry.messages.find(m => m.isImage && m.imageBuffer);
+
     let combinedMessage = messageParts.join('\n').trim();
     if (!combinedMessage) {
         const hasImage = bufferEntry.messages.some(m => m.isImage);
         combinedMessage = hasImage ? '[Gambar diterima]' : '[Pesan tidak tersedia]';
     }
 
-    const analysisNotes = bufferEntry.messages
-        .map(m => {
-            if (typeof m.analysis === 'string') return m.analysis.trim();
-            return '';
-        })
-        .filter(note => note.length > 0);
-
-    const analysisContext = analysisNotes.length > 0
-        ? analysisNotes.map((note, index) => {
-            const label = analysisNotes.length > 1 ? `Analisis Gambar ${index + 1}` : 'Analisis Gambar';
-            return `${label}:\n${note}`;
-        }).join('\n\n')
-        : '';
-
     console.log(`[DEBOUNCED] Processing buffered message for ${senderName}: "${combinedMessage}"`);
-    if (analysisContext) {
-        console.log(`[DEBOUNCED] ✓ Analisis gambar tersedia untuk ${senderName}`);
-        console.log(`[DEBOUNCED] Analisis (internal):\n${analysisContext}`);
-    }
 
     // Cek status AI (Snooze/Handover) sekali lagi sebelum memproses
     // Ini menangani kasus di mana admin mematikan AI saat pesan sedang dalam buffer debounce
@@ -1246,13 +1255,18 @@ async function processBufferedMessages(senderNumber, client) {
         await delay(typingDelay);
         await client.startTyping(senderNumber);
 
-        // Get AI response with memory
-        const aiContext = analysisContext
-            ? `Informasi internal dari analisis gambar (jangan sebutkan proses analisis). Gunakan poin-poin ini sebagai referensi:
-${analysisContext}`
-            : '';
+        // Siapkan image payload jika ada
+        const imagePayload = imageMessage ? {
+            buffer: imageMessage.imageBuffer,
+            mimeType: imageMessage.mimeType || 'image/jpeg'
+        } : null;
 
-        const aiResponse = await getAIResponse(combinedMessage, senderName, senderNumber, aiContext);
+        const aiResponse = await getAIResponse(
+            combinedMessage, 
+            senderName, 
+            senderNumber, 
+            "", // Konteks analisis gambar tidak lagi diperlukan
+            imagePayload);
         
         // Save to Firebase if available
         if (db) {
@@ -1387,7 +1401,7 @@ function start(client) {
         entry.senderName = senderName;
 
         let analysisResult = null;
-
+        let imageBuffer = null;
         if (isImage) {
             const captionText = (msg.caption || '').trim();
             let previousContext = '';
@@ -1404,26 +1418,17 @@ function start(client) {
 
             try {
                 console.log(`[VISION] 🔄 Mengunduh gambar dari ${senderName}...`);
-                const imageBuffer = await client.decryptFile(msg);
+                imageBuffer = await client.decryptFile(msg);
                 console.log(`[VISION] ✅ Gambar terunduh (${imageBuffer.length} bytes, mimetype: ${msg.mimetype || 'unknown'})`);
-
-                analysisResult = await analyzeImageWithGemini(
-                    imageBuffer,
-                    msg.mimetype || 'image/jpeg',
-                    captionText,
-                    senderName,
-                    previousContext
-                );
             } catch (error) {
                 console.error(`[VISION] ❌ Gagal memproses gambar dari ${senderName}:`, error);
-                analysisResult = 'Analisis gambar otomatis gagal.';
             }
 
             messageContent = captionText || '[Gambar diterima]';
         }
 
         const messageEntry = {
-            content: messageContent || (isImage ? '[Gambar diterima]' : `[${msg.type}]`),
+            content: messageContent || (isImage ? (msg.caption || '[Gambar diterima]') : `[${msg.type}]`),
             isMedia,
             isImage,
             originalMsg: msg,
@@ -1431,6 +1436,10 @@ function start(client) {
 
         if (analysisResult) {
             messageEntry.analysis = analysisResult;
+        }
+        if (imageBuffer) {
+            messageEntry.imageBuffer = imageBuffer;
+            messageEntry.mimeType = msg.mimetype;
         }
 
         if (locationContext) {
