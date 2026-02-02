@@ -461,7 +461,7 @@ async function cleanupChromiumProfileLocks(sessionName, sessionDataPath = './tok
 // --- Memory Configuration ---
 const MEMORY_CONFIG = {
     maxMessages: parseInt(process.env.MEMORY_MAX_MESSAGES) || 20,
-    maxAgeHours: parseInt(process.env.MEMORY_MAX_AGE_HOURS) || 24,
+    // maxAgeHours: parseInt(process.env.MEMORY_MAX_AGE_HOURS) || 24, // Dihapus sesuai permintaan
     includeSystemMessages: process.env.MEMORY_INCLUDE_SYSTEM === 'true'
 };
 
@@ -477,12 +477,9 @@ async function getConversationHistory(senderNumber, limit = MEMORY_CONFIG.maxMes
     try {
         const messagesRef = db.collection('directMessages').doc(docId).collection('messages');
         
-        // Calculate cutoff time for memory
-        const cutoffTime = new Date();
-        cutoffTime.setHours(cutoffTime.getHours() - MEMORY_CONFIG.maxAgeHours);
-        
+        console.log(`[Memory] Fetching history for ${docId} with constraint: max ${limit} messages.`);
+
         const snapshot = await messagesRef
-            .where('timestamp', '>=', cutoffTime)
             .orderBy('timestamp', 'desc')
             .limit(limit)
             .get();
