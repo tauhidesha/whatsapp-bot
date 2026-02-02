@@ -264,14 +264,34 @@ Telp/WA 0895 4015 27556`;
              desc = item.substring(0, lastColonIndex).trim();
              priceStr = potentialPrice;
          }
+      } else {
+         // Fallback: Coba regex di akhir string (misal "Layanan Rp 100.000" atau "Layanan 100rb")
+         const priceMatch = item.match(/(?:Rp\.?\s?)?[\d,.]+\s*(?:rb|jt|juta|ribu)?$/i);
+         if (priceMatch) {
+             const potentialPrice = priceMatch[0].trim();
+             // Validasi agar tidak menangkap tahun atau cc (misal "Vario 150")
+             const isCurrency = /Rp|rb|jt|juta|ribu/i.test(potentialPrice) || 
+                                (potentialPrice.includes('.') && potentialPrice.length > 4) ||
+                                (potentialPrice.includes(',') && potentialPrice.length > 3);
+             
+             if (isCurrency) {
+                 priceStr = potentialPrice;
+                 desc = item.substring(0, item.length - priceMatch[0].length).trim();
+             }
+         }
       }
 
+      // Bersihkan bullet points atau nomor di awal deskripsi, dan separator di akhir
+      desc = desc.replace(/^(\d+\.|[-*•])\s*/, '').replace(/[-:]\s*$/, '');
+
       // Cari deskripsi layanan untuk ditampilkan di bawah nama layanan
-      const cleanName = desc.replace(/\s*\([A-Z]+\)$/i, '').trim();
-      const serviceData = masterLayanan.find(s => 
-        s.name.toLowerCase() === cleanName.toLowerCase() ||
-        cleanName.toLowerCase().includes(s.name.toLowerCase())
-      );
+      const cleanName = desc.replace(/\s*\(.*?\)/g, '').trim();
+      const serviceData = masterLayanan.find(s => {
+        const sName = s.name.toLowerCase();
+        const cName = cleanName.toLowerCase();
+        return sName === cName || cName.includes(sName) || sName.includes(cName);
+      });
+
       const descriptionText = serviceData ? (serviceData.summary || serviceData.description) : '';
 
       // Fallback: Jika harga kosong ('-'), coba cari di master data atau gunakan total jika item tunggal
