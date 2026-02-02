@@ -30,6 +30,7 @@ const { sendStudioPhotoTool } = require('./src/ai/tools/sendStudioPhotoTool.js')
 const { getRepaintColorSurchargeTool } = require('./src/ai/tools/getRepaintColorSurchargeTool.js');
 const { notifyVisitIntentTool } = require('./src/ai/tools/notifyVisitIntentTool.js');
 const { generateDocumentTool } = require('./src/ai/tools/generateDocumentTool.js');
+const { readDirectMessagesTool } = require('./src/ai/tools/readDirectMessagesTool.js');
 const { createMetaWebhookRouter } = require('./src/server/metaWebhook.js');
 const { sendMetaMessage } = require('./src/server/metaClient.js');
 const { startBookingReminderScheduler } = require('./src/ai/utils/bookingReminders.js');
@@ -86,6 +87,7 @@ const availableTools = {
     getRepaintColorSurcharge: getRepaintColorSurchargeTool.implementation,
     notifyVisitIntent: notifyVisitIntentTool.implementation,
     generateDocument: generateDocumentTool.implementation,
+    readDirectMessages: readDirectMessagesTool.implementation,
 };
 
 const toolDefinitions = [
@@ -103,6 +105,7 @@ const toolDefinitions = [
     getRepaintColorSurchargeTool.toolDefinition,
     notifyVisitIntentTool.toolDefinition,
     generateDocumentTool.toolDefinition,
+    readDirectMessagesTool.toolDefinition,
 ];
 
 console.log('🔧 [STARTUP] Tool Registry Initialized:');
@@ -301,6 +304,7 @@ Detail harga, durasi, dan ketentuan WAJIB lewat tools.
 - \`notifyVisitIntent\`: Beri tahu admin ada yang mau datang.
 - \`sendStudioPhoto\`: Kirim foto lokasi.
 - \`generateDocument\`: Membuat dokumen PDF (Invoice, Tanda Terima, Bukti Bayar) - KHUSUS ADMIN.
+- \`readDirectMessages\`: Baca database chat (List chat terbaru / Baca detail chat) - KHUSUS ADMIN.
 
 # Tone & Style Examples (Few-Shot)
 
