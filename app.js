@@ -1947,6 +1947,7 @@ server.listen(PORT, '0.0.0.0', async () => {
         sessionDataPath,
         puppeteerOptions: {
             timeout: 120000,
+            protocolTimeout: 240000, // Tambahkan timeout protokol (4 menit) untuk instance lambat
             args: PUPPETEER_CHROME_ARGS,
             defaultViewport: PUPPETEER_VIEWPORT,
         },
