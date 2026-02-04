@@ -68,9 +68,16 @@ const sendMessageTool = {
         };
       }
 
-      // Allow @lid to pass through without normalization to @c.us
       let target = destination.trim();
-      if (!target.endsWith('@lid')) {
+      // Heuristik: LID biasanya berupa angka panjang (>15 digit), sedangkan nomor HP biasanya <15 digit
+      // Tambahan: Pastikan tidak diawali '62' agar nomor HP panjang tidak dianggap LID
+      const isLikelyLid = /^\d{15,}$/.test(target) && !target.startsWith('62');
+
+      if (target.endsWith('@lid')) {
+        // Sudah format LID, biarkan
+      } else if (isLikelyLid && !target.endsWith('@c.us')) {
+        target = `${target}@lid`;
+      } else {
         target = normalizeWhatsappNumber(destination);
       }
 

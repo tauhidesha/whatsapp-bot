@@ -21,7 +21,7 @@ function normalizeWhatsappNumber(number) {
   const trimmed = number.trim();
   if (!trimmed) return null;
   if (trimmed.endsWith('@c.us')) return trimmed;
-  if (trimmed.endsWith('@lid')) return trimmed.replace('@lid', '@c.us');
+  if (trimmed.endsWith('@lid')) return trimmed;
   if (trimmed.startsWith('+')) {
     return `${trimmed.slice(1)}@c.us`;
   }

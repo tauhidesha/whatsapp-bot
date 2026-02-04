@@ -96,8 +96,15 @@ const readDirectMessagesTool = {
         const conversations = [];
         snapshot.forEach(doc => {
           const data = doc.data();
+          
+          // Fix: Jika di Firestore @lid hilang (hanya ID angka panjang), kita format ulang
+          let senderId = data.fullSenderId || doc.id;
+          if (!data.fullSenderId && /^\d{15,}$/.test(doc.id) && !doc.id.startsWith('62')) {
+            senderId = `${doc.id}@lid`;
+          }
+
           conversations.push({
-            number: doc.id,
+            number: senderId,
             name: data.name || 'Tanpa Nama',
             lastMessage: data.lastMessage || '-',
             time: data.updatedAt ? data.updatedAt.toDate().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : '-'
