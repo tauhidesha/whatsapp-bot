@@ -68,7 +68,12 @@ const sendMessageTool = {
         };
       }
 
-      const target = normalizeWhatsappNumber(destination);
+      // Allow @lid to pass through without normalization to @c.us
+      let target = destination.trim();
+      if (!target.endsWith('@lid')) {
+        target = normalizeWhatsappNumber(destination);
+      }
+
       if (!target) {
         return {
           success: false,
@@ -82,7 +87,7 @@ const sendMessageTool = {
       try {
         const db = getFirebaseAdmin().firestore();
         // Hapus suffix @c.us untuk mendapatkan docId standar
-        const docId = target.replace('@c.us', '');
+        const docId = target.replace(/@c\.us$|@lid$/, '');
         const timestamp = admin.firestore.FieldValue.serverTimestamp();
 
         // 1. Simpan di subcollection messages
