@@ -20,6 +20,7 @@ async function implementation(input) {
         address: 'Bukit Cengkeh 1, Jl. Medan No.B3/2, Kota Depok, Jawa Barat 16451',
         landmark: 'Bosmat Repaint Detailing Motor',
         googleMaps: 'https://maps.app.goo.gl/JrH7TxyfPtGxBjW19',
+        directions: 'Dari gapura Bukit Cengkeh 1 lurus sedikit, di perempatan pertama belok kanan. Rumah pertama cat hijau pagar hitam (dekat portal). Kalau portal ditutup, bisa masuk dari Jl. Padang atau Jl. Bengkulu. Langsung ketok atau panggil orang di dalam saja.',
         description: 'Lokasi Bosmat Repaint Detailing Motor',
         exteriorPhoto: 'data/c46dbcbe-7d71-45b7-bdd6-5eeb99b4c2f4.jpg',
       },
@@ -53,6 +54,8 @@ ${studioInfo.location.address}
 ${studioInfo.location.landmark}
 
 Google Maps: ${studioInfo.location.googleMaps}
+
+Ancer-ancer: ${studioInfo.location.directions}
 
         ⚠️ *Penting:* ${studioInfo.bookingPolicy.description}`;
         break;
@@ -98,6 +101,7 @@ Kontak booking: ${studioInfo.contact.phone}`;
 ${studioInfo.location.address}
 ${studioInfo.location.landmark}
 Google Maps: ${studioInfo.location.googleMaps}
+Ancer-ancer: ${studioInfo.location.directions}
 
 📞 *Kontak:*
 Telepon/WhatsApp: ${studioInfo.contact.phone}

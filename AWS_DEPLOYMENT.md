@@ -636,7 +636,7 @@ sudo systemctl start whatsapp-ai
 sudo systemctl stop whatsapp-ai
 
 # Restart service
-sudo systemctl restart whatsapp-ai
+
 
 # Check status
 sudo systemctl status whatsapp-ai
@@ -645,6 +645,7 @@ sudo systemctl status whatsapp-ai
 sudo systemctl enable whatsapp-ai
 
 # Disable auto-start
+
 sudo systemctl disable whatsapp-ai
 ```
 
@@ -652,6 +653,7 @@ sudo systemctl disable whatsapp-ai
 
 ```bash
 # Real-time logs
+sudo systemctl restart whatsapp-ai
 sudo journalctl -u whatsapp-ai -f
 
 # Last 100 lines
