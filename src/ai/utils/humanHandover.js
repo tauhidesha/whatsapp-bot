@@ -49,6 +49,38 @@ async function sendWhatsappNotification(message) {
   try {
     await client.sendText(target, message);
     console.log('[humanHandover] Notifikasi WA terkirim ke admin:', target);
+
+    // --- Simpan juga ke Firestore directMessages admin agar AI punya konteks ---
+    try {
+      const db = ensureFirestore();
+      // docId tanpa suffix @c.us/@lid, mengikuti pola directMessages lain
+      const docId = target.replace(/@c\.us$|@lid$/, '');
+      const timestamp = admin.firestore.FieldValue.serverTimestamp();
+
+      // Simpan ke subcollection messages
+      await db.collection('directMessages').doc(docId).collection('messages').add({
+        text: message,
+        sender: 'ai', // dikirim oleh sistem/AI ke admin
+        direction: 'outbound_admin',
+        timestamp,
+      });
+
+      // Update metadata percakapan admin
+      await db.collection('directMessages').doc(docId).set(
+        {
+          lastMessage: message,
+          lastMessageSender: 'ai',
+          lastMessageAt: timestamp,
+          updatedAt: timestamp,
+          fullSenderId: target,
+          isAdmin: true,
+          messageCount: admin.firestore.FieldValue.increment(1),
+        },
+        { merge: true }
+      );
+    } catch (err) {
+      console.warn('[humanHandover] Gagal menyimpan notifikasi admin ke Firestore:', err);
+    }
   } catch (error) {
     console.error('[humanHandover] Gagal mengirim notifikasi WA ke admin:', error);
   }
