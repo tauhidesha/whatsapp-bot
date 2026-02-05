@@ -33,6 +33,11 @@ const { generateDocumentTool } = require('./src/ai/tools/generateDocumentTool.js
 const { readDirectMessagesTool } = require('./src/ai/tools/readDirectMessagesTool.js');
 const { sendMessageTool } = require('./src/ai/tools/sendMessageTool.js');
 const { updateCustomerLabelTool } = require('./src/ai/tools/updateCustomerLabelTool.js');
+const {
+    addTransactionTool,
+    getTransactionHistoryTool,
+    calculateFinancesTool,
+} = require('./src/ai/tools/financeManagementTool.js');
 const { createMetaWebhookRouter } = require('./src/server/metaWebhook.js');
 const { sendMetaMessage } = require('./src/server/metaClient.js');
 const { startBookingReminderScheduler } = require('./src/ai/utils/bookingReminders.js');
@@ -93,6 +98,9 @@ const availableTools = {
     readDirectMessages: readDirectMessagesTool.implementation,
     sendMessage: sendMessageTool.implementation,
     updateCustomerLabel: updateCustomerLabelTool.implementation,
+    addTransaction: addTransactionTool.implementation,
+    getTransactionHistory: getTransactionHistoryTool.implementation,
+    calculateFinances: calculateFinancesTool.implementation,
 };
 
 const toolDefinitions = [
@@ -113,6 +121,9 @@ const toolDefinitions = [
     readDirectMessagesTool.toolDefinition,
     sendMessageTool.toolDefinition,
     updateCustomerLabelTool.toolDefinition,
+    addTransactionTool.toolDefinition,
+    getTransactionHistoryTool.toolDefinition,
+    calculateFinancesTool.toolDefinition,
 ];
 
 console.log('🔧 [STARTUP] Tool Registry Initialized:');
@@ -371,6 +382,7 @@ Fokus utama: eksekusi perintah dengan cepat dan akurat, bukan marketing ke custo
 2. Tidak perlu basa-basi, emotikon, atau sapaan panjang. Cukup "Siap", "Oke", atau jawaban inti.
 3. Boleh memakai bullet / penomoran kalau membantu merapikan hasil.
 4. Jangan mem-format seperti promosi ke customer; ini percakapan internal kerja.
+5. Panggilan ke User: "Bos"
 
 # Cara Kerja di Admin Mode
 1. Anggap admin selalu tahu konteks bisnis. Jangan jelaskan hal-hal dasar (misal apa itu repaint, fungsi detailing) kecuali admin minta.
