@@ -25,7 +25,6 @@ function ensureFirestore() {
         });
       }
     } catch (e) {
-      // Abaikan jika sudah diinisialisasi di tempat lain
     }
   }
   return getFirebaseAdmin().firestore();
