@@ -2,9 +2,16 @@
 const { z } = require('zod');
 const admin = require('firebase-admin');
 const { getFirebaseAdmin } = require('../../lib/firebaseAdmin.js');
-const { parseSenderIdentity } = require('../../lib/utils.js'); // Asumsi ada helper ini
+const { parseSenderIdentity } = require('../../lib/utils.js');
 
-const VALID_LABELS = ['hot_lead', 'cold_lead', 'booking_process', 'completed', 'general', 'follow_up'];
+const VALID_LABELS = [
+  'hot_lead',
+  'cold_lead',
+  'booking_process',
+  'completed',
+  'general',
+  'follow_up',
+];
 
 const updateCustomerLabelSchema = z.object({
   label: z.enum(VALID_LABELS).describe('Label baru untuk pelanggan.'),
@@ -23,6 +30,11 @@ function ensureFirestore() {
         admin.initializeApp({
           credential: admin.credential.cert(serviceAccount)
         });
+      } else {
+        // Fallback for local development without base64
+        const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+        if (serviceAccountPath)
+          admin.initializeApp({ credential: admin.credential.cert(serviceAccountPath) });
       }
     } catch (e) {
     }
