@@ -32,6 +32,7 @@ const { notifyVisitIntentTool } = require('./src/ai/tools/notifyVisitIntentTool.
 const { generateDocumentTool } = require('./src/ai/tools/generateDocumentTool.js');
 const { readDirectMessagesTool } = require('./src/ai/tools/readDirectMessagesTool.js');
 const { sendMessageTool } = require('./src/ai/tools/sendMessageTool.js');
+const { updateCustomerLabelTool } = require('./src/ai/tools/updateCustomerLabelTool.js');
 const { createMetaWebhookRouter } = require('./src/server/metaWebhook.js');
 const { sendMetaMessage } = require('./src/server/metaClient.js');
 const { startBookingReminderScheduler } = require('./src/ai/utils/bookingReminders.js');
@@ -90,6 +91,7 @@ const availableTools = {
     generateDocument: generateDocumentTool.implementation,
     readDirectMessages: readDirectMessagesTool.implementation,
     sendMessage: sendMessageTool.implementation,
+    updateCustomerLabel: updateCustomerLabelTool.implementation,
 };
 
 const toolDefinitions = [
@@ -109,6 +111,7 @@ const toolDefinitions = [
     generateDocumentTool.toolDefinition,
     readDirectMessagesTool.toolDefinition,
     sendMessageTool.toolDefinition,
+    updateCustomerLabelTool.toolDefinition,
 ];
 
 console.log('🔧 [STARTUP] Tool Registry Initialized:');
@@ -249,6 +252,15 @@ Lakukan pengecekan data sebelum panggil tool harga:
 * **RESPONSE:** Gunakan output dari \`getStudioInfo\` untuk memberikan alamat, link maps, dan ancer-ancer. Contoh: "Siap Mas, saya kabarin tim. Ini alamat lengkap dan ancer-ancernya ya: [Alamat dari tool]. Biar gak nyasar, ini link Google Maps-nya: [Link Maps dari tool]."
 
 ## LANGKAH 2: PRESENTASI HARGA & VALUE (Gunakan Data Tool)
+Setelah presentasi harga, **analisa respons customer** dan berikan label:
+*   Jika customer responsif, tanya detail, atau nego wajar -> Panggil \`updateCustomerLabel\` dengan label \`hot_lead\`.
+*   Jika customer hanya read atau respons singkat -> Panggil \`updateCustomerLabel\` dengan label \`cold_lead\`.
+*   Jika customer setuju dan lanjut ke booking -> Panggil \`updateCustomerLabel\` dengan label \`booking_process\`.
+*   Jika customer selesai transaksi/pengerjaan -> Panggil \`updateCustomerLabel\` dengan label \`completed\`.
+*   Jika butuh follow up manual dari admin -> Panggil \`updateCustomerLabel\` dengan label \`follow_up\`.
+
+---
+
 1.  **Jelaskan Value & Harga (Dari tool \`getServiceDetails\`)**:
     * Jelaskan apa yang didapat (deskripsi/SOP).
     * Sebutkan harga dan estimasi pengerjaan.
@@ -314,6 +326,7 @@ Detail harga, durasi, dan ketentuan WAJIB lewat tools.
 - \`generateDocument\`: Membuat dokumen PDF (Invoice, Tanda Terima, Bukti Bayar) - KHUSUS ADMIN.
 - \`readDirectMessages\`: Baca database chat (List chat terbaru / Baca detail chat) - KHUSUS ADMIN.
 - \`sendMessage\`: Kirim pesan WhatsApp ke nomor tertentu - KHUSUS ADMIN.
+- \`updateCustomerLabel\`: Memberi label status pada pelanggan (hot_lead, cold_lead, dll).
 
 # Tone & Style Examples (Few-Shot)
 
@@ -1581,6 +1594,9 @@ async function listConversations(limit = 100) {
                 aiPausedUntil: snoozeInfo.expiresAt,
                 aiPausedManual: snoozeInfo.manual,
                 aiPausedReason: snoozeInfo.reason,
+                customerLabel: data.customerLabel || null,
+                labelReason: data.labelReason || null,
+                labelUpdatedAt: serializeTimestamp(data.labelUpdatedAt),
             };
         }));
 
