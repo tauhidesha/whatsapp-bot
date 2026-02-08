@@ -2039,6 +2039,7 @@ server.listen(PORT, '0.0.0.0', async () => {
             console.log('📱 WhatsApp QR Code (Small Mode):');
             if (urlCode) {
                 qrcode.generate(urlCode, { small: true });
+                console.log('💡 Jika scan gagal, coba perbesar terminal atau copy kode di atas.');
             } else {
                 console.log(asciiQR);
             }
@@ -2079,6 +2080,13 @@ server.listen(PORT, '0.0.0.0', async () => {
                 console.log('⏳ [WhatsApp] Syncing connection... (TUNGGU, jangan logout dari mobile!)');
                 console.log('⏳ [WhatsApp] State: SYNCING - Proses normal, tunggu selesai...');
             }
+        },
+        puppeteerOptions: {
+            userDataDir: sessionDataPath, // Pastikan path session konsisten
+            args: [
+                ...PUPPETEER_CHROME_ARGS,
+                '--disable-web-security', // Membantu meloloskan beberapa resource WA Web
+            ]
         },
         headless: whatsappHeadless,
         logQR: false,
@@ -2130,7 +2138,7 @@ server.listen(PORT, '0.0.0.0', async () => {
                 
                 // Set realistic user agent
                 await page.setUserAgent(
-                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'
                 );
                 
                 console.log('🕵️ [Stealth] Anti-detection scripts injected successfully');
@@ -2258,7 +2266,7 @@ async function reconnectWhatsApp() {
                     window.chrome = { runtime: {}, loadTimes: function() {}, csi: function() {}, app: {} };
                 });
                 await page.setUserAgent(
-                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'
                 );
                 console.log('🕵️ [Stealth] Anti-detection injected on reconnect');
             }
