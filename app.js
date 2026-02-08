@@ -1993,7 +1993,7 @@ server.listen(PORT, '0.0.0.0', async () => {
     // Initialize WhatsApp connection
     // ⚠️ PENTING: Set autoClose ke false secara eksplisit untuk production
     const whatsappAutoClose = process.env.WHATSAPP_AUTO_CLOSE !== 'false'; // Default false jika tidak di-set
-    const whatsappHeadless = process.env.WHATSAPP_HEADLESS === 'true';
+    const whatsappHeadless = process.env.WHATSAPP_HEADLESS !== 'false'; // Default true (headless) agar jalan di Railway/Docker
     
     // Force false untuk production (jika env tidak di-set atau bukan 'true', maka false)
     const shouldAutoClose = process.env.WHATSAPP_AUTO_CLOSE === 'true';
@@ -2004,6 +2004,7 @@ server.listen(PORT, '0.0.0.0', async () => {
     // ⚠️ PENTING: Multi-device HARUS aktif di HP untuk mencegah unpair
     const multiDevice = process.env.WHATSAPP_MULTI_DEVICE !== 'false'; // Default true
     console.log(`🔧 WhatsApp Config: MULTI_DEVICE=${multiDevice}`);
+    console.log(`🔧 Puppeteer Config: Headless=${whatsappHeadless}, Executable=${process.env.PUPPETEER_EXECUTABLE_PATH || 'System Default'}`);
     if (!multiDevice) {
         console.warn('⚠️ [WhatsApp] WARNING: Multi-device DISABLED! Bot akan unpair jika WhatsApp aktif di mobile.');
         console.warn('💡 [WhatsApp] Rekomendasi: Set WHATSAPP_MULTI_DEVICE=true atau hapus env var (default true)');
@@ -2186,6 +2187,7 @@ async function reconnectWhatsApp() {
                 defaultViewport: PUPPETEER_VIEWPORT,
                 ignoreHTTPSErrors: true,
                 headless: whatsappHeadless,
+                executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
             },
             onLoadingScreen: async (page) => {
                 try {
