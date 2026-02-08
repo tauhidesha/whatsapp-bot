@@ -51,6 +51,11 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 4000;
 
+// Enable HTTP keep-alive untuk mencegah connection timeout
+server.keepAliveTimeout = 65000; // 65 detik (default 5 detik terlalu pendek)
+server.headersTimeout = 66000; // Harus lebih besar dari keepAliveTimeout
+server.maxConnections = 1000;
+
 // Middleware
 app.use(helmet());
 app.use(cors());
@@ -1606,15 +1611,22 @@ const metaWebhookRouter = createMetaWebhookRouter({
 app.use('/webhooks/meta', metaWebhookRouter);
 
 app.get('/health', (req, res) => {
+    const whatsappStatus = global.whatsappClient ? 'connected' : 'disconnected';
     res.json({
         status: 'healthy',
         service: 'WhatsApp AI Chatbot',
         provider: 'Google Gemini',
         model: process.env.AI_MODEL || 'gemini-1.5-flash-latest',
         visionModel: ACTIVE_VISION_MODEL,
+        whatsappStatus,
         uptime: process.uptime(),
         timestamp: new Date().toISOString()
     });
+});
+
+// Lightweight ping endpoint untuk keep-alive
+app.get('/ping', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 app.get('/conversations', async (req, res) => {
@@ -1966,11 +1978,74 @@ server.listen(PORT, '0.0.0.0', async () => {
         start(client);
         startBookingReminderScheduler();
         console.log('✅ WhatsApp client initialized successfully!');
+        
+        // Start keep-alive mechanism untuk mencegah server idle timeout
+        startKeepAlive();
     })
     .catch((error) => {
         console.error('❌ WhatsApp initialization error:', error);
+        // Tetap start keep-alive meskipun WhatsApp belum connect
+        startKeepAlive();
     });
 });
+
+// Keep-alive mechanism: periodic ping ke health endpoint sendiri
+// Mencegah server idle timeout saat tidak ada aktivitas
+function startKeepAlive() {
+    const KEEP_ALIVE_INTERVAL_MS = parseInt(process.env.KEEP_ALIVE_INTERVAL_MS || '300000', 10); // Default 5 menit
+    const KEEP_ALIVE_URL = process.env.KEEP_ALIVE_URL || `http://localhost:${PORT}/ping`;
+    
+    console.log(`🔄 [Keep-Alive] Starting keep-alive mechanism (interval: ${KEEP_ALIVE_INTERVAL_MS}ms)`);
+    
+    // Helper untuk fetch dengan timeout
+    const fetchWithTimeout = (url, timeoutMs = 5000) => {
+        return Promise.race([
+            fetch(url),
+            new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Request timeout')), timeoutMs)
+            )
+        ]);
+    };
+    
+    const keepAliveInterval = setInterval(async () => {
+        try {
+            const response = await fetchWithTimeout(KEEP_ALIVE_URL, 5000);
+            
+            if (response.ok) {
+                const data = await response.json();
+                console.log(`💚 [Keep-Alive] Server active - ${new Date().toISOString()}`);
+            } else {
+                console.warn(`⚠️ [Keep-Alive] Health check returned status ${response.status}`);
+            }
+        } catch (error) {
+            // Jangan log error terlalu sering, bisa spam log
+            const now = Date.now();
+            if (!keepAliveInterval.lastErrorTime || (now - keepAliveInterval.lastErrorTime) > 60000) {
+                console.warn(`⚠️ [Keep-Alive] Failed to ping server: ${error.message}`);
+                keepAliveInterval.lastErrorTime = now;
+            }
+        }
+    }, KEEP_ALIVE_INTERVAL_MS);
+    
+    // Cleanup saat shutdown
+    process.on('SIGINT', () => {
+        clearInterval(keepAliveInterval);
+    });
+    
+    process.on('SIGTERM', () => {
+        clearInterval(keepAliveInterval);
+    });
+    
+    // Ping pertama langsung setelah startup
+    setTimeout(async () => {
+        try {
+            await fetchWithTimeout(KEEP_ALIVE_URL, 5000);
+            console.log(`💚 [Keep-Alive] Initial ping successful`);
+        } catch (error) {
+            console.warn(`⚠️ [Keep-Alive] Initial ping failed: ${error.message}`);
+        }
+    }, 10000); // Tunggu 10 detik setelah startup
+}
 
 // Graceful shutdown
 process.on('SIGINT', () => {
