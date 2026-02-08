@@ -1483,33 +1483,42 @@ function start(client) {
             }
         }
         
+        // Handle SYNCING state - jangan trigger reconnect saat masih syncing
+        if (state.includes('SYNCING')) {
+            console.log('⏳ [WhatsApp] Syncing connection... (TUNGGU, jangan logout dari mobile!)');
+            // Jangan trigger reconnect saat masih syncing, biarkan proses selesai
+            return;
+        }
+        
         if (state.includes('UNPAIRED') || state.includes('LOGOUT')) {
             console.error('❌ [WhatsApp] Logged out / Unpaired detected!');
             console.warn('⚠️ [WhatsApp] Kemungkinan penyebab:');
             console.warn('   1. WhatsApp logout dari mobile device');
             console.warn('   2. WhatsApp Multi-Device tidak aktif');
             console.warn('   3. Session expired atau invalid');
-            console.log('🔄 [WhatsApp] Attempting to reconnect in 10 seconds...');
+            console.warn('   4. WhatsApp Web di-unlink dari mobile');
+            console.log('🔄 [WhatsApp] Attempting to reconnect in 15 seconds...');
             
             // Set flag untuk trigger reconnect
             global.whatsappClient = null;
             
-            // Reconnect setelah delay
+            // Reconnect setelah delay lebih lama untuk pastikan state sudah stabil
             setTimeout(async () => {
                 await reconnectWhatsApp();
-            }, 10000);
+            }, 15000);
         }
         
         if (state.includes('DISCONNECTED') || state.includes('disconnectedMobile')) {
             console.warn('⚠️ [WhatsApp] Disconnected / disconnectedMobile detected');
-            console.warn('💡 [WhatsApp] Pastikan WhatsApp Multi-Device aktif di HP Anda');
+            console.warn('💡 [WhatsApp] INSTRUKSI PENTING:');
+            console.warn('   1. Buka WhatsApp di HP Anda');
+            console.warn('   2. Settings → Linked Devices');
+            console.warn('   3. Pastikan "Multi-device beta" atau "Link a Device" AKTIF');
+            console.warn('   4. JANGAN logout dari WhatsApp di HP saat bot running');
+            console.log('🔄 [WhatsApp] Attempting to reconnect in 10 seconds...');
             setTimeout(async () => {
                 await reconnectWhatsApp();
-            }, 5000);
-        }
-        
-        if (state.includes('SYNCING')) {
-            console.log('⏳ [WhatsApp] Syncing... (jangan logout dari mobile saat ini)');
+            }, 10000);
         }
     });
 }
@@ -1978,8 +1987,13 @@ server.listen(PORT, '0.0.0.0', async () => {
     console.log(`🔧 WhatsApp Config: AUTO_CLOSE=${shouldAutoClose} (env: "${process.env.WHATSAPP_AUTO_CLOSE}"), HEADLESS=${whatsappHeadless}`);
     
     // Enable multi-device mode untuk mencegah unpair saat login di mobile
+    // ⚠️ PENTING: Multi-device HARUS aktif di HP untuk mencegah unpair
     const multiDevice = process.env.WHATSAPP_MULTI_DEVICE !== 'false'; // Default true
     console.log(`🔧 WhatsApp Config: MULTI_DEVICE=${multiDevice}`);
+    if (!multiDevice) {
+        console.warn('⚠️ [WhatsApp] WARNING: Multi-device DISABLED! Bot akan unpair jika WhatsApp aktif di mobile.');
+        console.warn('💡 [WhatsApp] Rekomendasi: Set WHATSAPP_MULTI_DEVICE=true atau hapus env var (default true)');
+    }
     
     wppconnect.create({
         session: sessionName,
@@ -2002,18 +2016,27 @@ server.listen(PORT, '0.0.0.0', async () => {
                 // Jangan throw error, biarkan retry
             } else if (statusSession === 'disconnectedMobile' || statusSession.includes('disconnectedMobile')) {
                 console.error('❌ [WhatsApp] Session Unpaired - WhatsApp terdeteksi login di mobile device');
-                console.warn('⚠️ [WhatsApp] PENTING: Jangan logout dari WhatsApp di HP saat bot running!');
-                console.warn('💡 [WhatsApp] Solusi: Pastikan WhatsApp Multi-Device aktif di HP Anda');
-                console.warn('💡 [WhatsApp] Atau jangan buka WhatsApp di HP saat bot running');
-                // Trigger reconnect setelah delay
+                console.error('⚠️ [WhatsApp] ============================================');
+                console.error('⚠️ [WhatsApp] MASALAH: WhatsApp Web di-unpair oleh mobile');
+                console.error('⚠️ [WhatsApp] ============================================');
+                console.warn('💡 [WhatsApp] SOLUSI (WAJIB DILAKUKAN):');
+                console.warn('   1. Buka WhatsApp di HP Anda');
+                console.warn('   2. Masuk ke: Settings → Linked Devices');
+                console.warn('   3. Pastikan "Multi-device beta" atau "Link a Device" AKTIF');
+                console.warn('   4. Jika belum aktif, AKTIFKAN sekarang');
+                console.warn('   5. JANGAN logout dari WhatsApp di HP saat bot running');
+                console.warn('   6. Bot akan auto-reconnect, scan QR code yang muncul');
+                console.warn('💡 [WhatsApp] Setelah Multi-Device aktif, bot tidak akan unpair lagi');
+                // Trigger reconnect setelah delay lebih lama
                 setTimeout(async () => {
                     if (global.whatsappClient) {
                         global.whatsappClient = null;
                         await reconnectWhatsApp();
                     }
-                }, 10000);
+                }, 15000);
             } else if (statusSession === 'SYNCING' || statusSession.includes('SYNCING')) {
-                console.log('⏳ [WhatsApp] Syncing connection... (jangan logout dari mobile saat ini)');
+                console.log('⏳ [WhatsApp] Syncing connection... (TUNGGU, jangan logout dari mobile!)');
+                console.log('⏳ [WhatsApp] State: SYNCING - Proses normal, tunggu selesai...');
             }
         },
         headless: whatsappHeadless,
@@ -2086,24 +2109,32 @@ async function reconnectWhatsApp() {
         
         // Recreate connection
         const multiDevice = process.env.WHATSAPP_MULTI_DEVICE !== 'false'; // Default true
+        console.log(`🔄 [WhatsApp] Reconnecting with MULTI_DEVICE=${multiDevice}`);
+        
         const client = await wppconnect.create({
             session: sessionName,
             catchQR: (base64Qr, asciiQR) => {
                 console.log('📱 [WhatsApp] QR Code (Reconnect):');
                 console.log(asciiQR);
+                console.log('💡 [WhatsApp] SCAN QR CODE INI dengan WhatsApp di HP Anda');
+                console.log('💡 [WhatsApp] Pastikan Multi-Device sudah aktif sebelum scan!');
             },
             statusFind: (statusSession, session) => {
                 console.log('📱 [WhatsApp] Status (Reconnect):', statusSession);
                 if (statusSession === 'disconnectedMobile' || statusSession.includes('disconnectedMobile')) {
                     console.error('❌ [WhatsApp] Masih terdeteksi disconnectedMobile');
-                    console.warn('💡 [WhatsApp] Pastikan WhatsApp Multi-Device aktif di HP Anda');
+                    console.error('⚠️ [WhatsApp] INSTRUKSI: Aktifkan Multi-Device di HP SEBELUM scan QR!');
+                } else if (statusSession === 'isLogged') {
+                    console.log('✅ [WhatsApp] Reconnected successfully!');
+                } else if (statusSession === 'qrReadSuccess') {
+                    console.log('✅ [WhatsApp] QR code scanned! Connecting...');
                 }
             },
             headless: whatsappHeadless,
             logQR: true,
             autoClose: shouldAutoClose,
             disableWelcome: true,
-            multiDevice: multiDevice, // Enable multi-device
+            multiDevice: multiDevice, // Enable multi-device - PENTING!
             sessionDataPath,
             puppeteerOptions: {
                 timeout: 180000,
