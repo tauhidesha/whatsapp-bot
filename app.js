@@ -484,6 +484,13 @@ const DEFAULT_CHROME_ARGS = [
     '--disable-ipc-flooding-protection',
     '--no-zygote',
     '--enable-features=NetworkService,NetworkServiceInProcess',
+    // Stealth mode - Anti-detection flags
+    '--disable-blink-features=AutomationControlled',
+    '--exclude-switches=enable-automation',
+    '--disable-infobars',
+    '--window-size=1920,1080',
+    '--start-maximized',
+    '--lang=en-US,en',
 ];
 
 const ADDITIONAL_CHROME_ARGS = (process.env.CHROMIUM_ADDITIONAL_ARGS || '')
@@ -2045,15 +2052,59 @@ server.listen(PORT, '0.0.0.0', async () => {
         disableWelcome: true, // Disable welcome message
         multiDevice: multiDevice, // Enable multi-device untuk mencegah unpair
         sessionDataPath,
-        puppeteerOptions: {
-            timeout: 180000, // Naikkan ke 3 menit
-            protocolTimeout: 360000, // Naikkan ke 6 menit untuk instance lambat/throttled
-            args: PUPPETEER_CHROME_ARGS,
-            defaultViewport: PUPPETEER_VIEWPORT,
-        },
     })
-    .then((client) => {
+    .then(async (client) => {
         global.whatsappClient = client;
+        
+        // Inject stealth mode setelah client ready
+        try {
+            if (client.page) {
+                const page = client.page;
+                // Bypass webdriver detection
+                await page.evaluateOnNewDocument(() => {
+                    // Override navigator.webdriver
+                    Object.defineProperty(navigator, 'webdriver', {
+                        get: () => false,
+                    });
+                    
+                    // Override chrome object
+                    window.chrome = {
+                        runtime: {},
+                        loadTimes: function() {},
+                        csi: function() {},
+                        app: {}
+                    };
+                    
+                    // Override permissions
+                    const originalQuery = window.navigator.permissions.query;
+                    window.navigator.permissions.query = (parameters) => (
+                        parameters.name === 'notifications' ?
+                            Promise.resolve({ state: Notification.permission }) :
+                            originalQuery(parameters)
+                    );
+                    
+                    // Override plugins
+                    Object.defineProperty(navigator, 'plugins', {
+                        get: () => [1, 2, 3, 4, 5],
+                    });
+                    
+                    // Override languages
+                    Object.defineProperty(navigator, 'languages', {
+                        get: () => ['en-US', 'en'],
+                    });
+                });
+                
+                // Set realistic user agent
+                await page.setUserAgent(
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                );
+                
+                console.log('🕵️ [Stealth] Anti-detection scripts injected successfully');
+            }
+        } catch (stealthError) {
+            console.warn('[Stealth] Failed to inject anti-detection (non-critical):', stealthError.message);
+        }
+        
         start(client);
         startBookingReminderScheduler();
         console.log('✅ WhatsApp client initialized successfully!');
@@ -2119,6 +2170,29 @@ async function reconnectWhatsApp() {
                 console.log('💡 [WhatsApp] SCAN QR CODE INI dengan WhatsApp di HP Anda');
                 console.log('💡 [WhatsApp] Pastikan Multi-Device sudah aktif sebelum scan!');
             },
+            // Stealth mode untuk reconnect juga
+            browserArgs: PUPPETEER_CHROME_ARGS,
+            puppeteerOptions: {
+                timeout: 180000,
+                protocolTimeout: 360000,
+                args: PUPPETEER_CHROME_ARGS,
+                defaultViewport: PUPPETEER_VIEWPORT,
+                ignoreHTTPSErrors: true,
+                headless: whatsappHeadless,
+            },
+            onLoadingScreen: async (page) => {
+                try {
+                    await page.evaluateOnNewDocument(() => {
+                        Object.defineProperty(navigator, 'webdriver', { get: () => false });
+                        window.chrome = { runtime: {}, loadTimes: function() {}, csi: function() {}, app: {} };
+                    });
+                    await page.setUserAgent(
+                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    );
+                } catch (e) {
+                    console.warn('[Stealth] Reconnect injection failed:', e.message);
+                }
+            },
             statusFind: (statusSession, session) => {
                 console.log('📱 [WhatsApp] Status (Reconnect):', statusSession);
                 if (statusSession === 'disconnectedMobile' || statusSession.includes('disconnectedMobile')) {
@@ -2136,15 +2210,27 @@ async function reconnectWhatsApp() {
             disableWelcome: true,
             multiDevice: multiDevice, // Enable multi-device - PENTING!
             sessionDataPath,
-            puppeteerOptions: {
-                timeout: 180000,
-                protocolTimeout: 360000,
-                args: PUPPETEER_CHROME_ARGS,
-                defaultViewport: PUPPETEER_VIEWPORT,
-            },
         });
         
         global.whatsappClient = client;
+        
+        // Inject stealth mode untuk reconnect juga
+        try {
+            if (client.page) {
+                const page = client.page;
+                await page.evaluateOnNewDocument(() => {
+                    Object.defineProperty(navigator, 'webdriver', { get: () => false });
+                    window.chrome = { runtime: {}, loadTimes: function() {}, csi: function() {}, app: {} };
+                });
+                await page.setUserAgent(
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                );
+                console.log('🕵️ [Stealth] Anti-detection injected on reconnect');
+            }
+        } catch (stealthError) {
+            console.warn('[Stealth] Reconnect injection failed (non-critical):', stealthError.message);
+        }
+        
         start(client);
         startWhatsAppKeepAlive(client);
         console.log('✅ [WhatsApp] Reconnected successfully!');
