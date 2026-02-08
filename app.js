@@ -82,6 +82,13 @@ if (serviceAccountBase64) {
         });
     }
 }
+
+// Fallback: Jika tidak ada credential di env, coba gunakan Application Default Credentials (ADC)
+if (admin.apps.length === 0) {
+    console.log('⚠️ [Firebase] Tidak ada credential spesifik di env. Mencoba Application Default Credentials...');
+    admin.initializeApp();
+}
+
 const db = admin.firestore();
 
 // --- Tool Registry ---
