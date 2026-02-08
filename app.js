@@ -2044,6 +2044,8 @@ server.listen(PORT, '0.0.0.0', async () => {
             console.log('📱 WhatsApp QR Code (Small Mode):');
             if (urlCode) {
                 qrcode.generate(urlCode, { small: true });
+                console.log('\n🎫 Pairing Code (Raw):', urlCode);
+                console.log('💡 Jika QR terpotong, copy kode di atas ke https://www.the-qrcode-generator.com/');
                 console.log('💡 Jika scan gagal, coba perbesar terminal atau copy kode di atas.');
             } else {
                 console.log(asciiQR);
@@ -2216,9 +2218,14 @@ async function reconnectWhatsApp() {
             userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
             authTimeout: 120000,
             blockCrashLogs: true,
-            catchQR: (base64Qr, asciiQR) => {
+            catchQR: (base64Qr, asciiQR, attempt, urlCode) => {
                 console.log('📱 [WhatsApp] QR Code (Reconnect):');
-                console.log(asciiQR);
+                if (urlCode) {
+                    qrcode.generate(urlCode, { small: true });
+                    console.log('\n🎫 Pairing Code (Raw):', urlCode);
+                } else {
+                    console.log(asciiQR);
+                }
                 console.log('💡 [WhatsApp] SCAN QR CODE INI dengan WhatsApp di HP Anda');
                 console.log('💡 [WhatsApp] Pastikan Multi-Device sudah aktif sebelum scan!');
             },
