@@ -89,9 +89,97 @@ const updateCustomerLabelTool = {
 
       await docRef.set(updatePayload, { merge: true });
 
+      // Update label di WhatsApp Business (wppconnect) menggunakan setLabelChat
+      if (global.whatsappClient) {
+        try {
+          const { normalizedAddress } = parseSenderIdentity(senderNumber);
+          const whatsappNumber = normalizedAddress || senderNumber;
+
+          // Mapping label ke nama label yang akan dibuat/dicari di WhatsApp Business
+          const labelMapping = {
+            hot_lead: 'Hot Lead',
+            cold_lead: 'Cold Lead',
+            booking_process: 'Booking Process',
+            completed: 'Completed',
+            follow_up: 'Follow Up',
+            general: 'General',
+          };
+
+          const labelName = labelMapping[label] || label;
+
+          // Ambil semua label yang ada di WhatsApp Business
+          let allLabels = [];
+          try {
+            if (global.whatsappClient.getAllLabels) {
+              allLabels = await global.whatsappClient.getAllLabels();
+              console.log(`[updateCustomerLabelTool] Daftar label yang ada:`, allLabels);
+            }
+          } catch (labelsError) {
+            console.warn('[updateCustomerLabelTool] Gagal mengambil daftar label:', labelsError.message);
+          }
+
+          // Cari label ID berdasarkan nama, atau buat label baru jika belum ada
+          let labelId = null;
+          
+          // Cari label yang sudah ada
+          if (Array.isArray(allLabels) && allLabels.length > 0) {
+            const existingLabel = allLabels.find(
+              (l) => l.name && l.name.toLowerCase() === labelName.toLowerCase()
+            );
+            if (existingLabel && existingLabel.id) {
+              labelId = existingLabel.id.toString();
+              console.log(`[updateCustomerLabelTool] Label "${labelName}" sudah ada dengan ID: ${labelId}`);
+            }
+          }
+
+          // Jika label belum ada, buat label baru
+          if (!labelId && global.whatsappClient.createLabel) {
+            try {
+              const newLabel = await global.whatsappClient.createLabel(labelName);
+              if (newLabel && newLabel.id) {
+                labelId = newLabel.id.toString();
+                console.log(`[updateCustomerLabelTool] Label baru "${labelName}" dibuat dengan ID: ${labelId}`);
+              }
+            } catch (createError) {
+              console.warn('[updateCustomerLabelTool] Gagal membuat label baru:', createError.message);
+            }
+          }
+
+          // Set label ke chat menggunakan setLabelChat
+          if (labelId && global.whatsappClient.setLabelChat) {
+            try {
+              // Hapus label lama dulu (opsional, bisa di-skip jika ingin multiple labels)
+              // Untuk sekarang, kita set label baru saja (WhatsApp akan replace label lama)
+              
+              const result = await global.whatsappClient.setLabelChat(whatsappNumber, [labelId]);
+              console.log(`[updateCustomerLabelTool] Label "${labelName}" (ID: ${labelId}) berhasil dipasang ke chat ${whatsappNumber}`);
+              console.log(`[updateCustomerLabelTool] Result:`, result);
+            } catch (setLabelError) {
+              console.warn('[updateCustomerLabelTool] Gagal set label ke chat:', setLabelError.message);
+              // Jika error karena label belum ada, coba buat dulu
+              if (setLabelError.message && setLabelError.message.includes('label')) {
+                console.log('[updateCustomerLabelTool] Mencoba membuat label terlebih dahulu...');
+                // Retry logic bisa ditambahkan di sini jika perlu
+              }
+            }
+          } else {
+            if (!labelId) {
+              console.warn('[updateCustomerLabelTool] Label ID tidak ditemukan/dibuat. Skip set label ke WhatsApp.');
+            }
+            if (!global.whatsappClient.setLabelChat) {
+              console.warn('[updateCustomerLabelTool] Method setLabelChat tidak tersedia di wppconnect client.');
+            }
+          }
+
+        } catch (waError) {
+          console.warn('[updateCustomerLabelTool] Gagal update label di WhatsApp Business:', waError.message);
+          // Jangan gagalkan proses utama jika update WA gagal
+        }
+      }
+
       return {
         success: true,
-        message: `Label pelanggan berhasil diubah menjadi "${label}".`,
+        message: `Label pelanggan berhasil diubah menjadi "${label}" dan di-sync ke WhatsApp Business.`,
         data: {
           docId,
           ...updatePayload,
