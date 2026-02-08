@@ -13,6 +13,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const admin = require('firebase-admin');
+const qrcode = require('qrcode-terminal');
 const fetch = require('node-fetch');
 const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
 const { HumanMessage, SystemMessage, ToolMessage, AIMessage } = require('@langchain/core/messages');
@@ -2012,10 +2013,13 @@ server.listen(PORT, '0.0.0.0', async () => {
     
     wppconnect.create({
         session: sessionName,
-        catchQR: (base64Qr, asciiQR) => { 
-            console.log('📱 WhatsApp QR Code:');
-            console.log(asciiQR); 
-            console.log('Base64 QR:', base64Qr); 
+        catchQR: (base64Qr, asciiQR, attempt, urlCode) => { 
+            console.log('📱 WhatsApp QR Code (Small Mode):');
+            if (urlCode) {
+                qrcode.generate(urlCode, { small: true });
+            } else {
+                console.log(asciiQR);
+            }
         },
         statusFind: (statusSession, session) => {
             console.log('📱 WhatsApp Status:', statusSession, 'Session:', session);
@@ -2055,7 +2059,7 @@ server.listen(PORT, '0.0.0.0', async () => {
             }
         },
         headless: whatsappHeadless,
-        logQR: true,
+        logQR: false,
         autoClose: shouldAutoClose, // Hanya true jika env var eksplisit 'true'
         disableWelcome: true, // Disable welcome message
         multiDevice: multiDevice, // Enable multi-device untuk mencegah unpair
