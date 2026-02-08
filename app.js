@@ -2035,6 +2035,11 @@ server.listen(PORT, '0.0.0.0', async () => {
     
     wppconnect.create({
         session: sessionName,
+        // 🛠️ FIX: Set User Agent di awal config agar lolos deteksi saat loading/syncing
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+        authTimeout: 120000, // Perpanjang ke 2 menit untuk toleransi Syncing
+        blockCrashLogs: true,
+        disableGoogleAnalytics: true,
         catchQR: (base64Qr, asciiQR, attempt, urlCode) => { 
             console.log('📱 WhatsApp QR Code (Small Mode):');
             if (urlCode) {
@@ -2085,6 +2090,7 @@ server.listen(PORT, '0.0.0.0', async () => {
             userDataDir: sessionDataPath, // Pastikan path session konsisten
             args: [
                 ...PUPPETEER_CHROME_ARGS,
+                '--disable-gpu', // Pastikan GPU mati untuk hemat memori
                 '--disable-web-security', // Membantu meloloskan beberapa resource WA Web
             ]
         },
@@ -2206,6 +2212,10 @@ async function reconnectWhatsApp() {
         
         const client = await wppconnect.create({
             session: sessionName,
+            // 🛠️ FIX: Terapkan config yang sama saat reconnect
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+            authTimeout: 120000,
+            blockCrashLogs: true,
             catchQR: (base64Qr, asciiQR) => {
                 console.log('📱 [WhatsApp] QR Code (Reconnect):');
                 console.log(asciiQR);
