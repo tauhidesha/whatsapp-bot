@@ -1669,6 +1669,28 @@ const metaWebhookRouter = createMetaWebhookRouter({
     logger: console,
 });
 
+// Explicitly handle Meta Webhook Verification (GET)
+// Ini memastikan verifikasi berjalan lancar terlepas dari logika di dalam router
+app.get('/webhooks/meta', (req, res) => {
+    const mode = req.query['hub.mode'];
+    const token = req.query['hub.verify_token'];
+    const challenge = req.query['hub.challenge'];
+    
+    const VERIFY_TOKEN = process.env.META_WEBHOOK_VERIFY_TOKEN;
+
+    if (mode && token) {
+        if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+            console.log('[Meta Webhook] Verified successfully!');
+            res.status(200).send(challenge);
+        } else {
+            console.error(`[Meta Webhook] Verification failed. Token mismatch. Expected: ${VERIFY_TOKEN}, Got: ${token}`);
+            res.sendStatus(403);
+        }
+    } else {
+        res.status(200).send('Meta Webhook is active');
+    }
+});
+
 app.use('/webhooks/meta', metaWebhookRouter);
 
 app.get('/health', (req, res) => {
