@@ -1470,10 +1470,38 @@ function start(client) {
         }
     });
 
-    client.onStateChange((state) => {
-        console.log('WhatsApp State changed:', state);
-        if ('CONFLICT'.includes(state)) client.useHere();
-        if ('UNPAIRED'.includes(state)) console.log('WhatsApp logged out');
+    client.onStateChange(async (state) => {
+        console.log('📱 [WhatsApp] State changed:', state);
+        
+        if (state.includes('CONFLICT')) {
+            console.log('⚠️ [WhatsApp] Conflict detected, using current session...');
+            try {
+                await client.useHere();
+                console.log('✅ [WhatsApp] Conflict resolved');
+            } catch (e) {
+                console.error('❌ [WhatsApp] Failed to resolve conflict:', e.message);
+            }
+        }
+        
+        if (state.includes('UNPAIRED') || state.includes('LOGOUT')) {
+            console.error('❌ [WhatsApp] Logged out / Unpaired detected!');
+            console.log('🔄 [WhatsApp] Attempting to reconnect in 10 seconds...');
+            
+            // Set flag untuk trigger reconnect
+            global.whatsappClient = null;
+            
+            // Reconnect setelah delay
+            setTimeout(async () => {
+                await reconnectWhatsApp();
+            }, 10000);
+        }
+        
+        if (state.includes('DISCONNECTED')) {
+            console.warn('⚠️ [WhatsApp] Disconnected, attempting reconnect...');
+            setTimeout(async () => {
+                await reconnectWhatsApp();
+            }, 5000);
+        }
     });
 }
 
@@ -1981,13 +2009,151 @@ server.listen(PORT, '0.0.0.0', async () => {
         
         // Start keep-alive mechanism untuk mencegah server idle timeout
         startKeepAlive();
+        
+        // Start WhatsApp connection keep-alive
+        startWhatsAppKeepAlive(client);
     })
     .catch((error) => {
         console.error('❌ WhatsApp initialization error:', error);
         // Tetap start keep-alive meskipun WhatsApp belum connect
         startKeepAlive();
+        
+        // Retry connection setelah delay
+        setTimeout(async () => {
+            await reconnectWhatsApp();
+        }, 30000);
     });
 });
+
+// Reconnect WhatsApp function
+async function reconnectWhatsApp() {
+    if (global.whatsappReconnecting) {
+        console.log('⏳ [WhatsApp] Reconnection already in progress, skipping...');
+        return;
+    }
+    
+    global.whatsappReconnecting = true;
+    console.log('🔄 [WhatsApp] Starting reconnection process...');
+    
+    try {
+        const sessionName = process.env.WHATSAPP_SESSION || 'ai-chatbot';
+        const sessionDataPath = './tokens';
+        const whatsappHeadless = process.env.WHATSAPP_HEADLESS === 'true';
+        const shouldAutoClose = process.env.WHATSAPP_AUTO_CLOSE === 'true';
+        
+        // Cleanup old client jika ada
+        if (global.whatsappClient) {
+            try {
+                await global.whatsappClient.close();
+            } catch (e) {
+                console.warn('[WhatsApp] Error closing old client:', e.message);
+            }
+            global.whatsappClient = null;
+        }
+        
+        // Cleanup locks
+        await cleanupChromiumProfileLocks(sessionName, sessionDataPath).catch((error) => {
+            console.warn('[Browser] Failed to clean up Chromium profile locks:', error.message);
+        });
+        
+        // Recreate connection
+        const client = await wppconnect.create({
+            session: sessionName,
+            catchQR: (base64Qr, asciiQR) => {
+                console.log('📱 [WhatsApp] QR Code (Reconnect):');
+                console.log(asciiQR);
+            },
+            statusFind: (statusSession, session) => {
+                console.log('📱 [WhatsApp] Status (Reconnect):', statusSession);
+            },
+            headless: whatsappHeadless,
+            logQR: true,
+            autoClose: shouldAutoClose,
+            disableWelcome: true,
+            sessionDataPath,
+            puppeteerOptions: {
+                timeout: 180000,
+                protocolTimeout: 360000,
+                args: PUPPETEER_CHROME_ARGS,
+                defaultViewport: PUPPETEER_VIEWPORT,
+            },
+        });
+        
+        global.whatsappClient = client;
+        start(client);
+        startWhatsAppKeepAlive(client);
+        console.log('✅ [WhatsApp] Reconnected successfully!');
+        
+    } catch (error) {
+        console.error('❌ [WhatsApp] Reconnection failed:', error.message);
+        console.log('🔄 [WhatsApp] Will retry in 60 seconds...');
+        setTimeout(async () => {
+            global.whatsappReconnecting = false;
+            await reconnectWhatsApp();
+        }, 60000);
+        return;
+    }
+    
+    global.whatsappReconnecting = false;
+}
+
+// WhatsApp connection keep-alive: periodic check untuk memastikan connection tetap aktif
+function startWhatsAppKeepAlive(client) {
+    const KEEP_ALIVE_INTERVAL_MS = parseInt(process.env.WHATSAPP_KEEP_ALIVE_INTERVAL_MS || '300000', 10); // Default 5 menit
+    
+    console.log(`💚 [WhatsApp Keep-Alive] Starting (interval: ${KEEP_ALIVE_INTERVAL_MS}ms)`);
+    
+    const keepAliveInterval = setInterval(async () => {
+        try {
+            if (!global.whatsappClient || !client) {
+                console.warn('⚠️ [WhatsApp Keep-Alive] Client tidak tersedia, skip ping');
+                return;
+            }
+            
+            // Cek state connection
+            if (client.getState) {
+                const state = await client.getState();
+                if (state === 'UNPAIRED' || state === 'LOGOUT' || state === 'DISCONNECTED') {
+                    console.warn(`⚠️ [WhatsApp Keep-Alive] State tidak sehat: ${state}, trigger reconnect...`);
+                    clearInterval(keepAliveInterval);
+                    await reconnectWhatsApp();
+                    return;
+                }
+            }
+            
+            // Ping sederhana: coba get profile picture atau check connection
+            if (client.getHostDevice) {
+                await client.getHostDevice();
+                console.log('💚 [WhatsApp Keep-Alive] Connection active');
+            } else if (client.getConnectionState) {
+                const connState = await client.getConnectionState();
+                if (connState === 'close' || connState === 'close') {
+                    console.warn('⚠️ [WhatsApp Keep-Alive] Connection closed, trigger reconnect...');
+                    clearInterval(keepAliveInterval);
+                    await reconnectWhatsApp();
+                }
+            }
+            
+        } catch (error) {
+            console.warn(`⚠️ [WhatsApp Keep-Alive] Error: ${error.message}`);
+            // Jika error karena disconnected, trigger reconnect
+            if (error.message && (error.message.includes('not connected') || error.message.includes('closed'))) {
+                console.warn('🔄 [WhatsApp Keep-Alive] Connection lost, trigger reconnect...');
+                clearInterval(keepAliveInterval);
+                await reconnectWhatsApp();
+            }
+        }
+    }, KEEP_ALIVE_INTERVAL_MS);
+    
+    // Cleanup saat shutdown
+    process.on('SIGINT', () => {
+        clearInterval(keepAliveInterval);
+    });
+    
+    process.on('SIGTERM', () => {
+        clearInterval(keepAliveInterval);
+    });
+}
 
 // Keep-alive mechanism: periodic ping ke health endpoint sendiri
 // Mencegah server idle timeout saat tidak ada aktivitas
