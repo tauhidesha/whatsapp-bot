@@ -145,277 +145,216 @@ Telp/WA 0895 4015 27556`;
     doc.pipe(writeStream);
 
     // --- STYLING CONSTANTS ---
-    const primaryColor = '#2c3e50'; // Dark Blue/Grey
-    const secondaryColor = '#7f8c8d'; // Grey
+    const primaryColor = '#18181b'; // Zinc-950
+    const secondaryColor = '#52525b'; // Zinc-600
+    const mutedColor = '#71717a'; // Zinc-500
+    const lightBg = '#f4f4f5'; // Zinc-100
+    const accentYellow = '#FFEA00';
 
     // --- HEADER ---
-    // Logo: data/boS Mat (1000 x 500 px) (1).png
+    // Logo: Top Left
     const logoPath = path.join(__dirname, '../../../data/boS Mat (1000 x 500 px) (1).png');
-
     if (fs.existsSync(logoPath)) {
-      doc.image(logoPath, 50, 30, { width: 150 });
+      doc.image(logoPath, 50, 30, { width: 140 });
     }
 
-    // Company Info
-    doc
-      .fillColor(secondaryColor)
-      .fontSize(10)
-      .font('Helvetica')
-      .text(studioAddress, 200, 45, { align: 'right', width: 350 })
-      .moveDown();
+    // Document Title & Company Info: Top Right
+    let title = 'Faktur';
+    let docCode = 'INV';
+    if (documentType === 'tanda_terima') { title = 'Surat Tanda Terima'; docCode = 'STT'; }
+    else if (documentType === 'bukti_bayar') { title = 'Kuitansi'; docCode = 'RCP'; }
 
-    // Divider Header
-    generateHr(doc, 110);
+    const docNumber = `${idSuffix}`; // Minimalist ID like in reference
 
-    // --- DOCUMENT TITLE ---
-    let title = '';
-    let docCode = '';
-
-    if (documentType === 'tanda_terima') {
-      title = 'TANDA TERIMA';
-      docCode = 'STT';
-    } else if (documentType === 'invoice') {
-      title = 'INVOICE';
-      docCode = 'INV';
-    } else if (documentType === 'bukti_bayar') {
-      title = 'RECEIPT';
-      docCode = 'RCP';
-    }
-
-    const docNumber = `${docCode}/${now.getFullYear()}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${idSuffix}`;
-
-    // --- INFO SECTION (2 Columns) ---
-    const infoTop = 130;
-
-    // Left Column: Document Title & Customer
     doc
       .fillColor(primaryColor)
-      .fontSize(20)
+      .fontSize(22)
       .font('Helvetica-Bold')
-      .text(title, 50, infoTop);
+      .text(title, 400, 30, { align: 'right' });
 
     doc
       .fontSize(10)
-      .fillColor('black')
-      .font('Helvetica-Bold')
-      .text('Kepada Yth:', 50, infoTop + 35)
+      .text('Bosmat Detailing And Repainting', 400, 60, { align: 'right' })
       .font('Helvetica')
-      .text(customerName, 50, infoTop + 50)
-      .text(motorDetails, 50, infoTop + 65);
+      .fillColor(secondaryColor)
+      .text('Garasi 54', 400, 72, { align: 'right' })
+      .text('Jl. R. Sanim No. 99 , Beji, Tanah Baru', 400, 84, { align: 'right' })
+      .text('Depok Jawa Barat 16456', 400, 96, { align: 'right' })
+      .text('ID', 400, 108, { align: 'right' })
+      .text('08179481010', 400, 120, { align: 'right' })
+      .text('Bosmatdetailing.studio@gmail.com', 400, 132, { align: 'right' });
 
-    // Right Column: Document Details
+    // --- BILL TO / INFO BAR ---
+    doc.fillColor(lightBg).rect(30, 160, 535, 60).fill();
+
     doc
-      .fontSize(10)
+      .fillColor(secondaryColor)
+      .fontSize(9)
       .font('Helvetica-Bold')
-      .text('Detail Dokumen:', 350, infoTop + 35)
+      .text('DITAGIH KEPADA', 50, 175);
+
+    doc
+      .fillColor(primaryColor)
+      .fontSize(11)
+      .text(customerName, 50, 188)
       .font('Helvetica')
-      .text(`Nomor: ${docNumber}`, 350, infoTop + 50)
-      .text(`Tanggal: ${dateStr}`, 350, infoTop + 65)
-      .text(`Jam: ${timeStr}`, 350, infoTop + 80);
+      .fontSize(10)
+      .text(normalizedAddress || senderNumber, 50, 202);
+
+    // Document Meta (Right side of bar)
+    doc
+      .fillColor(primaryColor)
+      .fontSize(9)
+      .font('Helvetica-Bold')
+      .text('Faktur #', 400, 175, { width: 80, align: 'right' })
+      .text(docNumber, 500, 175, { align: 'right' })
+      .text('Tanggal', 400, 188, { width: 80, align: 'right' })
+      .text(now.toLocaleDateString('id-ID', { day: 'j', month: 'short', year: 'numeric' }), 500, 188, { align: 'right' })
+      .text('Jatuh tempo', 400, 201, { width: 80, align: 'right' })
+      .text(new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('id-ID', { day: 'j', month: 'short', year: 'numeric' }), 500, 201, { align: 'right' });
 
     // --- TABLE ITEMS ---
-    const tableTop = 270;
-    const itemCodeX = 50;
-    const descriptionX = 90;
-    const priceX = 450;
-
-    // Table Header
+    const tableTop = 245;
     doc
-      .font('Helvetica-Bold')
+      .fillColor(primaryColor)
       .fontSize(10)
-      .text('No', itemCodeX, tableTop)
-      .text('Layanan', descriptionX, tableTop)
-      .text('Harga', priceX, tableTop, { align: 'right' });
+      .font('Helvetica-Bold')
+      .text('Barang', 50, tableTop)
+      .text('Kuantitas', 300, tableTop, { width: 80, align: 'center' })
+      .text('Harga', 400, tableTop, { width: 80, align: 'right' })
+      .text('Jumlah', 500, tableTop, { align: 'right' });
 
     generateHr(doc, tableTop + 15);
 
-    // Table Rows
-    doc.font('Helvetica');
     let y = tableTop + 30;
-
-    // Split items by newline (preferred) or comma
     const itemsList = finalItems.split(/\n|,\s*/).map(i => i.trim()).filter(Boolean);
 
     itemsList.forEach((item, index) => {
-      // Coba pisahkan nama layanan dan harga jika formatnya "Layanan : RpXXX"
       let desc = item;
-      let priceStr = '-';
+      let priceVal = 0;
 
       const lastColonIndex = item.lastIndexOf(':');
       if (lastColonIndex > -1) {
-        const potentialPrice = item.substring(lastColonIndex + 1).trim();
-        // Cek apakah bagian kanan terlihat seperti harga (ada angka atau Rp)
-        if (potentialPrice.includes('Rp') || /\d/.test(potentialPrice)) {
-          desc = item.substring(0, lastColonIndex).trim();
-          priceStr = potentialPrice;
-        }
-      } else {
-        // Fallback: Coba regex di akhir string (misal "Layanan Rp 100.000" atau "Layanan 100rb")
-        const priceMatch = item.match(/(?:Rp\.?\s?)?[\d,.]+\s*(?:rb|jt|juta|ribu)?$/i);
-        if (priceMatch) {
-          const potentialPrice = priceMatch[0].trim();
-          // Validasi agar tidak menangkap tahun atau cc (misal "Vario 150")
-          const isCurrency = /Rp|rb|jt|juta|ribu/i.test(potentialPrice) ||
-            (potentialPrice.includes('.') && potentialPrice.length > 4) ||
-            (potentialPrice.includes(',') && potentialPrice.length > 3);
-
-          if (isCurrency) {
-            priceStr = potentialPrice;
-            desc = item.substring(0, item.length - priceMatch[0].length).trim();
-          }
-        }
+        const potentialPrice = item.substring(lastColonIndex + 1).replace(/[^\d]/g, '');
+        priceVal = parseInt(potentialPrice) || 0;
+        desc = item.substring(0, lastColonIndex).trim();
+      } else if (itemsList.length === 1) {
+        priceVal = finalTotal;
       }
 
-      // Bersihkan bullet points atau nomor di awal deskripsi, dan separator di akhir
-      desc = desc.replace(/^(\d+\.|[-*•])\s*/, '').replace(/[-:]\s*$/, '');
+      // Cleanup desc
+      desc = desc.replace(/^(\d+\.|[-*•])\s*/, '').trim();
 
-      // Cari deskripsi layanan untuk ditampilkan di bawah nama layanan
-      const cleanName = desc.replace(/\s*\(.*?\)/g, '').trim();
-      const serviceData = masterLayanan.find(s => {
-        const sName = s.name.toLowerCase();
-        const cName = cleanName.toLowerCase();
-        return sName === cName || cName.includes(sName) || sName.includes(cName);
-      });
+      // Item Name
+      doc.font('Helvetica-Bold').fontSize(10).text(desc, 50, y, { width: 240 });
 
-      const descriptionText = serviceData ? (serviceData.summary || serviceData.description) : '';
+      // Kuantitas, Harga, Jumlah
+      doc.font('Helvetica').text('1', 300, y, { width: 80, align: 'center' });
+      doc.text(formatCurrency(priceVal), 400, y, { width: 80, align: 'right' });
+      doc.text(formatCurrency(priceVal), 500, y, { align: 'right' });
 
-      // Fallback: Jika harga kosong ('-'), coba cari di master data atau gunakan total jika item tunggal
-      if (priceStr === '-' && documentType !== 'tanda_terima') {
-        if (serviceData && detectedSize) {
-          let price = serviceData.price;
-          if (serviceData.variants && Array.isArray(serviceData.variants)) {
-            const variant = serviceData.variants.find(v => v.name === detectedSize);
-            if (variant) price = variant.price;
-          }
-          if (price > 0) priceStr = formatCurrency(price);
-        }
+      // Item Description (Summary/SOP)
+      const serviceData = masterLayanan.find(s => desc.toLowerCase().includes(s.name.toLowerCase()));
+      if (serviceData && (serviceData.summary || serviceData.description)) {
+        const summary = serviceData.summary || serviceData.description;
+        const bulletPoints = summary.split('\n').filter(p => p.trim());
 
-        // Jika masih kosong dan ini satu-satunya item, gunakan finalTotal
-        if (priceStr === '-' && itemsList.length === 1 && finalTotal > 0) {
-          priceStr = formatCurrency(finalTotal);
-        }
-      }
+        y += doc.heightOfString(desc, { width: 240 }) + 5;
+        doc.fontSize(8).fillColor(secondaryColor);
 
-      doc.fontSize(10).fillColor('black').font('Helvetica').text(`${index + 1}`, itemCodeX, y);
-      doc.font('Helvetica-Bold').text(desc, descriptionX, y, { width: 340 });
-      doc.font('Helvetica').text(priceStr, priceX, y, { align: 'right' });
-
-      if (descriptionText) {
-        const nameHeight = doc.heightOfString(desc, { width: 340 });
-        const descY = y + nameHeight + 2;
-
-        doc.fontSize(8).fillColor('#555555').font('Helvetica-Oblique')
-          .text(descriptionText, descriptionX, descY, { width: 340 });
-
-        const descHeight = doc.heightOfString(descriptionText, { width: 340 });
-        y = descY + descHeight + 10;
-        doc.fillColor('black').font('Helvetica');
+        bulletPoints.forEach(point => {
+          const pointText = `• ${point.replace(/^•\s*/, '')}`;
+          doc.text(pointText, 50, y, { width: 240 });
+          y += doc.heightOfString(pointText, { width: 240 }) + 2;
+        });
+        y += 10;
+        doc.fillColor(primaryColor);
       } else {
-        y += 20;
+        y += Math.max(doc.heightOfString(desc, { width: 240 }) + 15, 25);
       }
 
       if (y > 700) { doc.addPage(); y = 50; }
     });
 
     generateHr(doc, y);
-    y += 15;
+    y += 20;
 
-    // --- TOTAL & FOOTER ---
-    if (documentType !== 'tanda_terima') {
+    // --- SUMMARY SECTION ---
+    const summaryX = 350;
+    const valueX = 500;
+
+    const subtotal = finalTotal;
+    const paid = amountPaid || 0;
+    const balance = subtotal - paid;
+
+    doc
+      .fontSize(10)
+      .fillColor(secondaryColor)
+      .text('Subtotal', summaryX, y, { width: 120, align: 'right' })
+      .fillColor(primaryColor)
+      .text(formatCurrency(subtotal), valueX, y, { align: 'right' });
+    y += 18;
+
+    doc
+      .fillColor(secondaryColor)
+      .text('Total', summaryX, y, { width: 120, align: 'right' })
+      .fillColor(primaryColor)
+      .text(formatCurrency(subtotal), valueX, y, { align: 'right' });
+    y += 18;
+
+    if (paid > 0) {
       doc
-        .font('Helvetica-Bold')
-        .fontSize(12)
-        .text('TOTAL', 350, y, { width: 90, align: 'right' })
-        .text(formatCurrency(finalTotal), priceX, y, { align: 'right' });
-      y += 20;
-
-      // Logic Status Pembayaran (DP / Lunas / Belum Bayar)
-      const paid = amountPaid || 0;
-      const remaining = finalTotal - paid;
-
-      if (paid > 0) {
-        // Tampilkan baris pembayaran jika ada uang masuk (DP atau Lunas)
-        doc
-          .font('Helvetica')
-          .fontSize(10)
-          .text('Sudah Dibayar', 350, y, { width: 90, align: 'right' })
-          .text(formatCurrency(paid), priceX, y, { align: 'right' });
-        y += 15;
-
-        if (remaining > 0) {
-          // Kasus DP
-          doc
-            .font('Helvetica-Bold')
-            .fontSize(12)
-            .text('SISA TAGIHAN', 350, y, { width: 90, align: 'right' })
-            .text(formatCurrency(remaining), priceX, y, { align: 'right' });
-          y += 25;
-
-          // Stempel BELUM LUNAS
-          doc.save().rotate(-10, { origin: [420, y] });
-          doc.rect(380, y - 5, 130, 30).stroke('orange');
-          doc.fillColor('orange').fontSize(16).text('BELUM LUNAS', 380, y + 2, { width: 130, align: 'center' });
-          doc.restore();
-        } else {
-          // Kasus Lunas
-          doc.save().rotate(-10, { origin: [420, y] });
-          doc.rect(400, y - 5, 100, 30).stroke('green');
-          doc.fillColor('green').fontSize(16).text('LUNAS', 400, y + 2, { width: 100, align: 'center' });
-          doc.restore();
-        }
-      } else if (documentType === 'bukti_bayar') {
-        // Jika tipe dokumen bukti bayar tapi amountPaid 0, anggap Lunas (default behavior lama)
-        doc.fillColor('green')
-          .fontSize(12)
-          .text('LUNAS', priceX, y, { align: 'right' });
-        doc.fillColor('black');
-      }
-
-      // Info Metode Pembayaran
-      if (paymentMethod !== '-' && paid > 0) {
-        y += 15;
-        doc.fillColor('black').fontSize(10).font('Helvetica').text(`Metode: ${paymentMethod}`, priceX, y, { align: 'right' });
-      }
-
-      // Info Rekening (Hanya muncul jika masih ada tagihan/invoice)
-      if (documentType === 'invoice' && remaining > 0) {
-        y += 30;
-        doc
-          .fillColor('black')
-          .font('Helvetica-Bold')
-          .fontSize(10)
-          .text('Detail Pembayaran:', 50, y)
-          .font('Helvetica')
-          .text('Bank: BCA', 50, y + 15)
-          .text('No. Rek: 1662515412', 50, y + 30)
-          .text('A.N: Muhammad Tauhid Haryadesa', 50, y + 45);
-        y += 45;
-      }
-    } else {
-      doc.moveDown(2);
-      y = doc.y;
-      doc.font('Helvetica-Oblique').fontSize(10).text('Kendaraan telah diterima untuk dilakukan pengecekan/pengerjaan.', 50, y, { align: 'center', width: 500 });
+        .fillColor(secondaryColor)
+        .text(`Lunas pada ${now.toLocaleDateString('id-ID', { day: 'j', month: 'short', year: 'numeric' })}`, summaryX, y, { width: 120, align: 'right' })
+        .fillColor(primaryColor)
+        .text(formatCurrency(paid), valueX, y, { align: 'right' });
+      y += 25;
     }
 
-    // --- NOTES ---
+    // Amount Due Highlight box
+    doc.fillColor(lightBg).rect(summaryX, y, 215, 45).fill();
+    doc
+      .fillColor(secondaryColor)
+      .fontSize(10)
+      .text('Jumlah yang Harus Dibayar', summaryX + 10, y + 10);
+    doc
+      .fillColor(primaryColor)
+      .fontSize(18)
+      .font('Helvetica-Bold')
+      .text(formatCurrency(balance), summaryX + 40, y + 20, { width: 165, align: 'right' });
+
+    // --- FOOTER / PAYMENT ---
+    y += 70;
+    doc
+      .fontSize(12)
+      .fillColor(primaryColor)
+      .font('Helvetica-Bold')
+      .text('Instruksi Pembayaran', 50, y);
+    y += 20;
+
+    doc
+      .fontSize(10)
+      .font('Helvetica')
+      .text('Bank BCA', 50, y)
+      .text('1662515412', 50, y + 14)
+      .text('A/N Nama Muhammad Tauhid Haryadesa', 50, y + 28);
+
+    y += 80;
+    doc
+      .fontSize(9)
+      .fillColor(secondaryColor)
+      .text('Penjadwalan pengerjaan menyusul sesuai ketersediaan slot (TBA).', 50, y);
+
     y += 40;
-    if (notes && notes !== '-') {
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(10)
-        .text('Catatan:', 50, y)
-        .font('Helvetica')
-        .text(notes, 50, y + 15);
-      y += 40;
-    }
-
-    // Signatures
-    y += 30;
-    // Pastikan tidak keluar halaman
-    if (y > 700) { doc.addPage(); y = 50; }
-
-    doc.text('Hormat Kami,', 400, y, { align: 'center', width: 150 });
-    doc.text('( Admin Bosmat )', 400, y + 50, { align: 'center', width: 150 });
+    doc
+      .fillColor(primaryColor)
+      .font('Helvetica-Bold')
+      .text('Detail Pembayaran', 50, y);
+    doc
+      .font('Helvetica')
+      .text('Bank: BCA', 50, y + 14)
+      .text('Nomor Rekening: 1662515412', 50, y + 28)
+      .text('Atas Nama: Muhammad Tauhid Haryadesa', 50, y + 42);
 
     doc.end();
 
