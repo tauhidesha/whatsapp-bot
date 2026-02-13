@@ -849,7 +849,7 @@ async function analyzeImageWithGemini(imageBuffer, mimeType = 'image/jpeg', capt
                     new HumanMessage({
                         content: [
                             { type: "text", text: textPrompt },
-                            { type: "media", mime_type: mimeType, data: base64Image }
+                            { type: "image_url", image_url: `data:${mimeType};base64,${base64Image}` }
                         ]
                     })
                 ]);
