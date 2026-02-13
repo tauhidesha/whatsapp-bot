@@ -199,7 +199,7 @@ Telp/WA 0895 4015 27556`;
       .text(customerName, 50, 188)
       .font('Helvetica')
       .fontSize(10)
-      .text(normalizedAddress || senderNumber, 50, 202);
+      .text(senderNumber, 50, 202);
 
     // Document Meta (Right side of bar)
     doc
