@@ -33,7 +33,10 @@ const generateDocumentTool = {
           },
           customerName: { type: 'string', description: 'Nama pelanggan.' },
           motorDetails: { type: 'string', description: 'Info motor (Merk, Tipe, Nopol).' },
-          items: { type: 'string', description: 'Daftar layanan/barang. Contoh: "Ganti Oli, Servis CVT".' },
+          items: {
+            type: 'string',
+            description: 'Daftar layanan/barang. Gunakan format "Nama Layanan: Harga" untuk item kustom. Gunakan "-" di awal baris untuk sub-item/deskripsi yang tidak punya harga sendiri. Contoh: "Paket Coating: 4500000\n- Poles Bodi\n- Coating Kaca".'
+          },
           totalAmount: { type: 'number', description: 'Total biaya. Jika 0 atau kosong, sistem akan mencoba menghitung otomatis berdasarkan layanan dan ukuran motor.' },
           amountPaid: { type: 'number', description: 'Jumlah yang sudah dibayar. Isi 0 jika belum bayar. Isi sebagian jika DP. Isi sama dengan total jika Lunas.' },
           paymentMethod: { type: 'string', description: 'Metode pembayaran (Transfer, Tunai, QRIS).' },
@@ -119,16 +122,7 @@ const generateDocumentTool = {
 
     // 2. Setup Waktu, ID, & Info Studio
     const now = new Date();
-    const dateStr = now.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
     const idSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-
-    // Info alamat studio
-    const studioAddress = `Bosmat Studio
-Bukit Cengkeh 1
-Jl. Medan No.B3/2
-Kota Depok, Jawa Barat 16451
-Telp/WA 0895 4015 27556`;
 
     // 3. Generate PDF
     const doc = new PDFDocument({ margin: 50, size: 'A4' });
@@ -149,7 +143,6 @@ Telp/WA 0895 4015 27556`;
     const secondaryColor = '#52525b'; // Zinc-600
     const mutedColor = '#71717a'; // Zinc-500
     const lightBg = '#f4f4f5'; // Zinc-100
-    const accentYellow = '#FFEA00';
 
     // --- HEADER ---
     // Logo: Top Left
@@ -246,6 +239,8 @@ Telp/WA 0895 4015 27556`;
       let desc = item;
       let priceVal = 0;
 
+      const isSubItem = /^([-*•])/.test(item);
+
       const lastColonIndex = item.lastIndexOf(':');
       if (lastColonIndex > -1) {
         const potentialPrice = item.substring(lastColonIndex + 1).replace(/[^\d]/g, '');
@@ -253,12 +248,12 @@ Telp/WA 0895 4015 27556`;
         desc = item.substring(0, lastColonIndex).trim();
       }
 
-      // Cleanup desc
-      desc = desc.replace(/^(\d+\.|[-*•])\s*/, '').trim();
+      // Cleanup desc for matching/display
+      const cleanDesc = desc.replace(/^(\d+\.|[-*•])\s*/, '').trim();
 
-      // Fallback price from masterLayanan if still 0
-      if (priceVal === 0) {
-        const service = masterLayanan.find(s => desc.toLowerCase().includes(s.name.toLowerCase()));
+      // Fallback price from masterLayanan if still 0 and NOT a sub-item
+      if (!isSubItem && priceVal === 0) {
+        const service = masterLayanan.find(s => cleanDesc.toLowerCase().includes(s.name.toLowerCase()));
         if (service) {
           priceVal = service.price;
           if (service.variants && Array.isArray(service.variants) && detectedSize) {
@@ -269,39 +264,48 @@ Telp/WA 0895 4015 27556`;
       }
 
       // Secondary fallback: if it's the only item, use finalTotal
-      if (priceVal === 0 && itemsList.length === 1) {
+      if (!isSubItem && priceVal === 0 && itemsList.length === 1) {
         priceVal = finalTotal;
       }
 
       // Item Name
-      doc.font('Helvetica-Bold').fontSize(10).text(desc, 50, y, { width: 240 });
+      doc.font(isSubItem ? 'Helvetica' : 'Helvetica-Bold')
+        .fontSize(isSubItem ? 9 : 10)
+        .fillColor(isSubItem ? secondaryColor : primaryColor)
+        .text(isSubItem ? `  ${desc}` : cleanDesc, 50, y, { width: 240 });
 
-      // Kuantitas, Harga, Jumlah
-      doc.font('Helvetica').text('1', 300, y, { width: 60, align: 'center' });
-      doc.text(formatCurrency(priceVal), 370, y, { width: 80, align: 'right' });
-      doc.text(formatCurrency(priceVal), 460, y, { width: 85, align: 'right' });
+      if (!isSubItem) {
+        // Kuantitas, Harga, Jumlah
+        doc.font('Helvetica').fontSize(10).fillColor(primaryColor).text('1', 300, y, { width: 60, align: 'center' });
 
-      // Item Description (Summary/SOP)
-      const serviceData = masterLayanan.find(s => desc.toLowerCase().includes(s.name.toLowerCase()));
+        const priceText = priceVal > 0 ? formatCurrency(priceVal) : '-';
+        doc.text(priceText, 370, y, { width: 80, align: 'right' });
+        doc.text(priceText, 460, y, { width: 85, align: 'right' });
+      }
+
+      // Automatically add SOP/Description from masterLayanan if it matches and isn't already a sub-item list
+      const serviceData = !isSubItem ? masterLayanan.find(s => cleanDesc.toLowerCase().includes(s.name.toLowerCase())) : null;
       if (serviceData && (serviceData.summary || serviceData.description)) {
         const summary = serviceData.summary || serviceData.description;
         const bulletPoints = summary.split('\n').filter(p => p.trim());
 
-        y += doc.heightOfString(desc, { width: 240 }) + 5;
+        y += doc.heightOfString(isSubItem ? `  ${desc}` : cleanDesc, { width: 240 }) + 5;
         doc.fontSize(8).fillColor(secondaryColor);
 
         bulletPoints.forEach(point => {
           const pointText = `• ${point.replace(/^•\s*/, '')}`;
+          const h = doc.heightOfString(pointText, { width: 240 });
+          if (y + h > 750) { doc.addPage(); y = 50; }
           doc.text(pointText, 50, y, { width: 240 });
-          y += doc.heightOfString(pointText, { width: 240 }) + 2;
+          y += h + 2;
         });
         y += 10;
         doc.fillColor(primaryColor);
       } else {
-        y += Math.max(doc.heightOfString(desc, { width: 240 }) + 15, 25);
+        y += Math.max(doc.heightOfString(isSubItem ? `  ${desc}` : cleanDesc, { width: 240 }) + 10, 20);
       }
 
-      if (y > 700) { doc.addPage(); y = 50; }
+      if (y > 750) { doc.addPage(); y = 50; }
     });
 
     generateHr(doc, y);
@@ -350,7 +354,6 @@ Telp/WA 0895 4015 27556`;
       .font('Helvetica-Bold')
       .text(formatCurrency(balance), 355, y + 20, { width: 190, align: 'right' });
 
-    // --- FOOTER / PAYMENT ---
     y += 70;
     doc
       .fontSize(12)
