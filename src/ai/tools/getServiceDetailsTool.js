@@ -3,6 +3,13 @@
 
 const masterLayanan = require('../../data/masterLayanan.js');
 const {
+  repaintBodiHalus,
+  repaintBodiKasar,
+  repaintVelg,
+  warnaSpesial,
+  syaratKetentuan,
+} = require('../../data/repaintPrices.js');
+const {
   getMotorSizesForSender,
   getPreferredSizeForService,
   setPreferredSizeForService,
@@ -33,7 +40,7 @@ function stringSimilarity(a, b) {
 
 function formatDuration(minutesStr) {
   if (!minutesStr) return 'Segera';
-  
+
   const durationInMinutes = parseInt(minutesStr, 10);
   if (isNaN(durationInMinutes) || durationInMinutes <= 0) {
     return 'Segera';
@@ -101,16 +108,109 @@ function resolveSizeForService({ service, sizeArg, senderNumber, cachedSizes }) 
   return { finalSize, category };
 }
 
+// --- Repaint Model-Based Price Lookup ---
+function lookupRepaintPrice(motorModel, subcategory) {
+  if (!motorModel) return null;
+  const query = motorModel.trim().toLowerCase();
+
+  // 1. Bodi Halus (default jika subcategory tidak spesifik)
+  if (!subcategory || subcategory === 'bodi_halus') {
+    for (const entry of repaintBodiHalus) {
+      const candidates = [entry.model, ...entry.aliases].map(a => a.toLowerCase());
+      for (const candidate of candidates) {
+        if (candidate === query || query.includes(candidate) || candidate.includes(query)) {
+          return {
+            found: true,
+            model: entry.model,
+            price: entry.price || null,
+            min: entry.min || null,
+            max: entry.max || null,
+            note: entry.note,
+            brand: entry.brand,
+            subcategory: 'bodi_halus',
+          };
+        }
+      }
+    }
+  }
+
+  // 2. Bodi Kasar – lookup berdasarkan ukuran motor dari daftarUkuranMotor
+  if (subcategory === 'bodi_kasar') {
+    // Untuk bodi kasar, kita return daftar range-nya langsung
+    return {
+      found: true,
+      model: motorModel,
+      price: null,
+      ranges: repaintBodiKasar,
+      subcategory: 'bodi_kasar',
+      note: 'Harga tergantung kategori ukuran motor.',
+    };
+  }
+
+  // 3. Velg
+  if (subcategory === 'velg') {
+    return {
+      found: true,
+      model: motorModel,
+      price: null,
+      ranges: repaintVelg,
+      subcategory: 'velg',
+      note: 'Harga per pasang, sudah termasuk bongkar pasang ban.',
+    };
+  }
+
+  return null;
+}
+
+function formatRepaintPriceResult(lookup) {
+  if (!lookup || !lookup.found) return null;
+
+  if (lookup.price) {
+    return {
+      price: lookup.price,
+      price_formatted: `Rp${lookup.price.toLocaleString('id-ID')}`,
+      price_type: 'fixed',
+      motor_model: lookup.model,
+      note: lookup.note,
+    };
+  }
+
+  if (lookup.min != null && lookup.max != null) {
+    return {
+      price: null,
+      price_min: lookup.min,
+      price_max: lookup.max,
+      price_formatted: `Rp${lookup.min.toLocaleString('id-ID')} - Rp${lookup.max.toLocaleString('id-ID')}`,
+      price_type: 'range',
+      motor_model: lookup.model,
+      note: lookup.note,
+    };
+  }
+
+  if (lookup.ranges) {
+    return {
+      price: null,
+      price_type: 'category_ranges',
+      ranges: lookup.ranges,
+      motor_model: lookup.model,
+      note: lookup.note,
+    };
+  }
+
+  return null;
+}
+
 // --- Implementation ---
 async function implementation(input) {
   try {
     console.log('[getServiceDetailsTool] Input:', input);
-    
+
     if (!input || typeof input !== 'object') {
       return { success: false, error: 'generic_error', message: 'Input tidak valid' };
     }
 
     const { service_name: parsedServiceName } = input;
+    const motorModel = typeof input.motor_model === 'string' ? input.motor_model.trim() : null;
     const senderNumber = typeof input.senderNumber === 'string'
       ? input.senderNumber
       : typeof input.sender_number === 'string'
@@ -128,12 +228,12 @@ async function implementation(input) {
     if (parsedServiceName.trim().toLowerCase() === 'coating') {
       const names = ['Coating Motor Doff', 'Coating Motor Glossy'];
       const services = masterLayanan.filter(s => names.includes(s.name));
-      
+
       const results = services.map(service => {
         const { finalSize } = resolveSizeForService({ service, sizeArg: sizeFromArgs, senderNumber, cachedSizes });
         const variant = service.variants?.find(v => v.name === finalSize);
         const basePrice = variant?.price ?? service.price;
-        
+
         return {
           name: service.name,
           summary: service.summary,
@@ -168,9 +268,44 @@ async function implementation(input) {
       cachedSizes,
     });
 
+    const durationFormatted = formatDuration(service.estimatedDuration);
+
+    // --- Model-based pricing for repaint services ---
+    if (service.usesModelPricing && motorModel) {
+      const subcategory = service.subcategory || null;
+      const lookup = lookupRepaintPrice(motorModel, subcategory);
+      const priceInfo = formatRepaintPriceResult(lookup);
+
+      if (priceInfo) {
+        const result = {
+          success: true,
+          service_name: service.name,
+          category: service.category,
+          subcategory: subcategory,
+          summary: service.summary,
+          description: service.description,
+          estimated_duration: durationFormatted,
+          motor_model: priceInfo.motor_model,
+          motor_size: finalSize || null,
+          ...priceInfo,
+          syarat_ketentuan: syaratKetentuan,
+        };
+
+        if (senderNumber && finalSize) {
+          setPreferredSizeForService(senderNumber, category, finalSize);
+          setMotorSizeForSender(senderNumber, {
+            serviceSize: category === 'repaint' ? null : finalSize,
+            repaintSize: category === 'repaint' ? finalSize : null,
+          });
+        }
+
+        return result;
+      }
+    }
+
+    // --- Fallback: variant-based (S/M/L/XL) or flat price ---
     const variant = service.variants?.find(v => v.name === finalSize);
     const basePrice = variant?.price ?? service.price;
-    const durationFormatted = formatDuration(service.estimatedDuration);
 
     const result = {
       success: true,
@@ -181,8 +316,13 @@ async function implementation(input) {
       estimated_duration: durationFormatted,
       motor_size: finalSize || null,
       price: basePrice || null,
-      price_formatted: basePrice ? `Rp${basePrice.toLocaleString('id-ID')}` : 'Harga perlu ukuran motor',
+      price_formatted: basePrice ? `Rp${basePrice.toLocaleString('id-ID')}` : 'Harga perlu model motor',
     };
+
+    // Jika repaint dan tidak ada model, beri hint
+    if (service.usesModelPricing && !motorModel) {
+      result.hint = 'Untuk harga yang lebih akurat, sertakan model motor (contoh: Scoopy, NMax, Beat).';
+    }
 
     if (senderNumber && finalSize) {
       setPreferredSizeForService(senderNumber, category, finalSize);
@@ -212,6 +352,10 @@ const getServiceDetailsTool = {
           service_name: {
             type: "string",
             description: "Nama layanan, misal: 'Coating Motor Doff', 'Full Detailing', 'Repaint Bodi Halus'."
+          },
+          motor_model: {
+            type: "string",
+            description: "Model motor spesifik (misal: 'Scoopy', 'NMax', 'Beat', 'CBR 150R'). Wajib untuk layanan repaint agar mendapat harga akurat."
           },
           size: {
             type: "string",

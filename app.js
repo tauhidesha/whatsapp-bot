@@ -1,5 +1,5 @@
 /**
- * WhatsApp AI Chatbot dengan LangChain dan Groq
+ * WhatsApp AI Chatbot dengan LangChain dan Gemini
  * Arsitektur JavaScript yang konsisten
  */
 
@@ -148,7 +148,7 @@ toolDefinitions.forEach((tool, index) => {
 
 // --- AI Configuration ---
 console.log('🤖 [STARTUP] Initializing AI Model...');
-console.log(`🤖 [STARTUP] Model: ${process.env.AI_MODEL || 'gemini-1.5-flash-latest'}`);
+console.log(`🤖 [STARTUP] Model: ${process.env.AI_MODEL || 'gemini-2.5-flash'}`);
 console.log(`🤖 [STARTUP] Temperature: ${parseFloat(process.env.AI_TEMPERATURE) || 0.7}`);
 console.log(`🤖 [STARTUP] Tools available: ${toolDefinitions.length} tools`);
 
@@ -167,10 +167,10 @@ if (API_KEYS.length > 1) {
     console.log(`🔄 [STARTUP] Fallback API key configured - will auto-retry on failures`);
 }
 
-const ACTIVE_AI_MODEL = process.env.AI_MODEL || 'gemini-1.5-flash-latest';
-// Vision default: gemini-1.5-flash-latest (multimodal). Bisa override via VISION_MODEL/IMAGE_MODEL.
-const ACTIVE_VISION_MODEL = process.env.VISION_MODEL || process.env.IMAGE_MODEL || 'gemini-1.5-flash-latest';
-const FALLBACK_VISION_MODEL = process.env.VISION_FALLBACK_MODEL || 'gemini-1.5-flash';
+const ACTIVE_AI_MODEL = process.env.AI_MODEL || 'gemini-2.5-flash';
+// Vision default: gemini-2.5-flash (multimodal). Bisa override via VISION_MODEL/IMAGE_MODEL.
+const ACTIVE_VISION_MODEL = process.env.VISION_MODEL || process.env.IMAGE_MODEL || 'gemini-2.5-flash';
+const FALLBACK_VISION_MODEL = process.env.VISION_FALLBACK_MODEL || 'gemini-2.0-flash';
 
 const baseModel = new ChatGoogleGenerativeAI({
     model: ACTIVE_AI_MODEL,
@@ -193,8 +193,8 @@ const geminiToolSpecifications = toolDefinitions.map(tool => {
             delete parameters.properties.sender_name;
         }
         if (parameters.required && Array.isArray(parameters.required)) {
-            parameters.required = parameters.required.filter(p => 
-                p !== 'senderNumber' && 
+            parameters.required = parameters.required.filter(p =>
+                p !== 'senderNumber' &&
                 p !== 'senderName' &&
                 p !== 'sender_number' &&
                 p !== 'sender_name'
@@ -568,7 +568,7 @@ const MEMORY_CONFIG = {
 // --- Memory Functions ---
 async function getConversationHistory(senderNumber, limit = MEMORY_CONFIG.maxMessages) {
     if (!db) return [];
-    
+
     const { docId } = parseSenderIdentity(senderNumber);
     if (!docId) {
         return [];
@@ -576,14 +576,14 @@ async function getConversationHistory(senderNumber, limit = MEMORY_CONFIG.maxMes
 
     try {
         const messagesRef = db.collection('directMessages').doc(docId).collection('messages');
-        
+
         console.log(`[Memory] Fetching history for ${docId} with constraint: max ${limit} messages.`);
 
         const snapshot = await messagesRef
             .orderBy('timestamp', 'desc')
             .limit(limit)
             .get();
-        
+
         const messages = [];
         snapshot.forEach(doc => {
             const data = doc.data();
@@ -593,7 +593,7 @@ async function getConversationHistory(senderNumber, limit = MEMORY_CONFIG.maxMes
                 timestamp: data.timestamp
             });
         });
-        
+
         // Return in chronological order (oldest first)
         return messages.reverse();
     } catch (error) {
@@ -629,15 +629,15 @@ async function executeToolCall(toolName, args, metadata = {}) {
     console.log(`⚡ [TOOL_CALL] Tool Name: ${toolName}`);
     console.log(`⚡ [TOOL_CALL] Arguments: ${JSON.stringify(args, null, 2)}`);
     console.log(`⚡ [TOOL_CALL] Available tools: ${Object.keys(availableTools).join(', ')}`);
-    
+
     if (!availableTools[toolName]) {
         console.error(`❌ [TOOL_CALL] Tool ${toolName} not found in available tools`);
         console.error(`❌ [TOOL_CALL] Available tools: ${Object.keys(availableTools)}`);
         return { error: `Tool ${toolName} tidak tersedia` };
     }
-    
+
     console.log(`✅ [TOOL_CALL] Tool ${toolName} found, executing...`);
-    
+
     try {
         let preparedArgs = args;
         if (typeof preparedArgs === 'string') {
@@ -663,11 +663,11 @@ async function executeToolCall(toolName, args, metadata = {}) {
         const startTime = Date.now();
         const result = await availableTools[toolName](preparedArgs);
         const executionTime = Date.now() - startTime;
-        
+
         console.log(`✅ [TOOL_CALL] Tool ${toolName} executed successfully in ${executionTime}ms`);
         console.log(`📊 [TOOL_CALL] Tool result: ${JSON.stringify(result, null, 2)}`);
         console.log(`⚡ [TOOL_CALL] ===== TOOL EXECUTION COMPLETED =====\n`);
-        
+
         return result;
     } catch (error) {
         console.error(`❌ [TOOL_CALL] Error executing ${toolName}:`, error);
@@ -790,10 +790,32 @@ function sanitizeToolDirectiveOutput(text) {
 
 async function analyzeImageWithGemini(imageBuffer, mimeType = 'image/jpeg', caption = '', senderName = 'User', previousContext = '') {
     const base64Image = imageBuffer.toString('base64');
-    const systemPrompt = 'Anda adalah Zoya, asisten Bosmat. Analisis foto motor pengguna, jelaskan kondisi, kerusakan, kebersihan, dan rekomendasi perawatan secara singkat dalam bahasa Indonesia. Fokus pada hal yang benar-benar terlihat dan hindari asumsi. ## Layanan Utama Repaint**: Bodi Halus/Kasar, Velg, Cover CVT/Arm Detailing/Coating**: Detailing Mesin, Cuci Komplit, Poles Bodi Glossy, Full Detailing Glossy, Coating Motor Doff/Glossy, Complete Service Doff/Glossy';
-    const textPrompt = `Analisis foto motor dari ${senderName}. ${caption ? `Caption pengguna: ${caption}.` : ''} ${previousContext ? `Konteks chat sebelumnya: "${previousContext}".` : ''} Sebutkan poin penting dalam 2-3 kalimat. Jika ada noda/baret/kerusakan, jelaskan singkat dan rekomendasikan treatment Bosmat yang relevan.`;
+    const VISION_TIMEOUT_MS = parseInt(process.env.VISION_TIMEOUT_MS || '30000', 10);
 
-    const fallbackChain = ['gemini-1.5-flash-latest', 'gemini-1.5-flash-001'];
+    const systemPrompt = [
+        'Anda adalah Zoya, asisten Bosmat Repainting and Detailing Studio.',
+        'Tugas: Analisis foto motor pengguna secara akurat.',
+        '',
+        'Fokus analisis:',
+        '- Kondisi cat (kusam, baret, mengelupas, jamur)',
+        '- Kebersihan (kerak mesin, debu tebal, noda)',
+        '- Kerusakan fisik yang terlihat',
+        '',
+        'Aturan:',
+        '- Hanya deskripsikan apa yang BENAR-BENAR terlihat di foto.',
+        '- Jangan berasumsi atau mengarang kerusakan.',
+        '- Jawab dalam bahasa Indonesia, singkat 2-4 kalimat.',
+        '- Rekomendasikan treatment Bosmat yang relevan.',
+        '',
+        'Layanan Bosmat:',
+        '- Repaint: Bodi Halus, Bodi Kasar, Velg, Cover CVT/Arm, Spot Repair',
+        '- Detailing: Detailing Mesin, Cuci Komplit, Poles Bodi Glossy, Full Detailing Glossy',
+        '- Coating: Coating Motor Doff/Glossy, Complete Service Doff/Glossy',
+    ].join('\n');
+
+    const textPrompt = `Analisis foto motor dari ${senderName}. ${caption ? `Caption pengguna: ${caption}.` : ''} ${previousContext ? `Konteks chat sebelumnya: "${previousContext}".` : ''} Sebutkan poin penting dalam 2-4 kalimat. Jika ada noda/baret/kerusakan, jelaskan singkat dan rekomendasikan treatment Bosmat yang relevan.`;
+
+    const fallbackChain = ['gemini-2.0-flash', 'gemini-1.5-flash-latest'];
     const modelsToTry = Array.from(
         new Set([
             ACTIVE_VISION_MODEL,
@@ -807,9 +829,9 @@ async function analyzeImageWithGemini(imageBuffer, mimeType = 'image/jpeg', capt
         for (let apiKeyIndex = 0; apiKeyIndex < API_KEYS.length; apiKeyIndex++) {
             const currentApiKey = API_KEYS[apiKeyIndex];
             const apiKeyLabel = apiKeyIndex === 0 ? 'primary' : `fallback #${apiKeyIndex}`;
-            
+
             try {
-                const logPrefix = apiKeyIndex === 0 
+                const logPrefix = apiKeyIndex === 0
                     ? `[VISION] 🔍 Analysing image using ${modelName}...`
                     : `[VISION] 🔄 Trying ${modelName} with ${apiKeyLabel} API key...`;
                 console.log(logPrefix);
@@ -817,19 +839,26 @@ async function analyzeImageWithGemini(imageBuffer, mimeType = 'image/jpeg', capt
                 const visionModel = new ChatGoogleGenerativeAI({
                     model: modelName,
                     apiKey: currentApiKey,
-                    temperature: 0.5,
-                    maxOutputTokens: 1024,
+                    temperature: 0.3,
+                    maxOutputTokens: 2048,
                 });
 
-                const response = await visionModel.invoke([
+                // Timeout wrapper: abort jika Gemini tidak respond dalam batas waktu
+                const invokePromise = visionModel.invoke([
                     new SystemMessage(systemPrompt),
                     new HumanMessage({
                         content: [
                             { type: "text", text: textPrompt },
-                            { type: "image_url", image_url: `data:${mimeType};base64,${base64Image}` }
+                            { type: "media", mime_type: mimeType, data: base64Image }
                         ]
                     })
                 ]);
+
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error(`Vision analysis timeout after ${VISION_TIMEOUT_MS}ms`)), VISION_TIMEOUT_MS)
+                );
+
+                const response = await Promise.race([invokePromise, timeoutPromise]);
 
                 const text = extractTextFromAIContent(response.content);
 
@@ -841,16 +870,24 @@ async function analyzeImageWithGemini(imageBuffer, mimeType = 'image/jpeg', capt
                     return text;
                 }
             } catch (error) {
-                const isQuotaError = error?.message?.includes('Quota exceeded') || 
-                                   error?.message?.includes('429') ||
-                                   error?.message?.includes('quota') ||
-                                   error?.message?.includes('RESOURCE_EXHAUSTED');
-                
-                const errorLabel = apiKeyIndex === 0 
+                const isQuotaError = error?.message?.includes('Quota exceeded') ||
+                    error?.message?.includes('429') ||
+                    error?.message?.includes('quota') ||
+                    error?.message?.includes('RESOURCE_EXHAUSTED');
+
+                const isTimeoutError = error?.message?.includes('timeout');
+
+                const errorLabel = apiKeyIndex === 0
                     ? `[VISION] ❌ ${modelName} failed`
                     : `[VISION] ❌ ${modelName} with ${apiKeyLabel} API key failed`;
                 console.error(`${errorLabel}:`, error?.message || error);
-                
+
+                // If timeout, skip remaining API keys for this model and try next model
+                if (isTimeoutError) {
+                    console.warn(`[VISION] ⏱️ ${modelName} timed out, trying next model...`);
+                    break;
+                }
+
                 // If quota error and more API keys available, try next key with same model
                 if (isQuotaError && apiKeyIndex < API_KEYS.length - 1) {
                     continue;
@@ -920,30 +957,30 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
         while (iteration < MAX_ITERATIONS) {
             const traceLabel = iteration === 0 ? 'chat-response-initial' : `chat-response-iteration-${iteration}`;
             console.log(`🚀 [AI_PROCESSING] Sending request to AI model... (iteration ${iteration + 1})`);
-            
+
             let lastError = null;
             let responseReceived = false;
-            
+
             // Try each API key in sequence
             for (let apiKeyIndex = 0; apiKeyIndex < API_KEYS.length; apiKeyIndex++) {
                 const currentApiKey = API_KEYS[apiKeyIndex];
                 const isFirstKey = apiKeyIndex === 0;
                 const apiKeyLabel = isFirstKey ? 'primary' : `fallback #${apiKeyIndex}`;
-                
+
                 try {
                     if (!isFirstKey) {
                         console.log(`🔄 [AI_PROCESSING] Trying ${apiKeyLabel} API key...`);
                     }
-                    
+
                     // Create model instance with current API key
                     const modelInstance = apiKeyIndex === 0 ? aiModel : new ChatGoogleGenerativeAI({
                         model: ACTIVE_AI_MODEL,
                         temperature: parseFloat(process.env.AI_TEMPERATURE) || 0.7,
                         apiKey: currentApiKey
                     }).bindTools(geminiToolSpecifications);
-                    
+
                     response = await modelInstance.invoke(messages, getTracingConfig(traceLabel));
-                    
+
                     // Validate response
                     const hasToolCalls = getToolCallsFromResponse(response).length > 0;
                     // Relaxed validation: Allow empty string content. Only fail if strictly null/undefined.
@@ -951,44 +988,44 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                         console.error('❌ [AI_PROCESSING] Invalid response structure:', response ? Object.keys(response) : 'null');
                         throw new Error('Invalid response from AI model: empty or undefined content');
                     }
-                    
+
                     if (!isFirstKey) {
                         console.log(`✅ [AI_PROCESSING] ${apiKeyLabel} API key succeeded!`);
                     }
-                    
+
                     responseReceived = true;
                     break; // Success - exit API key retry loop
-                    
+
                 } catch (error) {
                     lastError = error;
-                    
+
                     // Check if this is a retryable error
-                    const isQuotaError = error?.message?.includes('Quota exceeded') || 
-                                       error?.message?.includes('429') ||
-                                       error?.message?.includes('quota') ||
-                                       error?.message?.includes('RESOURCE_EXHAUSTED');
-                    
+                    const isQuotaError = error?.message?.includes('Quota exceeded') ||
+                        error?.message?.includes('429') ||
+                        error?.message?.includes('quota') ||
+                        error?.message?.includes('RESOURCE_EXHAUSTED');
+
                     const isAuthError = error?.message?.includes('API key not valid') ||
-                                      error?.message?.includes('authentication') ||
-                                      error?.message?.includes('401');
-                    
+                        error?.message?.includes('authentication') ||
+                        error?.message?.includes('401');
+
                     const isResponseError = error?.message?.includes('Cannot read properties') ||
-                                          error?.message?.includes('undefined');
-                    
+                        error?.message?.includes('undefined');
+
                     const isRetryableError = isQuotaError || isResponseError || isAuthError;
-                    
+
                     console.error(`❌ [AI_PROCESSING] Error with ${apiKeyLabel} API key:`, error.message);
-                    
+
                     // If this is the last API key or non-retryable error, try model fallback
                     if (apiKeyIndex === API_KEYS.length - 1 || !isRetryableError) {
                         if (isRetryableError && (isQuotaError || isResponseError)) {
                             console.error(`❌ [AI_PROCESSING] All API keys exhausted, trying model fallback...`);
-                            const fallbackModel = 'gemini-1.5-flash-latest';
-                            
+                            const fallbackModel = 'gemini-2.0-flash';
+
                             if (fallbackModel === ACTIVE_AI_MODEL) {
                                 break; // No point in model fallback
                             }
-                            
+
                             try {
                                 console.log(`🔄 [AI_PROCESSING] Trying fallback model: ${fallbackModel} with primary API key`);
                                 const fallbackModelInstance = new ChatGoogleGenerativeAI({
@@ -996,9 +1033,9 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                                     temperature: parseFloat(process.env.AI_TEMPERATURE) || 0.7,
                                     apiKey: API_KEYS[0]
                                 });
-                                
+
                                 response = await fallbackModelInstance.invoke(messages, getTracingConfig(traceLabel));
-                                
+
                                 // Validate fallback response
                                 const hasFallbackToolCalls = getToolCallsFromResponse(response).length > 0;
                                 // Relaxed validation: Allow empty string content. Only fail if strictly null/undefined.
@@ -1006,7 +1043,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                                     console.error('❌ [AI_PROCESSING] Invalid fallback response structure:', response ? Object.keys(response) : 'null');
                                     throw new Error('Invalid response from fallback model');
                                 }
-                                
+
                                 console.log(`✅ [AI_PROCESSING] Fallback model ${fallbackModel} succeeded!`);
                                 responseReceived = true;
                                 break;
@@ -1017,12 +1054,12 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                         }
                         break; // Exit API key retry loop
                     }
-                    
+
                     // Continue to next API key
                     continue;
                 }
             }
-            
+
             // If we still don't have a response after trying all options, throw error
             if (!responseReceived) {
                 console.error(`❌ [AI_PROCESSING] All retry attempts failed`);
@@ -1159,7 +1196,7 @@ async function rewriteAdminMessage(originalMessage, senderNumber) {
 
         let response = null;
         let lastError = null;
-        
+
         // Try each API key for admin message rewrite
         for (let apiKeyIndex = 0; apiKeyIndex < API_KEYS.length; apiKeyIndex++) {
             try {
@@ -1168,12 +1205,12 @@ async function rewriteAdminMessage(originalMessage, senderNumber) {
                     temperature: parseFloat(process.env.AI_TEMPERATURE) || 0.7,
                     apiKey: API_KEYS[apiKeyIndex]
                 });
-                
+
                 response = await modelInstance.invoke([
                     new SystemMessage(ADMIN_MESSAGE_REWRITE_STYLE_PROMPT),
                     new HumanMessage(prompt),
                 ], getTracingConfig('admin-message-rewrite'));
-                
+
                 break; // Success
             } catch (error) {
                 lastError = error;
@@ -1183,7 +1220,7 @@ async function rewriteAdminMessage(originalMessage, senderNumber) {
                 }
             }
         }
-        
+
         if (!response) {
             throw lastError || new Error('Failed to rewrite admin message');
         }
@@ -1268,7 +1305,7 @@ ${analysisContext}`
             : '';
 
         const aiResponse = await getAIResponse(combinedMessage, senderName, senderNumber, aiContext);
-        
+
         // Save to Firebase if available
         if (db) {
             await saveMessageToFirestore(senderNumber, combinedMessage, 'user');
@@ -1278,11 +1315,11 @@ ${analysisContext}`
         // Send response back to user
         if (aiResponse) {
             const targetNumber = toSenderNumberWithSuffix(senderNumber);
-            
+
             // Delay dinamis tambahan berdasarkan panjang teks agar typing indicator terlihat cukup lama untuk pesan panjang
             const dynamicDelay = Math.min(Math.max(aiResponse.length * 10, 1000), 4000);
             await delay(dynamicDelay);
-            
+
             await client.sendText(targetNumber, aiResponse.trim());
         }
 
@@ -1324,7 +1361,7 @@ function start(client) {
         } else {
             console.log(`[BUFFER] 💬 Text received from ${senderName}: "${messageContent}"`);
         }
-        
+
         // Save sender metadata
         await saveSenderMeta(senderNumber, senderName);
 
@@ -1487,7 +1524,7 @@ function start(client) {
 
     client.onStateChange(async (state) => {
         console.log('📱 [WhatsApp] State changed:', state);
-        
+
         if (state.includes('CONFLICT')) {
             console.log('⚠️ [WhatsApp] Conflict detected, using current session...');
             try {
@@ -1497,14 +1534,14 @@ function start(client) {
                 console.error('❌ [WhatsApp] Failed to resolve conflict:', e.message);
             }
         }
-        
+
         // Handle SYNCING state - jangan trigger reconnect saat masih syncing
         if (state.includes('SYNCING')) {
             console.log('⏳ [WhatsApp] Syncing connection... (TUNGGU, jangan logout dari mobile!)');
             // Jangan trigger reconnect saat masih syncing, biarkan proses selesai
             return;
         }
-        
+
         if (state.includes('UNPAIRED') || state.includes('LOGOUT')) {
             console.error('❌ [WhatsApp] Logged out / Unpaired detected!');
             console.warn('⚠️ [WhatsApp] Kemungkinan penyebab:');
@@ -1513,16 +1550,16 @@ function start(client) {
             console.warn('   3. Session expired atau invalid');
             console.warn('   4. WhatsApp Web di-unlink dari mobile');
             console.log('🔄 [WhatsApp] Attempting to reconnect in 15 seconds...');
-            
+
             // Set flag untuk trigger reconnect
             global.whatsappClient = null;
-            
+
             // Reconnect setelah delay lebih lama untuk pastikan state sudah stabil
             setTimeout(async () => {
                 await reconnectWhatsApp();
             }, 15000);
         }
-        
+
         if (state.includes('DISCONNECTED') || state.includes('disconnectedMobile')) {
             console.warn('⚠️ [WhatsApp] Disconnected / disconnectedMobile detected');
             console.warn('💡 [WhatsApp] INSTRUKSI PENTING:');
@@ -1541,7 +1578,7 @@ function start(client) {
 // --- Firebase Functions ---
 async function saveMessageToFirestore(senderNumber, message, senderType) {
     if (!db) return;
-    
+
     const { docId, channel, platformId } = parseSenderIdentity(senderNumber);
     if (!docId) {
         return;
@@ -1575,7 +1612,7 @@ async function saveMessageToFirestore(senderNumber, message, senderType) {
 
 async function saveSenderMeta(senderNumber, displayName) {
     if (!db) return;
-    
+
     const { docId, channel, platformId } = parseSenderIdentity(senderNumber);
     if (!docId) {
         return;
@@ -1675,7 +1712,7 @@ app.get('/webhooks/meta', (req, res) => {
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
-    
+
     const VERIFY_TOKEN = process.env.META_WEBHOOK_VERIFY_TOKEN;
 
     if (mode && token) {
@@ -1774,12 +1811,12 @@ app.post('/send-media', async (req, res) => {
     if (!number || !base64 || !mimetype) {
         return res.status(400).json({ error: 'Number, base64, and mimetype are required.' });
     }
-    
+
     try {
         if (!global.whatsappClient) {
             throw new Error('WhatsApp client not initialized.');
         }
-        
+
         const targetNumber = toSenderNumberWithSuffix(number);
         const dataUri = `data:${mimetype};base64,${base64}`;
         await global.whatsappClient.sendFile(targetNumber, dataUri, filename || 'file', caption || '');
@@ -1796,9 +1833,9 @@ app.post('/test-ai', async (req, res) => {
         const { message, senderNumber } = req.body;
         const testMessage = message || "Hello, test message";
         const testSenderNumber = senderNumber || null;
-        
+
         const response = await getAIResponse(testMessage, "Test User", testSenderNumber);
-        
+
         res.json({
             input: testMessage,
             ai_response: response,
@@ -1814,7 +1851,7 @@ app.get('/conversation-history/:number', async (req, res) => {
     try {
         const { number } = req.params;
         const { limit } = req.query;
-        
+
         if (!number) {
             return res.status(400).json({ error: 'Number is required.' });
         }
@@ -1880,7 +1917,7 @@ app.post('/conversation/:number/ai-state', async (req, res) => {
             const manual = !hasDuration;
             // Jika manual (toggle via UI), set durasi sangat panjang (1 tahun) agar tidak auto-ON dalam 60 menit
             const effectiveDuration = hasDuration ? durationMinutes : (365 * 24 * 60);
-            
+
             await setSnoozeMode(senderNumber, effectiveDuration, {
                 manual,
                 reason: reason || (manual ? 'manual-toggle' : 'timed-toggle'),
@@ -1913,23 +1950,23 @@ app.get('/bookings', async (req, res) => {
 
         const snapshot = await query.orderBy('bookingDate', 'asc').get();
         const bookings = [];
-        
+
         snapshot.forEach(doc => {
             const data = doc.data();
-            
+
             // Hitung Estimasi Durasi & Cek Kategori Repaint
             let maxDurationMinutes = 0;
             let isRepaint = false;
-            
+
             const serviceList = data.services || (data.serviceName ? [data.serviceName] : []);
-            
+
             serviceList.forEach(sName => {
                 const cleanName = sName.toLowerCase();
-                const svc = masterLayanan.find(m => 
-                    cleanName.includes(m.name.toLowerCase()) || 
+                const svc = masterLayanan.find(m =>
+                    cleanName.includes(m.name.toLowerCase()) ||
                     m.name.toLowerCase().includes(cleanName)
                 );
-                
+
                 if (svc) {
                     if (svc.category === 'repaint') isRepaint = true;
                     const dur = parseInt(svc.estimatedDuration || '0', 10);
@@ -1939,7 +1976,7 @@ app.get('/bookings', async (req, res) => {
 
             // Konversi menit ke hari kerja (asumsi 8 jam/hari = 480 menit)
             const durationDays = Math.ceil(maxDurationMinutes / 480) || 1;
-            
+
             // Hitung Tanggal Selesai
             let estimatedEndDate = data.bookingDate;
             if (data.bookingDate) {
@@ -2005,7 +2042,7 @@ server.listen(PORT, '0.0.0.0', async () => {
     console.log(`🧠 Memory Config: Max ${MEMORY_CONFIG.maxMessages} messages, ${MEMORY_CONFIG.maxAgeHours}h retention`);
     console.log(`🖥️  Chromium launch args: ${PUPPETEER_CHROME_ARGS.join(' ')}`);
     console.log(`🖥️  Chromium viewport: ${PUPPETEER_VIEWPORT.width}x${PUPPETEER_VIEWPORT.height}`);
-    
+
     const sessionName = process.env.WHATSAPP_SESSION || 'ai-chatbot';
     const sessionDataPath = './tokens';
 
@@ -2017,22 +2054,14 @@ server.listen(PORT, '0.0.0.0', async () => {
     // ⚠️ PENTING: Set autoClose ke false secara eksplisit untuk production
     const whatsappAutoClose = process.env.WHATSAPP_AUTO_CLOSE !== 'false'; // Default false jika tidak di-set
     const whatsappHeadless = process.env.WHATSAPP_HEADLESS !== 'false'; // Default true (headless) agar jalan di Railway/Docker
-    
+
     // Force false untuk production (jika env tidak di-set atau bukan 'true', maka false)
     const shouldAutoClose = process.env.WHATSAPP_AUTO_CLOSE === 'true';
-    
+
     console.log(`🔧 WhatsApp Config: AUTO_CLOSE=${shouldAutoClose} (env: "${process.env.WHATSAPP_AUTO_CLOSE}"), HEADLESS=${whatsappHeadless}`);
-    
-    // Enable multi-device mode untuk mencegah unpair saat login di mobile
-    // ⚠️ PENTING: Multi-device HARUS aktif di HP untuk mencegah unpair
-    const multiDevice = process.env.WHATSAPP_MULTI_DEVICE !== 'false'; // Default true
-    console.log(`🔧 WhatsApp Config: MULTI_DEVICE=${multiDevice}`);
+
     console.log(`🔧 Puppeteer Config: Headless=${whatsappHeadless}, Executable=${process.env.PUPPETEER_EXECUTABLE_PATH || 'System Default'}`);
-    if (!multiDevice) {
-        console.warn('⚠️ [WhatsApp] WARNING: Multi-device DISABLED! Bot akan unpair jika WhatsApp aktif di mobile.');
-        console.warn('💡 [WhatsApp] Rekomendasi: Set WHATSAPP_MULTI_DEVICE=true atau hapus env var (default true)');
-    }
-    
+
     wppconnect.create({
         session: sessionName,
         // 🛠️ FIX: Set User Agent di awal config agar lolos deteksi saat loading/syncing
@@ -2040,7 +2069,7 @@ server.listen(PORT, '0.0.0.0', async () => {
         authTimeout: 120000, // Perpanjang ke 2 menit untuk toleransi Syncing
         blockCrashLogs: true,
         disableGoogleAnalytics: true,
-        catchQR: (base64Qr, asciiQR, attempt, urlCode) => { 
+        catchQR: (base64Qr, asciiQR, attempt, urlCode) => {
             console.log('📱 WhatsApp QR Code (Small Mode):');
             if (urlCode) {
                 qrcode.generate(urlCode, { small: true });
@@ -2100,81 +2129,80 @@ server.listen(PORT, '0.0.0.0', async () => {
         logQR: false,
         autoClose: shouldAutoClose, // Hanya true jika env var eksplisit 'true'
         disableWelcome: true, // Disable welcome message
-        multiDevice: multiDevice, // Enable multi-device untuk mencegah unpair
         sessionDataPath,
     })
-    .then(async (client) => {
-        global.whatsappClient = client;
-        
-        // Inject stealth mode setelah client ready
-        try {
-            if (client.page) {
-                const page = client.page;
-                // Bypass webdriver detection
-                await page.evaluateOnNewDocument(() => {
-                    // Override navigator.webdriver
-                    Object.defineProperty(navigator, 'webdriver', {
-                        get: () => false,
+        .then(async (client) => {
+            global.whatsappClient = client;
+
+            // Inject stealth mode setelah client ready
+            try {
+                if (client.page) {
+                    const page = client.page;
+                    // Bypass webdriver detection
+                    await page.evaluateOnNewDocument(() => {
+                        // Override navigator.webdriver
+                        Object.defineProperty(navigator, 'webdriver', {
+                            get: () => false,
+                        });
+
+                        // Override chrome object
+                        window.chrome = {
+                            runtime: {},
+                            loadTimes: function () { },
+                            csi: function () { },
+                            app: {}
+                        };
+
+                        // Override permissions
+                        const originalQuery = window.navigator.permissions.query;
+                        window.navigator.permissions.query = (parameters) => (
+                            parameters.name === 'notifications' ?
+                                Promise.resolve({ state: Notification.permission }) :
+                                originalQuery(parameters)
+                        );
+
+                        // Override plugins
+                        Object.defineProperty(navigator, 'plugins', {
+                            get: () => [1, 2, 3, 4, 5],
+                        });
+
+                        // Override languages
+                        Object.defineProperty(navigator, 'languages', {
+                            get: () => ['en-US', 'en'],
+                        });
                     });
-                    
-                    // Override chrome object
-                    window.chrome = {
-                        runtime: {},
-                        loadTimes: function() {},
-                        csi: function() {},
-                        app: {}
-                    };
-                    
-                    // Override permissions
-                    const originalQuery = window.navigator.permissions.query;
-                    window.navigator.permissions.query = (parameters) => (
-                        parameters.name === 'notifications' ?
-                            Promise.resolve({ state: Notification.permission }) :
-                            originalQuery(parameters)
+
+                    // Set realistic user agent
+                    await page.setUserAgent(
+                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'
                     );
-                    
-                    // Override plugins
-                    Object.defineProperty(navigator, 'plugins', {
-                        get: () => [1, 2, 3, 4, 5],
-                    });
-                    
-                    // Override languages
-                    Object.defineProperty(navigator, 'languages', {
-                        get: () => ['en-US', 'en'],
-                    });
-                });
-                
-                // Set realistic user agent
-                await page.setUserAgent(
-                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'
-                );
-                
-                console.log('🕵️ [Stealth] Anti-detection scripts injected successfully');
+
+                    console.log('🕵️ [Stealth] Anti-detection scripts injected successfully');
+                }
+            } catch (stealthError) {
+                console.warn('[Stealth] Failed to inject anti-detection (non-critical):', stealthError.message);
             }
-        } catch (stealthError) {
-            console.warn('[Stealth] Failed to inject anti-detection (non-critical):', stealthError.message);
-        }
-        
-        start(client);
-        startBookingReminderScheduler();
-        console.log('✅ WhatsApp client initialized successfully!');
-        
-        // Start keep-alive mechanism untuk mencegah server idle timeout
-        startKeepAlive();
-        
-        // Start WhatsApp connection keep-alive
-        startWhatsAppKeepAlive(client);
-    })
-    .catch((error) => {
-        console.error('❌ WhatsApp initialization error:', error);
-        // Tetap start keep-alive meskipun WhatsApp belum connect
-        startKeepAlive();
-        
-        // Retry connection setelah delay
-        setTimeout(async () => {
-            await reconnectWhatsApp();
-        }, 30000);
-    });
+
+            start(client);
+            startBookingReminderScheduler();
+            console.log('✅ WhatsApp client initialized successfully!');
+
+            // Start keep-alive mechanism untuk mencegah server idle timeout
+            startKeepAlive();
+
+            // Start WhatsApp connection keep-alive
+            startWhatsAppKeepAlive(client);
+        })
+        .catch((error) => {
+            console.error('❌ WhatsApp initialization error:', error);
+            // Tetap start keep-alive meskipun WhatsApp belum connect
+            startKeepAlive();
+
+            // Retry connection setelah delay
+            setTimeout(async () => {
+                await reconnectWhatsApp();
+            }, 30000);
+        });
 });
 
 // Reconnect WhatsApp function
@@ -2183,16 +2211,16 @@ async function reconnectWhatsApp() {
         console.log('⏳ [WhatsApp] Reconnection already in progress, skipping...');
         return;
     }
-    
+
     global.whatsappReconnecting = true;
     console.log('🔄 [WhatsApp] Starting reconnection process...');
-    
+
     try {
         const sessionName = process.env.WHATSAPP_SESSION || 'ai-chatbot';
         const sessionDataPath = './tokens';
         const whatsappHeadless = process.env.WHATSAPP_HEADLESS === 'true';
         const shouldAutoClose = process.env.WHATSAPP_AUTO_CLOSE === 'true';
-        
+
         // Cleanup old client jika ada
         if (global.whatsappClient) {
             try {
@@ -2202,16 +2230,15 @@ async function reconnectWhatsApp() {
             }
             global.whatsappClient = null;
         }
-        
+
         // Cleanup locks
         await cleanupChromiumProfileLocks(sessionName, sessionDataPath).catch((error) => {
             console.warn('[Browser] Failed to clean up Chromium profile locks:', error.message);
         });
-        
+
         // Recreate connection
-        const multiDevice = process.env.WHATSAPP_MULTI_DEVICE !== 'false'; // Default true
-        console.log(`🔄 [WhatsApp] Reconnecting with MULTI_DEVICE=${multiDevice}`);
-        
+        console.log(`🔄 [WhatsApp] Reconnecting...`);
+
         const client = await wppconnect.create({
             session: sessionName,
             // 🛠️ FIX: Terapkan config yang sama saat reconnect
@@ -2244,7 +2271,7 @@ async function reconnectWhatsApp() {
                 try {
                     await page.evaluateOnNewDocument(() => {
                         Object.defineProperty(navigator, 'webdriver', { get: () => false });
-                        window.chrome = { runtime: {}, loadTimes: function() {}, csi: function() {}, app: {} };
+                        window.chrome = { runtime: {}, loadTimes: function () { }, csi: function () { }, app: {} };
                     });
                     await page.setUserAgent(
                         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -2268,19 +2295,18 @@ async function reconnectWhatsApp() {
             logQR: true,
             autoClose: shouldAutoClose,
             disableWelcome: true,
-            multiDevice: multiDevice, // Enable multi-device - PENTING!
             sessionDataPath,
         });
-        
+
         global.whatsappClient = client;
-        
+
         // Inject stealth mode untuk reconnect juga
         try {
             if (client.page) {
                 const page = client.page;
                 await page.evaluateOnNewDocument(() => {
                     Object.defineProperty(navigator, 'webdriver', { get: () => false });
-                    window.chrome = { runtime: {}, loadTimes: function() {}, csi: function() {}, app: {} };
+                    window.chrome = { runtime: {}, loadTimes: function () { }, csi: function () { }, app: {} };
                 });
                 await page.setUserAgent(
                     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'
@@ -2290,11 +2316,11 @@ async function reconnectWhatsApp() {
         } catch (stealthError) {
             console.warn('[Stealth] Reconnect injection failed (non-critical):', stealthError.message);
         }
-        
+
         start(client);
         startWhatsAppKeepAlive(client);
         console.log('✅ [WhatsApp] Reconnected successfully!');
-        
+
     } catch (error) {
         console.error('❌ [WhatsApp] Reconnection failed:', error.message);
         console.log('🔄 [WhatsApp] Will retry in 60 seconds...');
@@ -2304,23 +2330,23 @@ async function reconnectWhatsApp() {
         }, 60000);
         return;
     }
-    
+
     global.whatsappReconnecting = false;
 }
 
 // WhatsApp connection keep-alive: periodic check untuk memastikan connection tetap aktif
 function startWhatsAppKeepAlive(client) {
     const KEEP_ALIVE_INTERVAL_MS = parseInt(process.env.WHATSAPP_KEEP_ALIVE_INTERVAL_MS || '300000', 10); // Default 5 menit
-    
+
     console.log(`💚 [WhatsApp Keep-Alive] Starting (interval: ${KEEP_ALIVE_INTERVAL_MS}ms)`);
-    
+
     const keepAliveInterval = setInterval(async () => {
         try {
             if (!global.whatsappClient || !client) {
                 console.warn('⚠️ [WhatsApp Keep-Alive] Client tidak tersedia, skip ping');
                 return;
             }
-            
+
             // Cek state connection
             if (client.getState) {
                 const state = await client.getState();
@@ -2331,7 +2357,7 @@ function startWhatsAppKeepAlive(client) {
                     return;
                 }
             }
-            
+
             // Ping sederhana: coba get profile picture atau check connection
             if (client.getHostDevice) {
                 await client.getHostDevice();
@@ -2344,7 +2370,7 @@ function startWhatsAppKeepAlive(client) {
                     await reconnectWhatsApp();
                 }
             }
-            
+
         } catch (error) {
             console.warn(`⚠️ [WhatsApp Keep-Alive] Error: ${error.message}`);
             // Jika error karena disconnected, trigger reconnect
@@ -2355,12 +2381,12 @@ function startWhatsAppKeepAlive(client) {
             }
         }
     }, KEEP_ALIVE_INTERVAL_MS);
-    
+
     // Cleanup saat shutdown
     process.on('SIGINT', () => {
         clearInterval(keepAliveInterval);
     });
-    
+
     process.on('SIGTERM', () => {
         clearInterval(keepAliveInterval);
     });
@@ -2371,23 +2397,23 @@ function startWhatsAppKeepAlive(client) {
 function startKeepAlive() {
     const KEEP_ALIVE_INTERVAL_MS = parseInt(process.env.KEEP_ALIVE_INTERVAL_MS || '300000', 10); // Default 5 menit
     const KEEP_ALIVE_URL = process.env.KEEP_ALIVE_URL || `http://localhost:${PORT}/ping`;
-    
+
     console.log(`🔄 [Keep-Alive] Starting keep-alive mechanism (interval: ${KEEP_ALIVE_INTERVAL_MS}ms)`);
-    
+
     // Helper untuk fetch dengan timeout
     const fetchWithTimeout = (url, timeoutMs = 5000) => {
         return Promise.race([
             fetch(url),
-            new Promise((_, reject) => 
+            new Promise((_, reject) =>
                 setTimeout(() => reject(new Error('Request timeout')), timeoutMs)
             )
         ]);
     };
-    
+
     const keepAliveInterval = setInterval(async () => {
         try {
             const response = await fetchWithTimeout(KEEP_ALIVE_URL, 5000);
-            
+
             if (response.ok) {
                 const data = await response.json();
                 console.log(`💚 [Keep-Alive] Server active - ${new Date().toISOString()}`);
@@ -2403,16 +2429,16 @@ function startKeepAlive() {
             }
         }
     }, KEEP_ALIVE_INTERVAL_MS);
-    
+
     // Cleanup saat shutdown
     process.on('SIGINT', () => {
         clearInterval(keepAliveInterval);
     });
-    
+
     process.on('SIGTERM', () => {
         clearInterval(keepAliveInterval);
     });
-    
+
     // Ping pertama langsung setelah startup
     setTimeout(async () => {
         try {

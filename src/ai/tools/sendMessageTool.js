@@ -1,24 +1,8 @@
 // File: src/ai/tools/sendMessageTool.js
 const { z } = require('zod');
 const admin = require('firebase-admin');
-const { getFirebaseAdmin } = require('../../lib/firebaseAdmin.js');
+const { isAdmin, ensureFirestore } = require('../utils/adminAuth.js');
 const { normalizeWhatsappNumber } = require('../utils/humanHandover.js');
-
-// Helper untuk memvalidasi apakah pengirim adalah admin
-function isAdmin(senderNumber) {
-  const adminNumbers = [
-    process.env.BOSMAT_ADMIN_NUMBER,
-    process.env.ADMIN_WHATSAPP_NUMBER
-  ].filter(Boolean);
-
-  if (!senderNumber || adminNumbers.length === 0) return false;
-
-  // Normalisasi: hapus karakter non-digit dan suffix @c.us
-  const normalize = (n) => n.toString().replace(/\D/g, '');
-  const sender = normalize(senderNumber);
-  
-  return adminNumbers.some(admin => normalize(admin) === sender);
-}
 
 const sendMessageSchema = z.object({
   destination: z.string().describe('Nomor tujuan (contoh: 08123456789)'),
@@ -92,7 +76,7 @@ const sendMessageTool = {
 
       // --- Simpan ke Firestore agar AI punya konteks ---
       try {
-        const db = getFirebaseAdmin().firestore();
+        const db = ensureFirestore();
         // Hapus suffix @c.us untuk mendapatkan docId standar
         const docId = target.replace(/@c\.us$|@lid$/, '');
         const timestamp = admin.firestore.FieldValue.serverTimestamp();

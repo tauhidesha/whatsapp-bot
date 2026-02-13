@@ -6,22 +6,7 @@ const { formatCurrency } = require('../utils/distanceMatrix.js');
 const { getStudioInfoTool } = require('./getStudioInfoTool.js');
 const { getMotorSizeDetailsTool } = require('./getMotorSizeDetailsTool.js');
 const masterLayanan = require('../../data/masterLayanan.js');
-
-// Helper untuk memvalidasi apakah pengirim adalah admin
-function isAdmin(senderNumber) {
-  const adminNumbers = [
-    process.env.BOSMAT_ADMIN_NUMBER,
-    process.env.ADMIN_WHATSAPP_NUMBER
-  ].filter(Boolean);
-
-  if (!senderNumber || adminNumbers.length === 0) return false;
-
-  // Normalisasi: hapus karakter non-digit dan suffix @c.us
-  const normalize = (n) => n.toString().replace(/\D/g, '');
-  const sender = normalize(senderNumber);
-  
-  return adminNumbers.some(admin => normalize(admin) === sender);
-}
+const { isAdmin } = require('../utils/adminAuth.js');
 
 // Helper untuk membuat garis horizontal
 function generateHr(doc, y) {
@@ -104,8 +89,8 @@ const generateDocumentTool = {
 
           for (const itemStr of itemList) {
             // Find service in masterLayanan
-            const service = masterLayanan.find(s => 
-              itemStr.toLowerCase().includes(s.name.toLowerCase()) || 
+            const service = masterLayanan.find(s =>
+              itemStr.toLowerCase().includes(s.name.toLowerCase()) ||
               s.name.toLowerCase().includes(itemStr.toLowerCase())
             );
 
@@ -137,7 +122,7 @@ const generateDocumentTool = {
     const dateStr = now.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
     const idSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    
+
     // Info alamat studio
     const studioAddress = `Bosmat Studio
 Bukit Cengkeh 1
@@ -148,7 +133,7 @@ Telp/WA 0895 4015 27556`;
     // 3. Generate PDF
     const doc = new PDFDocument({ margin: 50, size: 'A4' });
     const tempDir = path.resolve(__dirname, '../../../temp_docs');
-    
+
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });
     }
@@ -166,7 +151,7 @@ Telp/WA 0895 4015 27556`;
     // --- HEADER ---
     // Logo: data/boS Mat (1000 x 500 px) (1).png
     const logoPath = path.join(__dirname, '../../../data/boS Mat (1000 x 500 px) (1).png');
-    
+
     if (fs.existsSync(logoPath)) {
       doc.image(logoPath, 50, 30, { width: 150 });
     }
@@ -201,7 +186,7 @@ Telp/WA 0895 4015 27556`;
 
     // --- INFO SECTION (2 Columns) ---
     const infoTop = 130;
-    
+
     // Left Column: Document Title & Customer
     doc
       .fillColor(primaryColor)
@@ -250,35 +235,35 @@ Telp/WA 0895 4015 27556`;
 
     // Split items by newline (preferred) or comma
     const itemsList = finalItems.split(/\n|,\s*/).map(i => i.trim()).filter(Boolean);
-    
+
     itemsList.forEach((item, index) => {
       // Coba pisahkan nama layanan dan harga jika formatnya "Layanan : RpXXX"
       let desc = item;
       let priceStr = '-';
-      
+
       const lastColonIndex = item.lastIndexOf(':');
       if (lastColonIndex > -1) {
-         const potentialPrice = item.substring(lastColonIndex + 1).trim();
-         // Cek apakah bagian kanan terlihat seperti harga (ada angka atau Rp)
-         if (potentialPrice.includes('Rp') || /\d/.test(potentialPrice)) {
-             desc = item.substring(0, lastColonIndex).trim();
-             priceStr = potentialPrice;
-         }
+        const potentialPrice = item.substring(lastColonIndex + 1).trim();
+        // Cek apakah bagian kanan terlihat seperti harga (ada angka atau Rp)
+        if (potentialPrice.includes('Rp') || /\d/.test(potentialPrice)) {
+          desc = item.substring(0, lastColonIndex).trim();
+          priceStr = potentialPrice;
+        }
       } else {
-         // Fallback: Coba regex di akhir string (misal "Layanan Rp 100.000" atau "Layanan 100rb")
-         const priceMatch = item.match(/(?:Rp\.?\s?)?[\d,.]+\s*(?:rb|jt|juta|ribu)?$/i);
-         if (priceMatch) {
-             const potentialPrice = priceMatch[0].trim();
-             // Validasi agar tidak menangkap tahun atau cc (misal "Vario 150")
-             const isCurrency = /Rp|rb|jt|juta|ribu/i.test(potentialPrice) || 
-                                (potentialPrice.includes('.') && potentialPrice.length > 4) ||
-                                (potentialPrice.includes(',') && potentialPrice.length > 3);
-             
-             if (isCurrency) {
-                 priceStr = potentialPrice;
-                 desc = item.substring(0, item.length - priceMatch[0].length).trim();
-             }
-         }
+        // Fallback: Coba regex di akhir string (misal "Layanan Rp 100.000" atau "Layanan 100rb")
+        const priceMatch = item.match(/(?:Rp\.?\s?)?[\d,.]+\s*(?:rb|jt|juta|ribu)?$/i);
+        if (priceMatch) {
+          const potentialPrice = priceMatch[0].trim();
+          // Validasi agar tidak menangkap tahun atau cc (misal "Vario 150")
+          const isCurrency = /Rp|rb|jt|juta|ribu/i.test(potentialPrice) ||
+            (potentialPrice.includes('.') && potentialPrice.length > 4) ||
+            (potentialPrice.includes(',') && potentialPrice.length > 3);
+
+          if (isCurrency) {
+            priceStr = potentialPrice;
+            desc = item.substring(0, item.length - priceMatch[0].length).trim();
+          }
+        }
       }
 
       // Bersihkan bullet points atau nomor di awal deskripsi, dan separator di akhir
@@ -297,38 +282,38 @@ Telp/WA 0895 4015 27556`;
       // Fallback: Jika harga kosong ('-'), coba cari di master data atau gunakan total jika item tunggal
       if (priceStr === '-' && documentType !== 'tanda_terima') {
         if (serviceData && detectedSize) {
-           let price = serviceData.price;
-           if (serviceData.variants && Array.isArray(serviceData.variants)) {
-             const variant = serviceData.variants.find(v => v.name === detectedSize);
-             if (variant) price = variant.price;
-           }
-           if (price > 0) priceStr = formatCurrency(price);
+          let price = serviceData.price;
+          if (serviceData.variants && Array.isArray(serviceData.variants)) {
+            const variant = serviceData.variants.find(v => v.name === detectedSize);
+            if (variant) price = variant.price;
+          }
+          if (price > 0) priceStr = formatCurrency(price);
         }
-        
+
         // Jika masih kosong dan ini satu-satunya item, gunakan finalTotal
         if (priceStr === '-' && itemsList.length === 1 && finalTotal > 0) {
-           priceStr = formatCurrency(finalTotal);
+          priceStr = formatCurrency(finalTotal);
         }
       }
 
       doc.fontSize(10).fillColor('black').font('Helvetica').text(`${index + 1}`, itemCodeX, y);
       doc.font('Helvetica-Bold').text(desc, descriptionX, y, { width: 340 });
       doc.font('Helvetica').text(priceStr, priceX, y, { align: 'right' });
-      
+
       if (descriptionText) {
         const nameHeight = doc.heightOfString(desc, { width: 340 });
         const descY = y + nameHeight + 2;
-        
+
         doc.fontSize(8).fillColor('#555555').font('Helvetica-Oblique')
-           .text(descriptionText, descriptionX, descY, { width: 340 });
-        
+          .text(descriptionText, descriptionX, descY, { width: 340 });
+
         const descHeight = doc.heightOfString(descriptionText, { width: 340 });
         y = descY + descHeight + 10;
         doc.fillColor('black').font('Helvetica');
       } else {
         y += 20;
       }
-      
+
       if (y > 700) { doc.addPage(); y = 50; }
     });
 
@@ -343,7 +328,7 @@ Telp/WA 0895 4015 27556`;
         .text('TOTAL', 350, y, { width: 90, align: 'right' })
         .text(formatCurrency(finalTotal), priceX, y, { align: 'right' });
       y += 20;
-      
+
       // Logic Status Pembayaran (DP / Lunas / Belum Bayar)
       const paid = amountPaid || 0;
       const remaining = finalTotal - paid;
@@ -448,7 +433,15 @@ Telp/WA 0895 4015 27556`;
           filename,
           `Berikut dokumen *${title}* yang diminta.`
         );
-        
+
+        // Cleanup: Hapus file temp setelah dikirim
+        setTimeout(() => {
+          fs.unlink(filePath, (err) => {
+            if (err) console.error(`[generateDocument] Gagal menghapus temp file ${filePath}:`, err);
+            else console.log(`[generateDocument] Temp file dihapus: ${filename}`);
+          });
+        }, 5000);
+
         return {
           success: true,
           message: `Dokumen PDF ${documentType} berhasil dibuat dan dikirim ke WhatsApp Anda.`,

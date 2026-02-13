@@ -5,44 +5,32 @@ const masterLayanan = [
   {
     name: "Repaint Bodi Halus",
     category: "repaint",
+    subcategory: "bodi_halus",
     summary: "Cat ulang bodi motor pakai bahan premium (PU & HS) untuk hasil mulus seperti pabrikan.",
-    description: "- Bahan cat menggunakan full PU - Untuk clear coat menggunakan clearcoat jenis HS - Harga untuk warna solid/metalik. Candy, bunglon, moonlight dikenakan tambahan 150–350rb tergantung motor. - Repaint hasil kulit jeruk tipis ala pabrik (bisa lebih halus dengan tambahan poles) - Estimasi pengerjaan repaint: 5–6 hari kerja tergantung kondisi dan antrian",
+    description: "- Bahan cat menggunakan full PU - Untuk clear coat menggunakan clearcoat jenis HS - Harga untuk warna solid/metalik. Candy, bunglon, moonlight dikenakan tambahan 125–210rb tergantung jenis warna. - Repaint hasil kulit jeruk tipis ala pabrik (bisa lebih halus dengan tambahan poles) - Estimasi pengerjaan repaint: 5–6 hari kerja tergantung kondisi dan antrian - Harga bervariasi per model motor, lihat daftar harga terbaru.",
     price: 0,
     estimatedDuration: "2400",
-    variants: [
-      { name: "S", price: 900000 },
-      { name: "M", price: 1250000 },
-      { name: "L", price: 1400000 },
-      { name: "XL", price: 1800000 }
-    ]
+    usesModelPricing: true,
   },
   {
     name: "Repaint Bodi Kasar",
     category: "repaint",
+    subcategory: "bodi_kasar",
     summary: "Hitamkan kembali dek dan bodi kasar motormu yang sudah kusam atau tergores.",
-    description: "Pengecatan ulang bagian bodi kasar atau dek motor.",
+    description: "Pengecatan ulang bagian bodi kasar atau dek motor. Menggunakan cat khusus PP Primer & Texture Paint.",
     price: 0,
     estimatedDuration: "960",
-    variants: [
-      { name: "S", price: 300000 },
-      { name: "M", price: 350000 },
-      { name: "L", price: 450000 },
-      { name: "XL", price: 600000 }
-    ]
+    usesModelPricing: true,
   },
   {
     name: "Repaint Velg",
     category: "repaint",
+    subcategory: "velg",
     summary: "Bikin tampilan kaki-kaki motormu jadi baru lagi dengan cat ulang velg.",
-    description: "Pengecatan ulang sepasang velg (pelek) motor.",
+    description: "Pengecatan ulang sepasang velg (pelek) motor. Harga sudah termasuk jasa bongkar pasang ban.",
     price: 0,
     estimatedDuration: "960",
-    variants: [
-      { name: "S", price: 350000 },
-      { name: "M", price: 400000 },
-      { name: "L", price: 400000 },
-      { name: "XL", price: 500000 }
-    ]
+    usesModelPricing: true,
   },
   {
     name: "Repaint Cover CVT / Arm",

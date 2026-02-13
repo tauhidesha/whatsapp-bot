@@ -1,34 +1,7 @@
 // File: src/ai/tools/readDirectMessagesTool.js
 const admin = require('firebase-admin');
-const { getFirebaseAdmin } = require('../../lib/firebaseAdmin.js');
+const { isAdmin, ensureFirestore } = require('../utils/adminAuth.js');
 
-// Helper untuk memvalidasi apakah pengirim adalah admin
-function isAdmin(senderNumber) {
-  const adminNumbers = [
-    process.env.BOSMAT_ADMIN_NUMBER,
-    process.env.ADMIN_WHATSAPP_NUMBER
-  ].filter(Boolean);
-
-  if (!senderNumber || adminNumbers.length === 0) return false;
-
-  // Normalisasi: hapus karakter non-digit dan suffix @c.us
-  const normalize = (n) => n.toString().replace(/\D/g, '');
-  const sender = normalize(senderNumber);
-  
-  return adminNumbers.some(admin => normalize(admin) === sender);
-}
-
-function ensureFirestore() {
-  if (!admin.apps.length) {
-    admin.initializeApp();
-  }
-  // Gunakan helper jika ada, atau fallback ke admin default
-  try {
-    return getFirebaseAdmin().firestore();
-  } catch (e) {
-    return admin.firestore();
-  }
-}
 
 const readDirectMessagesTool = {
   toolDefinition: {
@@ -82,7 +55,7 @@ const readDirectMessagesTool = {
       if (action === 'list_recent') {
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() - days);
-        
+
         const snapshot = await db.collection('directMessages')
           .where('updatedAt', '>=', admin.firestore.Timestamp.fromDate(cutoffDate))
           .orderBy('updatedAt', 'desc')
@@ -96,7 +69,7 @@ const readDirectMessagesTool = {
         const conversations = [];
         snapshot.forEach(doc => {
           const data = doc.data();
-          
+
           // Fix: Jika di Firestore @lid hilang (hanya ID angka panjang), kita format ulang
           let senderId = data.fullSenderId || doc.id;
           if (!data.fullSenderId && /^\d{15,}$/.test(doc.id) && !doc.id.startsWith('62')) {
@@ -112,8 +85,8 @@ const readDirectMessagesTool = {
         });
 
         // Format output agar mudah dibaca AI
-        const summaryList = conversations.map((c, i) => 
-          `${i+1}. ${c.name} (${c.number})\n   🕒 ${c.time}\n   💬 "${c.lastMessage.substring(0, 50)}..."`
+        const summaryList = conversations.map((c, i) =>
+          `${i + 1}. ${c.name} (${c.number})\n   🕒 ${c.time}\n   💬 "${c.lastMessage.substring(0, 50)}..."`
         ).join('\n\n');
 
         return {
@@ -133,9 +106,9 @@ const readDirectMessagesTool = {
         if (cleanTarget.startsWith('08')) {
           cleanTarget = '62' + cleanTarget.slice(1);
         }
-        
-        const docId = cleanTarget; 
-        
+
+        const docId = cleanTarget;
+
         const messagesRef = db.collection('directMessages').doc(docId).collection('messages');
         const snapshot = await messagesRef
           .orderBy('timestamp', 'desc')
@@ -158,8 +131,8 @@ const readDirectMessagesTool = {
 
         // Urutkan dari lama ke baru untuk pembacaan
         const sortedMessages = messages.reverse();
-        
-        const chatLog = sortedMessages.map(m => 
+
+        const chatLog = sortedMessages.map(m =>
           `[${m.time}] ${m.sender.toUpperCase()}: ${m.text}`
         ).join('\n');
 

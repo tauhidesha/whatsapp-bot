@@ -1,14 +1,7 @@
 // File: src/ai/tools/financeManagementTool.js
 const { z } = require('zod');
 const admin = require('firebase-admin');
-const { getFirebaseAdmin } = require('../../lib/firebaseAdmin.js');
-
-function ensureFirestore() {
-  if (!admin.apps.length) {
-    admin.initializeApp();
-  }
-  return getFirebaseAdmin().firestore();
-}
+const { isAdmin, ensureFirestore } = require('../utils/adminAuth.js');
 
 const TransactionTypeEnum = z.enum(['income', 'expense']);
 
@@ -31,6 +24,7 @@ const addTransactionSchema = z.object({
     .string()
     .optional()
     .describe('Tanggal transaksi dalam ISO string (opsional). Jika kosong, pakai waktu server sekarang.'),
+  senderNumber: z.string().describe('Nomor pengirim (otomatis diisi sistem).'),
 });
 
 const getTransactionHistorySchema = z.object({
@@ -51,6 +45,7 @@ const getTransactionHistorySchema = z.object({
     .max(500)
     .optional()
     .describe('Batas jumlah transaksi yang diambil (default 100, max 500).'),
+  senderNumber: z.string().describe('Nomor pengirim (otomatis diisi sistem).'),
 });
 
 const calculateFinancesSchema = z.object({
@@ -68,6 +63,7 @@ const calculateFinancesSchema = z.object({
     .describe(
       "Periode ringkas untuk laporan: 'day' (hari ini), 'week' (7 hari terakhir), 'month' (bulan berjalan). Akan override fromDate/toDate jika diisi.",
     ),
+  senderNumber: z.string().describe('Nomor pengirim (otomatis diisi sistem).'),
 });
 
 function formatCurrencyIDR(amount) {
@@ -129,7 +125,7 @@ const addTransactionTool = {
     function: {
       name: 'addTransaction',
       description:
-        'Mencatat transaksi pemasukan atau pengeluaran keuangan Bosmat ke koleksi "transactions" di Firestore.',
+        'KHUSUS ADMIN. Mencatat transaksi pemasukan atau pengeluaran keuangan Bosmat ke koleksi "transactions" di Firestore.',
       parameters: {
         type: 'object',
         properties: {
@@ -159,14 +155,27 @@ const addTransactionTool = {
             description:
               'Tanggal transaksi dalam ISO string (opsional). Jika tidak diisi, otomatis pakai waktu server sekarang.',
           },
+          senderNumber: {
+            type: 'string',
+            description: 'Nomor pengirim (otomatis diisi sistem).',
+          },
         },
-        required: ['type', 'amount', 'category', 'description', 'paymentMethod'],
+        required: ['type', 'amount', 'category', 'description', 'paymentMethod', 'senderNumber'],
       },
     },
   },
   implementation: async (input = {}) => {
     try {
       const parsed = addTransactionSchema.parse(input || {});
+
+      // Security Check
+      if (!isAdmin(parsed.senderNumber)) {
+        return {
+          success: false,
+          message: "⛔ Akses Ditolak. Fitur ini hanya untuk Admin."
+        };
+      }
+
       const db = ensureFirestore();
 
       const now = admin.firestore.FieldValue.serverTimestamp();
@@ -185,6 +194,7 @@ const addTransactionTool = {
         date: dateField,
         createdAt: now,
         updatedAt: now,
+        createdBy: parsed.senderNumber
       };
 
       await docRef.set(payload);
@@ -214,7 +224,7 @@ const getTransactionHistoryTool = {
     function: {
       name: 'getTransactionHistory',
       description:
-        'Mengambil riwayat transaksi keuangan Bosmat dari koleksi "transactions" dengan filter tanggal, tipe, dan kategori.',
+        'KHUSUS ADMIN. Mengambil riwayat transaksi keuangan Bosmat dari koleksi "transactions" dengan filter tanggal, tipe, dan kategori.',
       parameters: {
         type: 'object',
         properties: {
@@ -240,13 +250,27 @@ const getTransactionHistoryTool = {
             type: 'number',
             description: 'Batas jumlah transaksi (default 100, maksimal 500).',
           },
+          senderNumber: {
+            type: 'string',
+            description: 'Nomor pengirim (otomatis diisi sistem).',
+          },
         },
+        required: ['senderNumber']
       },
     },
   },
   implementation: async (input = {}) => {
     try {
       const parsed = getTransactionHistorySchema.parse(input || {});
+
+      // Security Check
+      if (!isAdmin(parsed.senderNumber)) {
+        return {
+          success: false,
+          message: "⛔ Akses Ditolak. Fitur ini hanya untuk Admin."
+        };
+      }
+
       const db = ensureFirestore();
 
       let from = parseDateOrNull(parsed.fromDate || '');
@@ -349,7 +373,7 @@ const calculateFinancesTool = {
     function: {
       name: 'calculateFinances',
       description:
-        'Menghitung total pemasukan, pengeluaran, dan profit bersih pada periode tertentu (harian, mingguan, bulanan, atau custom).',
+        'KHUSUS ADMIN. Menghitung total pemasukan, pengeluaran, dan profit bersih pada periode tertentu (harian, mingguan, bulanan, atau custom).',
       parameters: {
         type: 'object',
         properties: {
@@ -369,13 +393,27 @@ const calculateFinancesTool = {
             description:
               "Opsi cepat: 'day' (hari ini), 'week' (7 hari terakhir), 'month' (bulan berjalan). Jika ini diisi, fromDate/toDate akan diabaikan.",
           },
+          senderNumber: {
+            type: 'string',
+            description: 'Nomor pengirim (otomatis diisi sistem).',
+          },
         },
+        required: ['senderNumber']
       },
     },
   },
   implementation: async (input = {}) => {
     try {
       const parsed = calculateFinancesSchema.parse(input || {});
+
+      // Security Check
+      if (!isAdmin(parsed.senderNumber)) {
+        return {
+          success: false,
+          message: "⛔ Akses Ditolak. Fitur ini hanya untuk Admin."
+        };
+      }
+
       const db = ensureFirestore();
 
       let from;
@@ -479,4 +517,3 @@ module.exports = {
   getTransactionHistoryTool,
   calculateFinancesTool,
 };
-
