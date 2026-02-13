@@ -920,7 +920,7 @@ async function analyzeMediaWithGemini(mediaBuffer, mimeType, caption = '', sende
     return `${mediaTypeLabel} diterima, namun analisis otomatis gagal dilakukan.`;
 }
 
-async function getAIResponse(userMessage, senderName = "User", senderNumber = null, context = "") {
+async function getAIResponse(userMessage, senderName = "User", senderNumber = null, context = "", mediaItems = []) {
     try {
         console.log('\n🤖 [AI_PROCESSING] ===== STARTING AI PROCESSING =====');
         console.log(`📝 [AI_PROCESSING] User Message: "${userMessage}"`);
@@ -941,9 +941,35 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
             console.log(`🧠 [AI_PROCESSING] No conversation history (new user or no DB)`);
         }
 
-        const userContent = context
+        const userTextContent = context
             ? `${userMessage}\n\n[Context Internal]\n${context}`
             : userMessage;
+
+        let humanMessageContent;
+
+        if (mediaItems && mediaItems.length > 0) {
+            console.log(`🖼️ [AI_PROCESSING] Using multimodal input with ${mediaItems.length} media items`);
+            humanMessageContent = [
+                { type: "text", text: userTextContent }
+            ];
+
+            for (const item of mediaItems) {
+                if (item.type === 'image') {
+                    humanMessageContent.push({
+                        type: "image_url",
+                        image_url: `data:${item.mimetype};base64,${item.buffer.toString('base64')}`
+                    });
+                } else if (item.type === 'video') {
+                    humanMessageContent.push({
+                        type: "media",
+                        mimeType: item.mimetype,
+                        data: item.buffer.toString('base64')
+                    });
+                }
+            }
+        } else {
+            humanMessageContent = userTextContent;
+        }
 
         // Cek apakah pengirim adalah admin
         const adminNumbers = [
@@ -964,7 +990,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
         const messages = [
             new SystemMessage(effectiveSystemPrompt),
             ...conversationHistoryMessages,
-            new HumanMessage(userContent)
+            new HumanMessage(humanMessageContent)
         ].filter(msg => !!msg); // Filter out null/undefined messages
 
         console.log(`🔧 [AI_PROCESSING] Tools registered: ${toolDefinitions.map(t => t.function.name).join(', ')}`);
@@ -1280,28 +1306,16 @@ async function processBufferedMessages(senderNumber, client) {
         combinedMessage = hasImage ? '[Gambar diterima]' : '[Pesan tidak tersedia]';
     }
 
-    const analysisNotes = bufferEntry.messages
-        .map(m => {
-            if (typeof m.analysis === 'string') return m.analysis.trim();
-            return '';
-        })
-        .filter(note => note.length > 0);
-
-    const analysisContext = analysisNotes.length > 0
-        ? analysisNotes.map((note, index) => {
-            const label = analysisNotes.length > 1 ? `Analisis Gambar ${index + 1}` : 'Analisis Gambar';
-            return `${label}:\n${note}`;
-        }).join('\n\n')
-        : '';
+    const mediaItems = bufferEntry.messages
+        .filter(m => m.mediaData)
+        .map(m => m.mediaData);
 
     console.log(`[DEBOUNCED] Processing buffered message for ${senderName}: "${combinedMessage}"`);
-    if (analysisContext) {
-        console.log(`[DEBOUNCED] ✓ Analisis gambar tersedia untuk ${senderName}`);
-        console.log(`[DEBOUNCED] Analisis (internal):\n${analysisContext}`);
+    if (mediaItems.length > 0) {
+        console.log(`[DEBOUNCED] ✓ ${mediaItems.length} media items available for multimodal processing`);
     }
 
     // Cek status AI (Snooze/Handover) sekali lagi sebelum memproses
-    // Ini menangani kasus di mana admin mematikan AI saat pesan sedang dalam buffer debounce
     const { normalizedAddress } = parseSenderIdentity(senderNumber);
     if (await isSnoozeActive(normalizedAddress)) {
         console.log(`[DEBOUNCED] AI skipped for ${senderNumber} (handover active). Saving message only.`);
@@ -1317,13 +1331,7 @@ async function processBufferedMessages(senderNumber, client) {
         await delay(typingDelay);
         await client.startTyping(senderNumber);
 
-        // Get AI response with memory
-        const aiContext = analysisContext
-            ? `Informasi internal dari analisis gambar (jangan sebutkan proses analisis). Gunakan poin-poin ini sebagai referensi:
-${analysisContext}`
-            : '';
-
-        const aiResponse = await getAIResponse(combinedMessage, senderName, senderNumber, aiContext);
+        const aiResponse = await getAIResponse(combinedMessage, senderName, senderNumber, '', mediaItems);
 
         // Save to Firebase if available
         if (db) {
@@ -1460,53 +1468,37 @@ function start(client) {
 
         let analysisResult = null;
 
-        if (isImage || isVideo) {
-            const captionText = (msg.caption || '').trim();
-            let previousContext = '';
-
-            // Ambil 3 pesan terakhir sebagai konteks untuk Vision AI
-            try {
-                const history = await getConversationHistory(senderNumber, 3);
-                previousContext = history
-                    .map(h => `${h.sender === 'user' ? 'User' : 'Zoya'}: ${h.text}`)
-                    .join(' | ');
-            } catch (err) {
-                console.warn('[VISION] Gagal mengambil history chat:', err.message);
-            }
-
-            try {
-                console.log(`[VISION] 🔄 Mengunduh media (${isImage ? 'Image' : 'Video'}) dari ${senderName}...`);
-                const mediaBuffer = await client.decryptFile(msg);
-                console.log(`[VISION] ✅ Media terunduh (${mediaBuffer.length} bytes, mimetype: ${msg.mimetype || 'unknown'})`);
-
-                // Limit file size for video to avoid timeout/OOM (approx 10MB)
-                if (isVideo && mediaBuffer.length > 10 * 1024 * 1024) {
-                    console.warn(`[VISION] ⚠️ Video too large (${mediaBuffer.length} bytes). Skipping analysis.`);
-                    analysisResult = 'Video diterima, namun ukurannya terlalu besar untuk dianalisis otomatis.';
-                } else {
-                    analysisResult = await analyzeMediaWithGemini(
-                        mediaBuffer,
-                        msg.mimetype || (isImage ? 'image/jpeg' : 'video/mp4'),
-                        captionText,
-                        senderName,
-                        previousContext
-                    );
-                }
-            } catch (error) {
-                console.error(`[VISION] ❌ Gagal memproses media dari ${senderName}:`, error);
-                analysisResult = `Analisis ${isImage ? 'foto' : 'video'} otomatis gagal.`;
-            }
-
-            messageContent = captionText || `[${isImage ? 'Foto' : 'Video'} diterima]`;
-        }
-
         const messageEntry = {
-            content: messageContent || (isImage || isVideo ? `[${isImage ? 'Foto' : 'Video'} diterima]` : `[${msg.type}]`),
+            content: '',
             isMedia,
             isImage,
             isVideo,
             originalMsg: msg,
         };
+
+        if (isImage || isVideo) {
+            const captionText = (msg.caption || '').trim();
+
+            try {
+                console.log(`[MULTIMODAL] 🔄 Mengunduh media (${isImage ? 'Image' : 'Video'}) dari ${senderName}...`);
+                const mediaBuffer = await client.decryptFile(msg);
+                console.log(`[MULTIMODAL] ✅ Media terunduh (${mediaBuffer.length} bytes)`);
+
+                // Store media info for multimodal processing
+                messageEntry.mediaData = {
+                    buffer: mediaBuffer,
+                    mimetype: msg.mimetype || (isImage ? 'image/jpeg' : 'video/mp4'),
+                    type: isImage ? 'image' : 'video'
+                };
+            } catch (error) {
+                console.error(`[MULTIMODAL] ❌ Gagal mengunduh media dari ${senderName}:`, error);
+            }
+
+            messageContent = captionText || `[${isImage ? 'Foto' : 'Video'} diterima]`;
+            messageEntry.content = messageContent;
+        } else {
+            messageEntry.content = messageContent || (isLocation ? '[Lokasi diterima]' : `[${msg.type}]`);
+        }
 
         if (analysisResult) {
             messageEntry.analysis = analysisResult;
