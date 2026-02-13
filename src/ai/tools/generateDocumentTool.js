@@ -209,9 +209,9 @@ Telp/WA 0895 4015 27556`;
       .text('Faktur #', 400, 175, { width: 80, align: 'right' })
       .text(docNumber, 500, 175, { align: 'right' })
       .text('Tanggal', 400, 188, { width: 80, align: 'right' })
-      .text(now.toLocaleDateString('id-ID', { day: 'j', month: 'short', year: 'numeric' }), 500, 188, { align: 'right' })
+      .text(now.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }), 500, 188, { align: 'right' })
       .text('Jatuh tempo', 400, 201, { width: 80, align: 'right' })
-      .text(new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('id-ID', { day: 'j', month: 'short', year: 'numeric' }), 500, 201, { align: 'right' });
+      .text(new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }), 500, 201, { align: 'right' });
 
     // --- TABLE ITEMS ---
     const tableTop = 245;
@@ -305,7 +305,7 @@ Telp/WA 0895 4015 27556`;
     if (paid > 0) {
       doc
         .fillColor(secondaryColor)
-        .text(`Lunas pada ${now.toLocaleDateString('id-ID', { day: 'j', month: 'short', year: 'numeric' })}`, summaryX, y, { width: 120, align: 'right' })
+        .text(`Lunas pada ${now.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}`, summaryX, y, { width: 120, align: 'right' })
         .fillColor(primaryColor)
         .text(formatCurrency(paid), valueX, y, { align: 'right' });
       y += 25;
