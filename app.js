@@ -788,21 +788,25 @@ function sanitizeToolDirectiveOutput(text) {
     return clean.trim();
 }
 
-async function analyzeImageWithGemini(imageBuffer, mimeType = 'image/jpeg', caption = '', senderName = 'User', previousContext = '') {
-    const base64Image = imageBuffer.toString('base64');
-    const VISION_TIMEOUT_MS = parseInt(process.env.VISION_TIMEOUT_MS || '30000', 10);
+async function analyzeMediaWithGemini(mediaBuffer, mimeType, caption = '', senderName = 'User', previousContext = '') {
+    const base64Data = mediaBuffer.toString('base64');
+    const VISION_TIMEOUT_MS = parseInt(process.env.VISION_TIMEOUT_MS || '60000', 10); // Increase timeout for video
+
+    const isVideo = mimeType.startsWith('video/');
+    const mediaTypeLabel = isVideo ? 'Video' : 'Foto';
 
     const systemPrompt = [
         'Anda adalah Zoya, asisten Bosmat Repainting and Detailing Studio.',
-        'Tugas: Analisis foto motor pengguna secara akurat.',
+        `Tugas: Analisis ${mediaTypeLabel} motor pengguna secara akurat.`,
         '',
         'Fokus analisis:',
         '- Kondisi cat (kusam, baret, mengelupas, jamur)',
         '- Kebersihan (kerak mesin, debu tebal, noda)',
         '- Kerusakan fisik yang terlihat',
+        ...(isVideo ? ['- Suara mesin (jika ada dan terdengar aneh)', '- Gerakan atau demonstrasi masalah yang ditunjukkan'] : []),
         '',
         'Aturan:',
-        '- Hanya deskripsikan apa yang BENAR-BENAR terlihat di foto.',
+        `- Hanya deskripsikan apa yang BENAR-BENAR terlihat/terdengar di ${mediaTypeLabel}.`,
         '- Jangan berasumsi atau mengarang kerusakan.',
         '- Jawab dalam bahasa Indonesia, singkat 2-4 kalimat.',
         '- Rekomendasikan treatment Bosmat yang relevan.',
@@ -813,7 +817,7 @@ async function analyzeImageWithGemini(imageBuffer, mimeType = 'image/jpeg', capt
         '- Coating: Coating Motor Doff/Glossy, Complete Service Doff/Glossy',
     ].join('\n');
 
-    const textPrompt = `Analisis foto motor dari ${senderName}. ${caption ? `Caption pengguna: ${caption}.` : ''} ${previousContext ? `Konteks chat sebelumnya: "${previousContext}".` : ''} Sebutkan poin penting dalam 2-4 kalimat. Jika ada noda/baret/kerusakan, jelaskan singkat dan rekomendasikan treatment Bosmat yang relevan.`;
+    const textPrompt = `Analisis ${mediaTypeLabel} motor dari ${senderName}. ${caption ? `Caption pengguna: ${caption}.` : ''} ${previousContext ? `Konteks chat sebelumnya: "${previousContext}".` : ''} Sebutkan poin penting dalam 2-4 kalimat. Jika ada noda/baret/kerusakan, jelaskan singkat dan rekomendasikan treatment Bosmat yang relevan.`;
 
     const fallbackChain = ['gemini-2.0-flash', 'gemini-1.5-flash-latest'];
     const modelsToTry = Array.from(
@@ -832,7 +836,7 @@ async function analyzeImageWithGemini(imageBuffer, mimeType = 'image/jpeg', capt
 
             try {
                 const logPrefix = apiKeyIndex === 0
-                    ? `[VISION] 🔍 Analysing image using ${modelName}...`
+                    ? `[VISION] 🔍 Analysing ${mediaTypeLabel} using ${modelName}...`
                     : `[VISION] 🔄 Trying ${modelName} with ${apiKeyLabel} API key...`;
                 console.log(logPrefix);
 
@@ -843,14 +847,29 @@ async function analyzeImageWithGemini(imageBuffer, mimeType = 'image/jpeg', capt
                     maxOutputTokens: 2048,
                 });
 
+                // Construct message content based on media type
+                const messageContent = [
+                    { type: "text", text: textPrompt }
+                ];
+
+                if (isVideo) {
+                    messageContent.push({
+                        type: "media",
+                        mimeType: mimeType, // CamelCase required for video
+                        data: base64Data
+                    });
+                } else {
+                    messageContent.push({
+                        type: "image_url",
+                        image_url: `data:${mimeType};base64,${base64Data}`
+                    });
+                }
+
                 // Timeout wrapper: abort jika Gemini tidak respond dalam batas waktu
                 const invokePromise = visionModel.invoke([
                     new SystemMessage(systemPrompt),
                     new HumanMessage({
-                        content: [
-                            { type: "text", text: textPrompt },
-                            { type: "image_url", image_url: `data:${mimeType};base64,${base64Image}` }
-                        ]
+                        content: messageContent
                     })
                 ]);
 
@@ -898,7 +917,7 @@ async function analyzeImageWithGemini(imageBuffer, mimeType = 'image/jpeg', capt
         }
     }
 
-    return 'Gambar diterima, namun analisis otomatis gagal dilakukan.';
+    return `${mediaTypeLabel} diterima, namun analisis otomatis gagal dilakukan.`;
 }
 
 async function getAIResponse(userMessage, senderName = "User", senderNumber = null, context = "") {
@@ -1345,8 +1364,9 @@ function start(client) {
         const senderNumber = msg.from;
         const senderName = msg.sender.pushname || msg.notifyName || senderNumber;
         let messageContent = msg.body;
-        const isMedia = msg.isMedia || msg.type === 'image' || msg.type === 'document';
+        const isMedia = msg.isMedia || msg.type === 'image' || msg.type === 'video' || msg.type === 'tv' || msg.type === 'document';
         const isImage = msg.type === 'image';
+        const isVideo = msg.type === 'video' || msg.type === 'tv';
         const isLocation = msg.type === 'location';
 
         if (!messageContent && !isMedia && !isLocation) return;
@@ -1354,8 +1374,8 @@ function start(client) {
         // Log different types of messages
         if (isLocation) {
             console.log(`[BUFFER] 📍 Location received from ${senderName}. Lat: ${msg.lat || msg.latitude}, Lng: ${msg.lng || msg.longitude}`);
-        } else if (isImage) {
-            console.log(`[BUFFER] 📸 Image received from ${senderName}. Caption: "${msg.caption || 'No caption'}"`);
+        } else if (isImage || isVideo) {
+            console.log(`[BUFFER] 📸/🎥 Media (${isImage ? 'Image' : 'Video'}) received from ${senderName}. Caption: "${msg.caption || 'No caption'}"`);
         } else if (isMedia) {
             console.log(`[BUFFER] 📎 Media received from ${senderName}. Type: ${msg.type}`);
         } else {
@@ -1420,9 +1440,9 @@ function start(client) {
                 if (messageContent && messageContent.trim()) {
                     return messageContent.trim();
                 }
-                if (isImage) {
+                if (isImage || isVideo) {
                     const captionText = (msg.caption || '').trim();
-                    return captionText || '[Gambar diterima]';
+                    return captionText || `[${isImage ? 'Foto' : 'Video'} diterima]`;
                 }
                 if (isMedia) {
                     return `[${msg.type}]`;
@@ -1440,7 +1460,7 @@ function start(client) {
 
         let analysisResult = null;
 
-        if (isImage) {
+        if (isImage || isVideo) {
             const captionText = (msg.caption || '').trim();
             let previousContext = '';
 
@@ -1455,29 +1475,36 @@ function start(client) {
             }
 
             try {
-                console.log(`[VISION] 🔄 Mengunduh gambar dari ${senderName}...`);
-                const imageBuffer = await client.decryptFile(msg);
-                console.log(`[VISION] ✅ Gambar terunduh (${imageBuffer.length} bytes, mimetype: ${msg.mimetype || 'unknown'})`);
+                console.log(`[VISION] 🔄 Mengunduh media (${isImage ? 'Image' : 'Video'}) dari ${senderName}...`);
+                const mediaBuffer = await client.decryptFile(msg);
+                console.log(`[VISION] ✅ Media terunduh (${mediaBuffer.length} bytes, mimetype: ${msg.mimetype || 'unknown'})`);
 
-                analysisResult = await analyzeImageWithGemini(
-                    imageBuffer,
-                    msg.mimetype || 'image/jpeg',
-                    captionText,
-                    senderName,
-                    previousContext
-                );
+                // Limit file size for video to avoid timeout/OOM (approx 10MB)
+                if (isVideo && mediaBuffer.length > 10 * 1024 * 1024) {
+                    console.warn(`[VISION] ⚠️ Video too large (${mediaBuffer.length} bytes). Skipping analysis.`);
+                    analysisResult = 'Video diterima, namun ukurannya terlalu besar untuk dianalisis otomatis.';
+                } else {
+                    analysisResult = await analyzeMediaWithGemini(
+                        mediaBuffer,
+                        msg.mimetype || (isImage ? 'image/jpeg' : 'video/mp4'),
+                        captionText,
+                        senderName,
+                        previousContext
+                    );
+                }
             } catch (error) {
-                console.error(`[VISION] ❌ Gagal memproses gambar dari ${senderName}:`, error);
-                analysisResult = 'Analisis gambar otomatis gagal.';
+                console.error(`[VISION] ❌ Gagal memproses media dari ${senderName}:`, error);
+                analysisResult = `Analisis ${isImage ? 'foto' : 'video'} otomatis gagal.`;
             }
 
-            messageContent = captionText || '[Gambar diterima]';
+            messageContent = captionText || `[${isImage ? 'Foto' : 'Video'} diterima]`;
         }
 
         const messageEntry = {
-            content: messageContent || (isImage ? '[Gambar diterima]' : `[${msg.type}]`),
+            content: messageContent || (isImage || isVideo ? `[${isImage ? 'Foto' : 'Video'} diterima]` : `[${msg.type}]`),
             isMedia,
             isImage,
+            isVideo,
             originalMsg: msg,
         };
 
