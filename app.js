@@ -903,7 +903,7 @@ async function analyzeMediaWithGemini(mediaBuffer, mimeType, caption = '', sende
     return `${mediaTypeLabel} diterima, namun analisis otomatis gagal dilakukan.`;
 }
 
-async function getAIResponse(userMessage, senderName = "User", senderNumber = null, context = "", mediaItems = []) {
+async function getAIResponse(userMessage, senderName = "User", senderNumber = null, context = "", mediaItems = [], modelOverride = null) {
     try {
         console.log('\n🤖 [AI_PROCESSING] ===== STARTING AI PROCESSING =====');
         console.log(`📝 [AI_PROCESSING] User Message: "${userMessage}"`);
@@ -1001,11 +1001,19 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                     }
 
                     // Create model instance with current API key
-                    const modelInstance = apiKeyIndex === 0 ? aiModel : new ChatGoogleGenerativeAI({
-                        model: ACTIVE_AI_MODEL,
-                        temperature: parseFloat(process.env.AI_TEMPERATURE) || 0.7,
-                        apiKey: currentApiKey
-                    }).bindTools(geminiToolSpecifications);
+                    // Create model instance with current API key
+                    const targetModel = modelOverride || ACTIVE_AI_MODEL;
+                    let modelInstance;
+
+                    if (!modelOverride && apiKeyIndex === 0) {
+                        modelInstance = aiModel;
+                    } else {
+                        modelInstance = new ChatGoogleGenerativeAI({
+                            model: targetModel,
+                            temperature: parseFloat(process.env.AI_TEMPERATURE) || 0.7,
+                            apiKey: currentApiKey
+                        }).bindTools(geminiToolSpecifications);
+                    }
 
                     response = await modelInstance.invoke(messages, getTracingConfig(traceLabel));
 
@@ -1314,7 +1322,28 @@ async function processBufferedMessages(senderNumber, client) {
         await delay(typingDelay);
         await client.startTyping(senderNumber);
 
-        const aiResponse = await getAIResponse(combinedMessage, senderName, senderNumber, '', mediaItems);
+        // Check for Admin Model Override (#pro or !pro)
+        let modelOverride = null;
+        const adminNumbers = [
+            process.env.BOSMAT_ADMIN_NUMBER,
+            process.env.ADMIN_WHATSAPP_NUMBER
+        ].filter(Boolean);
+
+        const isAdmin = adminNumbers.some(num => {
+            const cleanNum = num.toString().replace(/\D/g, '');
+            return normalizedAddress && normalizedAddress.includes(cleanNum);
+        });
+
+        if (isAdmin) {
+            const lowerMsg = combinedMessage.toLowerCase();
+            if (lowerMsg.startsWith('#pro ') || lowerMsg.startsWith('!pro ')) {
+                modelOverride = 'gemini-3-pro-preview';
+                combinedMessage = combinedMessage.substring(5).trim();
+                console.log(`[ADMIN] 🚀 Model Override Triggered: ${modelOverride}`);
+            }
+        }
+
+        const aiResponse = await getAIResponse(combinedMessage, senderName, senderNumber, '', mediaItems, modelOverride);
 
         // Save to Firebase if available
         if (db) {
