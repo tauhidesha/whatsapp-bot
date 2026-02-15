@@ -40,6 +40,7 @@ const {
     calculateFinancesTool,
 } = require('./src/ai/tools/financeManagementTool.js');
 const { updateSystemPromptTool } = require('./src/ai/tools/updateSystemPromptTool.js');
+const { getSystemPromptTool } = require('./src/ai/tools/getSystemPromptTool.js');
 const { createMetaWebhookRouter } = require('./src/server/metaWebhook.js');
 const { sendMetaMessage } = require('./src/server/metaClient.js');
 const { startBookingReminderScheduler } = require('./src/ai/utils/bookingReminders.js');
@@ -124,6 +125,7 @@ const availableTools = {
         }
         return result;
     },
+    getSystemPrompt: getSystemPromptTool.implementation,
 };
 
 const toolDefinitions = [
@@ -148,6 +150,7 @@ const toolDefinitions = [
     getTransactionHistoryTool.toolDefinition,
     calculateFinancesTool.toolDefinition,
     updateSystemPromptTool.toolDefinition,
+    getSystemPromptTool.toolDefinition,
 ];
 
 console.log('🔧 [STARTUP] Tool Registry Initialized:');
