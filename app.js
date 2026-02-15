@@ -39,6 +39,7 @@ const {
     getTransactionHistoryTool,
     calculateFinancesTool,
 } = require('./src/ai/tools/financeManagementTool.js');
+const { updateSystemPromptTool } = require('./src/ai/tools/updateSystemPromptTool.js');
 const { createMetaWebhookRouter } = require('./src/server/metaWebhook.js');
 const { sendMetaMessage } = require('./src/server/metaClient.js');
 const { startBookingReminderScheduler } = require('./src/ai/utils/bookingReminders.js');
@@ -114,6 +115,15 @@ const availableTools = {
     addTransaction: addTransactionTool.implementation,
     getTransactionHistory: getTransactionHistoryTool.implementation,
     calculateFinances: calculateFinancesTool.implementation,
+    updateSystemPrompt: async (args) => {
+        const result = await updateSystemPromptTool.implementation(args);
+        // Jika sukses, paksa reload prompt lokal agar langsung aktif tanpa restart
+        if (result.status === 'success' && args.newPrompt) {
+            currentSystemPrompt = args.newPrompt;
+            console.log('🔄 [SYSTEM] In-memory System Prompt updated via tool.');
+        }
+        return result;
+    },
 };
 
 const toolDefinitions = [
@@ -137,6 +147,7 @@ const toolDefinitions = [
     addTransactionTool.toolDefinition,
     getTransactionHistoryTool.toolDefinition,
     calculateFinancesTool.toolDefinition,
+    updateSystemPromptTool.toolDefinition,
 ];
 
 console.log('🔧 [STARTUP] Tool Registry Initialized:');
@@ -384,6 +395,43 @@ Rincian biayanya gini ya:
 
 Total estimasi jadi *1,7 jutaan* Mas. Gimana, harganya cocok? 😁"
 `;
+
+// --- Dynamic System Prompt Logic ---
+let currentSystemPrompt = SYSTEM_PROMPT;
+
+async function loadSystemPrompt() {
+    try {
+        if (!db) return;
+
+        // Initial load
+        const doc = await db.collection('settings').doc('ai_config').get();
+        if (doc.exists && doc.data().systemPrompt) {
+            currentSystemPrompt = doc.data().systemPrompt;
+            console.log('✅ [CONFIG] Loaded custom System Prompt from Firestore.');
+        } else {
+            console.log('ℹ️ [CONFIG] Using default hardcoded System Prompt.');
+        }
+
+        // Real-time listener
+        db.collection('settings').doc('ai_config').onSnapshot(docSnapshot => {
+            if (docSnapshot.exists && docSnapshot.data().systemPrompt) {
+                const newPrompt = docSnapshot.data().systemPrompt;
+                if (newPrompt !== currentSystemPrompt) {
+                    currentSystemPrompt = newPrompt;
+                    console.log('🔄 [CONFIG] System Prompt updated from Firestore listener.');
+                }
+            }
+        }, err => {
+            console.warn('⚠️ [CONFIG] System prompt listener error:', err.message);
+        });
+
+    } catch (error) {
+        console.error('❌ [CONFIG] Failed to load system prompt:', error);
+    }
+}
+
+// Start loading prompt (async but non-blocking for startup)
+loadSystemPrompt();
 
 // Prompt khusus jika pengirim adalah ADMIN (owner / admin Bosmat)
 const ADMIN_SYSTEM_PROMPT = `# Identity & Persona (ADMIN MODE)
@@ -964,7 +1012,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
         const senderNormalized = normalize(senderNumber);
         const isAdmin = adminNumbers.some(num => normalize(num) === senderNormalized);
 
-        let effectiveSystemPrompt = SYSTEM_PROMPT;
+        let effectiveSystemPrompt = currentSystemPrompt;
         if (isAdmin) {
             console.log(`👮 [AI_PROCESSING] Admin detected: ${senderNumber}. Using ADMIN_SYSTEM_PROMPT.`);
             effectiveSystemPrompt = ADMIN_SYSTEM_PROMPT;
