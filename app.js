@@ -1923,16 +1923,24 @@ app.post('/send-media', async (req, res) => {
 
 app.post('/test-ai', async (req, res) => {
     try {
-        const { message, senderNumber } = req.body;
+        const { message, senderNumber, mode } = req.body;
         const testMessage = message || "Hello, test message";
-        const testSenderNumber = senderNumber || null;
 
-        const response = await getAIResponse(testMessage, "Test User", testSenderNumber);
+        // If mode is 'admin', use the admin number so getAIResponse picks up the ADMIN_SYSTEM_PROMPT
+        let effectiveSenderNumber = senderNumber || null;
+        let senderName = "Test User";
+        if (mode === 'admin') {
+            effectiveSenderNumber = process.env.BOSMAT_ADMIN_NUMBER || process.env.ADMIN_WHATSAPP_NUMBER || effectiveSenderNumber;
+            senderName = "Admin (Playground)";
+        }
+
+        const response = await getAIResponse(testMessage, senderName, effectiveSenderNumber);
 
         res.json({
             input: testMessage,
             ai_response: response,
-            memory_enabled: !!testSenderNumber,
+            memory_enabled: !!effectiveSenderNumber,
+            mode: mode || 'customer',
             status: 'success'
         });
     } catch (error) {
