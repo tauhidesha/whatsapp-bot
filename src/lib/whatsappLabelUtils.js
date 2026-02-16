@@ -67,13 +67,22 @@ async function ensureWhatsAppLabel(client, db, labelKey) {
     // 2. Search in existing WA labels
     if (client.getAllLabels) {
         try {
+            console.log(`[LabelUtils] Fetching all labels from WhatsApp to find "${labelName}"...`);
             const allLabels = await client.getAllLabels();
+
+            // Log available labels for debugging
+            const availableNames = allLabels.map(l => l.name).join(', ');
+            console.log(`[LabelUtils] Available labels in WA (${allLabels.length}): ${availableNames}`);
+
             const existing = allLabels.find((l) => l.name === labelName);
             if (existing && existing.id) {
                 labelId = existing.id.toString();
+                console.log(`[LabelUtils] ✅ Found label "${labelName}" in WA with ID: ${labelId}`);
                 // Update cache
                 await cacheLabel(db, labelKey, labelId, labelName);
                 return { id: labelId, name: labelName };
+            } else {
+                console.warn(`[LabelUtils] ⚠️ Label "${labelName}" NOT found in WA list.`);
             }
         } catch (err) {
             console.warn('[LabelUtils] getAllLabels failed:', err.message);
