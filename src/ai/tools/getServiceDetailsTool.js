@@ -109,7 +109,23 @@ function resolveSizeForService({ service, sizeArg, senderNumber, cachedSizes }) 
 }
 
 // --- Repaint Model-Based Price Lookup ---
-function lookupRepaintPrice(motorModel, subcategory) {
+
+// Map motor size (S/M/L/XL) to bodi_kasar and velg category names
+const BODI_KASAR_SIZE_MAP = {
+  S: 'Small Matic / Bebek',
+  M: 'Medium Matic',
+  L: 'Big Matic',
+  XL: 'Extra Big Matic',
+};
+
+const VELG_SIZE_MAP = {
+  S: 'Matic Kecil / Bebek',
+  M: 'Matic Kecil / Bebek', // medium matic still uses small velg category (Ring 14)
+  L: 'Big Matic',
+  XL: 'Sport 150cc - 250cc',
+};
+
+function lookupRepaintPrice(motorModel, subcategory, motorSize) {
   if (!motorModel) return null;
   const query = motorModel.trim().toLowerCase();
 
@@ -134,9 +150,23 @@ function lookupRepaintPrice(motorModel, subcategory) {
     }
   }
 
-  // 2. Bodi Kasar – lookup berdasarkan ukuran motor dari daftarUkuranMotor
+  // 2. Bodi Kasar – resolve specific price if motor size is known
   if (subcategory === 'bodi_kasar') {
-    // Untuk bodi kasar, kita return daftar range-nya langsung
+    if (motorSize && BODI_KASAR_SIZE_MAP[motorSize]) {
+      const targetCategory = BODI_KASAR_SIZE_MAP[motorSize];
+      const match = repaintBodiKasar.find(r => r.category === targetCategory);
+      if (match) {
+        return {
+          found: true,
+          model: motorModel,
+          min: match.min,
+          max: match.max,
+          subcategory: 'bodi_kasar',
+          note: `Kategori: ${match.category}`,
+        };
+      }
+    }
+    // Fallback: return all ranges if size unknown
     return {
       found: true,
       model: motorModel,
@@ -147,8 +177,23 @@ function lookupRepaintPrice(motorModel, subcategory) {
     };
   }
 
-  // 3. Velg
+  // 3. Velg – resolve specific price if motor size is known
   if (subcategory === 'velg') {
+    if (motorSize && VELG_SIZE_MAP[motorSize]) {
+      const targetCategory = VELG_SIZE_MAP[motorSize];
+      const match = repaintVelg.find(r => r.category === targetCategory);
+      if (match) {
+        return {
+          found: true,
+          model: motorModel,
+          min: match.min,
+          max: match.max,
+          subcategory: 'velg',
+          note: match.note || `Kategori: ${match.category}`,
+        };
+      }
+    }
+    // Fallback: return all ranges if size unknown
     return {
       found: true,
       model: motorModel,
