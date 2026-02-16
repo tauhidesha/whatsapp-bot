@@ -8,6 +8,7 @@ const {
   repaintVelg,
   warnaSpesial,
   syaratKetentuan,
+  VELG_PRICE_MAP,
 } = require('../../data/repaintPrices.js');
 const {
   getMotorSizesForSender,
@@ -109,20 +110,12 @@ function resolveSizeForService({ service, sizeArg, senderNumber, cachedSizes }) 
 }
 
 // --- Repaint Model-Based Price Lookup ---
-
-// Map motor size (S/M/L/XL) to bodi_kasar and velg category names
+// Map motor size (S/M/L/XL) to bodi_kasar category names
 const BODI_KASAR_SIZE_MAP = {
   S: 'Small Matic / Bebek',
   M: 'Medium Matic',
   L: 'Big Matic',
   XL: 'Extra Big Matic',
-};
-
-const VELG_SIZE_MAP = {
-  S: 'Matic Kecil / Bebek',
-  M: 'Matic Kecil / Bebek', // medium matic still uses small velg category (Ring 14)
-  L: 'Big Matic',
-  XL: 'Sport 150cc - 250cc',
 };
 
 function lookupRepaintPrice(motorModel, subcategory, motorSize) {
@@ -177,23 +170,22 @@ function lookupRepaintPrice(motorModel, subcategory, motorSize) {
     };
   }
 
-  // 3. Velg – resolve specific price if motor size is known
+  // 3. Velg – resolve fixed price from VELG_PRICE_MAP
   if (subcategory === 'velg') {
-    if (motorSize && VELG_SIZE_MAP[motorSize]) {
-      const targetCategory = VELG_SIZE_MAP[motorSize];
-      const match = repaintVelg.find(r => r.category === targetCategory);
-      if (match) {
+    // Try historical model match first
+    for (const [modelKey, fixedPrice] of Object.entries(VELG_PRICE_MAP)) {
+      if (query === modelKey || query.includes(modelKey) || modelKey.includes(query)) {
         return {
           found: true,
           model: motorModel,
-          min: match.min,
-          max: match.max,
+          price: fixedPrice,
           subcategory: 'velg',
-          note: match.note || `Kategori: ${match.category}`,
+          note: 'Harga per pasang, sudah termasuk bongkar pasang ban.',
         };
       }
     }
-    // Fallback: return all ranges if size unknown
+
+    // Fallback: return all ranges if model not found
     return {
       found: true,
       model: motorModel,
@@ -318,7 +310,7 @@ async function implementation(input) {
     // --- Model-based pricing for repaint services ---
     if (service.usesModelPricing && motorModel) {
       const subcategory = service.subcategory || null;
-      const lookup = lookupRepaintPrice(motorModel, subcategory);
+      const lookup = lookupRepaintPrice(motorModel, subcategory, finalSize);
       const priceInfo = formatRepaintPriceResult(lookup);
 
       if (priceInfo) {
