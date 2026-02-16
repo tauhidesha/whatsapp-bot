@@ -39,13 +39,16 @@ async function getSystemPrompt(args) {
             return {
                 status: "success",
                 systemPrompt: doc.data().systemPrompt,
-                message: "Berikut adalah System Prompt yang sedang aktif:"
+                message: "Berikut adalah System Prompt yang sedang aktif (dari Database):"
             };
         } else {
+            // Fallback ke activePrompt yang ditaruh oleh app.js (in-memory value)
+            const fallbackPrompt = args.activePrompt || "Prompt tidak ditemukan.";
+
             return {
                 status: "success",
-                systemPrompt: null,
-                message: "Belum ada System Prompt custom di database. Bot menggunakan default hardcoded prompt dari source code."
+                systemPrompt: fallbackPrompt,
+                message: "Database kosong. Menggunakan System Prompt default (Hardcoded/Active Memory):"
             };
         }
 

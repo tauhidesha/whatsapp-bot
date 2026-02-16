@@ -125,7 +125,12 @@ const availableTools = {
         }
         return result;
     },
-    getSystemPrompt: getSystemPromptTool.implementation,
+    getSystemPrompt: (args) => {
+        return getSystemPromptTool.implementation({
+            ...args,
+            activePrompt: currentSystemPrompt
+        });
+    },
 };
 
 const toolDefinitions = [
