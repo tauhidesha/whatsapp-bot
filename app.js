@@ -1762,7 +1762,7 @@ async function listConversations(limit = 100) {
                 aiPausedUntil: snoozeInfo.expiresAt,
                 aiPausedManual: snoozeInfo.manual,
                 aiPausedReason: snoozeInfo.reason,
-                customerLabel: data.customerLabel || null,
+                label: data.customerLabel || null,
                 labelReason: data.labelReason || null,
                 labelUpdatedAt: serializeTimestamp(data.labelUpdatedAt),
             };
