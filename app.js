@@ -1769,7 +1769,7 @@ async function listConversations(limit = 100) {
                 aiPausedUntil: snoozeInfo.expiresAt,
                 aiPausedManual: snoozeInfo.manual,
                 aiPausedReason: snoozeInfo.reason,
-                customerLabel: data.customerLabel || null,
+                label: data.customerLabel || null,
                 labelReason: data.labelReason || null,
                 labelUpdatedAt: serializeTimestamp(data.labelUpdatedAt),
             };
@@ -1847,6 +1847,17 @@ app.get('/conversations', async (req, res) => {
     try {
         const limit = req.query.limit ? parseInt(req.query.limit, 10) : 100;
         const conversations = await listConversations(limit);
+
+        // DEBUG: Log first conversation to check label mapping
+        if (conversations.length > 0) {
+            console.log('[DEBUG API] /conversations first item:', JSON.stringify({
+                id: conversations[0].id,
+                label: conversations[0].label,
+                customerLabel: conversations[0].customerLabel // Check original field too
+            }));
+        }
+
+        res.set('Cache-Control', 'no-store');
         res.json({
             conversations,
             count: conversations.length,
