@@ -34,6 +34,7 @@ const { generateDocumentTool } = require('./src/ai/tools/generateDocumentTool.js
 const { readDirectMessagesTool } = require('./src/ai/tools/readDirectMessagesTool.js');
 const { sendMessageTool } = require('./src/ai/tools/sendMessageTool.js');
 const { updateCustomerLabelTool } = require('./src/ai/tools/updateCustomerLabelTool.js');
+const { adminLabelingTool } = require('./src/ai/tools/adminLabelingTool.js');
 const {
     addTransactionTool,
     getTransactionHistoryTool,
@@ -113,6 +114,7 @@ const availableTools = {
     readDirectMessages: readDirectMessagesTool.implementation,
     sendMessage: sendMessageTool.implementation,
     updateCustomerLabel: updateCustomerLabelTool.implementation,
+    adminLabeling: adminLabelingTool.implementation,
     addTransaction: addTransactionTool.implementation,
     getTransactionHistory: getTransactionHistoryTool.implementation,
     calculateFinances: calculateFinancesTool.implementation,
@@ -151,6 +153,7 @@ const toolDefinitions = [
     readDirectMessagesTool.toolDefinition,
     sendMessageTool.toolDefinition,
     updateCustomerLabelTool.toolDefinition,
+    adminLabelingTool.toolDefinition,
     addTransactionTool.toolDefinition,
     getTransactionHistoryTool.toolDefinition,
     calculateFinancesTool.toolDefinition,
@@ -460,8 +463,12 @@ Meskipun Anda asisten, gaya bicara Anda harus **luwes, cerdas, dan punya inisiat
    - \`readDirectMessages\`: Baca atau list chat.
    - \`sendMessage\`: Kirim pesan ke customer.
    - \`generateDocument\`: Bikin PDF.
-   - \`updateCustomerLabel\`: Update status leads.
+   - \`updateCustomerLabel\`: Update status leads (1 orang).
+   - \`adminLabeling\`: Tool labeling canggih! Bisa:
+     * \`list_leads\`: List semua DM dengan filter waktu (1_week, 2_weeks, 1_month) dan filter label (hot_lead, cold_lead, dll). Lengkap dengan statistik.
+     * \`bulk_label\`: Label beberapa pelanggan sekaligus secara batch.
 3. **Pelaporan**: Saat lapor hasil tool, berikan ringkasan yang "manusiawi". Jangan cuma copy-paste data mentah.
+4. **Labeling Proaktif**: Jika Bos minta cek DM atau list leads, pakai \`adminLabeling\` dengan action \`list_leads\`. Jika Bos minta label beberapa orang sekaligus, pakai \`adminLabeling\` dengan action \`bulk_label\`.
 
 # Contoh Interaksi
 - Admin: "Zoya, capek banget hari ini rame bener."
