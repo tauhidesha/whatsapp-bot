@@ -13,7 +13,7 @@ const scanFollowUpCandidatesTool = {
         type: 'function',
         function: {
             name: 'scanFollowUpCandidates',
-            description: 'Memindai database percakapan untuk mencari pelanggan yang perlu di-follow up berdasarkan kriteria: Cold Lead (>24 jam), Follow Up (>24 jam), dan Retention/Completed (>90 hari).',
+            description: 'Memindai database percakapan untuk mencari pelanggan yang perlu di-follow up berdasarkan kriteria: Hot Lead (>12 jam, PRIORITAS), Cold Lead (>24 jam), Follow Up (>24 jam), dan Retention/Completed (>90 hari).',
             parameters: {
                 type: 'object',
                 properties: {},
@@ -32,7 +32,9 @@ const scanFollowUpCandidatesTool = {
             // This is efficient enough for typical SME volume. 
             // If volume is huge, we'd need compound indexes or separate queries.
 
-            const labelsOfInterest = ['cold_lead', 'follow_up', 'completed'];
+            const twelveHoursAgo = new Date(now.getTime() - 12 * 60 * 60 * 1000);
+
+            const labelsOfInterest = ['hot_lead', 'cold_lead', 'follow_up', 'completed'];
             const snapshot = await db.collection('directMessages')
                 .where('customerLabel', 'in', labelsOfInterest)
                 .get();
@@ -59,16 +61,21 @@ const scanFollowUpCandidatesTool = {
                 let category = null;
                 let strategy = null;
 
+                // 0. Hot Lead (> 12 hours) - PRIORITAS TERTINGGI, paling dekat closing!
+                if (label === 'hot_lead' && lastActivity < twelveHoursAgo) {
+                    category = '🔥 Hot Lead (Prospek Tinggi)';
+                    strategy = 'PRIORITAS! Segera follow up, tawarkan slot/promo eksklusif. Mereka sudah minat tinggal di-push dikit.';
+                }
                 // 1. Cold Lead (> 24 hours)
-                if (label === 'cold_lead' && lastActivity < oneDayAgo) {
-                    category = 'The Ghost (Cold Lead)';
+                else if (label === 'cold_lead' && lastActivity < oneDayAgo) {
+                    category = '👻 The Ghost (Cold Lead)';
                     strategy = 'Pancing respon ("Say Hello"), tawarkan slot terbatas.';
                 }
-                // 2. Follow Up (> 24 hours OR specific date if we had it)
+                // 2. Follow Up (> 24 hours)
                 // Check if there is a specific 'followUpDate' field (future implementation), 
                 // for now use 24h rule as per plan.
                 else if (label === 'follow_up' && lastActivity < oneDayAgo) {
-                    category = 'The Pending (Janji/Ragu)';
+                    category = '⏳ The Pending (Janji/Ragu)';
                     strategy = 'Ingatkan janji secara halus, tawarkan bantuan/diskon kecil.';
                 }
                 // 3. Retention (> 90 days)
