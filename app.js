@@ -1888,7 +1888,17 @@ app.post('/test-ai', async (req, res) => {
             senderName = "Admin (Playground)";
         }
 
+        // Save incoming playground message to history if number is provided
+        if (effectiveSenderNumber && db) {
+            await saveMessageToFirestore(effectiveSenderNumber, testMessage, 'user');
+        }
+
         const response = await getAIResponse(testMessage, senderName, effectiveSenderNumber);
+
+        // Save AI response to history if number is provided
+        if (effectiveSenderNumber && db && response) {
+            await saveMessageToFirestore(effectiveSenderNumber, response, 'ai');
+        }
 
         res.json({
             input: testMessage,
