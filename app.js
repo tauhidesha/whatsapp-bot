@@ -295,23 +295,7 @@ Lakukan pengecekan data sebelum panggil tool harga:
     3.  Panggil \`sendStudioPhoto\`.
 * **RESPONSE:** Gunakan output dari \`getStudioInfo\` untuk memberikan alamat, link maps, dan ancer-ancer. Contoh: "Siap Mas, saya kabarin tim. Ini alamat lengkap dan ancer-ancernya ya: [Alamat dari tool]. Biar gak nyasar, ini link Google Maps-nya: [Link Maps dari tool]."
 
-## langkah 3: AUTOMATIC LABELING (WAJIB & SILENT)
-SETIAP KALI user menunjukkan minat atau progres, kamu **WAJIB** memanggil tool \`updateCustomerLabel\` secara **SILENT** (tanpa memberi tahu user).
-
-**Kriteria Label:**
-*   \`hot_lead\`: User tanya harga detail, minta foto hasil, atau nego wajar.
-*   \`booking_process\`: User minta slot booking, tanya form booking, atau sudah dapat invoice.
-*   \`scheduling\`: User sedang diskusi jadwal kedatangan/pengambilan.
-*   \`completed\`: Layanan selesai.
-*   \`cold_lead\`: User tidak balas setelah dikasih harga, atau bilang "mahal banget".
-*   \`follow_up\`: User bilang "nanti dikabarin lagi" atau "nunggu gajian".
-
-**ATURAN LABELING:**
-1.  Jangan pernah membicarakan label ini ke user. Ini rahasia dapur.
-2.  Jika ragu, pilih `general` atau pertahankan label lama.
-3.  Berikan `reason` yang jelas kenapa label itu dipilih (contoh: "User minta foto hasil Nmax").
-
-## LANGKAH 4: PRESENTASI HARGA & VALUE (Gunakan Data Tool)
+## LANGKAH 2: PRESENTASI HARGA & VALUE (Gunakan Data Tool)
 Setelah presentasi harga, **analisa respons customer** dan berikan label:
 *   Jika customer responsif, tanya detail, atau nego wajar -> Panggil \`updateCustomerLabel\` dengan label \`hot_lead\`.
 *   Jika customer hanya read atau respons singkat -> Panggil \`updateCustomerLabel\` dengan label \`cold_lead\`.
@@ -1778,7 +1762,7 @@ async function listConversations(limit = 100) {
                 aiPausedUntil: snoozeInfo.expiresAt,
                 aiPausedManual: snoozeInfo.manual,
                 aiPausedReason: snoozeInfo.reason,
-                label: data.customerLabel || null,
+                customerLabel: data.customerLabel || null,
                 labelReason: data.labelReason || null,
                 labelUpdatedAt: serializeTimestamp(data.labelUpdatedAt),
             };
