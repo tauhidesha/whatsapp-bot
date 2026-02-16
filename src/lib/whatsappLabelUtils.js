@@ -28,7 +28,7 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Ensures a WhatsApp label exists by name.
- * Checks cache -> Checks WA -> Creates if missing -> Retries fetch.
+ * Checks cache -> Checks WA -> Returns null if missing (does NOT create).
  * @param {object} client - WPPConnect client instance
  * @param {object} db - Firestore instance
  * @param {string} labelKey - The internal label key (e.g., 'hot_lead')
@@ -80,49 +80,8 @@ async function ensureWhatsAppLabel(client, db, labelKey) {
         }
     }
 
-    // 3. Create new label if missing
-    if (!labelId && client.addNewLabel) {
-        try {
-            console.log(`[LabelUtils] Creating new label: "${labelName}"...`);
-
-            // Try to get a color if supported
-            let newColor = undefined;
-            if (client.getNewLabelColor) {
-                try {
-                    newColor = await client.getNewLabelColor();
-                } catch (e) { /* ignore */ }
-            }
-
-            if (newColor) {
-                await client.addNewLabel(labelName, { labelColor: newColor });
-            } else {
-                await client.addNewLabel(labelName);
-            }
-
-            // 4. Retry fetching the new label (Wait for propagation)
-            for (let i = 1; i <= 3; i++) {
-                await delay(1500 * i); // Increasing delay: 1.5s, 3s, 4.5s
-                console.log(`[LabelUtils] Verifying new label (Attempt ${i}/3)...`);
-
-                if (client.getAllLabels) {
-                    const allLabels = await client.getAllLabels();
-                    const created = allLabels.find((l) => l.name === labelName);
-                    if (created && created.id) {
-                        labelId = created.id.toString();
-                        console.log(`[LabelUtils] ✅ Label created and verified: ID ${labelId}`);
-                        await cacheLabel(db, labelKey, labelId, labelName);
-                        return { id: labelId, name: labelName };
-                    }
-                }
-            }
-
-            console.warn(`[LabelUtils] ⚠️ Create label failed: "${labelName}" not found after retries.`);
-
-        } catch (err) {
-            console.warn('[LabelUtils] addNewLabel failed:', err.message);
-        }
-    }
-
+    // 3. Label not found (User must create it manually)
+    console.warn(`[LabelUtils] Label "${labelName}" not found in WhatsApp. Please create it manually in WA Business.`);
     return null;
 }
 
