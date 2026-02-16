@@ -7,6 +7,8 @@ const VALID_LABELS = [
     'completed',
     'general',
     'follow_up',
+    'scheduling',
+    'archive'
 ];
 
 const LABEL_DISPLAY_NAMES = {
@@ -16,6 +18,8 @@ const LABEL_DISPLAY_NAMES = {
     completed: 'Completed',
     follow_up: 'Follow Up',
     general: 'General',
+    scheduling: 'Scheduling',
+    archive: 'Archive'
 };
 
 const PERIOD_MAP = {

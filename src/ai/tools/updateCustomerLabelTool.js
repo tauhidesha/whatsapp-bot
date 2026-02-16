@@ -28,7 +28,7 @@ const updateCustomerLabelTool = {
           label: {
             type: 'string',
             enum: VALID_LABELS,
-            description: 'Label yang akan diberikan: hot_lead (prospek tinggi), cold_lead (kurang berminat), booking_process (sedang booking), completed (selesai), follow_up (perlu ditindaklanjuti), general (umum).',
+            description: 'Label yang akan diberikan: hot_lead (prospek tinggi), cold_lead (kurang berminat), booking_process (sedang booking), completed (selesai), follow_up (perlu ditindaklanjuti), general (umum), scheduling (penjadwalan), archive (arsip).',
           },
           reason: {
             type: 'string',
