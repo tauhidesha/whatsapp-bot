@@ -94,7 +94,7 @@ async function ensureWhatsAppLabel(client, db, labelKey) {
             }
 
             if (newColor) {
-                await client.addNewLabel(labelName, newColor);
+                await client.addNewLabel(labelName, { labelColor: newColor });
             } else {
                 await client.addNewLabel(labelName);
             }
