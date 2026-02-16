@@ -34,6 +34,7 @@ const { generateDocumentTool } = require('./src/ai/tools/generateDocumentTool.js
 const { readDirectMessagesTool } = require('./src/ai/tools/readDirectMessagesTool.js');
 const { sendMessageTool } = require('./src/ai/tools/sendMessageTool.js');
 const { updateCustomerLabelTool } = require('./src/ai/tools/updateCustomerLabelTool.js');
+const { scanFollowUpCandidatesTool } = require('./src/ai/tools/scanFollowUpCandidatesTool.js');
 const { adminLabelingTool } = require('./src/ai/tools/adminLabelingTool.js');
 const {
     addTransactionTool,
@@ -114,6 +115,7 @@ const availableTools = {
     readDirectMessages: readDirectMessagesTool.implementation,
     sendMessage: sendMessageTool.implementation,
     updateCustomerLabel: updateCustomerLabelTool.implementation,
+    scanFollowUpCandidates: scanFollowUpCandidatesTool.implementation,
     adminLabeling: adminLabelingTool.implementation,
     addTransaction: addTransactionTool.implementation,
     getTransactionHistory: getTransactionHistoryTool.implementation,
@@ -153,6 +155,7 @@ const toolDefinitions = [
     readDirectMessagesTool.toolDefinition,
     sendMessageTool.toolDefinition,
     updateCustomerLabelTool.toolDefinition,
+    scanFollowUpCandidatesTool.toolDefinition,
     adminLabelingTool.toolDefinition,
     addTransactionTool.toolDefinition,
     getTransactionHistoryTool.toolDefinition,
