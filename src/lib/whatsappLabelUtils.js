@@ -51,6 +51,7 @@ async function ensureWhatsAppLabel(client, db, labelKey) {
                 const allLabels = await client.getAllLabels();
                 const stillExists = allLabels.find((l) => l.id?.toString() === labelId);
                 if (stillExists) {
+                    console.log(`[LabelUtils] ✅ Cache hit for label "${labelName}" (ID: ${labelId})`);
                     return { id: labelId, name: labelName };
                 } else {
                     console.warn(`[LabelUtils] Cached ID ${labelId} not found in WA, clearing cache.`);
