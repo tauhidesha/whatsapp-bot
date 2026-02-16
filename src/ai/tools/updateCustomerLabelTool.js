@@ -111,17 +111,41 @@ const updateCustomerLabelTool = {
             console.warn('[Label] Cache lookup failed:', cacheErr.message);
           }
 
-          // Jika belum ada, buat label baru pakai addNewLabel (method WPPConnect yang benar)
+          // Jika belum ada di cache, cari di semua label WA yang sudah ada
+          if (!labelId && global.whatsappClient.getAllLabels) {
+            try {
+              const allLabels = await global.whatsappClient.getAllLabels();
+              const existing = allLabels.find(l => l.name === labelName);
+              if (existing && existing.id) {
+                labelId = existing.id.toString();
+                console.log(`[Label] Found existing WA label "${labelName}" → ID ${labelId}`);
+              }
+            } catch (listErr) {
+              console.warn('[Label] getAllLabels failed:', listErr.message);
+            }
+          }
+
+          // Jika masih belum ada, buat label baru
           if (!labelId && global.whatsappClient.addNewLabel) {
             try {
-              const newLabel = await global.whatsappClient.addNewLabel(labelName, {
+              // addNewLabel returns Promise<void>, so we create then search
+              await global.whatsappClient.addNewLabel(labelName, {
                 labelColor: config.color,
               });
-              if (newLabel && newLabel.id) {
-                labelId = newLabel.id.toString();
-                console.log(`[Label] ✅ Label baru "${labelName}" dibuat → ID ${labelId}`);
+              console.log(`[Label] ✅ Label baru "${labelName}" dibuat, mencari ID...`);
 
-                // Cache ke Firestore agar tidak perlu buat ulang
+              // Setelah buat, ambil semua labels lalu cari ID-nya
+              if (global.whatsappClient.getAllLabels) {
+                const allLabels = await global.whatsappClient.getAllLabels();
+                const created = allLabels.find(l => l.name === labelName);
+                if (created && created.id) {
+                  labelId = created.id.toString();
+                  console.log(`[Label] ✅ Label "${labelName}" → ID ${labelId}`);
+                }
+              }
+
+              // Cache ke Firestore agar tidak perlu cari ulang
+              if (labelId) {
                 try {
                   await db.collection('_labelCache').doc(label).set({
                     labelId,
@@ -152,7 +176,7 @@ const updateCustomerLabelTool = {
               // Tambah label baru
               operations.push({ labelId, type: 'add' });
 
-              await global.whatsappClient.addOrRemoveLabels(whatsappNumber, operations);
+              await global.whatsappClient.addOrRemoveLabels([whatsappNumber], operations);
               console.log(`[Label] ✅ Label "${labelName}" (ID: ${labelId}) assigned to ${whatsappNumber}`);
 
               // Simpan labelId ke Firestore untuk tracking
