@@ -3,31 +3,13 @@
 const admin = require('firebase-admin');
 const { isAdmin, ensureFirestore } = require('../utils/adminAuth.js');
 const { parseSenderIdentity } = require('../../lib/utils.js');
-
-const VALID_LABELS = [
-    'hot_lead',
-    'cold_lead',
-    'booking_process',
-    'completed',
-    'general',
-    'follow_up',
-];
-
-const LABEL_DISPLAY_NAMES = {
-    hot_lead: 'Hot Lead 🔥',
-    cold_lead: 'Cold Lead ❄️',
-    booking_process: 'Booking 📅',
-    completed: 'Completed ✅',
-    follow_up: 'Follow Up 📞',
-    general: 'General 📋',
-};
-
-// Mapping period presets ke jumlah hari
-const PERIOD_MAP = {
-    '1_week': 7,
-    '2_weeks': 14,
-    '1_month': 30,
-};
+const {
+    VALID_LABELS,
+    LABEL_DISPLAY_NAMES,
+    PERIOD_MAP,
+    ensureWhatsAppLabel,
+    assignWhatsAppLabel
+} = require('../../lib/whatsappLabelUtils.js');
 
 const adminLabelingTool = {
     toolDefinition: {
@@ -244,13 +226,26 @@ const adminLabelingTool = {
                     };
                 }
 
+                // Ensure label exists in WA once for the whole batch
+                let waLabelId = null;
+                if (global.whatsappClient) {
+                    try {
+                        const waLabel = await ensureWhatsAppLabel(global.whatsappClient, db, label);
+                        if (waLabel && waLabel.id) {
+                            waLabelId = waLabel.id;
+                        }
+                    } catch (e) {
+                        console.warn('[AdminLabeling] Failed to ensure label in WA:', e.message);
+                    }
+                }
+
                 const results = [];
                 let successCount = 0;
                 let failCount = 0;
 
                 for (const number of targetNumbers) {
                     try {
-                        const { docId } = parseSenderIdentity(number);
+                        const { docId, normalizedAddress } = parseSenderIdentity(number);
                         if (!docId) {
                             results.push({
                                 number,
@@ -276,6 +271,7 @@ const adminLabelingTool = {
                         }
 
                         const customerName = docSnapshot.data()?.name || 'Tanpa Nama';
+                        const prevLabelId = docSnapshot.data()?.whatsappLabelId;
 
                         const updatePayload = {
                             customerLabel: label,
@@ -285,55 +281,17 @@ const adminLabelingTool = {
 
                         await docRef.set(updatePayload, { merge: true });
 
-                        // Sync ke WA jika client tersedia
+                        // Sync ke WA jika client tersedia dan label valid
                         let waSynced = false;
-                        if (global.whatsappClient && global.whatsappClient.addOrRemoveLabels) {
-                            try {
-                                const { normalizedAddress } = parseSenderIdentity(number);
-                                const whatsappNumber = normalizedAddress || number;
-                                const labelName = (LABEL_DISPLAY_NAMES[label] || label).replace(/[🔥❄️📅✅📞📋]/g, '').trim();
-
-                                // Cari atau buat label di WA
-                                let labelId = null;
-
-                                // Cek cache
-                                try {
-                                    const cached = await db.collection('_labelCache').doc(label).get();
-                                    if (cached.exists && cached.data().labelId) {
-                                        labelId = cached.data().labelId;
-                                    }
-                                } catch { /* non-fatal */ }
-
-                                // Cari di WA labels
-                                if (!labelId && global.whatsappClient.getAllLabels) {
-                                    try {
-                                        const allLabels = await global.whatsappClient.getAllLabels();
-                                        const existing = allLabels.find((l) => l.name === labelName);
-                                        if (existing && existing.id) {
-                                            labelId = existing.id.toString();
-                                        }
-                                    } catch { /* non-fatal */ }
-                                }
-
-                                if (labelId) {
-                                    // Remove old label if different
-                                    const prevLabelId = docSnapshot.data()?.whatsappLabelId;
-                                    const operations = [];
-                                    if (prevLabelId && prevLabelId !== labelId) {
-                                        operations.push({ labelId: prevLabelId, type: 'remove' });
-                                    }
-                                    operations.push({ labelId, type: 'add' });
-
-                                    await global.whatsappClient.addOrRemoveLabels(
-                                        [whatsappNumber],
-                                        operations
-                                    );
-                                    await docRef.set({ whatsappLabelId: labelId }, { merge: true });
-                                    waSynced = true;
-                                }
-                            } catch (waErr) {
-                                console.warn(`[AdminLabeling] WA sync failed for ${number}:`, waErr.message);
-                            }
+                        if (global.whatsappClient && waLabelId) {
+                            waSynced = await assignWhatsAppLabel(
+                                global.whatsappClient,
+                                db,
+                                normalizedAddress || number,
+                                docId,
+                                waLabelId,
+                                prevLabelId
+                            );
                         }
 
                         results.push({

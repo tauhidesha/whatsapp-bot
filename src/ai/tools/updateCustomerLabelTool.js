@@ -3,33 +3,18 @@ const { z } = require('zod');
 const admin = require('firebase-admin');
 const { ensureFirestore } = require('../utils/adminAuth.js');
 const { parseSenderIdentity } = require('../../lib/utils.js');
-
-const VALID_LABELS = [
-  'hot_lead',
-  'cold_lead',
-  'booking_process',
-  'completed',
-  'general',
-  'follow_up',
-];
+const {
+  VALID_LABELS,
+  LABEL_DISPLAY_NAMES,
+  ensureWhatsAppLabel,
+  assignWhatsAppLabel
+} = require('../../lib/whatsappLabelUtils.js');
 
 const updateCustomerLabelSchema = z.object({
   label: z.enum(VALID_LABELS).describe('Label baru untuk pelanggan.'),
   reason: z.string().optional().describe('Alasan singkat mengapa label ini diberikan.'),
   senderNumber: z.string().describe('Nomor WA pelanggan yang akan diberi label.'),
 });
-
-// Display names for WA Business labels
-const LABEL_DISPLAY_NAMES = {
-  hot_lead: 'Hot Lead',
-  cold_lead: 'Cold Lead',
-  booking_process: 'Booking Process',
-  completed: 'Completed',
-  follow_up: 'Follow Up',
-  general: 'General',
-};
-
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 const updateCustomerLabelTool = {
   toolDefinition: {
@@ -49,6 +34,10 @@ const updateCustomerLabelTool = {
             type: 'string',
             description: 'Alasan singkat pemberian label (misal: "Nanya harga detail & cicilan", "Hanya tanya-tanya").',
           },
+          senderNumber: {
+            type: 'string',
+            description: 'Nomor pengirim (otomatis diisi sistem).',
+          },
         },
         required: ['label'],
       },
@@ -62,13 +51,17 @@ const updateCustomerLabelTool = {
         return { success: false, message: 'senderNumber tidak tersedia.' };
       }
 
-      const { docId } = parseSenderIdentity(senderNumber);
+      const { docId, normalizedAddress } = parseSenderIdentity(senderNumber);
       if (!docId) {
         return { success: false, message: 'Gagal mem-parsing nomor pelanggan.' };
       }
 
       const db = ensureFirestore();
       const docRef = db.collection('directMessages').doc(docId);
+
+      // Get current data to check for existing label
+      const docSnapshot = await docRef.get();
+      const prevLabelId = docSnapshot.exists ? docSnapshot.data()?.whatsappLabelId : null;
 
       const updatePayload = {
         customerLabel: label,
@@ -80,161 +73,58 @@ const updateCustomerLabelTool = {
 
       // --- Sync label ke WhatsApp Business via WPPConnect ---
       let waSynced = false;
+      let syncMessage = 'WA sync: gagal/tidak tersedia';
 
       if (global.whatsappClient) {
         try {
-          const { normalizedAddress } = parseSenderIdentity(senderNumber);
           const whatsappNumber = normalizedAddress || senderNumber;
-          const labelName = LABEL_DISPLAY_NAMES[label] || label;
 
-          // Step 1: Cari label yang sudah ada di WA by name
-          let labelId = null;
+          // 1. Ensure label exists in WA
+          const waLabel = await ensureWhatsAppLabel(global.whatsappClient, db, label);
 
-          // 1a. Cek cache Firestore dulu
-          try {
-            const labelCacheRef = db.collection('_labelCache').doc(label);
-            const cached = await labelCacheRef.get();
-            if (cached.exists && cached.data().labelId) {
-              labelId = cached.data().labelId;
-              console.log(`[Label] Cache hit: "${labelName}" → ID ${labelId}`);
+          if (waLabel && waLabel.id) {
+            // 2. Assign label to chat
+            const assigned = await assignWhatsAppLabel(
+              global.whatsappClient, // Pass client
+              db, // Pass db (although assignWhatsAppLabel might not strictly need it if we pass docId, but current impl uses it) FIXME: check signature
+              whatsappNumber, // Pass phone number for WPPConnect
+              docId, // Pass docId for Firestore update inside? checks implementation
+              waLabel.id, // labelId
+              prevLabelId // oldLabelId
+            );
+            // Wait, let me double check assignWhatsAppLabel signature:
+            // async function assignWhatsAppLabel(client, db, senderNumber, docId, labelId, prevLabelId = null)
 
-              // Verifikasi label masih ada di WA
-              if (global.whatsappClient.getAllLabels) {
-                const allLabels = await global.whatsappClient.getAllLabels();
-                const stillExists = allLabels.find(l => l.id?.toString() === labelId);
-                if (!stillExists) {
-                  console.warn(`[Label] Cached ID ${labelId} no longer exists in WA, clearing cache...`);
-                  labelId = null;
-                }
-              }
-            }
-          } catch (cacheErr) {
-            console.warn('[Label] Cache lookup failed:', cacheErr.message);
-          }
+            // So I should pass:
+            const success = await assignWhatsAppLabel(
+              global.whatsappClient,
+              db,
+              whatsappNumber, // This must be the phone number used by WPPConnect
+              docId,
+              waLabel.id,
+              prevLabelId
+            );
 
-          // 1b. Cari di semua label WA yang sudah ada
-          if (!labelId && global.whatsappClient.getAllLabels) {
-            try {
-              const allLabels = await global.whatsappClient.getAllLabels();
-              console.log(`[Label] Searching "${labelName}" in ${allLabels.length} existing WA labels...`);
-              const existing = allLabels.find(l => l.name === labelName);
-              if (existing && existing.id) {
-                labelId = existing.id.toString();
-                console.log(`[Label] ✅ Found existing WA label "${labelName}" → ID ${labelId}`);
-
-                // Cache it
-                try {
-                  await db.collection('_labelCache').doc(label).set({
-                    labelId,
-                    labelName,
-                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                  });
-                } catch { /* cache write fail is non-fatal */ }
-              }
-            } catch (listErr) {
-              console.warn('[Label] getAllLabels failed:', listErr.message);
-            }
-          }
-
-          // 1c. Bikin label baru jika belum ada
-          if (!labelId && global.whatsappClient.addNewLabel) {
-            try {
-              // WPPConnect addNewLabel(name: string, options?: string)
-              // wa-js addNewLabel(name: string, color: string)
-              // Get a valid color from WA's palette
-              let newColor = undefined;
-              if (global.whatsappClient.getNewLabelColor) {
-                try {
-                  newColor = await global.whatsappClient.getNewLabelColor();
-                  console.log(`[Label] Got palette color for new label: ${newColor}`);
-                } catch (colorErr) {
-                  console.warn('[Label] getNewLabelColor failed:', colorErr.message);
-                }
-              }
-
-              // Create the label - pass color as a plain string (NOT an object)
-              if (newColor) {
-                await global.whatsappClient.addNewLabel(labelName, newColor);
-              } else {
-                await global.whatsappClient.addNewLabel(labelName);
-              }
-              console.log(`[Label] addNewLabel("${labelName}") called, waiting for WA to sync...`);
-
-              // WA needs time to propagate the new label
-              await delay(1500);
-
-              // Now search for the newly created label
-              if (global.whatsappClient.getAllLabels) {
-                const allLabels = await global.whatsappClient.getAllLabels();
-                console.log(`[Label] Post-create: ${allLabels.length} labels found. Names: ${allLabels.map(l => l.name).join(', ')}`);
-                const created = allLabels.find(l => l.name === labelName);
-                if (created && created.id) {
-                  labelId = created.id.toString();
-                  console.log(`[Label] ✅ New label "${labelName}" created → ID ${labelId}`);
-
-                  // Cache it
-                  try {
-                    await db.collection('_labelCache').doc(label).set({
-                      labelId,
-                      labelName,
-                      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                    });
-                  } catch { /* non-fatal */ }
-                } else {
-                  console.warn(`[Label] ⚠️ Label "${labelName}" not found after creation. Available: ${allLabels.map(l => `${l.name}(${l.id})`).join(', ')}`);
-                }
-              }
-            } catch (createError) {
-              console.warn('[Label] addNewLabel error:', createError.message);
-            }
-          }
-
-          // Step 2: Assign label ke chat (hapus label lama dulu)
-          if (labelId && global.whatsappClient.addOrRemoveLabels) {
-            try {
-              const operations = [];
-
-              // Hapus label lama dari chat jika ada
-              const docSnapshot = await docRef.get();
-              const prevLabelId = docSnapshot.data()?.whatsappLabelId;
-              if (prevLabelId && prevLabelId !== labelId) {
-                operations.push({ labelId: prevLabelId, type: 'remove' });
-                console.log(`[Label] 🔄 Removing old label ID ${prevLabelId} from chat`);
-              }
-
-              // Tambah label baru
-              operations.push({ labelId, type: 'add' });
-
-              // chatIds HARUS array (sesuai WPPConnect API)
-              await global.whatsappClient.addOrRemoveLabels([whatsappNumber], operations);
-              console.log(`[Label] ✅ Label "${labelName}" (ID: ${labelId}) assigned to ${whatsappNumber}`);
-
-              // Simpan labelId ke Firestore untuk tracking
-              await docRef.set({ whatsappLabelId: labelId }, { merge: true });
+            if (success) {
               waSynced = true;
+              syncMessage = 'ter-sync ke WhatsApp Business';
+            } else {
+              syncMessage = 'gagal assign label di WA';
+            }
 
-            } catch (assignError) {
-              console.warn('[Label] addOrRemoveLabels failed:', assignError.message);
-            }
           } else {
-            if (!labelId) {
-              console.warn('[Label] ⚠️ Tidak bisa mendapatkan label ID. Label hanya tersimpan di Firestore.');
-            }
-            if (!global.whatsappClient.addOrRemoveLabels) {
-              console.warn('[Label] ⚠️ Method addOrRemoveLabels tidak tersedia.');
-            }
+            syncMessage = 'gagal membuat/menemukan label di WA';
           }
 
         } catch (waError) {
           console.warn('[Label] Gagal sync ke WhatsApp Business:', waError.message);
+          syncMessage = `gagal sync (${waError.message})`;
         }
       }
 
       return {
         success: true,
-        message: waSynced
-          ? `Label pelanggan berhasil diubah menjadi "${label}" dan di-sync ke WhatsApp Business.`
-          : `Label pelanggan berhasil diubah menjadi "${label}" di Firestore (WA sync: gagal/tidak tersedia).`,
+        message: `Label pelanggan berhasil diubah menjadi "${label}" (${syncMessage}).`,
         data: {
           docId,
           waSynced,
