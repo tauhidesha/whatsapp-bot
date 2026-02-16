@@ -115,6 +115,11 @@ const updateCustomerLabelTool = {
           if (!labelId && global.whatsappClient.getAllLabels) {
             try {
               const allLabels = await global.whatsappClient.getAllLabels();
+              console.log(`[Label] DEBUG getAllLabels returned ${Array.isArray(allLabels) ? allLabels.length : typeof allLabels} items`);
+              if (Array.isArray(allLabels) && allLabels.length > 0) {
+                console.log(`[Label] DEBUG first label keys: ${JSON.stringify(Object.keys(allLabels[0]))}`);
+                console.log(`[Label] DEBUG first label raw: ${JSON.stringify(allLabels[0])}`);
+              }
               const existing = allLabels.find(l => l.name === labelName);
               if (existing && existing.id) {
                 labelId = existing.id.toString();
@@ -137,6 +142,7 @@ const updateCustomerLabelTool = {
               // Setelah buat, ambil semua labels lalu cari ID-nya
               if (global.whatsappClient.getAllLabels) {
                 const allLabels = await global.whatsappClient.getAllLabels();
+                console.log(`[Label] DEBUG post-create getAllLabels: ${JSON.stringify(allLabels)}`);
                 const created = allLabels.find(l => l.name === labelName);
                 if (created && created.id) {
                   labelId = created.id.toString();
