@@ -7,9 +7,9 @@ const masterLayanan = [
     category: "repaint",
     subcategory: "bodi_halus",
     summary: "Cat ulang bodi motor pakai bahan premium (PU & HS) untuk hasil mulus seperti pabrikan.",
-    description: "- Bahan cat menggunakan full PU - Untuk clear coat menggunakan clearcoat jenis HS - Harga untuk warna solid/metalik. Candy, bunglon, moonlight dikenakan tambahan 125–210rb tergantung jenis warna. - Repaint hasil kulit jeruk tipis ala pabrik (bisa lebih halus dengan tambahan poles) - Estimasi pengerjaan repaint: 5–6 hari kerja tergantung kondisi dan antrian - Harga bervariasi per model motor, lihat daftar harga terbaru.",
+    description: "- Bahan cat menggunakan full PU - Untuk clear coat menggunakan clearcoat jenis HS - Harga untuk warna solid/metalik. Candy, bunglon, moonlight dikenakan tambahan 125–210rb tergantung jenis warna. - Repaint hasil kulit jeruk tipis ala pabrik (bisa lebih halus dengan tambahan poles) - Estimasi pengerjaan repaint: 3–4 hari kerja tergantung kondisi dan antrian - Harga bervariasi per model motor, lihat daftar harga terbaru.",
     price: 0,
-    estimatedDuration: "2400",
+    estimatedDuration: "1920",
     usesModelPricing: true,
   },
   {

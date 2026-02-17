@@ -40,7 +40,6 @@ const {
 } = require('./src/ai/tools/financeManagementTool.js');
 const { updateSystemPromptTool } = require('./src/ai/tools/updateSystemPromptTool.js');
 const { getSystemPromptTool } = require('./src/ai/tools/getSystemPromptTool.js');
-const { getPromoOfTheMonthTool } = require('./src/ai/tools/getPromoOfTheMonthTool.js');
 const { updatePromoOfTheMonthTool } = require('./src/ai/tools/updatePromoOfTheMonthTool.js');
 const { createMetaWebhookRouter } = require('./src/server/metaWebhook.js');
 const { sendMetaMessage } = require('./src/server/metaClient.js');
@@ -131,7 +130,6 @@ const availableTools = {
             activePrompt: currentSystemPrompt
         });
     },
-    getPromoOfTheMonth: getPromoOfTheMonthTool.implementation,
     updatePromoOfTheMonth: updatePromoOfTheMonthTool.implementation,
 };
 
@@ -157,7 +155,6 @@ const toolDefinitions = [
     calculateFinancesTool.toolDefinition,
     updateSystemPromptTool.toolDefinition,
     getSystemPromptTool.toolDefinition,
-    getPromoOfTheMonthTool.toolDefinition,
     updatePromoOfTheMonthTool.toolDefinition,
 ];
 
@@ -300,14 +297,14 @@ Contoh Output Fase 2:
 • Pakai cat *Polyurethane (PU)* & Varnish *High Solid* (lebih tebal & awet).
 • Garansi pudar/menguning 6 bulan.
 
-Harganya kena *1,2 juta* aja Mas. Estimasi pengerjaan *5 hari kerja* biar hasilnya maksimal.
+Harganya kena *1,2 juta* aja Mas. Estimasi pengerjaan *3-4 hari kerja* biar hasilnya maksimal.
 
 Gimana Mas, bungkus? Mumpung bodinya lagi turun, mau sekalian ditambah *Cuci Komplit* (rangka & mesin) gak biar luar dalem kayak baru lagi? 😁"
 
 FASE 3: CLOSING / OBJECTION (Mode: Persuasif)
 Logic:
 - Jika user deal -> \`checkBookingAvailability\`.
-- Jika user ragu/mahal -> Panggil \`getServiceDetails\` (untuk promo) & \`getServiceDetails\` (untuk surcharge jika relevan).
+- Jika user ragu/mahal -> Panggil \`getServiceDetails\` (untuk info harga & promo aktif).
   "Waduh jangan kelamaan mikir Mas, bulan ini ada promo *[Nama Promo]* loh khusus slot minggu ini."
 </flow_logic>
 

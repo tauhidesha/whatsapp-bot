@@ -1,6 +1,7 @@
 // File: src/ai/tools/getServiceDetailsTool.js
 // Tool gabungan untuk mendapatkan deskripsi, SOP, harga, dan estimasi waktu layanan.
 
+const admin = require('firebase-admin');
 const masterLayanan = require('../../data/masterLayanan.js');
 const {
   repaintBodiHalus,
@@ -149,6 +150,24 @@ async function resolveSizeForService({ service, sizeArg, senderNumber, cachedSiz
   }
 
   return { finalSize, category };
+}
+
+async function getPromoInfo() {
+  try {
+    const db = admin.firestore();
+    const doc = await db.collection('settings').doc('promo_config').get();
+
+    if (doc.exists && doc.data().isActive) {
+      const data = doc.data();
+      return {
+        text: data.promoText,
+        formatted: `💡 *PROMO BOOM BULAN INI:* \n\n${data.promoText}\n\n*Syarat & Ketentuan berlaku.*`
+      };
+    }
+  } catch (error) {
+    console.warn('[getServiceDetailsTool] Failed to fetch promo:', error.message);
+  }
+  return null;
 }
 
 // --- Repaint Model-Based Price Lookup ---
@@ -300,6 +319,7 @@ async function implementation(input) {
 
     const sizeFromArgs = normalizeSizeInput(input.size);
     const cachedSizes = senderNumber ? await getMotorSizesForSender(senderNumber) : null;
+    const promo = await getPromoInfo();
 
     if (!parsedServiceName || typeof parsedServiceName !== 'string') {
       return { success: false, error: 'generic_error', message: 'service_name tidak valid atau kosong' };
@@ -327,6 +347,7 @@ async function implementation(input) {
         success: true,
         multiple_candidates: true,
         candidates: results,
+        promo: promo,
         message: 'Ditemukan 2 layanan utama untuk "coating". Silakan pilih Doff atau Glossy.'
       };
     }
@@ -382,6 +403,7 @@ async function implementation(input) {
           color_surcharge_formatted: `Rp${colorSurcharge.toLocaleString('id-ID')}`,
           final_price: finalPrice,
           final_price_formatted: finalPrice ? `Rp${finalPrice.toLocaleString('id-ID')}` : null,
+          promo: promo,
           syarat_ketentuan: syaratKetentuan,
         };
 
@@ -417,6 +439,7 @@ async function implementation(input) {
       color_surcharge_formatted: `Rp${colorSurcharge.toLocaleString('id-ID')}`,
       final_price: basePrice ? basePrice + colorSurcharge : null,
       final_price_formatted: basePrice ? `Rp${(basePrice + colorSurcharge).toLocaleString('id-ID')}` : null,
+      promo: promo,
     };
 
     // Jika repaint dan tidak ada model, beri hint
