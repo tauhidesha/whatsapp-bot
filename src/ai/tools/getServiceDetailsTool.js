@@ -159,10 +159,7 @@ async function getPromoInfo() {
 
     if (doc.exists && doc.data().isActive) {
       const data = doc.data();
-      return {
-        text: data.promoText,
-        formatted: `💡 *PROMO BOOM BULAN INI:* \n\n${data.promoText}\n\n*Syarat & Ketentuan berlaku.*`
-      };
+      return `💡 *PROMO BOOM BULAN INI:* \n\n${data.promoText}\n\n*Syarat & Ketentuan berlaku.*`;
     }
   } catch (error) {
     console.warn('[getServiceDetailsTool] Failed to fetch promo:', error.message);

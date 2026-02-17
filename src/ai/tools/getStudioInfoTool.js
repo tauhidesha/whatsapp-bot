@@ -57,7 +57,7 @@ Google Maps: ${studioInfo.location.googleMaps}
 
 Ancer-ancer: ${studioInfo.location.directions}
 
-        ⚠️ *Penting:* ${studioInfo.bookingPolicy.description}`;
+⚠️ *Penting:* ${studioInfo.bookingPolicy.description}`;
         break;
       case 'hours':
         response = `🕒 *Jam Operasional Bosmat Studio:*
@@ -90,6 +90,7 @@ Untuk datang ke studio, mas harus:
 • Booking slot dulu via WhatsApp
 • Tentukan tanggal & jam kunjungan
 • Konfirmasi 1 hari sebelumnya
+• Penjadwalan pengerjaan menyusul sesuai ketersediaan slot (TBA)
 
 Kontak booking: ${studioInfo.contact.phone}`;
         break;
@@ -117,21 +118,14 @@ Wajib booking slot dulu sebelum datang ke studio!`;
         break;
     }
 
-    const result = {
-      success: true,
-      infoType,
-      studioInfo,
-      response,
-      timestamp: new Date().toISOString(),
-    };
-
     console.log('[getStudioInfo] Studio info retrieved successfully');
 
     return {
       success: true,
-      message: `Info studio ${infoType} berhasil diambil`,
-      data: result,
-      response,
+      infoType,
+      studioInfo,
+      formattedResponse: response,
+      timestamp: new Date().toISOString()
     };
   } catch (error) {
     console.error('[getStudioInfo] Error:', error);
