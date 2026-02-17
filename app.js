@@ -17,8 +17,6 @@ const qrcode = require('qrcode-terminal');
 const fetch = require('node-fetch');
 const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
 const { HumanMessage, SystemMessage, ToolMessage, AIMessage } = require('@langchain/core/messages');
-const { getMotorSizeDetailsTool } = require('./src/ai/tools/getMotorSizeDetailsTool.js');
-const { listServicesByCategoryTool } = require('./src/ai/tools/listServicesByCategoryTool.js');
 const { getServiceDetailsTool } = require('./src/ai/tools/getServiceDetailsTool.js');
 const { getStudioInfoTool } = require('./src/ai/tools/getStudioInfoTool.js');
 const { checkBookingAvailabilityTool } = require('./src/ai/tools/checkBookingAvailabilityTool.js');
@@ -28,7 +26,6 @@ const { updateBookingTool } = require('./src/ai/tools/updateBookingTool.js');
 const { triggerBosMatTool } = require('./src/ai/tools/triggerBosMatTool.js');
 const { calculateHomeServiceFeeTool } = require('./src/ai/tools/calculateHomeServiceFeeTool.js');
 const { sendStudioPhotoTool } = require('./src/ai/tools/sendStudioPhotoTool.js');
-const { getRepaintColorSurchargeTool } = require('./src/ai/tools/getRepaintColorSurchargeTool.js');
 const { notifyVisitIntentTool } = require('./src/ai/tools/notifyVisitIntentTool.js');
 const { generateDocumentTool } = require('./src/ai/tools/generateDocumentTool.js');
 const { readDirectMessagesTool } = require('./src/ai/tools/readDirectMessagesTool.js');
@@ -100,8 +97,6 @@ const db = admin.firestore();
 
 // --- Tool Registry ---
 const availableTools = {
-    getMotorSizeDetails: getMotorSizeDetailsTool.implementation,
-    listServicesByCategory: listServicesByCategoryTool.implementation,
     getServiceDetails: getServiceDetailsTool.implementation,
     getStudioInfo: getStudioInfoTool.implementation,
     checkBookingAvailability: checkBookingAvailabilityTool.implementation,
@@ -111,7 +106,6 @@ const availableTools = {
     triggerBosMatTool: triggerBosMatTool.implementation,
     calculateHomeServiceFee: calculateHomeServiceFeeTool.implementation,
     sendStudioPhoto: sendStudioPhotoTool.implementation,
-    getRepaintColorSurcharge: getRepaintColorSurchargeTool.implementation,
     notifyVisitIntent: notifyVisitIntentTool.implementation,
     generateDocument: generateDocumentTool.implementation,
     readDirectMessages: readDirectMessagesTool.implementation,
@@ -142,8 +136,6 @@ const availableTools = {
 };
 
 const toolDefinitions = [
-    getMotorSizeDetailsTool.toolDefinition,
-    listServicesByCategoryTool.toolDefinition,
     getServiceDetailsTool.toolDefinition,
     getStudioInfoTool.toolDefinition,
     checkBookingAvailabilityTool.toolDefinition,
@@ -153,7 +145,6 @@ const toolDefinitions = [
     triggerBosMatTool.toolDefinition,
     calculateHomeServiceFeeTool.toolDefinition,
     sendStudioPhotoTool.toolDefinition,
-    getRepaintColorSurchargeTool.toolDefinition,
     notifyVisitIntentTool.toolDefinition,
     generateDocumentTool.toolDefinition,
     readDirectMessagesTool.toolDefinition,
@@ -316,16 +307,13 @@ Gimana Mas, bungkus? Mumpung bodinya lagi turun, mau sekalian ditambah *Cuci Kom
 FASE 3: CLOSING / OBJECTION (Mode: Persuasif)
 Logic:
 - Jika user deal -> \`checkBookingAvailability\`.
-- Jika user ragu/mahal -> Panggil \`getPromoOfTheMonth\` & \`getRepaintColorSurcharge\` (jika relevan).
+- Jika user ragu/mahal -> Panggil \`getServiceDetails\` (untuk promo) & \`getServiceDetails\` (untuk surcharge jika relevan).
   "Waduh jangan kelamaan mikir Mas, bulan ini ada promo *[Nama Promo]* loh khusus slot minggu ini."
 </flow_logic>
 
 <tools>
-\`getMotorSizeDetails\`: Input nama motor -> Output Kategori.
-\`getServiceDetails\`: Input kategori & jenis layanan -> Output Harga & SOP.
-\`getPromoOfTheMonth\`: Cek promo aktif.
-\`getRepaintColorSurcharge\`: Cek biaya warna khusus.
-\`checkBookingAvailability\`: Cek slot.
+    \`getServiceDetails\`: Cek detail layanan (SOP, Harga, Estimasi).
+    \`checkBookingAvailability\`: Cek slot.
 \`triggerBosMat\`: Eskalasi ke admin manusia (Komplain/Nego Alot).
 </tools>
 

@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { formatCurrency } = require('../utils/distanceMatrix.js');
 const { getStudioInfoTool } = require('./getStudioInfoTool.js');
-const { getMotorSizeDetailsTool } = require('./getMotorSizeDetailsTool.js');
+const { getServiceDetailsTool } = require('./getServiceDetailsTool.js');
 const masterLayanan = require('../../data/masterLayanan.js');
 const { isAdmin } = require('../utils/adminAuth.js');
 
@@ -76,7 +76,11 @@ const generateDocumentTool = {
     // Detect Motor Size (needed for auto-price or filling missing row prices)
     if (documentType !== 'tanda_terima') {
       try {
-        const sizeRes = await getMotorSizeDetailsTool.implementation({ motor_query: motorDetails });
+        const sizeRes = await getServiceDetailsTool.implementation({
+          service_name: 'Full Detailing', // Layanan dummy untuk infer ukuran
+          motor_model: motorDetails,
+          senderNumber
+        });
         detectedSize = (sizeRes.success && sizeRes.motor_size) ? sizeRes.motor_size : null;
       } catch (err) {
         console.warn('[generateDocument] Size detection failed:', err);
