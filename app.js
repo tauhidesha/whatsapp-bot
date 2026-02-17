@@ -565,8 +565,7 @@ async function cleanupChromiumProfileLocks(sessionName, sessionDataPath = './tok
 
 // --- Memory Configuration ---
 const MEMORY_CONFIG = {
-    maxMessages: parseInt(process.env.MEMORY_MAX_MESSAGES) || 20,
-    // maxAgeHours: parseInt(process.env.MEMORY_MAX_AGE_HOURS) || 24, // Dihapus sesuai permintaan
+    maxMessages: parseInt(process.env.MEMORY_MAX_MESSAGES) || 5,
     includeSystemMessages: process.env.MEMORY_INCLUDE_SYSTEM === 'true'
 };
 

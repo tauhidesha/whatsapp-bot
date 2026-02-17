@@ -16,8 +16,28 @@ const {
   setPreferredSizeForService,
   setMotorSizeForSender,
 } = require('../utils/motorSizeMemory.js');
+const daftarUkuranMotor = require('../../data/daftarUkuranMotor.js');
 
 // --- Helper Functions ---
+
+function lookupColorSurcharge(colorName) {
+  if (!colorName || typeof colorName !== 'string') return null;
+  const query = colorName.trim().toLowerCase();
+
+  // Fuzzy match with warnaSpesial
+  for (const entry of warnaSpesial) {
+    const candidates = [entry.type, ...(entry.aliases || [])].map(a => a.toLowerCase());
+    for (const candidate of candidates) {
+      if (candidate === query || query.includes(candidate) || candidate.includes(query)) {
+        return {
+          name: entry.type,
+          surcharge: entry.surcharge,
+        };
+      }
+    }
+  }
+  return null;
+}
 
 function levenshtein(a, b) {
   const dp = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
@@ -82,12 +102,34 @@ function inferCategory(name) {
   return 'other';
 }
 
-function resolveSizeForService({ service, sizeArg, senderNumber, cachedSizes }) {
+function lookupMotorSizeFromData(motorModel) {
+  if (!motorModel) return null;
+  const query = motorModel.trim().toLowerCase();
+  for (const entry of daftarUkuranMotor) {
+    const candidates = [entry.model, ...(entry.aliases || [])].map(a => a.toLowerCase());
+    if (candidates.some(c => c === query || query.includes(c) || c.includes(query))) {
+      return entry;
+    }
+  }
+  return null;
+}
+
+async function resolveSizeForService({ service, sizeArg, senderNumber, cachedSizes, motorModel }) {
   const category = (service.category || inferCategory(service.name)).toLowerCase();
   let finalSize = sizeArg;
 
+  // 1. Prefer size from motorModel data if provided
+  if (!finalSize && motorModel) {
+    const motorData = lookupMotorSizeFromData(motorModel);
+    if (motorData) {
+      finalSize = category === 'repaint' ? motorData.repaint_size : motorData.service_size;
+      console.log(`[resolveSizeForService] Inferred ${finalSize} from model ${motorModel}`);
+    }
+  }
+
+  // 2. Fallback to cached preferred size
   const cachedPreferred = senderNumber
-    ? getPreferredSizeForService(senderNumber, category)
+    ? await getPreferredSizeForService(senderNumber, category)
     : null;
 
   if (cachedPreferred && finalSize && cachedPreferred !== finalSize) {
@@ -254,8 +296,10 @@ async function implementation(input) {
         ? input.sender_number
         : null;
 
+    const colorNameInput = typeof input.color_name === 'string' ? input.color_name.trim() : null;
+
     const sizeFromArgs = normalizeSizeInput(input.size);
-    const cachedSizes = senderNumber ? getMotorSizesForSender(senderNumber) : null;
+    const cachedSizes = senderNumber ? await getMotorSizesForSender(senderNumber) : null;
 
     if (!parsedServiceName || typeof parsedServiceName !== 'string') {
       return { success: false, error: 'generic_error', message: 'service_name tidak valid atau kosong' };
@@ -266,8 +310,8 @@ async function implementation(input) {
       const names = ['Coating Motor Doff', 'Coating Motor Glossy'];
       const services = masterLayanan.filter(s => names.includes(s.name));
 
-      const results = services.map(service => {
-        const { finalSize } = resolveSizeForService({ service, sizeArg: sizeFromArgs, senderNumber, cachedSizes });
+      const results = await Promise.all(services.map(async (service) => {
+        const { finalSize } = await resolveSizeForService({ service, sizeArg: sizeFromArgs, senderNumber, cachedSizes, motorModel });
         const variant = service.variants?.find(v => v.name === finalSize);
         const basePrice = variant?.price ?? service.price;
 
@@ -277,7 +321,7 @@ async function implementation(input) {
           price: basePrice || 'Tergantung ukuran',
           size: finalSize || 'Belum diketahui'
         };
-      });
+      }));
 
       return {
         success: true,
@@ -298,14 +342,19 @@ async function implementation(input) {
     }
 
     const service = candidates[0];
-    const { finalSize, category } = resolveSizeForService({
+    const { finalSize, category } = await resolveSizeForService({
       service,
       sizeArg: sizeFromArgs,
       senderNumber,
       cachedSizes,
+      motorModel,
     });
 
     const durationFormatted = formatDuration(service.estimatedDuration);
+
+    // --- Surcharge resolution ---
+    const surchargeMatch = colorNameInput ? lookupColorSurcharge(colorNameInput) : null;
+    const colorSurcharge = surchargeMatch ? surchargeMatch.surcharge : 0;
 
     // --- Model-based pricing for repaint services ---
     if (service.usesModelPricing && motorModel) {
@@ -314,6 +363,9 @@ async function implementation(input) {
       const priceInfo = formatRepaintPriceResult(lookup);
 
       if (priceInfo) {
+        const basePrice = priceInfo.price || null;
+        const finalPrice = basePrice ? basePrice + colorSurcharge : null;
+
         const result = {
           success: true,
           service_name: service.name,
@@ -325,14 +377,20 @@ async function implementation(input) {
           motor_model: priceInfo.motor_model,
           motor_size: finalSize || null,
           ...priceInfo,
+          color_name: surchargeMatch ? surchargeMatch.name : colorNameInput,
+          color_surcharge: colorSurcharge,
+          color_surcharge_formatted: `Rp${colorSurcharge.toLocaleString('id-ID')}`,
+          final_price: finalPrice,
+          final_price_formatted: finalPrice ? `Rp${finalPrice.toLocaleString('id-ID')}` : null,
           syarat_ketentuan: syaratKetentuan,
         };
 
         if (senderNumber && finalSize) {
-          setPreferredSizeForService(senderNumber, category, finalSize);
-          setMotorSizeForSender(senderNumber, {
+          await setPreferredSizeForService(senderNumber, category, finalSize);
+          await setMotorSizeForSender(senderNumber, {
             serviceSize: category === 'repaint' ? null : finalSize,
             repaintSize: category === 'repaint' ? finalSize : null,
+            motor_model: motorModel,
           });
         }
 
@@ -354,6 +412,11 @@ async function implementation(input) {
       motor_size: finalSize || null,
       price: basePrice || null,
       price_formatted: basePrice ? `Rp${basePrice.toLocaleString('id-ID')}` : 'Harga perlu model motor',
+      color_name: surchargeMatch ? surchargeMatch.name : colorNameInput,
+      color_surcharge: colorSurcharge,
+      color_surcharge_formatted: `Rp${colorSurcharge.toLocaleString('id-ID')}`,
+      final_price: basePrice ? basePrice + colorSurcharge : null,
+      final_price_formatted: basePrice ? `Rp${(basePrice + colorSurcharge).toLocaleString('id-ID')}` : null,
     };
 
     // Jika repaint dan tidak ada model, beri hint
@@ -362,10 +425,11 @@ async function implementation(input) {
     }
 
     if (senderNumber && finalSize) {
-      setPreferredSizeForService(senderNumber, category, finalSize);
-      setMotorSizeForSender(senderNumber, {
+      await setPreferredSizeForService(senderNumber, category, finalSize);
+      await setMotorSizeForSender(senderNumber, {
         serviceSize: category === 'repaint' ? null : finalSize,
         repaintSize: category === 'repaint' ? finalSize : null,
+        motor_model: motorModel,
       });
     }
 
@@ -396,8 +460,11 @@ const getServiceDetailsTool = {
           },
           size: {
             type: "string",
-            enum: ["S", "M", "L", "XL"],
-            description: "Ukuran motor (S/M/L/XL) jika sudah diketahui dari getMotorSizeDetails."
+            description: "Ukuran motor (S/M/L/XL) jika sudah diketahui."
+          },
+          color_name: {
+            type: "string",
+            description: "Nama warna repaint untuk cek biaya tambahan (surcharge), misal: 'Candy Red', 'Bunglon', 'Chrome'."
           },
           senderNumber: { type: "string", description: "Nomor WA pelanggan (otomatis)." }
         },

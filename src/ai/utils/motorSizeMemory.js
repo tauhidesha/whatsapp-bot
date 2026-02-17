@@ -1,4 +1,4 @@
-const cache = new Map();
+const { getState, updateState, clearState } = require('./conversationState.js');
 
 function normalizeKey(key) {
   if (typeof key !== 'string') return null;
@@ -14,10 +14,14 @@ function normalizeSize(size) {
 
 function mergeSizes(current, incoming) {
   const merged = {
-    serviceSize: current.serviceSize || null,
-    repaintSize: current.repaintSize || null,
-    updatedAt: Date.now(),
+    serviceSize: current?.serviceSize || null,
+    repaintSize: current?.repaintSize || null,
+    motor_model: current?.motor_model || null,
   };
+
+  if (incoming?.motor_model) {
+    merged.motor_model = incoming.motor_model;
+  }
 
   if (typeof incoming === 'string') {
     const normalized = normalizeSize(incoming);
@@ -72,24 +76,24 @@ function mergeSizes(current, incoming) {
   return merged;
 }
 
-function setMotorSizeForSender(sender, sizes) {
+async function setMotorSizeForSender(sender, sizes) {
   const key = normalizeKey(sender);
   if (!key) return;
 
-  const existing = cache.get(key) || { serviceSize: null, repaintSize: null, updatedAt: Date.now() };
+  const existing = await getState(key) || { serviceSize: null, repaintSize: null };
   const merged = mergeSizes(existing, sizes);
 
   if (!merged.serviceSize && !merged.repaintSize) {
     return;
   }
 
-  cache.set(key, merged);
+  await updateState(key, merged);
 }
 
-function getMotorSizesForSender(sender) {
+async function getMotorSizesForSender(sender) {
   const key = normalizeKey(sender);
   if (!key) return null;
-  const entry = cache.get(key);
+  const entry = await getState(key);
   if (!entry) return null;
   return {
     serviceSize: entry.serviceSize || null,
@@ -97,8 +101,8 @@ function getMotorSizesForSender(sender) {
   };
 }
 
-function getPreferredSizeForService(sender, category) {
-  const sizes = getMotorSizesForSender(sender);
+async function getPreferredSizeForService(sender, category) {
+  const sizes = await getMotorSizesForSender(sender);
   if (!sizes) return null;
 
   const normalizedCategory = typeof category === 'string' ? category.trim().toLowerCase() : '';
@@ -109,22 +113,22 @@ function getPreferredSizeForService(sender, category) {
   return sizes.serviceSize || sizes.repaintSize || null;
 }
 
-function setPreferredSizeForService(sender, category, size) {
+async function setPreferredSizeForService(sender, category, size) {
   const normalizedSize = normalizeSize(size);
   if (!normalizedSize) return;
 
   const normalizedCategory = typeof category === 'string' ? category.trim().toLowerCase() : '';
   if (normalizedCategory === 'repaint') {
-    setMotorSizeForSender(sender, { repaintSize: normalizedSize });
+    await setMotorSizeForSender(sender, { repaintSize: normalizedSize });
   } else {
-    setMotorSizeForSender(sender, { serviceSize: normalizedSize });
+    await setMotorSizeForSender(sender, { serviceSize: normalizedSize });
   }
 }
 
-function clearMotorSizeForSender(sender) {
+async function clearMotorSizeForSender(sender) {
   const key = normalizeKey(sender);
   if (key) {
-    cache.delete(key);
+    await clearState(key);
   }
 }
 

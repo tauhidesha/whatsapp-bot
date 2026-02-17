@@ -129,9 +129,11 @@ const VELG_PRICE_MAP = {
 
 // ─── TAMBAHAN WARNA SPESIAL ───
 const warnaSpesial = [
-    { type: "Candy Colors", surcharge: 125000 },
-    { type: "Stabilo (Fluo)", surcharge: 170000 },
-    { type: "Two-Tone / Polish", surcharge: 210000 },
+    { type: "Candy Colors", aliases: ["candy", "candy red", "candy blue", "candy tone"], surcharge: 125000 },
+    { type: "Stabilo (Fluo)", aliases: ["stabilo", "fluo", "fluorescent"], surcharge: 170000 },
+    { type: "Two-Tone / Polish", aliases: ["twotone", "polished", "velg polish"], surcharge: 210000 },
+    { type: "Bunglon", aliases: ["cameleon", "chameleon"], surcharge: 300000 },
+    { type: "Chrome / Hologram", aliases: ["chrome", "kroom", "hologram"], surcharge: 500000 },
 ];
 
 // ─── SYARAT & KETENTUAN ───
