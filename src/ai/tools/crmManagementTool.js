@@ -11,20 +11,19 @@ const {
 
 /**
  * Tool CRM Komprehensif untuk AI Admin (Zoya).
- * Memberikan analytics, deep dive pelanggan, manajemen leads, dan bulk operations.
  */
 const crmManagementTool = {
     toolDefinition: {
         type: 'function',
         function: {
             name: 'crmManagement',
-            description: 'KHUSUS ADMIN. Tool CRM untuk (1) crm_summary: analytics, (2) customer_deep_dive: riwayat 360, (3) find_followup: cari target jemput bola, (4) bulk_label: label massal, (5) update_notes: catatan internal.',
+            description: 'KHUSUS ADMIN. Tool CRM untuk (1) crm_summary, (2) customer_deep_dive, (3) find_followup: cari & bikin draft report, (4) execute_followup: kirim massal hasil acc admin, (5) bulk_label, (6) update_notes.',
             parameters: {
                 type: 'object',
                 properties: {
                     action: {
                         type: 'string',
-                        enum: ['crm_summary', 'customer_deep_dive', 'find_followup', 'bulk_label', 'update_notes'],
+                        enum: ['crm_summary', 'customer_deep_dive', 'find_followup', 'execute_followup', 'bulk_label', 'update_notes'],
                         description: 'Aksi CRM yang ingin dijalankan.',
                     },
                     targetPhone: {
@@ -88,7 +87,9 @@ const crmManagementTool = {
                 case 'customer_deep_dive':
                     return await handleCustomerDeepDive(db, targetPhone);
                 case 'find_followup':
-                    return await handleFindFollowup(db);
+                    return await handleFindFollowup(db, true); // true = save to queue
+                case 'execute_followup':
+                    return await handleExecuteFollowup(db);
                 case 'bulk_label':
                     return await handleBulkLabel(db, targetNumbers, label, reason);
                 case 'update_notes':
@@ -111,10 +112,7 @@ async function handleCrmSummary(db, days) {
     cutoff.setDate(cutoff.getDate() - days);
     const cutoffTs = admin.firestore.Timestamp.fromDate(cutoff);
 
-    const dmSnapshot = await db.collection('directMessages')
-        .where('updatedAt', '>=', cutoffTs)
-        .get();
-
+    const dmSnapshot = await db.collection('directMessages').where('updatedAt', '>=', cutoffTs).get();
     const stats = { total_leads: dmSnapshot.size, hot: 0, cold: 0, booking: 0, completed: 0, follow_up: 0, unlabeled: 0 };
     dmSnapshot.forEach(doc => {
         const l = doc.data().customerLabel;
@@ -125,7 +123,6 @@ async function handleCrmSummary(db, days) {
 
     const bookingSnapshot = await db.collection('bookings').where('createdAt', '>=', cutoffTs).get();
     const transSnapshot = await db.collection('transactions').where('type', '==', 'income').where('date', '>=', cutoffTs).get();
-
     let totalRevenue = 0;
     transSnapshot.forEach(doc => totalRevenue += (doc.data().amount || 0));
     const formatIDR = (val) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
@@ -134,7 +131,6 @@ async function handleCrmSummary(db, days) {
         success: true,
         formattedResponse: [
             `📊 *CRM Summary (${days} Hari Terakhir)*`,
-            `--------------------------------`,
             `📈 *Pipeline Leads:*`,
             `- Total Leads: ${stats.total_leads}`,
             `- 🔥 Hot: ${stats.hot}, 🧊 Cold: ${stats.cold}`,
@@ -143,8 +139,6 @@ async function handleCrmSummary(db, days) {
             `💰 *Performance:*`,
             `- Booking Dibuat: ${bookingSnapshot.size}`,
             `- Total Pemasukan: *${formatIDR(totalRevenue)}*`,
-            `--------------------------------`,
-            `💡 *Insight:* Konversi: ${stats.total_leads ? ((bookingSnapshot.size / stats.total_leads) * 100).toFixed(1) : 0}%`
         ].join('\n')
     };
 }
@@ -167,10 +161,6 @@ async function handleCustomerDeepDive(db, phone) {
         bList.push(`- ${d.bookingDate}: ${d.services?.join(', ')} (${d.status})`);
     });
 
-    const msgs = await docRef.collection('messages').orderBy('timestamp', 'desc').limit(3).get();
-    let rChats = [];
-    msgs.forEach(m => rChats.push(`> ${m.data().text.substring(0, 50)}...`));
-
     return {
         success: true,
         formattedResponse: [
@@ -181,17 +171,14 @@ async function handleCustomerDeepDive(db, phone) {
             ``,
             `📅 *5 Booking Terakhir:*`,
             bList.length ? bList.join('\n') : '- Belum ada riwayat',
-            ``,
-            `💬 *Chat Terakhir:*`,
-            rChats.reverse().join('\n')
         ].join('\n')
     };
 }
 
 /**
- * 🕵️ Find Follow-up (Jemput Bola)
+ * 🕵️ Find Follow-up (Jemput Bola) & Draft Report
  */
-async function handleFindFollowup(db) {
+async function handleFindFollowup(db, saveToQueue = false) {
     const now = new Date();
     const twelveHoursAgo = new Date(now.getTime() - 12 * 60 * 60 * 1000);
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -199,70 +186,119 @@ async function handleFindFollowup(db) {
 
     const snapshot = await db.collection('directMessages').where('customerLabel', 'in', ['hot_lead', 'cold_lead', 'follow_up', 'completed']).get();
     const candidates = [];
+    const queueItems = [];
 
     snapshot.forEach(doc => {
         const d = doc.data();
         const l = d.customerLabel;
+        const name = d.name || 'Mas';
         let lastAct = (d.labelUpdatedAt || d.updatedAt || d.lastMessageAt)?.toDate();
         if (!lastAct) return;
 
-        let cat = null, strat = null;
+        let cat = null, draft = null;
         if (l === 'hot_lead' && lastAct < twelveHoursAgo) {
-            cat = '🔥 Hot Lead (PRIORITAS)';
-            strat = 'Segera follow up, tawarkan slot/promo eksklusif.';
+            cat = '🔥 Hot Lead';
+            draft = `Halo ${name}! Kemarin sempat nanya soal treatment motor ya mas? Slot buat besok masih ada nih, mau dipesenin sekalian?`;
         } else if (l === 'cold_lead' && lastAct < oneDayAgo) {
             cat = '🧊 Cold Lead';
-            strat = 'Sapa kembali, tawarkan bantuan/info promo.';
+            draft = `Halo ${name}, cuma mau sapa nih. Ada yang bisa Zoya bantu lagi buat motornya? Kita lagi ada promo menarik bulan ini lho!`;
         } else if (l === 'follow_up' && lastAct < oneDayAgo) {
-            cat = '⏳ Pending/Follow-Up';
-            strat = 'Ingatkan janji halus, tanyakan kendalanya apa.';
+            cat = '⏳ Pending';
+            draft = `Halo ${name}! Zoya cuma mau ingetin lagi soal rencana treatment-nya. Jadi di-booking buat minggu ini mas?`;
         } else if (l === 'completed' && lastAct < ninetyDaysAgo) {
-            cat = '💎 Loyal (Retention)';
-            strat = 'Tawarkan perawatan ulang (Maintenance/Coating).';
+            cat = '💎 Loyal';
+            draft = `Halo ${name}! Pas 3 bulan nih sejak treatment terakhir. Gimana kondisi motornya mas? Waktunya maintenance biar coating-nya awet kinclong nih.`;
         }
 
-        if (cat) candidates.push({ name: d.name || doc.id, number: d.senderNumber || doc.id, cat, strat, days: Math.floor((now - lastAct) / 86400000) });
+        if (cat && draft) {
+            candidates.push({ name: d.name || doc.id, number: d.senderNumber || doc.id, cat, draft });
+            queueItems.push({
+                targetPhone: d.fullSenderId || d.senderNumber || doc.id,
+                name: d.name || 'Mas',
+                message: draft,
+                category: cat
+            });
+        }
     });
 
-    if (!candidates.length) return { success: true, message: 'Tidak ada kandidat follow-up yang memenuhi kriteria waktu saat ini.' };
+    if (saveToQueue && queueItems.length > 0) {
+        await db.collection('settings').doc('followup_queue').set({
+            items: queueItems,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+    }
 
-    const list = candidates.map((c, i) => `${i + 1}. ${c.name} (${c.number})\n   Kategori: ${c.cat} (${c.days} hari)\n   Tips: ${c.strat}`).join('\n\n');
-    return { success: true, formattedResponse: `🕵️ *Target Jemput Bola (${candidates.length} orang):*\n\n${list}` };
+    if (!candidates.length) return { success: true, message: 'Tidak ada kandidat follow-up harian.' };
+
+    const list = candidates.map((c, i) => `${i + 1}. *${c.name}* (${c.cat})\n   📝 Draft: "${c.draft}"`).join('\n\n');
+    return {
+        success: true,
+        data: queueItems,
+        formattedResponse: `🕵️ *Target Jemput Bola Pagi Ini (${candidates.length} orang):*\n\n${list}\n\n💡 *Balas "acc follow up" atau "gas pol" untuk kirim semua pesan di atas.*`
+    };
+}
+
+/**
+ * 🚀 Execute Follow-up (Mass Send)
+ */
+async function handleExecuteFollowup(db) {
+    const queueDoc = await db.collection('settings').doc('followup_queue').get();
+    if (!queueDoc.exists || !queueDoc.data().items || queueDoc.data().items.length === 0) {
+        return { success: false, message: 'Queue follow-up kosong atau tidak ditemukan. Scan dulu Bos!' };
+    }
+
+    const { items } = queueDoc.data();
+    const client = global.whatsappClient;
+    if (!client) return { success: false, message: 'Koneksi WhatsApp belum siap.' };
+
+    let successCount = 0;
+    for (const item of items) {
+        try {
+            await client.sendText(item.targetPhone, item.message);
+            successCount++;
+            // Sedikit delay agar tidak dianggap spam
+            await new Promise(r => setTimeout(r, 1500));
+        } catch (e) {
+            console.error(`[CRM] Gagal kirim follow up ke ${item.targetPhone}:`, e.message);
+        }
+    }
+
+    // Clear queue
+    await db.collection('settings').doc('followup_queue').update({ items: [] });
+
+    return {
+        success: true,
+        formattedResponse: `✅ *Eksekusi Selesai!* Berhasil mengirim ${successCount} dari ${items.length} pesan follow-up. Database queue sudah dibersihkan.`
+    };
 }
 
 /**
  * 🏷️ Bulk Labeling
  */
 async function handleBulkLabel(db, targetNumbers, label, reason) {
-    if (!label || !targetNumbers || !targetNumbers.length) return { success: false, message: 'Label dan daftar nomor wajib diisi.' };
-
+    if (!label || !targetNumbers || !targetNumbers.length) return { success: false, message: 'Label dan nomor wajib diisi.' };
     let waLabelId = null;
     if (global.whatsappClient) {
         try {
             const waLabel = await ensureWhatsAppLabel(global.whatsappClient, db, label);
             waLabelId = waLabel?.id;
-        } catch (e) {
-            console.warn('[CRM] WA Label Error:', e.message);
-        }
+        } catch (e) { }
     }
 
-    let success = 0, fail = 0;
+    let success = 0;
     for (const num of targetNumbers) {
         try {
             const { docId, normalizedAddress } = parseSenderIdentity(num);
             const docRef = db.collection('directMessages').doc(docId);
             const doc = await docRef.get();
-            if (!doc.exists) { fail++; continue; }
-
+            if (!doc.exists) continue;
             const prevLabelId = doc.data()?.whatsappLabelId;
             await docRef.set({ customerLabel: label, labelReason: reason || 'Bulk CRM', labelUpdatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
-
             if (global.whatsappClient && waLabelId) await assignWhatsAppLabel(global.whatsappClient, db, normalizedAddress || num, docId, waLabelId, prevLabelId);
             success++;
-        } catch (e) { fail++; }
+        } catch (e) { }
     }
-
-    return { success: true, formattedResponse: `✅ Bulk Label *${LABEL_DISPLAY_NAMES[label] || label}* Selesai!\n- Berhasil: ${success}\n- Gagal: ${fail}` };
+    return { success: true, formattedResponse: `✅ Bulk Label *${LABEL_DISPLAY_NAMES[label] || label}* Selesai! (${success}/${targetNumbers.length} Berhasil)` };
 }
 
 /**
@@ -275,4 +311,4 @@ async function handleUpdateNotes(db, phone, notes) {
     return { success: true, message: `Notes berhasil diperbarui.` };
 }
 
-module.exports = { crmManagementTool };
+module.exports = { crmManagementTool, handleFindFollowup };

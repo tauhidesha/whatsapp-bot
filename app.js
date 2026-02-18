@@ -43,6 +43,7 @@ const { updatePromoOfTheMonthTool } = require('./src/ai/tools/updatePromoOfTheMo
 const { createMetaWebhookRouter } = require('./src/server/metaWebhook.js');
 const { sendMetaMessage } = require('./src/server/metaClient.js');
 const { startBookingReminderScheduler } = require('./src/ai/utils/bookingReminders.js');
+const { startFollowupScheduler } = require('./src/ai/utils/followupScheduler.js');
 const { isSnoozeActive, setSnoozeMode, clearSnoozeMode, getSnoozeInfo } = require('./src/ai/utils/humanHandover.js');
 const { getLangSmithCallbacks } = require('./src/ai/utils/langsmith.js');
 const { saveCustomerLocation } = require('./src/ai/utils/customerLocations.js');
@@ -380,7 +381,8 @@ Panggilan: "Bos" (tapi jangan kaku, anggap partner kerja akrab).
    Gunakan \`crmManagement\` untuk:
    - \`crm_summary\`: Dashboard analytics & revenue.
    - \`customer_deep_dive\`: Cek riwayat lengkap 1 pelanggan.
-   - \`find_followup\`: Scan otomatis target "jemput bola" harian.
+   - \`find_followup\`: Scan otomatis target "jemput bola" harian & buat draft queue.
+   - \`execute_followup\`: WAJIB dipanggil jika Bos berkata "acc", "gas", "eksekusi", atau setuju dengan report follow-up harian. Ini akan mengirimkan semua draft pesan di queue ke pelanggan.
    - \`bulk_label\`: Label massal (Hot/Cold/Follow-up) ke banyak orang.
    - \`update_notes\`: Simpan catatan internal admin.
 </instructions>
@@ -2235,6 +2237,7 @@ server.listen(PORT, '0.0.0.0', async () => {
 
             start(client);
             startBookingReminderScheduler();
+            startFollowupScheduler();
             console.log('✅ WhatsApp client initialized successfully!');
 
             // Start keep-alive mechanism untuk mencegah server idle timeout

@@ -59,13 +59,15 @@ async function sendReminderMessage(booking) {
   }
 }
 
-async function sendBookingReminders() {
+async function sendBookingReminders(force = false) {
   if (!REMINDER_ENABLED) {
     return;
   }
 
   const now = DateTime.now().setZone(TIMEZONE);
-  if (now.hour !== REMINDER_HOUR || now.minute >= REMINDER_WINDOW_MINUTES) {
+  // Reaksi normal: hanya jam 8 pagi di menit 0-30
+  // Jika force: lompati pengecekan jam (berguna buat startup atau testing)
+  if (!force && (now.hour !== REMINDER_HOUR || now.minute >= REMINDER_WINDOW_MINUTES)) {
     return;
   }
 
@@ -131,7 +133,7 @@ function startBookingReminderScheduler() {
 
   console.log(`[bookingReminders] Scheduler dimulai. Interval ${REMINDER_INTERVAL_MINUTES} menit, pengingat jam ${REMINDER_HOUR}:00 ${TIMEZONE}`);
 
-  sendBookingReminders().catch(error => {
+  sendBookingReminders(true).catch(error => {
     console.error('[bookingReminders] Error saat run awal:', error);
   });
 }
