@@ -8,6 +8,7 @@ const {
     ensureWhatsAppLabel,
     assignWhatsAppLabel
 } = require('../../lib/whatsappLabelUtils.js');
+const { getCustomerChatHistory, generatePersonalizedDraft } = require('../utils/followupPersonalizer.js');
 
 /**
  * Tool CRM Komprehensif untuk AI Admin (Zoya).
@@ -188,6 +189,8 @@ async function handleFindFollowup(db, saveToQueue = false) {
     const candidates = [];
     const queueItems = [];
 
+    // Filter kandidat awal
+    const targetGroups = [];
     snapshot.forEach(doc => {
         const d = doc.data();
         const l = d.customerLabel;
@@ -195,31 +198,42 @@ async function handleFindFollowup(db, saveToQueue = false) {
         let lastAct = (d.labelUpdatedAt || d.updatedAt || d.lastMessageAt)?.toDate();
         if (!lastAct) return;
 
-        let cat = null, draft = null;
-        if (l === 'hot_lead' && lastAct < twelveHoursAgo) {
-            cat = '🔥 Hot Lead';
-            draft = `Halo ${name}! Kemarin sempat nanya soal treatment motor ya mas? Slot buat besok masih ada nih, mau dipesenin sekalian?`;
-        } else if (l === 'cold_lead' && lastAct < oneDayAgo) {
-            cat = '🧊 Cold Lead';
-            draft = `Halo ${name}, cuma mau sapa nih. Ada yang bisa Zoya bantu lagi buat motornya? Kita lagi ada promo menarik bulan ini lho!`;
-        } else if (l === 'follow_up' && lastAct < oneDayAgo) {
-            cat = '⏳ Pending';
-            draft = `Halo ${name}! Zoya cuma mau ingetin lagi soal rencana treatment-nya. Jadi di-booking buat minggu ini mas?`;
-        } else if (l === 'completed' && lastAct < ninetyDaysAgo) {
-            cat = '💎 Loyal';
-            draft = `Halo ${name}! Pas 3 bulan nih sejak treatment terakhir. Gimana kondisi motornya mas? Waktunya maintenance biar coating-nya awet kinclong nih.`;
-        }
+        let cat = null;
+        if (l === 'hot_lead' && lastAct < twelveHoursAgo) cat = '🔥 Hot Lead';
+        else if (l === 'cold_lead' && lastAct < oneDayAgo) cat = '🧊 Cold Lead';
+        else if (l === 'follow_up' && lastAct < oneDayAgo) cat = '⏳ Pending';
+        else if (l === 'completed' && lastAct < ninetyDaysAgo) cat = '💎 Loyal';
 
-        if (cat && draft) {
-            candidates.push({ name: d.name || doc.id, number: d.senderNumber || doc.id, cat, draft });
-            queueItems.push({
-                targetPhone: d.fullSenderId || d.senderNumber || doc.id,
-                name: d.name || 'Mas',
-                message: draft,
-                category: cat
+        if (cat) {
+            targetGroups.push({
+                docId: doc.id,
+                name,
+                label: l,
+                cat,
+                fullSenderId: d.fullSenderId || d.senderNumber || doc.id
             });
         }
     });
+
+    if (targetGroups.length === 0) return { success: true, message: 'Tidak ada kandidat follow-up harian.' };
+
+    // Proses personalisasi secara paralel (tapi terbatas biar nggak rate-limit)
+    const BATCH_SIZE = 5;
+    for (let i = 0; i < targetGroups.length; i += BATCH_SIZE) {
+        const batch = targetGroups.slice(i, i + BATCH_SIZE);
+        await Promise.all(batch.map(async (tg) => {
+            const history = await getCustomerChatHistory(db, tg.docId);
+            const personalizedDraft = await generatePersonalizedDraft(tg.name, tg.cat, history);
+
+            candidates.push({ name: tg.name, number: tg.fullSenderId, cat: tg.cat, draft: personalizedDraft });
+            queueItems.push({
+                targetPhone: tg.fullSenderId,
+                name: tg.name,
+                message: personalizedDraft,
+                category: tg.cat
+            });
+        }));
+    }
 
     if (saveToQueue && queueItems.length > 0) {
         await db.collection('settings').doc('followup_queue').set({
