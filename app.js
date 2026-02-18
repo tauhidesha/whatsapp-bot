@@ -154,7 +154,6 @@ const toolDefinitions = [
     updateSystemPromptTool.toolDefinition,
     getSystemPromptTool.toolDefinition,
     updatePromoOfTheMonthTool.toolDefinition,
-    crmManagementTool.toolDefinition,
 ];
 
 console.log('🔧 [STARTUP] Tool Registry Initialized:');
@@ -381,7 +380,7 @@ Panggilan: "Bos" (tapi jangan kaku, anggap partner kerja akrab).
    Gunakan \`crmManagement\` untuk:
    - \`crm_summary\`: Dashboard analytics & revenue.
    - \`customer_deep_dive\`: Cek riwayat lengkap 1 pelanggan.
-   - \`find_followup\`: Scan otomatis target "jemput bola" harian & buat draft queue.
+   - \`find_followup\`: Scan otomatis target "jemput bola" harian & buat draft queue. Jika Bos minta "ulang", "generate baru", atau "refresh report", panggil tool ini lagi untuk memperbarui queue dengan ide sapaan baru.
    - \`execute_followup\`: WAJIB dipanggil jika Bos berkata "acc", "gas", "eksekusi", atau setuju dengan report follow-up harian. Ini akan mengirimkan semua draft pesan di queue ke pelanggan.
    - \`bulk_label\`: Label massal (Hot/Cold/Follow-up) ke banyak orang.
    - \`update_notes\`: Simpan catatan internal admin.
