@@ -31,8 +31,7 @@ const { generateDocumentTool } = require('./src/ai/tools/generateDocumentTool.js
 const { readDirectMessagesTool } = require('./src/ai/tools/readDirectMessagesTool.js');
 const { sendMessageTool } = require('./src/ai/tools/sendMessageTool.js');
 const { updateCustomerLabelTool } = require('./src/ai/tools/updateCustomerLabelTool.js');
-const { scanFollowUpCandidatesTool } = require('./src/ai/tools/scanFollowUpCandidatesTool.js');
-const { adminLabelingTool } = require('./src/ai/tools/adminLabelingTool.js');
+const { crmManagementTool } = require('./src/ai/tools/crmManagementTool.js');
 const {
     addTransactionTool,
     getTransactionHistoryTool,
@@ -110,8 +109,7 @@ const availableTools = {
     readDirectMessages: readDirectMessagesTool.implementation,
     sendMessage: sendMessageTool.implementation,
     updateCustomerLabel: updateCustomerLabelTool.implementation,
-    scanFollowUpCandidates: scanFollowUpCandidatesTool.implementation,
-    adminLabeling: adminLabelingTool.implementation,
+    crmManagement: crmManagementTool.implementation,
     addTransaction: addTransactionTool.implementation,
     getTransactionHistory: getTransactionHistoryTool.implementation,
     calculateFinances: calculateFinancesTool.implementation,
@@ -148,14 +146,14 @@ const toolDefinitions = [
     readDirectMessagesTool.toolDefinition,
     sendMessageTool.toolDefinition,
     updateCustomerLabelTool.toolDefinition,
-    scanFollowUpCandidatesTool.toolDefinition,
-    adminLabelingTool.toolDefinition,
+    crmManagementTool.toolDefinition,
     addTransactionTool.toolDefinition,
     getTransactionHistoryTool.toolDefinition,
     calculateFinancesTool.toolDefinition,
     updateSystemPromptTool.toolDefinition,
     getSystemPromptTool.toolDefinition,
     updatePromoOfTheMonthTool.toolDefinition,
+    crmManagementTool.toolDefinition,
 ];
 
 console.log('🔧 [STARTUP] Tool Registry Initialized:');
@@ -378,24 +376,22 @@ Panggilan: "Bos" (tapi jangan kaku, anggap partner kerja akrab).
 <instructions>
 1. Context Aware: Anda paham seluk beluk bisnis Bosmat (Repaint, Detailing, Coaching). Gunakan pengetahuan ini saat diskusi.
 2. Eksekusi Cepat: Prioritaskan panggil tool yang tepat jika ada instruksi eksplisit.
-3. Labeling Proaktif:
-   Jika Bos minta cek DM atau list leads -> pakai \`adminLabeling\` dengan action \`list_leads\`.
-   Jika Bos minta label beberapa orang sekaligus -> pakai \`adminLabeling\` dengan action \`bulk_label\`.
-4. Follow-Up Proaktif ("Jemput Bola"):
-   Jika Bos minta cek target follow up, scan database, atau "jemput bola" -> pakai \`scanFollowUpCandidates\`.
-   Laporkan hasilnya dengan kategori (Hot Lead, Cold Lead, Pending, Retention) dan saran strategi pendekatan.
+3. CRM & Follow-Up ("Jemput Bola"):
+   Gunakan \`crmManagement\` untuk:
+   - \`crm_summary\`: Dashboard analytics & revenue.
+   - \`customer_deep_dive\`: Cek riwayat lengkap 1 pelanggan.
+   - \`find_followup\`: Scan otomatis target "jemput bola" harian.
+   - \`bulk_label\`: Label massal (Hot/Cold/Follow-up) ke banyak orang.
+   - \`update_notes\`: Simpan catatan internal admin.
 </instructions>
 
 <tools>
 \`readDirectMessages\`: Baca atau list chat.
 \`sendMessage\`: Kirim pesan ke customer.
 \`generateDocument\`: Bikin PDF (Invoice, Tanda Terima, Bukti Bayar).
-\`updateCustomerLabel\`: Update status leads (1 orang: hot_lead, cold_lead, booking_process, completed, follow_up, dll).
-\`adminLabeling\`: Tool labeling canggih:
-   \`list_leads\`: List semua DM dengan filter waktu (1_week, 2_weeks, 1_month) dan filter label. Lengkap dengan statistik.
-   \`bulk_label\`: Label beberapa pelanggan sekaligus secara batch.
-\`scanFollowUpCandidates\`: Scan database untuk cari pelanggan yang perlu di-follow up (Hot Lead >12jam, Cold Lead >24jam, Follow Up >24jam, Retention >90hari).
-\`updatePromoOfTheMonth\`: Update isi promo bulan ini agar bisa dipakai Zoya ke customer.
+\`updateCustomerLabel\`: Update status leads per orang.
+\`crmManagement\`: Toolbox CRM Lengkap (Summary, Profil 360, Follow-up, Bulk Label, Notes).
+\`updatePromoOfTheMonth\`: Update isi promo bulan ini.
 </tools>
 
 <output_format>
