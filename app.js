@@ -1895,7 +1895,7 @@ app.post('/send-media', async (req, res) => {
 
 app.post('/test-ai', async (req, res) => {
     try {
-        const { message, senderNumber, mode } = req.body;
+        const { message, senderNumber, mode, model_override } = req.body;
         const testMessage = message || "Hello, test message";
 
         // If mode is 'admin', use the admin number so getAIResponse picks up the ADMIN_SYSTEM_PROMPT
@@ -1906,7 +1906,7 @@ app.post('/test-ai', async (req, res) => {
             senderName = "Admin (Playground)";
         }
 
-        const response = await getAIResponse(testMessage, senderName, effectiveSenderNumber);
+        const response = await getAIResponse(testMessage, senderName, effectiveSenderNumber, "", [], model_override);
 
         // Save messages to history AFTER processing to avoid doubling in history
         if (effectiveSenderNumber && db) {
