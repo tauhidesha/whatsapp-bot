@@ -410,6 +410,7 @@ async function implementation(input) {
             serviceSize: category === 'repaint' ? null : finalSize,
             repaintSize: category === 'repaint' ? finalSize : null,
             motor_model: motorModel,
+            target_service: result.service_name,
           });
         }
 
@@ -450,6 +451,7 @@ async function implementation(input) {
         serviceSize: category === 'repaint' ? null : finalSize,
         repaintSize: category === 'repaint' ? finalSize : null,
         motor_model: motorModel,
+        target_service: result.service_name,
       });
     }
 

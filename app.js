@@ -40,6 +40,7 @@ const {
 const { updateSystemPromptTool } = require('./src/ai/tools/updateSystemPromptTool.js');
 const { getSystemPromptTool } = require('./src/ai/tools/getSystemPromptTool.js');
 const { updatePromoOfTheMonthTool } = require('./src/ai/tools/updatePromoOfTheMonthTool.js');
+const { updateCustomerContextTool } = require('./src/ai/tools/updateCustomerContextTool.js');
 const { createMetaWebhookRouter } = require('./src/server/metaWebhook.js');
 const { sendMetaMessage } = require('./src/server/metaClient.js');
 const { startBookingReminderScheduler } = require('./src/ai/utils/bookingReminders.js');
@@ -48,6 +49,7 @@ const { isSnoozeActive, setSnoozeMode, clearSnoozeMode, getSnoozeInfo } = requir
 const { getLangSmithCallbacks } = require('./src/ai/utils/langsmith.js');
 const { saveCustomerLocation } = require('./src/ai/utils/customerLocations.js');
 const { parseSenderIdentity } = require('./src/lib/utils.js');
+const { getState } = require('./src/ai/utils/conversationState.js');
 const masterLayanan = require('./src/data/masterLayanan.js');
 
 const app = express();
@@ -130,6 +132,7 @@ const availableTools = {
         });
     },
     updatePromoOfTheMonth: updatePromoOfTheMonthTool.implementation,
+    updateCustomerContext: updateCustomerContextTool.implementation,
 };
 
 const toolDefinitions = [
@@ -154,6 +157,7 @@ const toolDefinitions = [
     updateSystemPromptTool.toolDefinition,
     getSystemPromptTool.toolDefinition,
     updatePromoOfTheMonthTool.toolDefinition,
+    updateCustomerContextTool.toolDefinition,
 ];
 
 console.log('🔧 [STARTUP] Tool Registry Initialized:');
@@ -969,8 +973,28 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
             effectiveSystemPrompt = ADMIN_SYSTEM_PROMPT;
         }
 
+        // Persistent Memory Injection
+        let memoryPart = "";
+        if (senderNumber) {
+            try {
+                const state = await getState(senderNumber);
+                if (state) {
+                    const parts = [];
+                    if (state.motor_model) parts.push(`- Motor: ${state.motor_model}`);
+                    if (state.target_service) parts.push(`- Layanan dituju: ${state.target_service}`);
+                    if (state.important_notes) parts.push(`- Catatan: ${state.important_notes}`);
+
+                    if (parts.length > 0) {
+                        memoryPart = `\n\n[PERSISTENT CONTEXT]\nInformasi yang sudah diketahui tentang pelanggan ini:\n${parts.join('\n')}\n(Gunakan informasi ini jika relevan, jangan tanya ulang hal yang sudah diketahui).`;
+                    }
+                }
+            } catch (error) {
+                console.warn('[AI_PROCESSING] Gagal mengambil persistent state:', error.message);
+            }
+        }
+
         const messages = [
-            new SystemMessage(effectiveSystemPrompt),
+            new SystemMessage(effectiveSystemPrompt + memoryPart),
             ...conversationHistoryMessages,
             new HumanMessage(humanMessageContent)
         ].filter(msg => !!msg); // Filter out null/undefined messages

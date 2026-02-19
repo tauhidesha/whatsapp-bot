@@ -17,10 +17,20 @@ function mergeSizes(current, incoming) {
     serviceSize: current?.serviceSize || null,
     repaintSize: current?.repaintSize || null,
     motor_model: current?.motor_model || null,
+    target_service: current?.target_service || null,
+    important_notes: current?.important_notes || null,
   };
 
   if (incoming?.motor_model) {
     merged.motor_model = incoming.motor_model;
+  }
+
+  if (incoming?.target_service) {
+    merged.target_service = incoming.target_service;
+  }
+
+  if (incoming?.important_notes) {
+    merged.important_notes = incoming.important_notes;
   }
 
   if (typeof incoming === 'string') {
@@ -80,12 +90,14 @@ async function setMotorSizeForSender(sender, sizes) {
   const key = normalizeKey(sender);
   if (!key) return;
 
-  const existing = await getState(key) || { serviceSize: null, repaintSize: null };
+  const existing = await getState(key) || {
+    serviceSize: null,
+    repaintSize: null,
+    motor_model: null,
+    target_service: null,
+    important_notes: null
+  };
   const merged = mergeSizes(existing, sizes);
-
-  if (!merged.serviceSize && !merged.repaintSize) {
-    return;
-  }
 
   await updateState(key, merged);
 }
