@@ -906,12 +906,13 @@ async function analyzeMediaWithGemini(mediaBuffer, mimeType, caption = '', sende
     return `${mediaTypeLabel} diterima, namun analisis otomatis gagal dilakukan.`;
 }
 
-async function getAIResponse(userMessage, senderName = "User", senderNumber = null, context = "", mediaItems = [], modelOverride = null) {
+async function getAIResponse(userMessage, senderName = "User", senderNumber = null, context = "", mediaItems = [], modelOverride = null, providedHistory = []) {
     try {
         console.log('\n🤖 [AI_PROCESSING] ===== STARTING AI PROCESSING =====');
         console.log(`📝 [AI_PROCESSING] User Message: "${userMessage}"`);
         console.log(`👤 [AI_PROCESSING] Sender: ${senderName}`);
         console.log(`📱 [AI_PROCESSING] Sender Number: ${senderNumber || 'N/A'}`);
+
 
         let conversationHistoryMessages = [];
 
@@ -923,8 +924,11 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
             if (history.length > 0) {
                 console.log(`🧠 [AI_PROCESSING] Last message: "${history[history.length - 1]?.text?.substring(0, 50)}..."`);
             }
+        } else if (providedHistory && providedHistory.length > 0) {
+            console.log(`🧠 [AI_PROCESSING] Using provided local history (${providedHistory.length} messages)`);
+            conversationHistoryMessages = buildLangChainHistory(providedHistory);
         } else {
-            console.log(`🧠 [AI_PROCESSING] No conversation history (new user or no DB)`);
+            console.log(`🧠 [AI_PROCESSING] No conversation history (new user, no DB, or no local history provided)`);
         }
 
         const userTextContent = context
@@ -1895,18 +1899,21 @@ app.post('/send-media', async (req, res) => {
 
 app.post('/test-ai', async (req, res) => {
     try {
-        const { message, senderNumber, mode, model_override } = req.body;
+        const { message, senderNumber, mode, model_override, history } = req.body;
         const testMessage = message || "Hello, test message";
 
         // If mode is 'admin', use the admin number so getAIResponse picks up the ADMIN_SYSTEM_PROMPT
         let effectiveSenderNumber = senderNumber || null;
         let senderName = "Test User";
         if (mode === 'admin') {
-            effectiveSenderNumber = process.env.BOSMAT_ADMIN_NUMBER || process.env.ADMIN_WHATSAPP_NUMBER || effectiveSenderNumber;
+            // Only force the sender number if it's already set somehow, otherwise we still want it to be null to use local memory if applicable
+            if (effectiveSenderNumber) {
+                effectiveSenderNumber = process.env.BOSMAT_ADMIN_NUMBER || process.env.ADMIN_WHATSAPP_NUMBER || effectiveSenderNumber;
+            }
             senderName = "Admin (Playground)";
         }
 
-        const response = await getAIResponse(testMessage, senderName, effectiveSenderNumber, "", [], model_override);
+        const response = await getAIResponse(testMessage, senderName, effectiveSenderNumber, "", [], model_override, history);
 
         // Save messages to history AFTER processing to avoid doubling in history
         if (effectiveSenderNumber && db) {
