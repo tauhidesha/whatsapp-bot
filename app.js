@@ -1899,8 +1899,18 @@ app.post('/send-media', async (req, res) => {
 
 app.post('/test-ai', async (req, res) => {
     try {
-        const { message, senderNumber, mode, model_override, history } = req.body;
+        const { message, senderNumber, mode, model_override, history, media } = req.body;
         const testMessage = message || "Hello, test message";
+
+        // Convert base64 media to Buffer format for getAIResponse
+        let mediaItems = [];
+        if (media && Array.isArray(media)) {
+            mediaItems = media.map(item => ({
+                type: item.type, // 'image' or 'video'
+                mimetype: item.mimetype,
+                buffer: Buffer.from(item.base64, 'base64')
+            }));
+        }
 
         // If mode is 'admin', use the admin number so getAIResponse picks up the ADMIN_SYSTEM_PROMPT
         let effectiveSenderNumber = senderNumber || null;
@@ -1913,7 +1923,7 @@ app.post('/test-ai', async (req, res) => {
             senderName = "Admin (Playground)";
         }
 
-        const response = await getAIResponse(testMessage, senderName, effectiveSenderNumber, "", [], model_override, history);
+        const response = await getAIResponse(testMessage, senderName, effectiveSenderNumber, "", mediaItems, model_override, history);
 
         // Save messages to history AFTER processing to avoid doubling in history
         if (effectiveSenderNumber && db) {
