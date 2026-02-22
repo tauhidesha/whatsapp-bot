@@ -946,8 +946,9 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
             for (const item of mediaItems) {
                 if (item.type === 'image') {
                     humanMessageContent.push({
-                        type: "image_url",
-                        image_url: `data:${item.mimetype};base64,${item.buffer.toString('base64')}`
+                        type: "media",
+                        mimeType: item.mimetype,
+                        data: item.buffer.toString('base64')
                     });
                 } else if (item.type === 'video') {
                     humanMessageContent.push({
