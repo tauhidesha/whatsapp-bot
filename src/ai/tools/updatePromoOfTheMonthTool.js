@@ -3,6 +3,7 @@
 
 const admin = require('firebase-admin');
 const { isAdmin } = require('../utils/adminAuth');
+const { invalidatePromoCache } = require('../utils/promoConfig.js');
 
 async function implementation(args) {
     const { promoText, isActive, senderNumber } = args;
@@ -25,6 +26,9 @@ async function implementation(args) {
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             updatedBy: senderNumber
         }, { merge: true });
+
+        // Invalidate promo cache agar follow up engine langsung pakai promo baru
+        invalidatePromoCache();
 
         return {
             success: true,
