@@ -25,6 +25,9 @@ const addTransactionSchema = z.object({
     .string()
     .optional()
     .describe('Tanggal transaksi dalam ISO string (opsional). Jika kosong, pakai waktu server sekarang.'),
+  customerName: z.string().optional().describe('Nama customer (opsional/jika ada).'),
+  customerNumber: z.string().optional().describe('Nomor WhatsApp customer (opsional/jika ada).'),
+  customerId: z.string().optional().describe('ID Customer di Firestore jika ada link ke directMessages/{docId} (opsional).'),
   senderNumber: z.string().describe('Nomor pengirim (otomatis diisi sistem).'),
 });
 
@@ -156,6 +159,18 @@ const addTransactionTool = {
             description:
               'Tanggal transaksi dalam ISO string (opsional). Jika tidak diisi, otomatis pakai waktu server sekarang.',
           },
+          customerName: {
+            type: 'string',
+            description: 'Nama customer (opsional/jika ada).',
+          },
+          customerNumber: {
+            type: 'string',
+            description: 'Nomor WhatsApp customer (opsional/jika ada).',
+          },
+          customerId: {
+            type: 'string',
+            description: 'Link ID ke directMessages/{docId} (opsional).',
+          },
           senderNumber: {
             type: 'string',
             description: 'Nomor pengirim (otomatis diisi sistem).',
@@ -193,6 +208,9 @@ const addTransactionTool = {
         description: parsed.description,
         paymentMethod: parsed.paymentMethod,
         date: dateField,
+        customerName: parsed.customerName || null,
+        customerNumber: parsed.customerNumber || null,
+        customerId: parsed.customerId || null,
         createdAt: now,
         updatedAt: now,
         createdBy: parsed.senderNumber
