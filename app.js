@@ -50,6 +50,7 @@ const { saveCustomerLocation } = require('./src/ai/utils/customerLocations.js');
 const { parseSenderIdentity } = require('./src/lib/utils.js');
 const { getState } = require('./src/ai/utils/conversationState.js');
 const { extractAndSaveContext } = require('./src/ai/agents/contextExtractor.js');
+const { startAudit, handleAuditResponse, handleResumeAudit, hasActiveSession } = require('./src/ai/agents/customerAudit.js');
 const masterLayanan = require('./src/data/masterLayanan.js');
 
 const app = express();
@@ -1435,7 +1436,59 @@ async function processBufferedMessages(senderNumber, client) {
         });
 
         if (isAdmin) {
-            const lowerMsg = combinedMessage.toLowerCase();
+            const lowerMsg = combinedMessage.toLowerCase().trim();
+
+            // ─── Audit Customer Trigger ─────────────────────────────────
+            const AUDIT_TRIGGERS = ['audit customer', 'mulai audit', 'audit'];
+            const RESUME_TRIGGERS = ['lanjut audit', 'resume audit'];
+            const NEW_AUDIT_TRIGGER = 'audit baru';
+
+            if (lowerMsg === NEW_AUDIT_TRIGGER || AUDIT_TRIGGERS.includes(lowerMsg)) {
+                console.log(`[ADMIN] 📋 Audit trigger detected: "${lowerMsg}"`);
+                const targetNumber = toSenderNumberWithSuffix(senderNumber);
+                const auditResponse = await startAudit(normalizedAddress);
+                await client.sendText(targetNumber, auditResponse);
+                if (db) {
+                    await saveMessageToFirestore(senderNumber, combinedMessage, 'user');
+                    await saveMessageToFirestore(senderNumber, auditResponse, 'ai');
+                }
+                await client.stopTyping(senderNumber);
+                return;
+            }
+
+            if (RESUME_TRIGGERS.includes(lowerMsg)) {
+                console.log(`[ADMIN] 📋 Audit resume trigger detected`);
+                const targetNumber = toSenderNumberWithSuffix(senderNumber);
+                const auditResponse = await handleResumeAudit(normalizedAddress);
+                await client.sendText(targetNumber, auditResponse);
+                if (db) {
+                    await saveMessageToFirestore(senderNumber, combinedMessage, 'user');
+                    await saveMessageToFirestore(senderNumber, auditResponse, 'ai');
+                }
+                await client.stopTyping(senderNumber);
+                return;
+            }
+
+            // Check if admin has active audit session
+            if (await hasActiveSession(normalizedAddress)) {
+                console.log(`[ADMIN] 📋 Active audit session, routing to audit handler`);
+                const auditResponse = await handleAuditResponse(normalizedAddress, combinedMessage);
+                if (auditResponse !== null) {
+                    // Audit handled the message
+                    const targetNumber = toSenderNumberWithSuffix(senderNumber);
+                    await client.sendText(targetNumber, auditResponse);
+                    if (db) {
+                        await saveMessageToFirestore(senderNumber, combinedMessage, 'user');
+                        await saveMessageToFirestore(senderNumber, auditResponse, 'ai');
+                    }
+                    await client.stopTyping(senderNumber);
+                    return;
+                }
+                // auditResponse === null → escape hatch, proceed to getAIResponse
+                console.log(`[ADMIN] 📋 Audit escape hatch triggered, forwarding to AI`);
+            }
+
+            // ─── Model Override (#pro / !pro) ───────────────────────────
             if (lowerMsg.startsWith('#pro ') || lowerMsg.startsWith('!pro ')) {
                 modelOverride = 'gemini-3-pro-preview';
                 combinedMessage = combinedMessage.substring(5).trim();
