@@ -50,6 +50,7 @@ const { saveCustomerLocation } = require('./src/ai/utils/customerLocations.js');
 const { parseSenderIdentity } = require('./src/lib/utils.js');
 const { getState } = require('./src/ai/utils/conversationState.js');
 const { extractAndSaveContext } = require('./src/ai/agents/contextExtractor.js');
+const { classifyAndSaveCustomer } = require('./src/ai/agents/customerClassifier.js');
 const { startAudit, handleAuditResponse, handleResumeAudit, hasActiveSession } = require('./src/ai/agents/customerAudit.js');
 const masterLayanan = require('./src/data/masterLayanan.js');
 
@@ -1499,9 +1500,10 @@ async function processBufferedMessages(senderNumber, client) {
         const aiResponseResult = await getAIResponse(combinedMessage, senderName, senderNumber, '', mediaItems, modelOverride);
         const aiResponse = aiResponseResult.content;
 
-        // Fire and forget — extract customer context di background, tidak blocking
+        // Fire and forget — extract context THEN classify (chained, not parallel)
         extractAndSaveContext(combinedMessage, aiResponse, senderNumber)
-            .catch(err => console.warn('[Context] Extraction failed:', err.message));
+            .then(() => classifyAndSaveCustomer(senderNumber))
+            .catch(err => console.warn('[Pipeline] Context/Classifier failed:', err.message));
 
         // Save to Firebase if available
         if (db) {
