@@ -1107,7 +1107,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                             model: targetModel,
                             is_admin: isAdmin
                         },
-                        tags: [mode || 'customer', targetModel]
+                        tags: [isAdmin ? 'admin' : 'customer', targetModel]
                     });
 
                     response = await modelInstance.invoke(messages, tracingConfig);
