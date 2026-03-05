@@ -210,8 +210,7 @@ function lookupRepaintPrice(motorModel, subcategory, motorSize) {
         return {
           found: true,
           model: motorModel,
-          min: match.min,
-          max: match.max,
+          price: match.price,
           subcategory: 'bodi_kasar',
           note: `Kategori: ${match.category}`,
         };

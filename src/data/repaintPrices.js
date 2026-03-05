@@ -100,31 +100,31 @@ const repaintBodiHalus = [
 
 // ─── REPAINT BODI KASAR ───
 const repaintBodiKasar = [
-    { category: "Small Matic / Bebek", min: 300000, max: 380000, examples: "Beat, Mio, Supra" },
-    { category: "Medium Matic", min: 380000, max: 470000, examples: "Scoopy, Vario" },
-    { category: "Big Matic", min: 510000, max: 680000, examples: "NMax, PCX, ADV" },
-    { category: "Extra Big Matic", min: 765000, max: 1020000, examples: "XMAX, Forza" },
+    { category: "Small Matic / Bebek", price: 300000, examples: "Beat, Mio, Supra" },
+    { category: "Medium Matic", price: 380000, examples: "Scoopy, Vario" },
+    { category: "Big Matic", price: 510000, examples: "NMax, PCX, ADV" },
+    { category: "Extra Big Matic", price: 765000, examples: "XMAX, Forza" },
 ];
 
 // ─── REPAINT VELG ───
 const repaintVelg = [
-    { category: "Matic Kecil / Bebek", min: 250000, max: 250000, note: "Ring 14 / 17 (Scoopy, Beat, Vario, dll)" },
-    { category: "Big Matic / Super Bebek", min: 300000, max: 300000, note: "Velg Lebar (NMax, PCX, Aerox, Satria FU, MX King)" },
-    { category: "Sport 150cc - 250cc", min: 350000, max: 350000, note: "Velg Lebar (CBR, Ninja, GSX, Vixion)" },
+    { category: "Matic Kecil / Bebek", price: 350000, note: "Ring 14 / 17 (Scoopy, Beat, Vario, dll)" },
+    { category: "Big Matic / Super Bebek", price: 400000, note: "Velg Lebar (NMax, PCX, Aerox, Satria FU, MX King)" },
+    { category: "Sport 150cc - 250cc", price: 450000, note: "Velg Lebar (CBR, Ninja, GSX, Vixion)" },
 ];
 
 // Helper maps untuk Velg (memasukkan data fix dari user)
 const VELG_PRICE_MAP = {
-    // 250k tier
-    "scoopy": 250000, "genio": 250000, "vario": 250000, "mio": 250000, "beat": 250000, "vega": 250000, "fino": 250000,
-    "nouvo": 250000, "smash": 250000, "fazzio": 250000, "x-ride": 250000, "nex": 250000, "spacy": 250000, "gear": 250000,
-    "freego": 250000, "xeon": 250000, "skydrive": 250000, "spin": 250000, "hayate": 250000,
-    // 300k tier
-    "nmax": 300000, "mx king": 300000, "satria fu": 300000, "pcx": 300000, "adv": 300000, "aerox": 300000, "fizr": 300000,
-    "lexi": 300000, "jupiter": 300000, "vespa": 300000, "revo": 300000, "sonic": 300000, "blade": 300000,
     // 350k tier
-    "cbr": 350000, "gsx": 350000, "vixion": 350000, "byson": 350000, "tiger": 350000, "rx king": 350000, "thunder": 350000,
-    "xsr": 350000, "r15": 350000, "r25": 350000, "ninja": 350000, "cb 150": 350000, "megapro": 350000, "mt": 350000, "xabre": 350000
+    "scoopy": 350000, "genio": 350000, "vario": 350000, "mio": 350000, "beat": 350000, "vega": 350000, "fino": 350000,
+    "nouvo": 350000, "smash": 350000, "fazzio": 350000, "x-ride": 350000, "nex": 350000, "spacy": 350000, "gear": 350000,
+    "freego": 350000, "xeon": 350000, "skydrive": 350000, "spin": 350000, "hayate": 350000,
+    // 400k tier
+    "nmax": 400000, "mx king": 400000, "satria fu": 400000, "pcx": 400000, "adv": 400000, "aerox": 400000, "fizr": 400000,
+    "lexi": 400000, "jupiter": 400000, "vespa": 400000, "revo": 400000, "sonic": 400000, "blade": 400000,
+    // 450k tier
+    "cbr": 450000, "gsx": 450000, "vixion": 450000, "byson": 450000, "tiger": 450000, "rx king": 450000, "thunder": 450000,
+    "xsr": 450000, "r15": 450000, "r25": 450000, "ninja": 450000, "cb 150": 450000, "megapro": 450000, "mt": 450000, "xabre": 450000
 };
 
 // ─── TAMBAHAN WARNA SPESIAL ───
