@@ -323,7 +323,7 @@ async function implementation(input) {
 
     // Special case for "coating" generic query
     if (parsedServiceName.trim().toLowerCase() === 'coating') {
-      const names = ['Coating Motor Doff', 'Coating Motor Glossy'];
+      const names = ['Coating Motor Doff', 'Coating Motor Glossy', 'Complete Service Doff', 'Complete Service Glossy'];
       const services = masterLayanan.filter(s => names.includes(s.name));
 
       const results = await Promise.all(services.map(async (service) => {
@@ -335,6 +335,7 @@ async function implementation(input) {
           name: service.name,
           summary: service.summary,
           price: basePrice || 'Tergantung ukuran',
+          price_formatted: basePrice ? `Rp${basePrice.toLocaleString('id-ID')}` : 'Tergantung ukuran',
           size: finalSize || 'Belum diketahui'
         };
       }));
@@ -342,9 +343,94 @@ async function implementation(input) {
       return {
         success: true,
         multiple_candidates: true,
+        category: 'coating',
+        motor_model: motorModel || 'Belum diketahui',
         candidates: results,
         promo: promo,
-        message: 'Ditemukan 2 layanan utama untuk "coating". Silakan pilih Doff atau Glossy.'
+        message: 'Ditemukan beberapa paket coating & complete service. Silakan pilih sesuai kebutuhan.'
+      };
+    }
+
+    // Special case for "detailing" generic query
+    if (parsedServiceName.trim().toLowerCase() === 'detailing' || parsedServiceName.trim().toLowerCase() === 'poles') {
+      const services = masterLayanan.filter(s => s.category === 'detailing');
+
+      const results = await Promise.all(services.map(async (service) => {
+        const { finalSize } = await resolveSizeForService({ service, sizeArg: sizeFromArgs, senderNumber, cachedSizes, motorModel });
+        const variant = service.variants?.find(v => v.name === finalSize);
+        const basePrice = variant?.price ?? service.price;
+
+        return {
+          name: service.name,
+          summary: service.summary,
+          price: basePrice || 'Tergantung ukuran',
+          price_formatted: basePrice ? `Rp${basePrice.toLocaleString('id-ID')}` : 'Tergantung ukuran',
+          size: finalSize || 'Belum diketahui'
+        };
+      }));
+
+      return {
+        success: true,
+        multiple_candidates: true,
+        category: 'detailing',
+        motor_model: motorModel || 'Belum diketahui',
+        candidates: results,
+        promo: promo,
+        message: 'Berikut adalah daftar harga paket detailing kami.'
+      };
+    }
+
+    // Special case for "repaint" generic query
+    if (parsedServiceName.trim().toLowerCase() === 'repaint') {
+      if (!motorModel) {
+        return {
+          success: true,
+          multiple_candidates: true,
+          needs_motor_model: true,
+          message: 'Untuk memberikan estimasi harga repaint, mohon infokan tipe motornya (misal: Vario, NMax, Beat).'
+        };
+      }
+
+      // We have a motor model, let's gather all repaint prices for it
+      const results = [];
+      const { finalSize } = await resolveSizeForService({ service: { category: 'repaint' }, sizeArg: sizeFromArgs, senderNumber, cachedSizes, motorModel });
+
+      // 1. Bodi Halus
+      const halusLookup = lookupRepaintPrice(motorModel, 'bodi_halus', finalSize);
+      const halusInfo = formatRepaintPriceResult(halusLookup);
+      if (halusInfo && halusInfo.price) {
+        results.push({ name: 'Repaint Bodi Halus', price: halusInfo.price, price_formatted: halusInfo.price_formatted, note: halusInfo.note });
+      }
+
+      // 2. Bodi Kasar
+      const kasarLookup = lookupRepaintPrice(motorModel, 'bodi_kasar', finalSize);
+      const kasarInfo = formatRepaintPriceResult(kasarLookup);
+      if (kasarInfo && kasarInfo.price) {
+        results.push({ name: 'Repaint Bodi Kasar', price: kasarInfo.price, price_formatted: kasarInfo.price_formatted, note: kasarInfo.note });
+      }
+
+      // 3. Velg
+      const velgLookup = lookupRepaintPrice(motorModel, 'velg', finalSize);
+      const velgInfo = formatRepaintPriceResult(velgLookup);
+      if (velgInfo && velgInfo.price) {
+        results.push({ name: 'Repaint Velg', price: velgInfo.price, price_formatted: velgInfo.price_formatted, note: velgInfo.note });
+      }
+
+      // 4. Cover CVT / Arm (Fixed price from masterLayanan)
+      const cvtService = masterLayanan.find(s => s.name === 'Repaint Cover CVT / Arm');
+      if (cvtService) {
+        results.push({ name: cvtService.name, price: cvtService.price, price_formatted: `Rp${cvtService.price.toLocaleString('id-ID')}`, note: cvtService.summary });
+      }
+
+      return {
+        success: true,
+        multiple_candidates: true,
+        category: 'repaint',
+        motor_model: motorModel,
+        motor_size: finalSize,
+        candidates: results,
+        promo: promo,
+        message: `Berikut estimasi harga repaint untuk motor ${motorModel}.`
       };
     }
 
