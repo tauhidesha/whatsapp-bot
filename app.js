@@ -166,8 +166,16 @@ toolDefinitions.forEach((tool, index) => {
 
 // --- AI Configuration ---
 console.log('🤖 [STARTUP] Initializing AI Model...');
+
+const ACTIVE_AI_TEMPERATURE = (() => {
+    if (process.env.AI_TEMPERATURE === undefined) return 0.7;
+    const cleanStr = process.env.AI_TEMPERATURE.replace(/['"]/g, '');
+    const parsed = parseFloat(cleanStr);
+    return !isNaN(parsed) ? parsed : 0.7;
+})();
+
 console.log(`🤖 [STARTUP] Model: ${process.env.AI_MODEL || 'gemini-2.5-flash'}`);
-console.log(`🤖 [STARTUP] Temperature: ${parseFloat(process.env.AI_TEMPERATURE) || 0.7}`);
+console.log(`🤖 [STARTUP] Temperature: ${ACTIVE_AI_TEMPERATURE}`);
 console.log(`🤖 [STARTUP] Tools available: ${toolDefinitions.length} tools`);
 
 // API Keys configuration with fallback support
@@ -192,7 +200,7 @@ const FALLBACK_VISION_MODEL = process.env.VISION_FALLBACK_MODEL || 'gemini-2.0-f
 
 const baseModel = new ChatGoogleGenerativeAI({
     model: ACTIVE_AI_MODEL,
-    temperature: parseFloat(process.env.AI_TEMPERATURE) || 0.7,
+    temperature: ACTIVE_AI_TEMPERATURE,
     apiKey: API_KEYS[0]
 });
 
@@ -1030,7 +1038,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                     } else {
                         modelInstance = new ChatGoogleGenerativeAI({
                             model: targetModel,
-                            temperature: parseFloat(process.env.AI_TEMPERATURE) || 0.7,
+                            temperature: ACTIVE_AI_TEMPERATURE,
                             apiKey: currentApiKey
                         }).bindTools(geminiToolSpecifications);
                     }
@@ -1086,7 +1094,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                                 console.log(`🔄[AI_PROCESSING] Trying fallback model: ${fallbackModel} with primary API key`);
                                 const fallbackModelInstance = new ChatGoogleGenerativeAI({
                                     model: fallbackModel,
-                                    temperature: parseFloat(process.env.AI_TEMPERATURE) || 0.7,
+                                    temperature: ACTIVE_AI_TEMPERATURE,
                                     apiKey: API_KEYS[0]
                                 });
 
@@ -1258,7 +1266,7 @@ async function rewriteAdminMessage(originalMessage, senderNumber) {
             try {
                 const modelInstance = apiKeyIndex === 0 ? baseModel : new ChatGoogleGenerativeAI({
                     model: ACTIVE_AI_MODEL,
-                    temperature: parseFloat(process.env.AI_TEMPERATURE) || 0.7,
+                    temperature: ACTIVE_AI_TEMPERATURE,
                     apiKey: API_KEYS[apiKeyIndex]
                 });
 
