@@ -242,108 +242,115 @@ console.log(`🤖 [STARTUP] Active AI model: ${ACTIVE_AI_MODEL}`);
 
 console.log(`🖼️ [STARTUP] Vision analysis target models: ${[ACTIVE_VISION_MODEL, FALLBACK_VISION_MODEL].filter(Boolean).join(', ')}`);
 
-const SYSTEM_PROMPT = `<role>
-Identity: Zoya, AI Assistant di Bosmat Repainting and Detailing Studio.
-Year: 2026.
-Tone: Profesional tapi santai. Ramah, sopan, dan to the point. Bukan bahasa gaul/tongkrongan.
-Target User: Pria (Panggilan: "Mas").
-</role>
-
+const SYSTEM_PROMPT = `<role> Identity: Zoya, AI Assistant di Bosmat Repainting and Detailing Studio. Year: 2026. Tone: Profesional tapi santai. Ramah, sopan, dan to the point. Bukan bahasa gaul/tongkrongan. Target User: Pria (Panggilan: "Mas"). </role>
 <response_style>
-- Balas singkat, 1-3 kalimat. Langsung ke inti. HANYA panjang (4-6 kalimat) saat: menjelaskan layanan, menjawab pertanyaan teknis, atau perlu detail.
-- Jangan basa-basi di awal. Contoh BURUK: "Wah seneng banget nih Mas bisa bantu! Jadi gini Mas, di Bosmat kita tuh punya..." → Terlalu panjang.
-- Contoh BAIK: "Boleh, Mas. Motornya apa dan mau diapain?" → Langsung.
-- Format WhatsApp: Gunakan *bold* untuk hal penting. Hindari paragraf panjang.
+
+DEFAULT: Balas singkat, 1–3 kalimat. Langsung ke inti.
+Jawaban boleh 3–5 kalimat hanya saat: menjelaskan layanan, harga, atau hal teknis yang benar-benar perlu detail.
+Hindari basa-basi. Jangan buka dengan kalimat panjang yang tidak perlu.
+Format WhatsApp: Gunakan bold untuk hal penting. Hindari paragraf panjang; utamakan 1–2 paragraf pendek.
 </response_style>
-
-<tools>
-1. getServiceDetails(service_name): Panggil saat user tanya detail layanan, harga, atau estimasi waktu.
-2. checkBookingAvailability(date/time): Panggil saat user mau booking.
-3. triggerBosMat(reason): Panggil jika ada komplain berat atau nego alot.
-4. updateCustomerLabel(label, reason, senderNumber): Panggil untuk update status leads.
-</tools>
-
+<tools> 1. \`getServiceDetails(service_name)\`: Panggil saat user tanya detail layanan, harga, atau estimasi waktu. 2. \`checkBookingAvailability(date/time)\`: Panggil saat user siap booking atau tanya ketersediaan jadwal. 3. \`triggerBosMat(reason)\`: Panggil jika ada komplain berat, user marah, atau nego terlalu keras. 4. \`updateCustomerLabel(label, reason, senderNumber)\`: Panggil untuk update status leads sesuai percakapan. </tools>
 <labeling_policy>
-Evaluasi respon user dan UPDATE label (panggil tool) sesuai aturan:
-1. **cold_lead** (Default): Chat baru masuk, user hanya "P", "Halo", "Info", atau pasif.
-2. **hot_lead** (Upgrade): User menyebut jenis motor/kondisi, atau aktif bertanya soal layanan.
-3. **follow_up** (Parkir): User tertarik tapi terkendala (budget, waktu, dll).
-4. **booking_process** (Closing): User setuju dan mau dijadwalkan.
+Selalu evaluasi respon user dan UPDATE label (via updateCustomerLabel) secara diam-diam:
+
+cold_lead (Default):
+
+Chat baru masuk, salam, atau pertanyaan umum: “P”, “Halo”, “Info”, “Mau tanya…”.
+hot_lead (Upgrade dari cold_lead):
+
+User menyebut jenis motor, kondisi motor, atau bertanya spesifik terkait layanan (harga, paket, estimasi, dsb.).
+follow_up:
+
+User tertarik tapi tertahan budget, waktu, atau perlu pikir-pikir dulu.
+Contoh: “Nanti saya pikir-pikir dulu ya, Mas” / “Bulan depan aja kali ya”.
+booking_process:
+
+User sudah setuju dan ingin atur jadwal atau konfirmasi hari/tanggal.
+Jangan pernah menyebut kata “label” di chat ke user. Semua labeling dilakukan di background.
 </labeling_policy>
 
 <upselling_policy>
-ATURAN PENTING — Jangan upsell terlalu cepat atau berulang:
-1. Upsell HANYA boleh dilakukan SEKALI, setelah user sudah SETUJU dengan layanan utama.
-2. Jangan upsell di awal percakapan. Fokus dulu ke kebutuhan user.
-3. Jika user sudah menolak upsell, JANGAN tawarkan upsell lain. Langsung lanjut ke booking.
-4. Sampaikan upsell secara natural, bukan memaksa. Cukup mention singkat, 1 kalimat.
+ATURAN UTAMA UPSALE: Pelan, sekali saja, dan hanya setelah layanan utama jelas disetujui.
 
-Alur upsell (jika timing tepat):
-- Repaint → suggest: Cuci Komplit (bodi sudah dibongkar, sekalian bersih rangka).
-- Cuci Komplit → suggest: Full Detailing (sekalian poles bodi).
-- Poles Bodi → suggest: Coating (proteksi cat supaya awet).
-- Coating → suggest: Complete Service (perawatan total).
+Dilarang upsell di awal percakapan.
+Upsell HANYA boleh dilakukan SETELAH:
+User sudah jelas memilih layanan utama (misal: “iya, repaint full bodi aja Mas”).
+Upsell maksimal 1x dalam satu percakapan. Jangan tawarkan upsell kedua jika yang pertama ditolak.
+Sampaikan upsell singkat dan natural, 1 kalimat saja.
+Mapping upsell (opsional, kalau momen tepat):
 
+Repaint → tawarkan Cuci Komplit (karena bodi dibongkar, sekalian bersih rangka).
+Cuci Komplit → tawarkan Full Detailing.
+Poles Bodi → tawarkan Coating.
+Coating → tawarkan Complete Service.
 Contoh upsell yang BAIK:
-"Btw Mas, kalau sekalian mau cuci komplit juga bisa. Karena bodi udah dibongkar, jadi rangka dalemnya bisa dibersiin sekalian."
 
-Contoh upsell yang BURUK:
-"Mas mau sekalian cuci komplit nggak? Terus poles juga? Oh ya coating juga recommended lho! Atau langsung complete service aja?" → JANGAN seperti ini.
+“Kalau mau sekalian, Mas bisa tambah cuci komplit, jadi rangka dalemnya ikut bersih karena bodi sekalian dibongkar.”
+Contoh upsell yang BURUK (DILARANG):
+
+“Mas mau sekalian cuci komplit nggak? Terus poles juga? Oh ya coating juga recommended lho! Atau langsung complete service aja?”
 </upselling_policy>
-
 <rejection_handling>
 Jika user menolak upsell:
-1. Terima keputusannya. ("Oke Mas, siap.")
-2. Panggil \`updateCustomerLabel(label='booking_process', reason='User menolak upsell, lanjut ke booking layanan utama')\`.
-3. Langsung lanjut ke proses booking layanan utama. JANGAN tawar layanan lain.
-</rejection_handling>
 
-<layanan>
-- **Repaint**: Cat ulang bodi & velg (Mulai 150rb).
-- **Detailing**: Pembersihan mendalam sampai ke rangka (Mulai 100rb).
-  Tingkatan:
-  1. *Detailing Mesin*: Bersihin mesin dari kerak & oli.
-  2. *Cuci Komplit*: Bongkar bodi, bersihkan rangka dalam secara total.
-  3. *Full Detailing*: Cuci Komplit + Poles Bodi.
-  4. *Complete Service*: Cuci Komplit + Poles + Coating.
-- **Coating**: Lapisan pelindung cat supaya awet dan tahan air (Mulai 350rb).
+Terima keputusan user secara singkat dan sopan (contoh: “Oke Mas, siap, kita fokus ke repaint bodi dulu ya.”).
+Panggil updateCustomerLabel(label='booking_process', reason='User menolak upsell, lanjut ke booking layanan utama') bila user tetap lanjut ke layanan utama.
+Langsung lanjut ke proses booking layanan utama, jangan tawarkan layanan lain lagi.
+</rejection_handling>
+<layanan> - **Repaint**: Cat ulang bodi & velg (Mulai 150rb). - **Detailing**: Pembersihan mendalam sampai ke rangka (Mulai 100rb). Tingkatan: 1. *Detailing Mesin*: Bersihin mesin dari kerak & oli. 2. *Cuci Komplit*: Bongkar bodi, bersihkan rangka dalam secara total. 3. *Full Detailing*: Cuci Komplit + Poles Bodi. 4. *Complete Service*: Cuci Komplit + Poles + Coating. - **Coating**: Lapisan pelindung cat supaya awet dan tahan air (Mulai 350rb).
+Saat sebut harga atau estimasi, prioritaskan data dari getServiceDetails. Hanya gunakan angka di atas jika tools tidak tersedia.
 </layanan>
 
 <campaign_context>
-- Campaign Aktif: "Supra Cuci Komplit" dari Meta Ads.
-- Layanan: Cuci Komplit.
-- Selling Point: Motor dibongkar bodinya untuk dibersihkan rangka dalamnya, bukan cuma cuci luar.
+
+Campaign Aktif: "Supra Cuci Komplit" dari Meta Ads.
+Layanan Fokus Campaign: Cuci Komplit.
+Selling Point Utama: Motor dibongkar bodinya untuk dibersihkan rangka dalam, bukan cuma cuci luar.
+Jika user datang dari iklan ini dan bertanya soal cuci/bersih-bersih, jelaskan keunggulan Cuci Komplit dengan bahasa sederhana.
 </campaign_context>
+<constraints> 1. **Satu pertanyaan per chat.** - Di setiap balasan, ajukan maksimal 1 pertanyaan utama ke user. - Hindari dua pertanyaan dalam satu kalimat atau dua kalimat berturut-turut.
+Gunakan tools saat relevan.
 
-<constraints>
-1. **Satu pertanyaan per chat.** Jangan bertanya lebih dari satu hal sekaligus.
-2. **Silent Labeling.** Jangan bicara soal label ke user. Update via tool \`updateCustomerLabel\` di background.
-3. **Bahasa mudah dipahami.** Hindari istilah teknis (oksidasi, PU HS, dekontaminasi). Fokus ke manfaat yang user bisa rasakan.
-4. **Jangan yapping.** Jawab seperlunya. User tidak perlu basa-basi panjang.
-</constraints>
+getServiceDetails: untuk harga, paket, atau estimasi waktu.
+checkBookingAvailability: saat user sudah mau atur jadwal.
+updateCustomerLabel: update status setiap kali user berpindah tahap (cold → hot → follow_up/booking_process).
+Silent Labeling.
 
-<task>
-Tugas: Konversi Cold Lead menjadi Booking.
+Jangan pernah menyebut “label”, “status lead”, atau sejenisnya ke user.
+Bahasa mudah dipahami.
 
-**Step 1: Kualifikasi**
-- Chat baru masuk → set \`cold_lead\`.
-- Tanya singkat: "Motornya apa Mas, dan mau diapain?"
-- User jawab → set \`hot_lead\`.
+Hindari istilah teknis (oksidasi, PU HS, dekontaminasi). Jelaskan manfaat praktis yang bisa dirasakan user.
+Jangan yapping.
 
-**Step 2: Konsultasi**
-- Pahami kebutuhan user berdasarkan kondisi motor.
-- Rekomendasikan layanan yang sesuai. Panggil \`getServiceDetails\` jika perlu detail.
-- Jika user terkendala budget/waktu → set \`follow_up\`.
+Jawab seperlunya, fokus ke kebutuhan user.
+Jika user tanya harga → jawab harga + singkat soal apa yang didapat + 1 pertanyaan lanjut yang jelas (misal soal tipe motor atau kondisi bodi). </constraints>
+<task> Tugas utama: Konversi Cold Lead menjadi Booking dengan alur yang rapi dan singkat.
+Step 1: Kualifikasi Awal
 
-**Step 3: Upsell (Opsional)**
-- HANYA jika user sudah setuju layanan utama.
-- Tawarkan SEKALI, singkat, natural. Jika ditolak, langsung lanjut.
+Chat baru masuk → set label cold_lead.
+Respon singkat, akhiri dengan 1 pertanyaan kunci, contoh:
+“Boleh, Mas. Motornya apa dan mau diapain?”
+Begitu user menyebut tipe motor / kondisi / kebutuhan → update ke hot_lead via updateCustomerLabel.
+Step 2: Konsultasi & Penentuan Layanan Utama
 
-**Step 4: Closing**
-- User setuju → set \`booking_process\`.
-- Cek jadwal dengan \`checkBookingAvailability\`.
+Pahami kebutuhan user berdasarkan: tipe motor, kondisi (lecet, pecah, kusam, dll.), dan tujuan (ganti warna, segarkan cat, dll.).
+Panggil getServiceDetails untuk ambil harga/estimasi resmi.
+Jelaskan layanan yang paling cocok dalam 1–3 kalimat, lalu tutup dengan 1 pertanyaan yang mengarahkan keputusan (contoh:
+“Dengan kondisi begitu, paling pas repaint full bodi, Mas. Mau dipertahankan warna standar atau ganti warna sekalian?”).
+Jika user ragu karena budget/waktu → ubah label ke follow_up.
+Step 3: Upsell (Opsional & Setelah Setuju Layanan Utama)
 
-Jika user marah/nego keras → \`triggerBosMat\`.
+Hanya lakukan setelah user mengatakan setuju dengan layanan utama.
+Lakukan 1 kali saja, singkat, natural.
+Jika user menolak, jangan tawarkan upsell lain; langsung kembali ke fokus layanan utama dan lanjut ke booking.
+Step 4: Closing & Booking
+
+Saat user sudah oke dengan layanan dan kisaran harga → ubah label ke booking_process.
+Tawarkan untuk atur jadwal:
+“Kalau cocok, Mas mau dikerjakan hari apa? Nanti saya cek jadwal dulu.”
+Gunakan checkBookingAvailability untuk memastikan jadwal, lalu konfirmasi ke user.
+Jika user marah, merasa tertipu, atau nego terlalu keras → panggil triggerBosMat dan tetap jawab sopan, singkat, dan menenangkan.
 </task>`;
 
 // --- Dynamic System Prompt Logic ---
@@ -384,11 +391,11 @@ async function loadSystemPrompt() {
 loadSystemPrompt();
 
 // Prompt khusus jika pengirim adalah ADMIN (owner / admin Bosmat)
-const ADMIN_SYSTEM_PROMPT = `<role>
-Anda adalah **Zoya**, asisten pribadi sekaligus partner diskusi untuk Admin Bosmat (ADMIN MODE).
+const ADMIN_SYSTEM_PROMPT = `< role >
+    Anda adalah ** Zoya **, asisten pribadi sekaligus partner diskusi untuk Admin Bosmat(ADMIN MODE).
 Meskipun Anda asisten, gaya bicara Anda harus luwes, cerdas, dan punya inisiatif.
-Panggilan: "Bos" (tapi jangan kaku, anggap partner kerja akrab).
-</role>
+    Panggilan: "Bos"(tapi jangan kaku, anggap partner kerja akrab).
+</role >
 
 <constraints>
 1. Dinamis: Perintah teknis -> jawab cepat dan akurat. Obrolan santai -> layani dengan ramah dan asik.
@@ -433,12 +440,12 @@ Assistant: (Pakai scanFollowUpCandidates) "Bos, ini daftar target jemput bola ha
 </output_format>`;
 
 const ADMIN_MESSAGE_REWRITE_ENABLED = process.env.ADMIN_MESSAGE_REWRITE === 'false' ? false : true;
-const ADMIN_MESSAGE_REWRITE_STYLE_PROMPT = `Kamu adalah Zoya, asisten Bosmat yang ramah dan profesional. Tugasmu adalah menulis ulang pesan admin berikut agar gaya bahasa konsisten dengan gaya Zoya:
+const ADMIN_MESSAGE_REWRITE_STYLE_PROMPT = `Kamu adalah Zoya, asisten Bosmat yang ramah dan profesional.Tugasmu adalah menulis ulang pesan admin berikut agar gaya bahasa konsisten dengan gaya Zoya:
 - Gunakan bahasa Indonesia santai namun sopan.
 - Panggil pelanggan dengan "mas" atau "mbak" jika relevan.
 - Pertahankan maksud dan janji yang sudah dibuat admin, jangan menambah atau mengubah fakta.
-- Gunakan gaya WhatsApp: maksimal 2-6 kalimat, bullet jika perlu, huruf tebal *...* bila menekankan istilah penting.
-- Jangan mengubah angka/harga/jadwal yang disebutkan.
+- Gunakan gaya WhatsApp: maksimal 2 - 6 kalimat, bullet jika perlu, huruf tebal *...* bila menekankan istilah penting.
+- Jangan mengubah angka / harga / jadwal yang disebutkan.
 - Jangan menyebutkan kamu sedang menulis ulang pesan admin.`;
 
 function getTracingConfig(label) {
@@ -546,9 +553,9 @@ async function cleanupChromiumProfileLocks(sessionName, sessionDataPath = './tok
             targets.map(async (target) => {
                 try {
                     await fs.promises.rm(target, { force: true });
-                    console.log(`[Browser] Removed stale lock file: ${target}`);
+                    console.log(`[Browser] Removed stale lock file: ${target} `);
                 } catch (error) {
-                    console.warn(`[Browser] Failed to remove lock file ${target}:`, error.message);
+                    console.warn(`[Browser] Failed to remove lock file ${target}: `, error.message);
                 }
             })
         );
@@ -625,18 +632,18 @@ function toSenderNumberWithSuffix(id) {
 }
 
 async function executeToolCall(toolName, args, metadata = {}) {
-    console.log(`\n⚡ [TOOL_CALL] ===== EXECUTING TOOL =====`);
-    console.log(`⚡ [TOOL_CALL] Tool Name: ${toolName}`);
-    console.log(`⚡ [TOOL_CALL] Arguments: ${JSON.stringify(args, null, 2)}`);
-    console.log(`⚡ [TOOL_CALL] Available tools: ${Object.keys(availableTools).join(', ')}`);
+    console.log(`\n⚡[TOOL_CALL] ===== EXECUTING TOOL ===== `);
+    console.log(`⚡[TOOL_CALL] Tool Name: ${toolName} `);
+    console.log(`⚡[TOOL_CALL] Arguments: ${JSON.stringify(args, null, 2)} `);
+    console.log(`⚡[TOOL_CALL] Available tools: ${Object.keys(availableTools).join(', ')} `);
 
     if (!availableTools[toolName]) {
-        console.error(`❌ [TOOL_CALL] Tool ${toolName} not found in available tools`);
-        console.error(`❌ [TOOL_CALL] Available tools: ${Object.keys(availableTools)}`);
+        console.error(`❌[TOOL_CALL] Tool ${toolName} not found in available tools`);
+        console.error(`❌[TOOL_CALL] Available tools: ${Object.keys(availableTools)} `);
         return { error: `Tool ${toolName} tidak tersedia` };
     }
 
-    console.log(`✅ [TOOL_CALL] Tool ${toolName} found, executing...`);
+    console.log(`✅[TOOL_CALL] Tool ${toolName} found, executing...`);
 
     try {
         let preparedArgs = args;
@@ -644,7 +651,7 @@ async function executeToolCall(toolName, args, metadata = {}) {
             try {
                 preparedArgs = JSON.parse(preparedArgs);
             } catch (error) {
-                console.warn(`[TOOL_CALL] Tidak dapat parse argumen string untuk ${toolName}:`, error.message);
+                console.warn(`[TOOL_CALL] Tidak dapat parse argumen string untuk ${toolName}: `, error.message);
             }
         }
 
@@ -664,16 +671,16 @@ async function executeToolCall(toolName, args, metadata = {}) {
         const result = await availableTools[toolName](preparedArgs);
         const executionTime = Date.now() - startTime;
 
-        console.log(`✅ [TOOL_CALL] Tool ${toolName} executed successfully in ${executionTime}ms`);
-        console.log(`📊 [TOOL_CALL] Tool result: ${JSON.stringify(result, null, 2)}`);
-        console.log(`⚡ [TOOL_CALL] ===== TOOL EXECUTION COMPLETED =====\n`);
+        console.log(`✅[TOOL_CALL] Tool ${toolName} executed successfully in ${executionTime} ms`);
+        console.log(`📊[TOOL_CALL] Tool result: ${JSON.stringify(result, null, 2)} `);
+        console.log(`⚡[TOOL_CALL] ===== TOOL EXECUTION COMPLETED =====\n`);
 
         return result;
     } catch (error) {
-        console.error(`❌ [TOOL_CALL] Error executing ${toolName}:`, error);
-        console.error(`❌ [TOOL_CALL] Error stack:`, error.stack);
-        console.error(`❌ [TOOL_CALL] ===== TOOL EXECUTION FAILED =====\n`);
-        return { error: `Kesalahan saat menjalankan ${toolName}: ${error.message}` };
+        console.error(`❌[TOOL_CALL] Error executing ${toolName}: `, error);
+        console.error(`❌[TOOL_CALL] Error stack: `, error.stack);
+        console.error(`❌[TOOL_CALL] ===== TOOL EXECUTION FAILED =====\n`);
+        return { error: `Kesalahan saat menjalankan ${toolName}: ${error.message} ` };
     }
 }
 
@@ -806,7 +813,7 @@ async function analyzeMediaWithGemini(mediaBuffer, mimeType, caption = '', sende
         ...(isVideo ? ['- Suara mesin (jika ada dan terdengar aneh)', '- Gerakan atau demonstrasi masalah yang ditunjukkan'] : []),
         '',
         'Aturan:',
-        `- Hanya deskripsikan apa yang BENAR-BENAR terlihat/terdengar di ${mediaTypeLabel}.`,
+        `- Hanya deskripsikan apa yang BENAR - BENAR terlihat / terdengar di ${mediaTypeLabel}.`,
         '- Jangan berasumsi atau mengarang kerusakan.',
         '- Jawab dalam bahasa Indonesia, singkat 2-4 kalimat.',
         '- Rekomendasikan treatment Bosmat yang relevan.',
@@ -817,7 +824,7 @@ async function analyzeMediaWithGemini(mediaBuffer, mimeType, caption = '', sende
         '- Coating: Coating Motor Doff/Glossy, Complete Service Doff/Glossy',
     ].join('\n');
 
-    const textPrompt = `Analisis ${mediaTypeLabel} motor dari ${senderName}. ${caption ? `Caption pengguna: ${caption}.` : ''} ${previousContext ? `Konteks chat sebelumnya: "${previousContext}".` : ''} Sebutkan poin penting dalam 2-4 kalimat. Jika ada noda/baret/kerusakan, jelaskan singkat dan rekomendasikan treatment Bosmat yang relevan.`;
+    const textPrompt = `Analisis ${mediaTypeLabel} motor dari ${senderName}. ${caption ? `Caption pengguna: ${caption}.` : ''} ${previousContext ? `Konteks chat sebelumnya: "${previousContext}".` : ''} Sebutkan poin penting dalam 2 - 4 kalimat.Jika ada noda / baret / kerusakan, jelaskan singkat dan rekomendasikan treatment Bosmat yang relevan.`;
 
     const fallbackChain = ['gemini-2.0-flash', 'gemini-1.5-flash-latest'];
     const modelsToTry = Array.from(
@@ -832,7 +839,7 @@ async function analyzeMediaWithGemini(mediaBuffer, mimeType, caption = '', sende
     for (const modelName of modelsToTry) {
         for (let apiKeyIndex = 0; apiKeyIndex < API_KEYS.length; apiKeyIndex++) {
             const currentApiKey = API_KEYS[apiKeyIndex];
-            const apiKeyLabel = apiKeyIndex === 0 ? 'primary' : `fallback #${apiKeyIndex}`;
+            const apiKeyLabel = apiKeyIndex === 0 ? 'primary' : `fallback #${apiKeyIndex} `;
 
             try {
                 const logPrefix = apiKeyIndex === 0
@@ -861,7 +868,7 @@ async function analyzeMediaWithGemini(mediaBuffer, mimeType, caption = '', sende
                 } else {
                     messageContent.push({
                         type: "image_url",
-                        image_url: `data:${mimeType};base64,${base64Data}`
+                        image_url: `data:${mimeType}; base64, ${base64Data} `
                     });
                 }
 
@@ -874,7 +881,7 @@ async function analyzeMediaWithGemini(mediaBuffer, mimeType, caption = '', sende
                 ]);
 
                 const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error(`Vision analysis timeout after ${VISION_TIMEOUT_MS}ms`)), VISION_TIMEOUT_MS)
+                    setTimeout(() => reject(new Error(`Vision analysis timeout after ${VISION_TIMEOUT_MS} ms`)), VISION_TIMEOUT_MS)
                 );
 
                 const response = await Promise.race([invokePromise, timeoutPromise]);
@@ -883,7 +890,7 @@ async function analyzeMediaWithGemini(mediaBuffer, mimeType, caption = '', sende
 
                 if (text) {
                     const successMsg = apiKeyIndex === 0
-                        ? `[VISION] ✅ Analysis complete with ${modelName}`
+                        ? `[VISION] ✅ Analysis complete with ${modelName} `
                         : `[VISION] ✅ Analysis complete with ${modelName} using ${apiKeyLabel} API key`;
                     console.log(successMsg);
                     return text;
@@ -899,7 +906,7 @@ async function analyzeMediaWithGemini(mediaBuffer, mimeType, caption = '', sende
                 const errorLabel = apiKeyIndex === 0
                     ? `[VISION] ❌ ${modelName} failed`
                     : `[VISION] ❌ ${modelName} with ${apiKeyLabel} API key failed`;
-                console.error(`${errorLabel}:`, error?.message || error);
+                console.error(`${errorLabel}: `, error?.message || error);
 
                 // If timeout, skip remaining API keys for this model and try next model
                 if (isTimeoutError) {
@@ -923,36 +930,36 @@ async function analyzeMediaWithGemini(mediaBuffer, mimeType, caption = '', sende
 async function getAIResponse(userMessage, senderName = "User", senderNumber = null, context = "", mediaItems = [], modelOverride = null, providedHistory = []) {
     try {
         console.log('\n🤖 [AI_PROCESSING] ===== STARTING AI PROCESSING =====');
-        console.log(`📝 [AI_PROCESSING] User Message: "${userMessage}"`);
-        console.log(`👤 [AI_PROCESSING] Sender: ${senderName}`);
-        console.log(`📱 [AI_PROCESSING] Sender Number: ${senderNumber || 'N/A'}`);
+        console.log(`📝[AI_PROCESSING] User Message: "${userMessage}"`);
+        console.log(`👤[AI_PROCESSING] Sender: ${senderName} `);
+        console.log(`📱[AI_PROCESSING] Sender Number: ${senderNumber || 'N/A'} `);
 
 
         let conversationHistoryMessages = [];
 
         if (senderNumber && db) {
-            console.log(`🧠 [AI_PROCESSING] Fetching conversation history for ${senderNumber}...`);
+            console.log(`🧠[AI_PROCESSING] Fetching conversation history for ${senderNumber}...`);
             const history = await getConversationHistory(senderNumber);
             conversationHistoryMessages = buildLangChainHistory(history);
-            console.log(`🧠 [AI_PROCESSING] Found ${history.length} previous messages`);
+            console.log(`🧠[AI_PROCESSING] Found ${history.length} previous messages`);
             if (history.length > 0) {
-                console.log(`🧠 [AI_PROCESSING] Last message: "${history[history.length - 1]?.text?.substring(0, 50)}..."`);
+                console.log(`🧠[AI_PROCESSING] Last message: "${history[history.length - 1]?.text?.substring(0, 50)}..."`);
             }
         } else if (providedHistory && providedHistory.length > 0) {
-            console.log(`🧠 [AI_PROCESSING] Using provided local history (${providedHistory.length} messages)`);
+            console.log(`🧠[AI_PROCESSING] Using provided local history(${providedHistory.length} messages)`);
             conversationHistoryMessages = buildLangChainHistory(providedHistory);
         } else {
-            console.log(`🧠 [AI_PROCESSING] No conversation history (new user, no DB, or no local history provided)`);
+            console.log(`🧠[AI_PROCESSING] No conversation history(new user, no DB, or no local history provided)`);
         }
 
         const userTextContent = context
-            ? `${userMessage}\n\n[Context Internal]\n${context}`
+            ? `${userMessage} \n\n[Context Internal]\n${context} `
             : userMessage;
 
         let humanMessageContent;
 
         if (mediaItems && mediaItems.length > 0) {
-            console.log(`🖼️ [AI_PROCESSING] Using multimodal input with ${mediaItems.length} media items`);
+            console.log(`🖼️[AI_PROCESSING] Using multimodal input with ${mediaItems.length} media items`);
             humanMessageContent = [
                 { type: "text", text: userTextContent }
             ];
@@ -988,7 +995,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
 
         let effectiveSystemPrompt = currentSystemPrompt;
         if (isAdmin) {
-            console.log(`👮 [AI_PROCESSING] Admin detected: ${senderNumber}. Using ADMIN_SYSTEM_PROMPT.`);
+            console.log(`👮[AI_PROCESSING] Admin detected: ${senderNumber}. Using ADMIN_SYSTEM_PROMPT.`);
             effectiveSystemPrompt = ADMIN_SYSTEM_PROMPT;
         }
 
@@ -999,12 +1006,12 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                 const state = await getState(senderNumber);
                 if (state) {
                     const parts = [];
-                    if (state.motor_model) parts.push(`- Motor: ${state.motor_model}`);
-                    if (state.target_service) parts.push(`- Layanan dituju: ${state.target_service}`);
-                    if (state.important_notes) parts.push(`- Catatan: ${state.important_notes}`);
+                    if (state.motor_model) parts.push(`- Motor: ${state.motor_model} `);
+                    if (state.target_service) parts.push(`- Layanan dituju: ${state.target_service} `);
+                    if (state.important_notes) parts.push(`- Catatan: ${state.important_notes} `);
 
                     if (parts.length > 0) {
-                        memoryPart = `\n\n[PERSISTENT CONTEXT]\nInformasi yang sudah diketahui tentang pelanggan ini:\n${parts.join('\n')}\n(Gunakan informasi ini jika relevan, jangan tanya ulang hal yang sudah diketahui).`;
+                        memoryPart = `\n\n[PERSISTENT CONTEXT]\nInformasi yang sudah diketahui tentang pelanggan ini: \n${parts.join('\n')} \n(Gunakan informasi ini jika relevan, jangan tanya ulang hal yang sudah diketahui).`;
                     }
                 }
             } catch (error) {
@@ -1018,15 +1025,15 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
             new HumanMessage(humanMessageContent)
         ].filter(msg => !!msg); // Filter out null/undefined messages
 
-        console.log(`🔧 [AI_PROCESSING] Tools registered: ${toolDefinitions.map(t => t.function.name).join(', ')}`);
+        console.log(`🔧[AI_PROCESSING] Tools registered: ${toolDefinitions.map(t => t.function.name).join(', ')} `);
         let iteration = 0;
         const MAX_ITERATIONS = 8;
 
         let response;
 
         while (iteration < MAX_ITERATIONS) {
-            const traceLabel = iteration === 0 ? 'chat-response-initial' : `chat-response-iteration-${iteration}`;
-            console.log(`🚀 [AI_PROCESSING] Sending request to AI model... (iteration ${iteration + 1})`);
+            const traceLabel = iteration === 0 ? 'chat-response-initial' : `chat - response - iteration - ${iteration} `;
+            console.log(`🚀[AI_PROCESSING] Sending request to AI model... (iteration ${iteration + 1})`);
 
             let lastError = null;
             let responseReceived = false;
@@ -1035,11 +1042,11 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
             for (let apiKeyIndex = 0; apiKeyIndex < API_KEYS.length; apiKeyIndex++) {
                 const currentApiKey = API_KEYS[apiKeyIndex];
                 const isFirstKey = apiKeyIndex === 0;
-                const apiKeyLabel = isFirstKey ? 'primary' : `fallback #${apiKeyIndex}`;
+                const apiKeyLabel = isFirstKey ? 'primary' : `fallback #${apiKeyIndex} `;
 
                 try {
                     if (!isFirstKey) {
-                        console.log(`🔄 [AI_PROCESSING] Trying ${apiKeyLabel} API key...`);
+                        console.log(`🔄[AI_PROCESSING] Trying ${apiKeyLabel} API key...`);
                     }
 
                     // Create model instance with current API key
@@ -1068,7 +1075,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                     }
 
                     if (!isFirstKey) {
-                        console.log(`✅ [AI_PROCESSING] ${apiKeyLabel} API key succeeded!`);
+                        console.log(`✅[AI_PROCESSING] ${apiKeyLabel} API key succeeded!`);
                     }
 
                     responseReceived = true;
@@ -1092,12 +1099,12 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
 
                     const isRetryableError = isQuotaError || isResponseError || isAuthError;
 
-                    console.error(`❌ [AI_PROCESSING] Error with ${apiKeyLabel} API key:`, error.message);
+                    console.error(`❌[AI_PROCESSING] Error with ${apiKeyLabel} API key: `, error.message);
 
                     // If this is the last API key or non-retryable error, try model fallback
                     if (apiKeyIndex === API_KEYS.length - 1 || !isRetryableError) {
                         if (isRetryableError && (isQuotaError || isResponseError)) {
-                            console.error(`❌ [AI_PROCESSING] All API keys exhausted, trying model fallback...`);
+                            console.error(`❌[AI_PROCESSING] All API keys exhausted, trying model fallback...`);
                             const fallbackModel = 'gemini-2.0-flash';
 
                             if (fallbackModel === ACTIVE_AI_MODEL) {
@@ -1105,7 +1112,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                             }
 
                             try {
-                                console.log(`🔄 [AI_PROCESSING] Trying fallback model: ${fallbackModel} with primary API key`);
+                                console.log(`🔄[AI_PROCESSING] Trying fallback model: ${fallbackModel} with primary API key`);
                                 const fallbackModelInstance = new ChatGoogleGenerativeAI({
                                     model: fallbackModel,
                                     temperature: parseFloat(process.env.AI_TEMPERATURE) || 0.7,
@@ -1122,11 +1129,11 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                                     throw new Error('Invalid response from fallback model');
                                 }
 
-                                console.log(`✅ [AI_PROCESSING] Fallback model ${fallbackModel} succeeded!`);
+                                console.log(`✅[AI_PROCESSING] Fallback model ${fallbackModel} succeeded!`);
                                 responseReceived = true;
                                 break;
                             } catch (fallbackError) {
-                                console.error(`❌ [AI_PROCESSING] Fallback model ${fallbackModel} also failed:`, fallbackError.message);
+                                console.error(`❌[AI_PROCESSING] Fallback model ${fallbackModel} also failed: `, fallbackError.message);
                                 lastError = fallbackError;
                             }
                         }
@@ -1140,7 +1147,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
 
             // If we still don't have a response after trying all options, throw error
             if (!responseReceived) {
-                console.error(`❌ [AI_PROCESSING] All retry attempts failed`);
+                console.error(`❌[AI_PROCESSING] All retry attempts failed`);
                 throw lastError || new Error('Failed to get AI response after all retry attempts');
             }
 
@@ -1150,19 +1157,19 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                 const finalTextRaw = extractTextFromAIContent(response.content);
                 const finalText = typeof finalTextRaw === 'string' ? finalTextRaw.trim() : '';
 
-                console.log(`📥 [AI_PROCESSING] AI Response received`);
-                console.log(`📥 [AI_PROCESSING] Response type: ${typeof response.content}`);
-                console.log(`📥 [AI_PROCESSING] Response content: "${finalText}"`);
+                console.log(`📥[AI_PROCESSING] AI Response received`);
+                console.log(`📥[AI_PROCESSING] Response type: ${typeof response.content} `);
+                console.log(`📥[AI_PROCESSING] Response content: "${finalText}"`);
 
                 const directive = parseToolDirectiveFromText(finalText);
                 if (directive) {
                     const { toolName, args } = directive;
-                    console.log(`[AI_PROCESSING] Detected textual tool directive: ${toolName}`);
+                    console.log(`[AI_PROCESSING] Detected textual tool directive: ${toolName} `);
 
                     if (!availableTools[toolName]) {
-                        console.warn(`[AI_PROCESSING] Tool ${toolName} from textual directive not found. Returning sanitized output.`);
+                        console.warn(`[AI_PROCESSING] Tool ${toolName} from textual directive not found.Returning sanitized output.`);
                         const safeText = sanitizeToolDirectiveOutput(finalText);
-                        console.log(`🎯 [AI_PROCESSING] ===== AI PROCESSING COMPLETED =====\n`);
+                        console.log(`🎯[AI_PROCESSING] ===== AI PROCESSING COMPLETED =====\n`);
                         return safeText || 'Baik mas, Zoya akan bantu cek ke tim Bosmat.';
                     }
 
@@ -1176,14 +1183,14 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                         enrichedArgs.senderName = senderName;
                     }
 
-                    const toolCallId = `${toolName}-directive-${Date.now()}`;
-                    console.log(`⚡ [AI_PROCESSING] Executing directive tool ${toolName} dengan args: ${JSON.stringify(enrichedArgs, null, 2)}`);
+                    const toolCallId = `${toolName} -directive - ${Date.now()} `;
+                    console.log(`⚡[AI_PROCESSING] Executing directive tool ${toolName} dengan args: ${JSON.stringify(enrichedArgs, null, 2)} `);
                     const toolResult = await executeToolCall(toolName, enrichedArgs, {
                         senderNumber,
                         senderName,
                     });
-                    console.log(`✅ [AI_PROCESSING] Directive tool ${toolName} completed`);
-                    console.log(`📊 [AI_PROCESSING] Directive tool result: ${JSON.stringify(toolResult, null, 2)}`);
+                    console.log(`✅[AI_PROCESSING] Directive tool ${toolName} completed`);
+                    console.log(`📊[AI_PROCESSING] Directive tool result: ${JSON.stringify(toolResult, null, 2)} `);
 
                     messages.push(new ToolMessage({
                         tool_call_id: toolCallId,
@@ -1194,13 +1201,13 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                     continue;
                 }
 
-                console.log(`🎯 [AI_PROCESSING] ===== AI PROCESSING COMPLETED =====\n`);
+                console.log(`🎯[AI_PROCESSING] ===== AI PROCESSING COMPLETED =====\n`);
                 return finalText || 'Maaf, saya belum bisa memberikan jawaban.';
             }
 
             iteration += 1;
-            console.log(`🔧 [AI_PROCESSING] ===== TOOL CALLS DETECTED (iteration ${iteration}) =====`);
-            console.log(`🔧 [AI_PROCESSING] Number of tool calls: ${toolCalls.length}`);
+            console.log(`🔧[AI_PROCESSING] ===== TOOL CALLS DETECTED(iteration ${iteration}) ===== `);
+            console.log(`🔧[AI_PROCESSING] Number of tool calls: ${toolCalls.length} `);
 
             messages.push(response);
 
@@ -1212,13 +1219,13 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                     try {
                         toolArgs = JSON.parse(toolArgs);
                     } catch (err) {
-                        console.warn(`⚠️ [AI_PROCESSING] Failed to parse tool args string for ${toolName}:`, err.message);
+                        console.warn(`⚠️[AI_PROCESSING] Failed to parse tool args string for ${toolName}: `, err.message);
                         toolArgs = {};
                     }
                 }
-                const toolCallId = toolCall.id || toolCall.tool_call_id || `${toolName}-${Date.now()}-${i}`;
+                const toolCallId = toolCall.id || toolCall.tool_call_id || `${toolName} -${Date.now()} -${i} `;
 
-                console.log(`⚡ [AI_PROCESSING] Executing tool ${i + 1}/${toolCalls.length}: ${toolName}`);
+                console.log(`⚡[AI_PROCESSING] Executing tool ${i + 1}/${toolCalls.length}: ${toolName}`);
                 console.log(`   📝 Args: ${JSON.stringify(toolArgs, null, 2)}`);
 
                 const toolResult = await executeToolCall(toolName, toolArgs, {
