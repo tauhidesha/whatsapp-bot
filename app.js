@@ -43,7 +43,7 @@ const { updateCustomerContextTool } = require('./src/ai/tools/updateCustomerCont
 const { createMetaWebhookRouter } = require('./src/server/metaWebhook.js');
 const { sendMetaMessage } = require('./src/server/metaClient.js');
 const { startBookingReminderScheduler } = require('./src/ai/utils/bookingReminders.js');
-const { startFollowupScheduler } = require('./src/ai/utils/followupScheduler.js');
+const { startFollowUpScheduler, updateSignalsOnIncomingMessage } = require('./src/ai/agents/followUpEngine/index.js');
 const { isSnoozeActive, setSnoozeMode, clearSnoozeMode, getSnoozeInfo } = require('./src/ai/utils/humanHandover.js');
 const { getLangSmithCallbacks } = require('./src/ai/utils/langsmith.js');
 const { saveCustomerLocation } = require('./src/ai/utils/customerLocations.js');
@@ -1505,6 +1505,10 @@ async function processBufferedMessages(senderNumber, client) {
             .then(() => classifyAndSaveCustomer(senderNumber))
             .catch(err => console.warn('[Pipeline] Context/Classifier failed:', err.message));
 
+        // Fire and forget — track follow-up signals
+        updateSignalsOnIncomingMessage(senderNumber, combinedMessage)
+            .catch(err => console.warn('[SignalTracker] Failed:', err.message));
+
         // Save to Firebase if available
         if (db) {
             await saveMessageToFirestore(senderNumber, combinedMessage, 'user');
@@ -2441,7 +2445,7 @@ server.listen(PORT, '0.0.0.0', async () => {
 
             start(client);
             startBookingReminderScheduler();
-            startFollowupScheduler();
+            startFollowUpScheduler();
             console.log('✅ WhatsApp client initialized successfully!');
 
             // Start keep-alive mechanism untuk mencegah server idle timeout
