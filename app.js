@@ -49,6 +49,7 @@ const { getLangSmithCallbacks } = require('./src/ai/utils/langsmith.js');
 const { saveCustomerLocation } = require('./src/ai/utils/customerLocations.js');
 const { parseSenderIdentity } = require('./src/lib/utils.js');
 const { getState } = require('./src/ai/utils/conversationState.js');
+const { extractAndSaveContext } = require('./src/ai/agents/contextExtractor.js');
 const masterLayanan = require('./src/data/masterLayanan.js');
 
 const app = express();
@@ -553,6 +554,28 @@ const MEMORY_CONFIG = {
     includeSystemMessages: process.env.MEMORY_INCLUDE_SYSTEM === 'true'
 };
 
+// --- Customer Context (extracted by background agent) ---
+async function getCustomerContext(senderNumber) {
+    if (!db || !senderNumber) return null;
+
+    const docId = senderNumber.replace(/[^0-9]/g, '');
+    if (!docId) return null;
+
+    try {
+        const doc = await db.collection('customerContext').doc(docId).get();
+        if (doc.exists) {
+            const data = doc.data();
+            // Remove internal fields
+            const { updatedAt, senderNumber: _, ...context } = data;
+            return context;
+        }
+        return null;
+    } catch (error) {
+        console.warn('[Context] Gagal mengambil customer context:', error.message);
+        return null;
+    }
+}
+
 // --- Memory Functions ---
 async function getConversationHistory(senderNumber, limit = MEMORY_CONFIG.maxMessages) {
     if (!db) return [];
@@ -980,20 +1003,51 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
             effectiveSystemPrompt = ADMIN_SYSTEM_PROMPT;
         }
 
-        // Persistent Memory Injection
+        // Persistent Memory Injection (getState + customerContext)
         let memoryPart = "";
         if (senderNumber) {
             try {
-                const state = await getState(senderNumber);
-                if (state) {
-                    const parts = [];
-                    if (state.motor_model) parts.push(`- Motor: ${state.motor_model} `);
-                    if (state.target_service) parts.push(`- Layanan dituju: ${state.target_service} `);
-                    if (state.important_notes) parts.push(`- Catatan: ${state.important_notes} `);
+                const [state, customerCtx] = await Promise.all([
+                    getState(senderNumber),
+                    getCustomerContext(senderNumber),
+                ]);
 
-                    if (parts.length > 0) {
-                        memoryPart = `\n\n[PERSISTENT CONTEXT]\nInformasi yang sudah diketahui tentang pelanggan ini: \n${parts.join('\n')} \n(Gunakan informasi ini jika relevan, jangan tanya ulang hal yang sudah diketahui).`;
-                    }
+                const parts = [];
+
+                // Legacy state fields
+                if (state) {
+                    if (state.motor_model) parts.push(`- Motor: ${state.motor_model}`);
+                    if (state.target_service) parts.push(`- Layanan dituju: ${state.target_service}`);
+                    if (state.important_notes) parts.push(`- Catatan: ${state.important_notes}`);
+                }
+
+                // Rich extracted context
+                if (customerCtx) {
+                    // Motor identity
+                    if (customerCtx.motor_model && !state?.motor_model) parts.push(`- Motor: ${customerCtx.motor_model}`);
+                    if (customerCtx.motor_year) parts.push(`- Tahun motor: ${customerCtx.motor_year}`);
+                    if (customerCtx.motor_color) parts.push(`- Warna motor: ${customerCtx.motor_color}`);
+                    if (customerCtx.motor_condition) parts.push(`- Kondisi: ${customerCtx.motor_condition}`);
+
+                    // Service needs
+                    if (customerCtx.target_service && !state?.target_service) parts.push(`- Layanan diminati: ${customerCtx.target_service}`);
+                    if (customerCtx.service_detail) parts.push(`- Detail layanan: ${customerCtx.service_detail}`);
+                    if (customerCtx.budget_signal) parts.push(`- Sinyal budget: ${customerCtx.budget_signal}`);
+
+                    // Intent signals
+                    if (customerCtx.intent_level) parts.push(`- Level intent: ${customerCtx.intent_level}`);
+                    if (customerCtx.said_expensive === true) parts.push(`- ⚠️ Pernah bilang mahal`);
+                    if (customerCtx.asked_price === true) parts.push(`- Sudah tanya harga`);
+                    if (customerCtx.asked_availability === true) parts.push(`- Sudah tanya jadwal`);
+                    if (customerCtx.shared_photo === true) parts.push(`- Sudah kirim foto motor`);
+
+                    // Logistics
+                    if (customerCtx.preferred_day) parts.push(`- Preferensi hari: ${customerCtx.preferred_day}`);
+                    if (customerCtx.location_hint) parts.push(`- Lokasi: ${customerCtx.location_hint}`);
+                }
+
+                if (parts.length > 0) {
+                    memoryPart = `\n\n[PERSISTENT CONTEXT]\nInformasi yang sudah diketahui tentang pelanggan ini:\n${parts.join('\n')}\n(Gunakan informasi ini jika relevan, jangan tanya ulang hal yang sudah diketahui).`;
                 }
             } catch (error) {
                 console.warn('[AI_PROCESSING] Gagal mengambil persistent state:', error.message);
@@ -1391,6 +1445,10 @@ async function processBufferedMessages(senderNumber, client) {
 
         const aiResponseResult = await getAIResponse(combinedMessage, senderName, senderNumber, '', mediaItems, modelOverride);
         const aiResponse = aiResponseResult.content;
+
+        // Fire and forget — extract customer context di background, tidak blocking
+        extractAndSaveContext(combinedMessage, aiResponse, senderNumber)
+            .catch(err => console.warn('[Context] Extraction failed:', err.message));
 
         // Save to Firebase if available
         if (db) {
