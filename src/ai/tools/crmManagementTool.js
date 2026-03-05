@@ -8,7 +8,53 @@ const {
     ensureWhatsAppLabel,
     assignWhatsAppLabel
 } = require('../../lib/whatsappLabelUtils.js');
-const { getCustomerChatHistory, generatePersonalizedDraft } = require('../utils/followupPersonalizer.js');
+const { generateFollowUpMessage } = require('../agents/followUpEngine/messageGenerator.js');
+
+// getCustomerChatHistory — previously in followupPersonalizer.js, inlined here for CRM tool
+async function getCustomerChatHistory(db, docId, limit = 5) {
+    try {
+        const snapshot = await db.collection('directMessages')
+            .doc(docId)
+            .collection('messages')
+            .orderBy('timestamp', 'desc')
+            .limit(limit)
+            .get();
+        const messages = [];
+        snapshot.forEach(doc => messages.push(doc.data()));
+        return messages.reverse();
+    } catch (error) {
+        console.error(`[CRM] Failed to fetch history for ${docId}:`, error.message);
+        return [];
+    }
+}
+
+// Wrapper to keep CRM tool's generatePersonalizedDraft interface working
+async function generatePersonalizedDraft(name, label, chatHistory) {
+    const historyText = chatHistory
+        .map(m => `${m.sender === 'user' ? 'Customer' : 'AI'}: ${m.text}`)
+        .join('\n');
+
+    const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
+    const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+    if (!apiKey) return `Halo ${name}, ada yang bisa Zoya bantu lagi?`;
+
+    const model = new ChatGoogleGenerativeAI({
+        model: 'gemini-2.0-flash',
+        temperature: 0.7,
+        apiKey,
+    });
+
+    const prompt = `Buat 1 kalimat sapaan follow-up pendek (maks 20 kata) untuk "${name}" (${label}).
+Riwayat: ${historyText || '(kosong)'}
+Panggil "Mas/Mbak". Santai. Langsung teks, tanpa placeholder.`;
+
+    try {
+        const response = await model.invoke(prompt);
+        return response.content.trim().replace(/^"(.*)"$/, '$1');
+    } catch (err) {
+        return `Halo ${name}, ada yang bisa Zoya bantu lagi?`;
+    }
+}
 
 const { traceable } = require('../utils/langsmith.js');
 
