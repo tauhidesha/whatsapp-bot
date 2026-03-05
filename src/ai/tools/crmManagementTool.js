@@ -10,6 +10,8 @@ const {
 } = require('../../lib/whatsappLabelUtils.js');
 const { getCustomerChatHistory, generatePersonalizedDraft } = require('../utils/followupPersonalizer.js');
 
+const { traceable } = require('../utils/langsmith.js');
+
 /**
  * Tool CRM Komprehensif untuk AI Admin (Zoya).
  */
@@ -63,7 +65,7 @@ const crmManagementTool = {
         },
     },
 
-    implementation: async (input) => {
+    implementation: traceable(async (input) => {
         const {
             action,
             targetPhone,
@@ -102,7 +104,7 @@ const crmManagementTool = {
             console.error('[crmManagementTool] Error:', error);
             return { success: false, message: `Error: ${error.message}` };
         }
-    },
+    }, { name: "crmManagementTool" }),
 };
 
 /**

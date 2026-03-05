@@ -1,9 +1,10 @@
-// File: src/ai/tools/financeManagementTool.js
 const { z } = require('zod');
 const admin = require('firebase-admin');
 const { isAdmin, ensureFirestore } = require('../utils/adminAuth.js');
+const { traceable } = require('../utils/langsmith.js');
 
 const TransactionTypeEnum = z.enum(['income', 'expense']);
+
 
 const addTransactionSchema = z.object({
   type: TransactionTypeEnum.describe("Tipe transaksi: 'income' (pemasukan) atau 'expense' (pengeluaran)."),
@@ -164,7 +165,7 @@ const addTransactionTool = {
       },
     },
   },
-  implementation: async (input = {}) => {
+  implementation: traceable(async (input = {}) => {
     try {
       const parsed = addTransactionSchema.parse(input || {});
 
@@ -215,7 +216,7 @@ const addTransactionTool = {
         message: error instanceof Error ? error.message : 'Gagal mencatat transaksi.',
       };
     }
-  },
+  }, { name: "addTransactionTool" }),
 };
 
 const getTransactionHistoryTool = {
@@ -259,7 +260,7 @@ const getTransactionHistoryTool = {
       },
     },
   },
-  implementation: async (input = {}) => {
+  implementation: traceable(async (input = {}) => {
     try {
       const parsed = getTransactionHistorySchema.parse(input || {});
 
@@ -364,7 +365,7 @@ const getTransactionHistoryTool = {
         message: error instanceof Error ? error.message : 'Gagal mengambil riwayat transaksi.',
       };
     }
-  },
+  }, { name: "getTransactionHistoryTool" }),
 };
 
 const calculateFinancesTool = {
@@ -402,7 +403,7 @@ const calculateFinancesTool = {
       },
     },
   },
-  implementation: async (input = {}) => {
+  implementation: traceable(async (input = {}) => {
     try {
       const parsed = calculateFinancesSchema.parse(input || {});
 
@@ -509,7 +510,7 @@ const calculateFinancesTool = {
         message: error instanceof Error ? error.message : 'Gagal menghitung laporan keuangan.',
       };
     }
-  },
+  }, { name: "calculateFinancesTool" }),
 };
 
 module.exports = {

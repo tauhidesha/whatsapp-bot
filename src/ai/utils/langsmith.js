@@ -1,28 +1,27 @@
-// File: src/ai/utils/langsmith.js
-// Helper utilities to integrate LangSmith tracing when environment variables are provided.
-
-let LangSmithTracer;
-try {
-  ({ LangSmithTracer } = require('langsmith'));
-} catch (error) {
-  // Dependency might not be installed yet (offline install). Log once lazily.
-  LangSmithTracer = null;
-}
+const { Client } = require('langsmith');
+const { traceable } = require('langsmith/traceable');
 
 function isLangSmithEnabled() {
-  if (!LangSmithTracer) return false;
   if (process.env.LANGSMITH_TRACING === 'false') return false;
   if (process.env.LANGSMITH_TRACING_V2 === 'false') return false;
   return Boolean(process.env.LANGSMITH_API_KEY);
 }
 
-function getLangSmithCallbacks(runName = 'whatsapp-ai-chatbot') {
+/**
+ * Get LangSmith tracing callbacks with metadata and tags
+ * @param {string} runName - Name of the run
+ * @param {Object} options - Additional options including metadata and tags
+ */
+function getLangSmithCallbacks(runName = 'whatsapp-ai-chatbot', options = {}) {
   if (!isLangSmithEnabled()) return [];
 
-  const tracer = new LangSmithTracer({
+  const { LangChainTracer } = require('@langchain/core/tracers/tracer_langchain');
+
+  const tracer = new LangChainTracer({
     projectName: process.env.LANGSMITH_PROJECT || 'WhatsApp AI Chatbot',
     apiUrl: process.env.LANGSMITH_ENDPOINT,
-    runName,
+    metadata: options.metadata || {},
+    tags: options.tags || [],
   });
 
   return [tracer];
@@ -30,4 +29,6 @@ function getLangSmithCallbacks(runName = 'whatsapp-ai-chatbot') {
 
 module.exports = {
   getLangSmithCallbacks,
+  traceable,
+  Client
 };

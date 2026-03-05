@@ -427,14 +427,16 @@ const ADMIN_MESSAGE_REWRITE_STYLE_PROMPT = `Kamu adalah Zoya, asisten Bosmat yan
 - Jangan mengubah angka / harga / jadwal yang disebutkan.
 - Jangan menyebutkan kamu sedang menulis ulang pesan admin.`;
 
-function getTracingConfig(label) {
-    const callbacks = getLangSmithCallbacks(label);
+function getTracingConfig(label, options = {}) {
+    const callbacks = getLangSmithCallbacks(label, options);
     if (!callbacks || callbacks.length === 0) {
-        return undefined;
+        return { runName: label };
     }
     return {
         runName: label,
         callbacks,
+        metadata: options.metadata || {},
+        tags: options.tags || [],
     };
 }
 
@@ -1043,7 +1045,18 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                         }).bindTools(geminiToolSpecifications);
                     }
 
-                    response = await modelInstance.invoke(messages, getTracingConfig(traceLabel));
+                    const tracingConfig = getTracingConfig(traceLabel, {
+                        metadata: {
+                            sender_number: senderNumber || 'anonymous',
+                            sender_name: senderName || 'User',
+                            iteration,
+                            model: targetModel,
+                            is_admin: isAdmin
+                        },
+                        tags: [mode || 'customer', targetModel]
+                    });
+
+                    response = await modelInstance.invoke(messages, tracingConfig);
 
                     // Validate response
                     const hasToolCalls = getToolCallsFromResponse(response).length > 0;
@@ -1146,10 +1159,12 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                     console.log(`[AI_PROCESSING] Detected textual tool directive: ${toolName} `);
 
                     if (!availableTools[toolName]) {
-                        console.warn(`[AI_PROCESSING] Tool ${toolName} from textual directive not found.Returning sanitized output.`);
                         const safeText = sanitizeToolDirectiveOutput(finalText);
                         console.log(`🎯[AI_PROCESSING] ===== AI PROCESSING COMPLETED =====\n`);
-                        return safeText || 'Baik mas, Zoya akan bantu cek ke tim Bosmat.';
+                        return {
+                            content: safeText || 'Baik mas, Zoya akan bantu cek ke tim Bosmat.',
+                            id: response.id
+                        };
                     }
 
                     messages.push(response);
@@ -1181,7 +1196,10 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                 }
 
                 console.log(`🎯[AI_PROCESSING] ===== AI PROCESSING COMPLETED =====\n`);
-                return finalText || 'Maaf, saya belum bisa memberikan jawaban.';
+                return {
+                    content: finalText || 'Maaf, saya belum bisa memberikan jawaban.',
+                    id: response.id
+                };
             }
 
             iteration += 1;
@@ -1223,11 +1241,11 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
         }
 
         console.warn('⚠️ [AI_PROCESSING] Maximum iteration reached without final response.');
-        return 'Maaf, saya belum bisa memberikan jawaban.';
+        return { content: 'Maaf, saya belum bisa memberikan jawaban.', id: null };
     } catch (error) {
         console.error('❌ [AI_PROCESSING] Error getting AI response:', error);
         console.error('❌ [AI_PROCESSING] Error stack:', error.stack);
-        return "Maaf, terjadi kesalahan. Silakan coba lagi.";
+        return { content: "Maaf, terjadi kesalahan. Silakan coba lagi.", id: null };
     }
 }
 
@@ -1371,7 +1389,8 @@ async function processBufferedMessages(senderNumber, client) {
             }
         }
 
-        const aiResponse = await getAIResponse(combinedMessage, senderName, senderNumber, '', mediaItems, modelOverride);
+        const aiResponseResult = await getAIResponse(combinedMessage, senderName, senderNumber, '', mediaItems, modelOverride);
+        const aiResponse = aiResponseResult.content;
 
         // Save to Firebase if available
         if (db) {
@@ -1801,6 +1820,28 @@ app.get('/health', (req, res) => {
         uptime: process.uptime(),
         timestamp: new Date().toISOString()
     });
+    const { Client: LSClient } = require('./src/ai/utils/langsmith.js');
+
+    app.post('/langsmith/feedback', async (req, res) => {
+        try {
+            const { runId, key, score, comment, value } = req.body;
+            if (!runId || !key) {
+                return res.status(400).json({ error: 'runId and key are required' });
+            }
+
+            const client = new LSClient();
+            await client.createFeedback(runId, key, {
+                score,
+                comment,
+                value
+            });
+
+            res.json({ success: true });
+        } catch (error) {
+            console.error('❌ [LANGSMITH] Failed to log feedback:', error);
+            res.status(500).json({ error: error.message });
+        }
+    });
 });
 
 // Lightweight ping endpoint untuk keep-alive
@@ -1924,7 +1965,9 @@ app.post('/test-ai', async (req, res) => {
             senderName = "Admin (Playground)";
         }
 
-        const response = await getAIResponse(testMessage, senderName, effectiveSenderNumber, "", mediaItems, model_override, history);
+        const aiResult = await getAIResponse(testMessage, senderName, effectiveSenderNumber, "", mediaItems, model_override, history);
+        const response = aiResult.content;
+        const runId = aiResult.id;
 
         // Save messages to history AFTER processing to avoid doubling in history
         if (effectiveSenderNumber && db) {
@@ -1937,6 +1980,7 @@ app.post('/test-ai', async (req, res) => {
         res.json({
             input: testMessage,
             ai_response: response,
+            run_id: runId,
             memory_enabled: !!effectiveSenderNumber,
             mode: mode || 'customer',
             status: 'success'
