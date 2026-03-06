@@ -39,7 +39,7 @@ const {
 const { updateSystemPromptTool } = require('./src/ai/tools/updateSystemPromptTool.js');
 const { getSystemPromptTool } = require('./src/ai/tools/getSystemPromptTool.js');
 const { updatePromoOfTheMonthTool } = require('./src/ai/tools/updatePromoOfTheMonthTool.js');
-const { updateCustomerContextTool } = require('./src/ai/tools/updateCustomerContextTool.js');
+// updateCustomerContextTool REMOVED — digantikan oleh background context extractor agent
 const { createMetaWebhookRouter } = require('./src/server/metaWebhook.js');
 const { sendMetaMessage } = require('./src/server/metaClient.js');
 const { startBookingReminderScheduler } = require('./src/ai/utils/bookingReminders.js');
@@ -133,7 +133,7 @@ const availableTools = {
         });
     },
     updatePromoOfTheMonth: updatePromoOfTheMonthTool.implementation,
-    updateCustomerContext: updateCustomerContextTool.implementation,
+
 };
 
 const toolDefinitions = [
@@ -157,7 +157,7 @@ const toolDefinitions = [
     updateSystemPromptTool.toolDefinition,
     getSystemPromptTool.toolDefinition,
     updatePromoOfTheMonthTool.toolDefinition,
-    updateCustomerContextTool.toolDefinition,
+
 ];
 
 console.log('🔧 [STARTUP] Tool Registry Initialized:');
@@ -1016,23 +1016,16 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
 
                 const parts = [];
 
-                // Legacy state fields
-                if (state) {
-                    if (state.motor_model) parts.push(`- Motor: ${state.motor_model}`);
-                    if (state.target_service) parts.push(`- Layanan dituju: ${state.target_service}`);
-                    if (state.important_notes) parts.push(`- Catatan: ${state.important_notes}`);
-                }
-
-                // Rich extracted context
+                // Prioritas 1: customerContext (dari background extractor, lebih reliable)
                 if (customerCtx) {
                     // Motor identity
-                    if (customerCtx.motor_model && !state?.motor_model) parts.push(`- Motor: ${customerCtx.motor_model}`);
+                    if (customerCtx.motor_model) parts.push(`- Motor: ${customerCtx.motor_model}`);
                     if (customerCtx.motor_year) parts.push(`- Tahun motor: ${customerCtx.motor_year}`);
                     if (customerCtx.motor_color) parts.push(`- Warna motor: ${customerCtx.motor_color}`);
                     if (customerCtx.motor_condition) parts.push(`- Kondisi: ${customerCtx.motor_condition}`);
 
                     // Service needs
-                    if (customerCtx.target_service && !state?.target_service) parts.push(`- Layanan diminati: ${customerCtx.target_service}`);
+                    if (customerCtx.target_service) parts.push(`- Layanan diminati: ${customerCtx.target_service}`);
                     if (customerCtx.service_detail) parts.push(`- Detail layanan: ${customerCtx.service_detail}`);
                     if (customerCtx.budget_signal) parts.push(`- Sinyal budget: ${customerCtx.budget_signal}`);
 
@@ -1046,6 +1039,13 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                     // Logistics
                     if (customerCtx.preferred_day) parts.push(`- Preferensi hari: ${customerCtx.preferred_day}`);
                     if (customerCtx.location_hint) parts.push(`- Lokasi: ${customerCtx.location_hint}`);
+                }
+
+                // Prioritas 2: Legacy state (fallback, hanya jika customerCtx belum punya)
+                if (state) {
+                    if (state.motor_model && !customerCtx?.motor_model) parts.push(`- Motor: ${state.motor_model}`);
+                    if (state.target_service && !customerCtx?.target_service) parts.push(`- Layanan dituju: ${state.target_service}`);
+                    if (state.important_notes) parts.push(`- Catatan: ${state.important_notes}`);
                 }
 
                 if (parts.length > 0) {
