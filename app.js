@@ -2045,6 +2045,11 @@ app.post('/test-ai', async (req, res) => {
             if (response) {
                 await saveMessageToFirestore(effectiveSenderNumber, response, 'ai');
             }
+
+            // Fire and forget — extract context THEN classify (same as WhatsApp flow)
+            extractAndSaveContext(testMessage, response, effectiveSenderNumber)
+                .then(() => classifyAndSaveCustomer(effectiveSenderNumber))
+                .catch(err => console.warn('[Playground] Context/Classifier failed:', err.message));
         }
 
         res.json({
