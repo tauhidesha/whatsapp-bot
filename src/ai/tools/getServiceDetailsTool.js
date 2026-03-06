@@ -537,17 +537,23 @@ async function implementation(input) {
       return { success: false, error: 'generic_error', message: 'Input tidak valid' };
     }
 
-    const { service_name } = input;
+    // Ensure service_name is treated as an array
+    let serviceNames = input.service_name;
     const promo = await getPromoInfo();
 
-    if (!service_name) {
+    if (!serviceNames) {
       return { success: false, error: 'generic_error', message: 'service_name tidak valid atau kosong' };
     }
 
+    // Convert string to array gracefully in case LLM hallucinations still send a string
+    if (typeof serviceNames === 'string') {
+      serviceNames = [serviceNames];
+    }
+
     // Initialize return object structure matching standard response
-    if (Array.isArray(service_name)) {
+    if (Array.isArray(serviceNames)) {
       const results = await Promise.all(
-        service_name.map(name => {
+        serviceNames.map(name => {
           if (typeof name !== 'string') return { success: false, error: 'generic_error', message: 'invalid service_name element' };
           return processSingleService(name, input, promo);
         })
@@ -557,10 +563,8 @@ async function implementation(input) {
         multiple_services_requested: true,
         results: results
       };
-    } else if (typeof service_name === 'string') {
-      return await processSingleService(service_name, input, promo);
     } else {
-      return { success: false, error: 'generic_error', message: 'service_name must be a string or array of strings' };
+      return { success: false, error: 'generic_error', message: 'service_name must be an array of strings' };
     }
 
   } catch (err) {
@@ -579,11 +583,11 @@ const getServiceDetailsTool = {
         type: "object",
         properties: {
           service_name: {
-            type: ["string", "array"],
+            type: "array",
             items: {
               type: "string",
             },
-            description: "Nama layanan atau array nama layanan, misal: 'Coating Motor Doff' atau ['Repaint Bodi Halus', 'Repaint Velg']."
+            description: "Array dari nama layanan yang ingin dicek, misal: ['Coating Motor Doff'] atau ['Repaint Bodi Halus', 'Repaint Velg']. SELALU gunakan format array."
           },
           motor_model: {
             type: "string",
