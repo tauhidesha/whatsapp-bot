@@ -8,7 +8,7 @@ const readDirectMessagesTool = {
     type: 'function',
     function: {
       name: 'readDirectMessages',
-      description: 'KHUSUS ADMIN. Membaca database pesan (directMessages) di Firestore. Bisa melihat daftar percakapan terbaru atau detail chat dengan nomor tertentu.',
+      description: 'Baca pesan: list_recent (daftar chat aktif) atau read_conversation (isi chat nomor tertentu).',
       parameters: {
         type: 'object',
         properties: {

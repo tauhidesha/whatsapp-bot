@@ -66,7 +66,7 @@ const crmManagementTool = {
         type: 'function',
         function: {
             name: 'crmManagement',
-            description: 'KHUSUS ADMIN. Tool CRM untuk (1) crm_summary, (2) customer_deep_dive, (3) find_followup: cari & bikin draft report, (4) execute_followup: kirim massal hasil acc admin, (5) bulk_label, (6) update_notes.',
+            description: 'CRM admin: crm_summary, customer_deep_dive, find_followup, execute_followup, bulk_label, update_notes.',
             parameters: {
                 type: 'object',
                 properties: {

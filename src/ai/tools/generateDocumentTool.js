@@ -22,7 +22,7 @@ const generateDocumentTool = {
     type: 'function',
     function: {
       name: 'generateDocument',
-      description: 'Membuat dokumen PDF resmi (Surat Tanda Terima, Invoice, Bukti Bayar) dan mengirimkannya ke admin. HANYA bisa digunakan jika pengirim adalah admin.',
+      description: 'Buat PDF (tanda_terima/invoice/bukti_bayar) dan kirim ke admin.',
       parameters: {
         type: 'object',
         properties: {

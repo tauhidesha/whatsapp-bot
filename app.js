@@ -6,6 +6,7 @@
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
+const { DateTime } = require('luxon');
 const wppconnect = require('@wppconnect-team/wppconnect');
 const express = require('express');
 const http = require('http');
@@ -160,6 +161,19 @@ const toolDefinitions = [
 
 ];
 
+// Customer-facing tools (subset) — mengurangi token load untuk model ringan
+const customerToolDefinitions = [
+    getServiceDetailsTool.toolDefinition,
+    getStudioInfoTool.toolDefinition,
+    checkBookingAvailabilityTool.toolDefinition,
+    createBookingTool.toolDefinition,
+    updateBookingTool.toolDefinition,
+    calculateHomeServiceFeeTool.toolDefinition,
+    triggerBosMatTool.toolDefinition,
+    sendStudioPhotoTool.toolDefinition,
+    notifyVisitIntentTool.toolDefinition,
+];
+
 console.log('🔧 [STARTUP] Tool Registry Initialized:');
 console.log(`🔧 [STARTUP] Available Tools: ${Object.keys(availableTools).join(', ')}`);
 console.log(`🔧 [STARTUP] Tool Definitions: ${toolDefinitions.length} tools registered`);
@@ -207,135 +221,68 @@ const baseModel = new ChatGoogleGenerativeAI({
     apiKey: API_KEYS[0]
 });
 
-const geminiToolSpecifications = toolDefinitions.map(tool => {
-    if (tool.function) {
-        // Clone parameters to avoid mutating original
-        const parameters = tool.function.parameters ? JSON.parse(JSON.stringify(tool.function.parameters)) : {};
-
-        // Remove system-injected parameters from the schema sent to AI
-        // This prevents the AI from hallucinating null/invalid values for these fields
-        if (parameters.properties) {
-            delete parameters.properties.senderNumber;
-            delete parameters.properties.senderName;
-            // Also remove snake_case versions which seem to be causing the issue
-            delete parameters.properties.sender_number;
-            delete parameters.properties.sender_name;
-        }
-        if (parameters.required && Array.isArray(parameters.required)) {
-            parameters.required = parameters.required.filter(p =>
-                p !== 'senderNumber' &&
-                p !== 'senderName' &&
-                p !== 'sender_number' &&
-                p !== 'sender_name'
-            );
-        }
-
-        return {
-            type: 'function',
-            function: {
-                name: tool.function.name,
-                description: tool.function.description,
-                parameters: parameters
+function prepareToolSpecs(defs) {
+    return defs.map(tool => {
+        if (tool.function) {
+            const parameters = tool.function.parameters ? JSON.parse(JSON.stringify(tool.function.parameters)) : {};
+            if (parameters.properties) {
+                delete parameters.properties.senderNumber;
+                delete parameters.properties.senderName;
+                delete parameters.properties.sender_number;
+                delete parameters.properties.sender_name;
             }
-        };
-    }
+            if (parameters.required && Array.isArray(parameters.required)) {
+                parameters.required = parameters.required.filter(p =>
+                    p !== 'senderNumber' &&
+                    p !== 'senderName' &&
+                    p !== 'sender_number' &&
+                    p !== 'sender_name'
+                );
+            }
+            return {
+                type: 'function',
+                function: {
+                    name: tool.function.name,
+                    description: tool.function.description,
+                    parameters: parameters
+                }
+            };
+        }
+        return tool;
+    });
+}
 
-    return tool;
-});
+// Admin: semua tools (20). Customer: subset (10) — hemat token untuk model ringan.
+const adminToolSpecs = prepareToolSpecs(toolDefinitions);
+const customerToolSpecs = prepareToolSpecs(customerToolDefinitions);
+const adminModel = baseModel.bindTools(adminToolSpecs);
+const customerModel = baseModel.bindTools(customerToolSpecs);
 
-const aiModel = baseModel.bindTools(geminiToolSpecifications);
+// Legacy alias agar kode lain yang referensi tetap jalan
+const geminiToolSpecifications = adminToolSpecs;
+const aiModel = adminModel;
 
 console.log('✅ [STARTUP] AI Model initialized with native tool calling support');
 console.log(`🤖 [STARTUP] Active AI model: ${ACTIVE_AI_MODEL}`);
 
 console.log(`🖼️ [STARTUP] Vision analysis target models: ${[ACTIVE_VISION_MODEL, FALLBACK_VISION_MODEL].filter(Boolean).join(', ')}`);
 
-const SYSTEM_PROMPT = `<role> Identity: Zoya, AI Assistant di Bosmat Repainting and Detailing Studio. Year: 2026. Tone: Profesional tapi santai. Ramah, sopan, dan to the point. Bukan bahasa gaul/tongkrongan. Target User: Pria (Panggilan: "Mas"). </role>
-<response_style>
+const SYSTEM_PROMPT = `Kamu Zoya, asisten Bosmat Repainting & Detailing Studio (2026). Panggil user "Mas". Profesional, santai, sopan, to the point.
 
-DEFAULT: Balas singkat, 1–3 kalimat. Langsung ke inti.
-Jawaban boleh 3–5 kalimat hanya saat: menjelaskan layanan, harga, atau hal teknis yang benar-benar perlu detail.
-Hindari basa-basi. Jangan buka dengan kalimat panjang yang tidak perlu.
-Format WhatsApp: Gunakan bold untuk hal penting. Hindari paragraf panjang; utamakan 1–2 paragraf pendek.
-</response_style>
-<tools> 1. \`getServiceDetails(service_name)\`: Panggil saat user tanya detail layanan, harga, atau estimasi waktu. 2. \`checkBookingAvailability(date/time)\`: Panggil saat user siap booking atau tanya ketersediaan jadwal. 3. \`triggerBosMat(reason)\`: Panggil jika ada komplain berat, user marah, atau nego terlalu keras. </tools>
+Balas 1-3 kalimat. Detail (3-5 kalimat) hanya untuk harga/layanan. Format WhatsApp (bold, paragraf pendek). Maksimal 1 pertanyaan per balasan. Jangan yapping. Hindari istilah teknis.
 
-<upselling_policy>
-ATURAN UTAMA UPSALE: Pelan, sekali saja, dan hanya setelah layanan utama jelas disetujui.
+Tools:
+- getServiceDetails: WAJIB saat user tanya harga/layanan. Tanya tipe motor dulu jika belum tahu. JANGAN TEBAK HARGA.
+- checkBookingAvailability: saat user mau atur jadwal.
+- triggerBosMat: jika user marah/komplain berat/nego keras.
 
-Dilarang upsell di awal percakapan.
-Upsell HANYA boleh dilakukan SETELAH:
-User sudah jelas memilih layanan utama (misal: “iya, repaint full bodi aja Mas”).
-Upsell maksimal 1x dalam satu percakapan. Jangan tawarkan upsell kedua jika yang pertama ditolak.
-Sampaikan upsell singkat dan natural, 1 kalimat saja.
-Mapping upsell (opsional, kalau momen tepat):
+Layanan: Repaint (Bodi Halus/Kasar, Velg, Cover CVT, mulai 150rb) | Detailing (Mesin, Cuci Komplit, Full Detailing, mulai 100rb) | Coating (Doff/Glossy, Complete Service, mulai 350rb). Prioritaskan data dari getServiceDetails. Jika bundling/diskon, SELALU sebutkan total harga akhir.
 
-Repaint → tawarkan Cuci Komplit (karena bodi dibongkar, sekalian bersih rangka).
-Cuci Komplit → tawarkan Full Detailing.
-Poles Bodi → tawarkan Coating.
-Coating → tawarkan Complete Service.
-Contoh upsell yang BAIK:
+Upsell: Boleh 1x SETELAH user setuju layanan utama. Mapping: Repaint→Cuci Komplit, Cuci→Full Detailing, Poles→Coating, Coating→Complete. Ditolak → terima sopan, lanjut booking.
 
-“Kalau mau sekalian, Mas bisa tambah cuci komplit, jadi rangka dalemnya ikut bersih karena bodi sekalian dibongkar.”
-Contoh upsell yang BURUK (DILARANG):
+Campaign aktif: "Supra Cuci Komplit" (Meta Ads). Fokus Cuci Komplit — motor dibongkar bodi, bersih rangka dalam.
 
-“Mas mau sekalian cuci komplit nggak? Terus poles juga? Oh ya coating juga recommended lho! Atau langsung complete service aja?”
-</upselling_policy>
-<rejection_handling>
-Jika user menolak upsell:
-
-Terima keputusan user secara singkat dan sopan (contoh: “Oke Mas, siap, kita fokus ke repaint bodi dulu ya.”).
-Langsung lanjut ke proses booking layanan utama, jangan tawarkan layanan lain lagi.
-</rejection_handling>
-<layanan> - **Repaint**: Cat ulang bodi & velg (Mulai 150rb). - **Detailing**: Pembersihan mendalam sampai ke rangka (Mulai 100rb). Tingkatan: 1. *Detailing Mesin*: Bersihin mesin dari kerak & oli. 2. *Cuci Komplit*: Bongkar bodi, bersihkan rangka dalam secara total. 3. *Full Detailing*: Cuci Komplit + Poles Bodi. 4. *Complete Service*: Cuci Komplit + Poles + Coating. - **Coating**: Lapisan pelindung cat supaya awet dan tahan air (Mulai 350rb).
-Saat sebut harga atau estimasi, prioritaskan data dari getServiceDetails. Hanya gunakan angka di atas jika tools tidak tersedia.
-</layanan>
-
-<campaign_context>
-
-Campaign Aktif: "Supra Cuci Komplit" dari Meta Ads.
-Layanan Fokus Campaign: Cuci Komplit.
-Selling Point Utama: Motor dibongkar bodinya untuk dibersihkan rangka dalam, bukan cuma cuci luar.
-Jika user datang dari iklan ini dan bertanya soal cuci/bersih-bersih, jelaskan keunggulan Cuci Komplit dengan bahasa sederhana.
-</campaign_context>
-<constraints> 1. **Satu pertanyaan per chat.** - Di setiap balasan, ajukan maksimal 1 pertanyaan utama ke user. - Hindari dua pertanyaan dalam satu kalimat atau dua kalimat berturut-turut.
-Gunakan tools saat relevan.
-
-getServiceDetails: WAJIB panggil saat user bertanya harga. Jika user tanya harga secara umum (misal: "berapa harga repaint?"), panggil dengan service_name kategori tersebut HANYA JIKA tipe motor sudah diketahui. Jika belum, TANYA tipe motornya dulu. JANGAN PERNAH MENEBAK HARGA.
-checkBookingAvailability: saat user sudah mau atur jadwal.
-Bahasa mudah dipahami.
-
-Hindari istilah teknis (oksidasi, PU HS, dekontaminasi). Jelaskan manfaat praktis yang bisa dirasakan user.
-Jangan yapping.
-
-Jawab seperlunya, fokus ke kebutuhan user.
-Proaktif Berhitung: Jika menawarkan bundling, gabungan layanan, atau ada diskon, SELALU hitung dan sebutkan TOTAL HARGA akhir secara eksplisit (termasuk potongan diskon) di chat yang sama tanpa menunggu ditanya user.
-Jika user tanya harga → jawab harga sesuai data dari tool + singkat soal apa yang didapat + 1 pertanyaan lanjut yang jelas. Jika tool mengembalikan daftar paket (misal list harga detailing), berikan opsi tersebut dengan jelas. </constraints>
-<task> Tugas utama: Konversi Cold Lead menjadi Booking dengan alur yang rapi dan singkat.
-Step 1: Kualifikasi Awal
-
-Chat baru masuk.
-Respon singkat, akhiri dengan 1 pertanyaan kunci, contoh:
-“Boleh, Mas. Motornya apa dan mau diapain?”
-Step 2: Konsultasi & Penentuan Layanan Utama
-
-Pahami kebutuhan user berdasarkan: tipe motor, kondisi (lecet, pecah, kusam, dll.), dan tujuan (ganti warna, segarkan cat, dll.).
-Panggil getServiceDetails untuk ambil harga/estimasi resmi.
-Jelaskan layanan yang paling cocok dalam 1–3 kalimat, lalu tutup dengan 1 pertanyaan yang mengarahkan keputusan (contoh:
-“Dengan kondisi begitu, paling pas repaint full bodi, Mas. Mau dipertahankan warna standar atau ganti warna sekalian?”).
-Step 3: Upsell (Opsional & Setelah Setuju Layanan Utama)
-
-Hanya lakukan setelah user mengatakan setuju dengan layanan utama.
-Lakukan 1 kali saja, singkat, natural.
-Jika user menolak, jangan tawarkan upsell lain; langsung kembali ke fokus layanan utama dan lanjut ke booking.
-Step 4: Closing & Booking
-
-Saat user sudah oke dengan layanan dan kisaran harga.
-Tawarkan untuk atur jadwal:
-“Kalau cocok, Mas mau dikerjakan hari apa? Nanti saya cek jadwal dulu.”
-Gunakan checkBookingAvailability untuk memastikan jadwal, lalu konfirmasi ke user.
-Jika user marah, merasa tertipu, atau nego terlalu keras → panggil triggerBosMat dan tetap jawab sopan, singkat, dan menenangkan.
-</task>`;
+Alur konversi: (1) Kualifikasi: tanya motor & kebutuhan. (2) Konsultasi: panggil getServiceDetails, jelaskan 1-3 kalimat + 1 pertanyaan keputusan. (3) Upsell opsional 1x. (4) Booking: tawarkan jadwal, panggil checkBookingAvailability.`;
 
 // --- Dynamic System Prompt Logic ---
 let currentSystemPrompt = SYSTEM_PROMPT;
@@ -552,7 +499,7 @@ async function cleanupChromiumProfileLocks(sessionName, sessionDataPath = './tok
 
 // --- Memory Configuration ---
 const MEMORY_CONFIG = {
-    maxMessages: parseInt(process.env.MEMORY_MAX_MESSAGES) || 5,
+    maxMessages: parseInt(process.env.MEMORY_MAX_MESSAGES) || 3,
     includeSystemMessages: process.env.MEMORY_INCLUDE_SYSTEM === 'true'
 };
 
@@ -1056,13 +1003,18 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
             }
         }
 
+        // Inject tanggal & waktu langsung ke prompt (hemat 1 tool call)
+        const now = DateTime.now().setZone('Asia/Jakarta').setLocale('id');
+        const dateTimePart = `\nSekarang: ${now.toFormat("cccc, d LLLL yyyy HH:mm")} WIB.`;
+
         const messages = [
-            new SystemMessage(effectiveSystemPrompt + memoryPart),
+            new SystemMessage(effectiveSystemPrompt + dateTimePart + memoryPart),
             ...conversationHistoryMessages,
             new HumanMessage(humanMessageContent)
         ].filter(msg => !!msg); // Filter out null/undefined messages
 
-        console.log(`🔧[AI_PROCESSING] Tools registered: ${toolDefinitions.map(t => t.function.name).join(', ')} `);
+        const activeToolDefs = isAdmin ? toolDefinitions : customerToolDefinitions;
+        console.log(`🔧[AI_PROCESSING] Tools registered (${isAdmin ? 'ADMIN' : 'CUSTOMER'}, ${activeToolDefs.length} tools): ${activeToolDefs.map(t => t.function.name).join(', ')} `);
         let iteration = 0;
         const MAX_ITERATIONS = 8;
 
@@ -1091,14 +1043,15 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                     const targetModel = modelOverride || ACTIVE_AI_MODEL;
                     let modelInstance;
 
+                    const activeToolSpecs = isAdmin ? adminToolSpecs : customerToolSpecs;
                     if (!modelOverride && apiKeyIndex === 0) {
-                        modelInstance = aiModel;
+                        modelInstance = isAdmin ? adminModel : customerModel;
                     } else {
                         modelInstance = new ChatGoogleGenerativeAI({
                             model: targetModel,
                             temperature: ACTIVE_AI_TEMPERATURE,
                             apiKey: currentApiKey
-                        }).bindTools(geminiToolSpecifications);
+                        }).bindTools(activeToolSpecs);
                     }
 
                     const tracingConfig = getTracingConfig(traceLabel, {
