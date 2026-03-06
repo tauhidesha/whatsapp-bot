@@ -1005,7 +1005,22 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
 
         // Inject tanggal & waktu langsung ke prompt (hemat 1 tool call)
         const now = DateTime.now().setZone('Asia/Jakarta').setLocale('id');
-        const dateTimePart = `\nSekarang: ${now.toFormat("cccc, d LLLL yyyy HH:mm")} WIB.`;
+        let dateTimePart = `\nSekarang: ${now.toFormat("cccc, d LLLL yyyy HH:mm")} WIB.`;
+
+        // Fetch and inject Promo Config
+        try {
+            if (db) {
+                const promoDoc = await db.collection('settings').doc('promo_config').get();
+                if (promoDoc.exists && promoDoc.data().isActive) {
+                    const promoText = promoDoc.data().promoText;
+                    if (promoText) {
+                        dateTimePart += `\n\n[PROMO AKTIF SAAT INI]\n${promoText}\n(Gunakan layanan promo ini sebagai penawaran diskon/upsell jika cocok dengan kebutuhan pelanggan, cukup gunakan informasi seperlunya tanpa mengorbankan token).`;
+                    }
+                }
+            }
+        } catch (error) {
+            console.warn('[AI_PROCESSING] Gagal mengambil promo config:', error.message);
+        }
 
         const messages = [
             new SystemMessage(effectiveSystemPrompt + dateTimePart + memoryPart),
