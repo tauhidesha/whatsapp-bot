@@ -295,6 +295,240 @@ function formatRepaintPriceResult(lookup) {
 }
 
 // --- Implementation ---
+async function processSingleService(parsedServiceName, input, promoText) {
+  const motorModel = typeof input.motor_model === 'string' ? input.motor_model.trim() : null;
+  const senderNumber = typeof input.senderNumber === 'string'
+    ? input.senderNumber
+    : typeof input.sender_number === 'string'
+      ? input.sender_number
+      : null;
+
+  const colorNameInput = typeof input.color_name === 'string' ? input.color_name.trim() : null;
+  const sizeFromArgs = normalizeSizeInput(input.size);
+  const cachedSizes = senderNumber ? await getMotorSizesForSender(senderNumber) : null;
+
+  // Special case for "coating" generic query
+  if (parsedServiceName.trim().toLowerCase() === 'coating') {
+    const names = ['Coating Motor Doff', 'Coating Motor Glossy', 'Complete Service Doff', 'Complete Service Glossy'];
+    const services = masterLayanan.filter(s => names.includes(s.name));
+
+    const results = await Promise.all(services.map(async (service) => {
+      const { finalSize } = await resolveSizeForService({ service, sizeArg: sizeFromArgs, senderNumber, cachedSizes, motorModel });
+      const variant = service.variants?.find(v => v.name === finalSize);
+      const basePrice = variant?.price ?? service.price;
+
+      return {
+        name: service.name,
+        summary: service.summary,
+        price: basePrice || 'Tergantung ukuran',
+        price_formatted: basePrice ? `Rp${basePrice.toLocaleString('id-ID')}` : 'Tergantung ukuran',
+        size: finalSize || 'Belum diketahui'
+      };
+    }));
+
+    return {
+      success: true,
+      multiple_candidates: true,
+      category: 'coating',
+      motor_model: motorModel || 'Belum diketahui',
+      candidates: results,
+      promo_active: !!promoText,
+      message: 'Ditemukan beberapa paket coating & complete service. Silakan pilih sesuai kebutuhan.'
+    };
+  }
+
+  // Special case for "detailing" generic query
+  if (parsedServiceName.trim().toLowerCase() === 'detailing' || parsedServiceName.trim().toLowerCase() === 'poles') {
+    const services = masterLayanan.filter(s => s.category === 'detailing');
+
+    const results = await Promise.all(services.map(async (service) => {
+      const { finalSize } = await resolveSizeForService({ service, sizeArg: sizeFromArgs, senderNumber, cachedSizes, motorModel });
+      const variant = service.variants?.find(v => v.name === finalSize);
+      const basePrice = variant?.price ?? service.price;
+
+      return {
+        name: service.name,
+        summary: service.summary,
+        price: basePrice || 'Tergantung ukuran',
+        price_formatted: basePrice ? `Rp${basePrice.toLocaleString('id-ID')}` : 'Tergantung ukuran',
+        size: finalSize || 'Belum diketahui'
+      };
+    }));
+
+    return {
+      success: true,
+      multiple_candidates: true,
+      category: 'detailing',
+      motor_model: motorModel || 'Belum diketahui',
+      candidates: results,
+      promo_active: !!promoText,
+      message: 'Berikut adalah daftar harga paket detailing kami.'
+    };
+  }
+
+  // Special case for "repaint" generic query
+  if (parsedServiceName.trim().toLowerCase() === 'repaint') {
+    if (!motorModel) {
+      return {
+        success: true,
+        multiple_candidates: true,
+        needs_motor_model: true,
+        message: 'Untuk memberikan estimasi harga repaint, mohon infokan tipe motornya (misal: Vario, NMax, Beat).'
+      };
+    }
+
+    // We have a motor model, let's gather all repaint prices for it
+    const results = [];
+    const { finalSize } = await resolveSizeForService({ service: { category: 'repaint' }, sizeArg: sizeFromArgs, senderNumber, cachedSizes, motorModel });
+
+    // 1. Bodi Halus
+    const halusLookup = lookupRepaintPrice(motorModel, 'bodi_halus', finalSize);
+    const halusInfo = formatRepaintPriceResult(halusLookup);
+    if (halusInfo && halusInfo.price) {
+      results.push({ name: 'Repaint Bodi Halus', price: halusInfo.price, price_formatted: halusInfo.price_formatted, note: halusInfo.note });
+    }
+
+    // 2. Bodi Kasar
+    const kasarLookup = lookupRepaintPrice(motorModel, 'bodi_kasar', finalSize);
+    const kasarInfo = formatRepaintPriceResult(kasarLookup);
+    if (kasarInfo && kasarInfo.price) {
+      results.push({ name: 'Repaint Bodi Kasar', price: kasarInfo.price, price_formatted: kasarInfo.price_formatted, note: kasarInfo.note });
+    }
+
+    // 3. Velg
+    const velgLookup = lookupRepaintPrice(motorModel, 'velg', finalSize);
+    const velgInfo = formatRepaintPriceResult(velgLookup);
+    if (velgInfo && velgInfo.price) {
+      results.push({ name: 'Repaint Velg', price: velgInfo.price, price_formatted: velgInfo.price_formatted, note: velgInfo.note });
+    }
+
+    // 4. Cover CVT / Arm (Fixed price from masterLayanan)
+    const cvtService = masterLayanan.find(s => s.name === 'Repaint Cover CVT / Arm');
+    if (cvtService) {
+      results.push({ name: cvtService.name, price: cvtService.price, price_formatted: `Rp${cvtService.price.toLocaleString('id-ID')}`, note: cvtService.summary });
+    }
+
+    return {
+      success: true,
+      multiple_candidates: true,
+      category: 'repaint',
+      motor_model: motorModel,
+      motor_size: finalSize,
+      candidates: results,
+      promo_active: !!promoText,
+      message: `Berikut estimasi harga repaint untuk motor ${motorModel}.`
+    };
+  }
+
+  // Fuzzy matching
+  const candidates = masterLayanan
+    .map(s => ({ ...s, similarity: stringSimilarity(parsedServiceName, s.name) }))
+    .filter(s => s.similarity >= 0.4) // Threshold agak longgar untuk menangkap variasi
+    .sort((a, b) => b.similarity - a.similarity);
+
+  if (candidates.length === 0) {
+    return { success: false, error: 'not_found', message: `Layanan "${parsedServiceName}" tidak ditemukan.` };
+  }
+
+  const service = candidates[0];
+  const { finalSize, category } = await resolveSizeForService({
+    service,
+    sizeArg: sizeFromArgs,
+    senderNumber,
+    cachedSizes,
+    motorModel,
+  });
+
+  const durationFormatted = formatDuration(service.estimatedDuration);
+
+  // --- Surcharge resolution ---
+  const surchargeMatch = colorNameInput ? lookupColorSurcharge(colorNameInput) : null;
+  const colorSurcharge = surchargeMatch ? surchargeMatch.surcharge : 0;
+
+  // --- Model-based pricing for repaint services ---
+  if (service.usesModelPricing && motorModel) {
+    const subcategory = service.subcategory || null;
+    const lookup = lookupRepaintPrice(motorModel, subcategory, finalSize);
+    const priceInfo = formatRepaintPriceResult(lookup);
+
+    if (priceInfo) {
+      const basePrice = priceInfo.price || null;
+      const finalPrice = basePrice ? basePrice + colorSurcharge : null;
+
+      const result = {
+        success: true,
+        service_name: service.name,
+        category: service.category,
+        subcategory: subcategory,
+        summary: service.summary,
+        description: service.description,
+        estimated_duration: durationFormatted,
+        motor_model: priceInfo.motor_model,
+        motor_size: finalSize || null,
+        ...priceInfo,
+        color_name: surchargeMatch ? surchargeMatch.name : colorNameInput,
+        color_surcharge: colorSurcharge,
+        color_surcharge_formatted: `Rp${colorSurcharge.toLocaleString('id-ID')}`,
+        final_price: finalPrice,
+        final_price_formatted: finalPrice ? `Rp${finalPrice.toLocaleString('id-ID')}` : null,
+        promo_active: !!promoText,
+        syarat_ketentuan: syaratKetentuan,
+      };
+
+      if (senderNumber && finalSize) {
+        await setPreferredSizeForService(senderNumber, category, finalSize);
+        await setMotorSizeForSender(senderNumber, {
+          serviceSize: category === 'repaint' ? null : finalSize,
+          repaintSize: category === 'repaint' ? finalSize : null,
+          motor_model: motorModel,
+          target_service: result.service_name,
+        });
+      }
+
+      return result;
+    }
+  }
+
+  // --- Fallback: variant-based (S/M/L/XL) or flat price ---
+  const variant = service.variants?.find(v => v.name === finalSize);
+  const basePrice = variant?.price ?? service.price;
+
+  const result = {
+    success: true,
+    service_name: service.name,
+    category: service.category,
+    summary: service.summary,
+    description: service.description,
+    estimated_duration: durationFormatted,
+    motor_size: finalSize || null,
+    price: basePrice || null,
+    price_formatted: basePrice ? `Rp${basePrice.toLocaleString('id-ID')}` : 'Harga perlu model motor',
+    color_name: surchargeMatch ? surchargeMatch.name : colorNameInput,
+    color_surcharge: colorSurcharge,
+    color_surcharge_formatted: `Rp${colorSurcharge.toLocaleString('id-ID')}`,
+    final_price: basePrice ? basePrice + colorSurcharge : null,
+    final_price_formatted: basePrice ? `Rp${(basePrice + colorSurcharge).toLocaleString('id-ID')}` : null,
+    promo_active: !!promoText,
+  };
+
+  // Jika repaint dan tidak ada model, beri hint
+  if (service.usesModelPricing && !motorModel) {
+    result.hint = 'Untuk harga yang lebih akurat, sertakan model motor (contoh: Scoopy, NMax, Beat).';
+  }
+
+  if (senderNumber && finalSize) {
+    await setPreferredSizeForService(senderNumber, category, finalSize);
+    await setMotorSizeForSender(senderNumber, {
+      serviceSize: category === 'repaint' ? null : finalSize,
+      repaintSize: category === 'repaint' ? finalSize : null,
+      motor_model: motorModel,
+      target_service: result.service_name,
+    });
+  }
+
+  return result;
+}
+
 async function implementation(input) {
   try {
     console.log('[getServiceDetailsTool] Input:', input);
@@ -303,244 +537,31 @@ async function implementation(input) {
       return { success: false, error: 'generic_error', message: 'Input tidak valid' };
     }
 
-    const { service_name: parsedServiceName } = input;
-    const motorModel = typeof input.motor_model === 'string' ? input.motor_model.trim() : null;
-    const senderNumber = typeof input.senderNumber === 'string'
-      ? input.senderNumber
-      : typeof input.sender_number === 'string'
-        ? input.sender_number
-        : null;
-
-    const colorNameInput = typeof input.color_name === 'string' ? input.color_name.trim() : null;
-
-    const sizeFromArgs = normalizeSizeInput(input.size);
-    const cachedSizes = senderNumber ? await getMotorSizesForSender(senderNumber) : null;
+    const { service_name } = input;
     const promo = await getPromoInfo();
 
-    if (!parsedServiceName || typeof parsedServiceName !== 'string') {
+    if (!service_name) {
       return { success: false, error: 'generic_error', message: 'service_name tidak valid atau kosong' };
     }
 
-    // Special case for "coating" generic query
-    if (parsedServiceName.trim().toLowerCase() === 'coating') {
-      const names = ['Coating Motor Doff', 'Coating Motor Glossy', 'Complete Service Doff', 'Complete Service Glossy'];
-      const services = masterLayanan.filter(s => names.includes(s.name));
-
-      const results = await Promise.all(services.map(async (service) => {
-        const { finalSize } = await resolveSizeForService({ service, sizeArg: sizeFromArgs, senderNumber, cachedSizes, motorModel });
-        const variant = service.variants?.find(v => v.name === finalSize);
-        const basePrice = variant?.price ?? service.price;
-
-        return {
-          name: service.name,
-          summary: service.summary,
-          price: basePrice || 'Tergantung ukuran',
-          price_formatted: basePrice ? `Rp${basePrice.toLocaleString('id-ID')}` : 'Tergantung ukuran',
-          size: finalSize || 'Belum diketahui'
-        };
-      }));
-
+    // Initialize return object structure matching standard response
+    if (Array.isArray(service_name)) {
+      const results = await Promise.all(
+        service_name.map(name => {
+          if (typeof name !== 'string') return { success: false, error: 'generic_error', message: 'invalid service_name element' };
+          return processSingleService(name, input, promo);
+        })
+      );
       return {
         success: true,
-        multiple_candidates: true,
-        category: 'coating',
-        motor_model: motorModel || 'Belum diketahui',
-        candidates: results,
-        promo: promo,
-        message: 'Ditemukan beberapa paket coating & complete service. Silakan pilih sesuai kebutuhan.'
+        multiple_services_requested: true,
+        results: results
       };
+    } else if (typeof service_name === 'string') {
+      return await processSingleService(service_name, input, promo);
+    } else {
+      return { success: false, error: 'generic_error', message: 'service_name must be a string or array of strings' };
     }
-
-    // Special case for "detailing" generic query
-    if (parsedServiceName.trim().toLowerCase() === 'detailing' || parsedServiceName.trim().toLowerCase() === 'poles') {
-      const services = masterLayanan.filter(s => s.category === 'detailing');
-
-      const results = await Promise.all(services.map(async (service) => {
-        const { finalSize } = await resolveSizeForService({ service, sizeArg: sizeFromArgs, senderNumber, cachedSizes, motorModel });
-        const variant = service.variants?.find(v => v.name === finalSize);
-        const basePrice = variant?.price ?? service.price;
-
-        return {
-          name: service.name,
-          summary: service.summary,
-          price: basePrice || 'Tergantung ukuran',
-          price_formatted: basePrice ? `Rp${basePrice.toLocaleString('id-ID')}` : 'Tergantung ukuran',
-          size: finalSize || 'Belum diketahui'
-        };
-      }));
-
-      return {
-        success: true,
-        multiple_candidates: true,
-        category: 'detailing',
-        motor_model: motorModel || 'Belum diketahui',
-        candidates: results,
-        promo: promo,
-        message: 'Berikut adalah daftar harga paket detailing kami.'
-      };
-    }
-
-    // Special case for "repaint" generic query
-    if (parsedServiceName.trim().toLowerCase() === 'repaint') {
-      if (!motorModel) {
-        return {
-          success: true,
-          multiple_candidates: true,
-          needs_motor_model: true,
-          message: 'Untuk memberikan estimasi harga repaint, mohon infokan tipe motornya (misal: Vario, NMax, Beat).'
-        };
-      }
-
-      // We have a motor model, let's gather all repaint prices for it
-      const results = [];
-      const { finalSize } = await resolveSizeForService({ service: { category: 'repaint' }, sizeArg: sizeFromArgs, senderNumber, cachedSizes, motorModel });
-
-      // 1. Bodi Halus
-      const halusLookup = lookupRepaintPrice(motorModel, 'bodi_halus', finalSize);
-      const halusInfo = formatRepaintPriceResult(halusLookup);
-      if (halusInfo && halusInfo.price) {
-        results.push({ name: 'Repaint Bodi Halus', price: halusInfo.price, price_formatted: halusInfo.price_formatted, note: halusInfo.note });
-      }
-
-      // 2. Bodi Kasar
-      const kasarLookup = lookupRepaintPrice(motorModel, 'bodi_kasar', finalSize);
-      const kasarInfo = formatRepaintPriceResult(kasarLookup);
-      if (kasarInfo && kasarInfo.price) {
-        results.push({ name: 'Repaint Bodi Kasar', price: kasarInfo.price, price_formatted: kasarInfo.price_formatted, note: kasarInfo.note });
-      }
-
-      // 3. Velg
-      const velgLookup = lookupRepaintPrice(motorModel, 'velg', finalSize);
-      const velgInfo = formatRepaintPriceResult(velgLookup);
-      if (velgInfo && velgInfo.price) {
-        results.push({ name: 'Repaint Velg', price: velgInfo.price, price_formatted: velgInfo.price_formatted, note: velgInfo.note });
-      }
-
-      // 4. Cover CVT / Arm (Fixed price from masterLayanan)
-      const cvtService = masterLayanan.find(s => s.name === 'Repaint Cover CVT / Arm');
-      if (cvtService) {
-        results.push({ name: cvtService.name, price: cvtService.price, price_formatted: `Rp${cvtService.price.toLocaleString('id-ID')}`, note: cvtService.summary });
-      }
-
-      return {
-        success: true,
-        multiple_candidates: true,
-        category: 'repaint',
-        motor_model: motorModel,
-        motor_size: finalSize,
-        candidates: results,
-        promo: promo,
-        message: `Berikut estimasi harga repaint untuk motor ${motorModel}.`
-      };
-    }
-
-    // Fuzzy matching
-    const candidates = masterLayanan
-      .map(s => ({ ...s, similarity: stringSimilarity(parsedServiceName, s.name) }))
-      .filter(s => s.similarity >= 0.4) // Threshold agak longgar untuk menangkap variasi
-      .sort((a, b) => b.similarity - a.similarity);
-
-    if (candidates.length === 0) {
-      return { success: false, error: 'not_found', message: `Layanan "${parsedServiceName}" tidak ditemukan.` };
-    }
-
-    const service = candidates[0];
-    const { finalSize, category } = await resolveSizeForService({
-      service,
-      sizeArg: sizeFromArgs,
-      senderNumber,
-      cachedSizes,
-      motorModel,
-    });
-
-    const durationFormatted = formatDuration(service.estimatedDuration);
-
-    // --- Surcharge resolution ---
-    const surchargeMatch = colorNameInput ? lookupColorSurcharge(colorNameInput) : null;
-    const colorSurcharge = surchargeMatch ? surchargeMatch.surcharge : 0;
-
-    // --- Model-based pricing for repaint services ---
-    if (service.usesModelPricing && motorModel) {
-      const subcategory = service.subcategory || null;
-      const lookup = lookupRepaintPrice(motorModel, subcategory, finalSize);
-      const priceInfo = formatRepaintPriceResult(lookup);
-
-      if (priceInfo) {
-        const basePrice = priceInfo.price || null;
-        const finalPrice = basePrice ? basePrice + colorSurcharge : null;
-
-        const result = {
-          success: true,
-          service_name: service.name,
-          category: service.category,
-          subcategory: subcategory,
-          summary: service.summary,
-          description: service.description,
-          estimated_duration: durationFormatted,
-          motor_model: priceInfo.motor_model,
-          motor_size: finalSize || null,
-          ...priceInfo,
-          color_name: surchargeMatch ? surchargeMatch.name : colorNameInput,
-          color_surcharge: colorSurcharge,
-          color_surcharge_formatted: `Rp${colorSurcharge.toLocaleString('id-ID')}`,
-          final_price: finalPrice,
-          final_price_formatted: finalPrice ? `Rp${finalPrice.toLocaleString('id-ID')}` : null,
-          promo: promo,
-          syarat_ketentuan: syaratKetentuan,
-        };
-
-        if (senderNumber && finalSize) {
-          await setPreferredSizeForService(senderNumber, category, finalSize);
-          await setMotorSizeForSender(senderNumber, {
-            serviceSize: category === 'repaint' ? null : finalSize,
-            repaintSize: category === 'repaint' ? finalSize : null,
-            motor_model: motorModel,
-            target_service: result.service_name,
-          });
-        }
-
-        return result;
-      }
-    }
-
-    // --- Fallback: variant-based (S/M/L/XL) or flat price ---
-    const variant = service.variants?.find(v => v.name === finalSize);
-    const basePrice = variant?.price ?? service.price;
-
-    const result = {
-      success: true,
-      service_name: service.name,
-      category: service.category,
-      summary: service.summary,
-      description: service.description,
-      estimated_duration: durationFormatted,
-      motor_size: finalSize || null,
-      price: basePrice || null,
-      price_formatted: basePrice ? `Rp${basePrice.toLocaleString('id-ID')}` : 'Harga perlu model motor',
-      color_name: surchargeMatch ? surchargeMatch.name : colorNameInput,
-      color_surcharge: colorSurcharge,
-      color_surcharge_formatted: `Rp${colorSurcharge.toLocaleString('id-ID')}`,
-      final_price: basePrice ? basePrice + colorSurcharge : null,
-      final_price_formatted: basePrice ? `Rp${(basePrice + colorSurcharge).toLocaleString('id-ID')}` : null,
-      promo: promo,
-    };
-
-    // Jika repaint dan tidak ada model, beri hint
-    if (service.usesModelPricing && !motorModel) {
-      result.hint = 'Untuk harga yang lebih akurat, sertakan model motor (contoh: Scoopy, NMax, Beat).';
-    }
-
-    if (senderNumber && finalSize) {
-      await setPreferredSizeForService(senderNumber, category, finalSize);
-      await setMotorSizeForSender(senderNumber, {
-        serviceSize: category === 'repaint' ? null : finalSize,
-        repaintSize: category === 'repaint' ? finalSize : null,
-        motor_model: motorModel,
-        target_service: result.service_name,
-      });
-    }
-
-    return result;
 
   } catch (err) {
     console.error('[getServiceDetailsTool] Error:', err);
@@ -553,17 +574,20 @@ const getServiceDetailsTool = {
     type: 'function',
     function: {
       name: "getServiceDetails",
-      description: "Dapatkan informasi LENGKAP layanan: deskripsi, SOP, harga, dan estimasi waktu. Wajib dipanggil saat user tanya harga atau detail layanan.",
+      description: "Dapatkan informasi harga dan layanan. Wajib dipanggil saat user tanya harga. Bisa kirim array of strings untuk cari banyak layanan sekaligus.",
       parameters: {
         type: "object",
         properties: {
           service_name: {
-            type: "string",
-            description: "Nama layanan, misal: 'Coating Motor Doff', 'Full Detailing', 'Repaint Bodi Halus'."
+            type: ["string", "array"],
+            items: {
+              type: "string",
+            },
+            description: "Nama layanan atau array nama layanan, misal: 'Coating Motor Doff' atau ['Repaint Bodi Halus', 'Repaint Velg']."
           },
           motor_model: {
             type: "string",
-            description: "Model motor spesifik (misal: 'Scoopy', 'NMax', 'Beat', 'CBR 150R'). Wajib untuk layanan repaint agar mendapat harga akurat."
+            description: "Model motor spesifik (misal: 'Scoopy', 'NMax'). Wajib untuk repaint agar harga akurat."
           },
           size: {
             type: "string",
@@ -571,7 +595,7 @@ const getServiceDetailsTool = {
           },
           color_name: {
             type: "string",
-            description: "Nama warna repaint untuk cek biaya tambahan (surcharge), misal: 'Candy Red', 'Bunglon', 'Chrome'."
+            description: "Nama warna repaint untuk cek biaya tambahan, misal: 'Candy Red'."
           },
           senderNumber: { type: "string", description: "Nomor WA pelanggan (otomatis)." }
         },
