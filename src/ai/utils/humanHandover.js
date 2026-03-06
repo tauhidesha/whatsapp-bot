@@ -18,14 +18,29 @@ function ensureFirestore() {
 
 function normalizeWhatsappNumber(number) {
   if (!number) return null;
-  const trimmed = number.trim();
+  let trimmed = number.trim();
   if (!trimmed) return null;
-  if (trimmed.endsWith('@c.us')) return trimmed;
-  if (trimmed.endsWith('@lid')) return trimmed;
-  if (trimmed.startsWith('+')) {
-    return `${trimmed.slice(1)}@c.us`;
+
+  // If it already has the suffix, just remove any accidental spaces
+  if (trimmed.endsWith('@c.us') || trimmed.endsWith('@lid')) {
+    return trimmed.replace(/\s+/g, '');
   }
-  return `${trimmed.replace(/[^0-9]/g, '')}@c.us`;
+
+  const isPlus = trimmed.startsWith('+');
+  let digits = trimmed.replace(/[^0-9]/g, '');
+
+  // If local Indonesian number starting with 0, change to 62
+  if (!isPlus && digits.startsWith('0')) {
+    digits = '62' + digits.slice(1);
+  }
+
+  // Heuristik untuk Linked Devices (@lid)
+  // ID Facebook/IG (Meta) biasanya 14-15 digit dan acak (bisa tidak berawalan 62)
+  if (digits.length >= 14 && !digits.startsWith('62')) {
+    return `${digits}@lid`;
+  }
+
+  return `${digits}@c.us`;
 }
 
 async function sendWhatsappNotification(message) {
