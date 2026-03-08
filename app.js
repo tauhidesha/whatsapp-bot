@@ -2113,7 +2113,7 @@ app.get('/conversation-history/:number', async (req, res) => {
         }
 
         const senderKey = identity.normalizedAddress || number;
-        const historyLimit = limit ? parseInt(limit) : MEMORY_CONFIG.maxMessages;
+        const historyLimit = limit ? parseInt(limit) : 200; // Updated default for Admin UI to 200
 
         const history = await getConversationHistory(senderKey, historyLimit);
         const snoozeInfo = await getSnoozeInfo(senderKey);
