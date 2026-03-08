@@ -76,27 +76,29 @@ app.use(express.json({ limit: '50mb' }));
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 // --- Firebase Initialization ---
-const serviceAccountBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
-if (serviceAccountBase64) {
-    const serviceAccountJson = Buffer.from(serviceAccountBase64, 'base64').toString('utf-8');
-    const serviceAccount = JSON.parse(serviceAccountJson);
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
-    });
-} else {
-    const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
-    if (serviceAccountJson) {
+if (!admin.apps.length) {
+    const serviceAccountBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
+    if (serviceAccountBase64) {
+        const serviceAccountJson = Buffer.from(serviceAccountBase64, 'base64').toString('utf-8');
         const serviceAccount = JSON.parse(serviceAccountJson);
         admin.initializeApp({
             credential: admin.credential.cert(serviceAccount)
         });
+    } else {
+        const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
+        if (serviceAccountJson) {
+            const serviceAccount = JSON.parse(serviceAccountJson);
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount)
+            });
+        }
     }
-}
 
-// Fallback: Jika tidak ada credential di env, coba gunakan Application Default Credentials (ADC)
-if (admin.apps.length === 0) {
-    console.log('⚠️ [Firebase] Tidak ada credential spesifik di env. Mencoba Application Default Credentials...');
-    admin.initializeApp();
+    // Fallback: Jika tidak ada credential di env, coba gunakan Application Default Credentials (ADC)
+    if (admin.apps.length === 0) {
+        console.log('⚠️ [Firebase] Tidak ada credential spesifik di env. Mencoba Application Default Credentials...');
+        admin.initializeApp();
+    }
 }
 
 const db = admin.firestore();
