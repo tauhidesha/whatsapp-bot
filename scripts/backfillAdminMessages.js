@@ -9,14 +9,16 @@ require('dotenv').config();
 const admin = require('firebase-admin');
 
 // Firebase init
-const serviceAccountBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
-if (serviceAccountBase64) {
-    const serviceAccount = JSON.parse(
-        Buffer.from(serviceAccountBase64, 'base64').toString('utf-8')
-    );
-    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-} else {
-    admin.initializeApp();
+if (!admin.apps.length) {
+    const serviceAccountBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
+    if (serviceAccountBase64) {
+        const serviceAccount = JSON.parse(
+            Buffer.from(serviceAccountBase64, 'base64').toString('utf-8')
+        );
+        admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+    } else {
+        admin.initializeApp();
+    }
 }
 
 const db = admin.firestore();
