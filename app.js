@@ -1513,7 +1513,25 @@ function start(client) {
             return;
         }
 
-        const senderNumber = msg.from;
+        let senderNumber = msg.from;
+
+        // Resolve @lid (Linked Devices / Meta Business) ke nomor asli
+        if (senderNumber.endsWith('@lid')) {
+            try {
+                // Coba ambil pnJid dari payload message (lazy load)
+                if (msg.sender && msg.sender.pnJid) {
+                    senderNumber = msg.sender.pnJid;
+                } else {
+                    // Fallback: minta nomor aslinya ke WPPConnect
+                    const realPhone = await client.requestPhoneNumber(senderNumber);
+                    if (realPhone) {
+                        senderNumber = realPhone;
+                    }
+                }
+            } catch (err) {
+                console.warn(`[WPP] Warning: Gagal resolve nomor asli dari LID ${msg.from}:`, err.message);
+            }
+        }
         const senderName = msg.sender.pushname || msg.notifyName || senderNumber;
         let messageContent = msg.body;
         const isMedia = msg.isMedia || msg.type === 'image' || msg.type === 'video' || msg.type === 'tv' || msg.type === 'document';
