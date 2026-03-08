@@ -46,6 +46,8 @@ const { sendMetaMessage } = require('./src/server/metaClient.js');
 const { startBookingReminderScheduler } = require('./src/ai/utils/bookingReminders.js');
 const { startFollowUpScheduler, updateSignalsOnIncomingMessage } = require('./src/ai/agents/followUpEngine/index.js');
 const { isSnoozeActive, setSnoozeMode, clearSnoozeMode, getSnoozeInfo } = require('./src/ai/utils/humanHandover.js');
+const { handleAdminHpMessage, markBotMessage } = require('./src/ai/utils/adminMessageSync.js');
+const { backfillAdminMessages } = require('./scripts/backfillAdminMessages.js');
 const { getLangSmithCallbacks } = require('./src/ai/utils/langsmith.js');
 const { saveCustomerLocation } = require('./src/ai/utils/customerLocations.js');
 const { parseSenderIdentity } = require('./src/lib/utils.js');
@@ -1491,6 +1493,7 @@ async function processBufferedMessages(senderNumber, client) {
             const dynamicDelay = Math.min(Math.max(aiResponse.length * 10, 1000), 4000);
             await delay(dynamicDelay);
 
+            markBotMessage(targetNumber, aiResponse.trim());
             await client.sendText(targetNumber, aiResponse.trim());
         }
 
@@ -1507,6 +1510,10 @@ function start(client) {
         await processBufferedMessages(senderNumber, client);
     });
     client.__debounceQueue = debounceQueue;
+
+    client.onAnyMessage(async (msg) => {
+        await handleAdminHpMessage(msg);
+    });
 
     client.onMessage(async (msg) => {
         if (msg.from === 'status@broadcast' || msg.fromMe) {
@@ -2438,6 +2445,16 @@ server.listen(PORT, '0.0.0.0', async () => {
             startBookingReminderScheduler();
             startFollowUpScheduler();
             console.log('✅ WhatsApp client initialized successfully!');
+
+            if (process.env.RUN_ADMIN_BACKFILL === 'true') {
+                console.log('🔄 [Backfill] Starting admin message backfill...');
+                backfillAdminMessages(client)
+                    .then(() => console.log('✅ [Backfill] Admin message backfill complete'))
+                    .catch(err => console.error('❌ [Backfill] Backfill failed:', err.message))
+                    .finally(() => {
+                        console.log('💡 [Backfill] Set RUN_ADMIN_BACKFILL=false to disable');
+                    });
+            }
 
             // Start keep-alive mechanism untuk mencegah server idle timeout
             startKeepAlive();
