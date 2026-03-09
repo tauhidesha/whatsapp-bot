@@ -227,8 +227,9 @@ const baseModel = new ChatGoogleGenerativeAI({
 
 function prepareToolSpecs(defs) {
     return defs.map(tool => {
-        if (tool.function) {
-            const parameters = tool.function.parameters ? JSON.parse(JSON.stringify(tool.function.parameters)) : {};
+        const functionDef = tool.toolDefinition?.function || tool.function;
+        if (functionDef) {
+            const parameters = functionDef.parameters ? JSON.parse(JSON.stringify(functionDef.parameters)) : {};
             if (parameters.properties) {
                 delete parameters.properties.senderNumber;
                 delete parameters.properties.senderName;
@@ -246,9 +247,9 @@ function prepareToolSpecs(defs) {
             return {
                 type: 'function',
                 function: {
-                    name: tool.function.name,
-                    description: tool.function.description,
-                    parameters: parameters
+                    name: functionDef.name,
+                    description: functionDef.description,
+                    parameters: Object.keys(parameters).length > 0 ? parameters : undefined
                 }
             };
         }
