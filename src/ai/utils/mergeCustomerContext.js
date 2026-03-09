@@ -77,7 +77,36 @@ async function mergeAndSaveContext(senderNumber, newData) {
     }
 }
 
+/**
+ * Retrieve customer context from Firestore.
+ * 
+ * @param {string} senderNumber - Raw sender number
+ * @returns {Object|null} Context data or null
+ */
+async function getCustomerContext(senderNumber) {
+    if (!senderNumber) return null;
+
+    const db = admin.firestore();
+    const docId = senderNumber.replace(/[^0-9]/g, '');
+    if (!docId) return null;
+
+    try {
+        const doc = await db.collection('customerContext').doc(docId).get();
+        if (doc.exists) {
+            const data = doc.data();
+            // Remove internal fields
+            const { updatedAt, senderNumber: _, ...context } = data;
+            return context;
+        }
+        return null;
+    } catch (error) {
+        console.warn('[Context] Gagal mengambil customer context:', error.message);
+        return null;
+    }
+}
+
 module.exports = {
     mergeContextData,
     mergeAndSaveContext,
+    getCustomerContext,
 };

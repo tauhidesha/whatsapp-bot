@@ -55,6 +55,7 @@ const { getState } = require('./src/ai/utils/conversationState.js');
 const { extractAndSaveContext } = require('./src/ai/agents/contextExtractor.js');
 const { classifyAndSaveCustomer } = require('./src/ai/agents/customerClassifier.js');
 const { startAudit, handleAuditResponse, handleResumeAudit, hasActiveSession } = require('./src/ai/agents/customerAudit.js');
+const { getCustomerContext } = require('./src/ai/utils/mergeCustomerContext.js');
 const masterLayanan = require('./src/data/masterLayanan.js');
 
 const app = express();
@@ -505,28 +506,6 @@ const MEMORY_CONFIG = {
     maxMessages: parseInt(process.env.MEMORY_MAX_MESSAGES) || 3,
     includeSystemMessages: process.env.MEMORY_INCLUDE_SYSTEM === 'true'
 };
-
-// --- Customer Context (extracted by background agent) ---
-async function getCustomerContext(senderNumber) {
-    if (!db || !senderNumber) return null;
-
-    const docId = senderNumber.replace(/[^0-9]/g, '');
-    if (!docId) return null;
-
-    try {
-        const doc = await db.collection('customerContext').doc(docId).get();
-        if (doc.exists) {
-            const data = doc.data();
-            // Remove internal fields
-            const { updatedAt, senderNumber: _, ...context } = data;
-            return context;
-        }
-        return null;
-    } catch (error) {
-        console.warn('[Context] Gagal mengambil customer context:', error.message);
-        return null;
-    }
-}
 
 // --- Memory Functions ---
 async function getConversationHistory(senderNumber, limit = MEMORY_CONFIG.maxMessages) {
