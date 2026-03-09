@@ -883,27 +883,29 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
         console.log(`📱[AI_PROCESSING] Sender Number: ${senderNumber || 'N/A'} `);
 
 
-        // [DEPRECATION] Old Chat History Fetching block.
-        // History is no longer concatenated to the Prompt.
-        // We solely rely on contextExtractor to build `conversation_summary`.
-        /*
+        // --- 4. CONDITIONAL HISTORY (HEMAT TOKEN & LUWES) ---
         let conversationHistoryMessages = [];
+        
+        // Cek apakah pesan user pendek (< 8 kata) atau mengandung kata ambigu yang butuh konteks
+        const wordCount = userMessage.split(/\s+/).length;
+        const isShortOrAmbiguous = wordCount < 8 || 
+                                   /^(oke|iya|gas|terus|jadi|boleh|harganya|kapan|jam berapa|besok|y|ok|sip|siap|mantap)$/i.test(userMessage.trim());
 
-        if (senderNumber && db) {
-            console.log(`🧠[AI_PROCESSING] Fetching conversation history for ${senderNumber}...`);
-            const history = await getConversationHistory(senderNumber);
-            conversationHistoryMessages = buildLangChainHistory(history);
-            console.log(`🧠[AI_PROCESSING] Found ${history.length} previous messages`);
-            if (history.length > 0) {
-                console.log(`🧠[AI_PROCESSING] Last message: "${history[history.length - 1]?.text?.substring(0, 50)}..."`);
+        if (isShortOrAmbiguous && senderNumber && db) {
+            console.log(`🧠 [AI_PROCESSING] Pesan pendek (${wordCount} kata) terdeteksi. Mengambil 4 pesan terakhir...`);
+            try {
+                // Ambil maksimal 4 pesan terakhir saja (2 turn)
+                const history = await getConversationHistory(senderNumber, 4);
+                if (history && history.length > 0) {
+                    conversationHistoryMessages = buildLangChainHistory(history);
+                    console.log(`🧠 [AI_PROCESSING] Berhasil memuat ${history.length} pesan terakhir untuk konteks`);
+                }
+            } catch (err) {
+                console.warn(`⚠️ [AI_PROCESSING] Gagal mengambil history: ${err.message}`);
             }
-        } else if (providedHistory && providedHistory.length > 0) {
-            console.log(`🧠[AI_PROCESSING] Using provided local history(${providedHistory.length} messages)`);
-            conversationHistoryMessages = buildLangChainHistory(providedHistory);
         } else {
-            console.log(`🧠[AI_PROCESSING] No conversation history(new user, no DB, or no local history provided)`);
+            console.log(`🧠 [AI_PROCESSING] Pesan cukup jelas (${wordCount} kata) atau history tidak di-trigger. Token diselamatkan!`);
         }
-        */
 
         const userTextContent = context
             ? `${userMessage} \n\n[Context Internal]\n${context} `
@@ -1069,10 +1071,11 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
             console.warn('[AI_PROCESSING] Gagal mengambil promo config:', error.message);
         }
 
-        // Optimasi: Hanya gunakan prompt sistem, konteks dari extractor (termasuk ringkasan terbaru), dan pesan user saat ini.
-        // Hilangkan full raw chat history untuk penghematan token drastis.
+        // Optimasi: Hanya gunakan prompt sistem, konteks dari extractor (termasuk ringkasan terbaru),
+        // CONDITIONAL HISTORY (hanya jika pesan pendek), dan pesan user saat ini.
         const messages = [
             new SystemMessage(effectiveSystemPrompt + dateTimePart + memoryPart),
+            ...conversationHistoryMessages,
             new HumanMessage(humanMessageContent)
         ].filter(msg => !!msg); // Filter out null/undefined messages
 
