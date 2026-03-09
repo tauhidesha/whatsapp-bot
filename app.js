@@ -1023,17 +1023,41 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                         parts.push(`- ⚠️ Upsell sudah ditawarkan, JANGAN tawarkan lagi`);
                     }
 
-                    // Add stage-aware instructions
-                    const stageInstructions = {
-                        'consulting': 'User sedang mempertimbangkan. Jawab pertanyaan, lalu tawarkan booking.',
-                        'booking': 'User sudah siap. FOKUS ke konfirmasi jadwal, jangan tanya hal lain.',
-                        'closing': 'User sudah setuju. LANGSUNG panggil checkBookingAvailability, STOP bertanya hal lain.',
-                        'done': 'Booking sudah confirmed. Cukup konfirmasi ulang dan tutup dengan ramah.',
-                    };
+                    // --- DYNAMIC FLOW CONTROLLER (Tanpa Token Bengkak) ---
+                    // Mengarahkan AI sesuai alur obrolan: Kualifikasi -> Konsultasi -> Upsell -> Booking
+                    let actionDirective = "";
+                    const m_model = customerCtx.motor_model || (state && state.motor_model);
+                    const t_service = customerCtx.target_service || (state && state.target_service);
+                    const m_cond = customerCtx.motor_condition;
+                    const m_color = customerCtx.motor_color;
+                    const isRepaint = t_service && t_service.toLowerCase().includes('repaint');
+                    const isRepaintVelg = t_service && t_service.toLowerCase().includes('velg');
+                    const isDetailing = t_service && (t_service.toLowerCase().includes('detailing') || t_service.toLowerCase().includes('cuci'));
 
-                    const stageHint = stageInstructions[customerCtx?.conversation_stage];
-                    if (stageHint) {
-                        parts.push(`\n🎯 INSTRUKSI STAGE: ${stageHint}`);
+                    if (!m_model) {
+                        actionDirective = `\n🎯 TARGET SAAT INI (KUALIFIKASI): Kamu belum tahu *jenis/tipe motor* user. Tanyakan tipe motornya secara natural. JANGAN bahas harga atau jadwal dulu.`;
+                    } else if (!t_service) {
+                        actionDirective = `\n🎯 TARGET SAAT INI (KUALIFIKASI): Kamu sudah tahu motornya (${m_model}), tapi belum tahu *layanan yang dibutuhkan* (Repaint/Detailing/Coating). Tanyakan kebutuhannya apa.`;
+                    } else if (isRepaint && !m_color) {
+                        actionDirective = `\n🎯 TARGET SAAT INI (KONSULTASI WARNA): User butuh Repaint untuk ${m_model}. Tanyakan *warna yang diinginkan* (Standar/Candy/Stabilo/Bunglon/Chrome) karena ada biaya tambahan (surcharge) untuk warna spesial.`;
+                    } else if (isRepaint && !m_cond) {
+                        actionDirective = `\n🎯 TARGET SAAT INI (KONSULTASI KONDISI BODI): User butuh Repaint. Tanyakan *kondisi bodi saat ini* (apakah ada lecet parah, pecah, atau butuh repair bodi kasar) karena bisa ada biaya tambahan perbaikan.`;
+                    } else if (isRepaintVelg && !customerCtx.upsell_offered && !customerCtx.quoted_services?.length) {
+                        actionDirective = `\n🎯 TARGET SAAT INI (KONSULTASI KONDISI VELG): User butuh Repaint Velg. Tanyakan apakah velg *pernah dicat ulang* atau *banyak jamur/kerak*, karena ada biaya tambahan remover (+50rb s/d 100rb). Boleh juga tawarkan sekalian cat Behel/Arm (+50rb) atau CVT (+100rb).`;
+                    } else if (isDetailing && !m_cond) {
+                        actionDirective = `\n🎯 TARGET SAAT INI (KONSULTASI KONDISI MOTOR): User butuh Detailing/Cuci untuk ${m_model}. Tanyakan dulu *kondisi motornya saat ini* (apakah banyak kerak oli, jamur, kusam, atau sekadar kotor debu) supaya kamu bisa merekomendasikan paket Detailing yang paling pas.`;
+                    } else if (!customerCtx.quoted_services || customerCtx.quoted_services.length === 0) {
+                        actionDirective = `\n🎯 TARGET SAAT INI (KONSULTASI HARGA): Informasi sudah cukup (${m_model}, ${t_service}, Warna/Kondisi sudah dikonfirmasi). SEGERA panggil tool \`getServiceDetails\` untuk mengecek harga (termasuk surcharge jika ada) dan jelaskan ke user secara singkat.`;
+                    } else if (!customerCtx.upsell_offered && customerCtx.intent_level !== 'hot') {
+                        actionDirective = `\n🎯 TARGET SAAT INI (EDUKASI & UPSELL): Kamu sudah mengutip harga. Jelaskan kelebihan layanan ini dengan santai, lalu tawarkan *upsell ringan 1x* (misal: "sekalian cuci komplit rangka mumpung dibongkar mas?").`;
+                    } else if (!customerCtx.preferred_day && !customerCtx.asked_availability) {
+                        actionDirective = `\n🎯 TARGET SAAT INI (CLOSING): User sudah tahu harga dan layanannya. Giring perlahan untuk booking dengan bertanya "Rencana mau dikerjakan hari apa Mas?" atau "Mau Zoya cek jadwal kosongnya?".`;
+                    } else if (customerCtx.conversation_stage === 'closing') {
+                        actionDirective = `\n🎯 TARGET SAAT INI (CLOSING FINAL): User sudah setuju. LANGSUNG panggil \`checkBookingAvailability\` dan buat bookingnya. STOP tanya hal lain.`;
+                    }
+
+                    if (actionDirective) {
+                        parts.push(actionDirective);
                     }
                 }
 
