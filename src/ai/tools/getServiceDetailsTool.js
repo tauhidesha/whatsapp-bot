@@ -11,12 +11,6 @@ const {
   syaratKetentuan,
   VELG_PRICE_MAP,
 } = require('../../data/repaintPrices.js');
-const {
-  getMotorSizesForSender,
-  getPreferredSizeForService,
-  setPreferredSizeForService,
-  setMotorSizeForSender,
-} = require('../utils/motorSizeMemory.js');
 const daftarUkuranMotor = require('../../data/daftarUkuranMotor.js');
 
 // --- Helper Functions ---
@@ -115,7 +109,7 @@ function lookupMotorSizeFromData(motorModel) {
   return null;
 }
 
-async function resolveSizeForService({ service, sizeArg, senderNumber, cachedSizes, motorModel }) {
+async function resolveSizeForService({ service, sizeArg, motorModel }) {
   const category = (service.category || inferCategory(service.name)).toLowerCase();
   let finalSize = sizeArg;
 
@@ -125,27 +119,6 @@ async function resolveSizeForService({ service, sizeArg, senderNumber, cachedSiz
     if (motorData) {
       finalSize = category === 'repaint' ? motorData.repaint_size : motorData.service_size;
       console.log(`[resolveSizeForService] Inferred ${finalSize} from model ${motorModel}`);
-    }
-  }
-
-  // 2. Fallback to cached preferred size
-  const cachedPreferred = senderNumber
-    ? await getPreferredSizeForService(senderNumber, category)
-    : null;
-
-  if (cachedPreferred && finalSize && cachedPreferred !== finalSize) {
-    finalSize = cachedPreferred;
-  }
-
-  if (!finalSize && cachedPreferred) {
-    finalSize = cachedPreferred;
-  }
-
-  if (!finalSize && cachedSizes) {
-    if (category === 'repaint') {
-      finalSize = cachedSizes.repaintSize || cachedSizes.serviceSize || null;
-    } else {
-      finalSize = cachedSizes.serviceSize || cachedSizes.repaintSize || null;
     }
   }
 
@@ -297,15 +270,8 @@ function formatRepaintPriceResult(lookup) {
 // --- Implementation ---
 async function processSingleService(parsedServiceName, input, promoText) {
   const motorModel = typeof input.motor_model === 'string' ? input.motor_model.trim() : null;
-  const senderNumber = typeof input.senderNumber === 'string'
-    ? input.senderNumber
-    : typeof input.sender_number === 'string'
-      ? input.sender_number
-      : null;
-
   const colorNameInput = typeof input.color_name === 'string' ? input.color_name.trim() : null;
   const sizeFromArgs = normalizeSizeInput(input.size);
-  const cachedSizes = senderNumber ? await getMotorSizesForSender(senderNumber) : null;
 
   // Special case for "coating" generic query
   if (parsedServiceName.trim().toLowerCase() === 'coating') {
@@ -313,7 +279,7 @@ async function processSingleService(parsedServiceName, input, promoText) {
     const services = masterLayanan.filter(s => names.includes(s.name));
 
     const results = await Promise.all(services.map(async (service) => {
-      const { finalSize } = await resolveSizeForService({ service, sizeArg: sizeFromArgs, senderNumber, cachedSizes, motorModel });
+      const { finalSize } = await resolveSizeForService({ service, sizeArg: sizeFromArgs, motorModel });
       const variant = service.variants?.find(v => v.name === finalSize);
       const basePrice = variant?.price ?? service.price;
 
@@ -342,7 +308,7 @@ async function processSingleService(parsedServiceName, input, promoText) {
     const services = masterLayanan.filter(s => s.category === 'detailing');
 
     const results = await Promise.all(services.map(async (service) => {
-      const { finalSize } = await resolveSizeForService({ service, sizeArg: sizeFromArgs, senderNumber, cachedSizes, motorModel });
+      const { finalSize } = await resolveSizeForService({ service, sizeArg: sizeFromArgs, motorModel });
       const variant = service.variants?.find(v => v.name === finalSize);
       const basePrice = variant?.price ?? service.price;
 
@@ -379,7 +345,7 @@ async function processSingleService(parsedServiceName, input, promoText) {
 
     // We have a motor model, let's gather all repaint prices for it
     const results = [];
-    const { finalSize } = await resolveSizeForService({ service: { category: 'repaint' }, sizeArg: sizeFromArgs, senderNumber, cachedSizes, motorModel });
+    const { finalSize } = await resolveSizeForService({ service: { category: 'repaint' }, sizeArg: sizeFromArgs, motorModel });
 
     // 1. Bodi Halus
     const halusLookup = lookupRepaintPrice(motorModel, 'bodi_halus', finalSize);
@@ -434,8 +400,6 @@ async function processSingleService(parsedServiceName, input, promoText) {
   const { finalSize, category } = await resolveSizeForService({
     service,
     sizeArg: sizeFromArgs,
-    senderNumber,
-    cachedSizes,
     motorModel,
   });
 
@@ -475,16 +439,6 @@ async function processSingleService(parsedServiceName, input, promoText) {
         syarat_ketentuan: syaratKetentuan,
       };
 
-      if (senderNumber && finalSize) {
-        await setPreferredSizeForService(senderNumber, category, finalSize);
-        await setMotorSizeForSender(senderNumber, {
-          serviceSize: category === 'repaint' ? null : finalSize,
-          repaintSize: category === 'repaint' ? finalSize : null,
-          motor_model: motorModel,
-          target_service: result.service_name,
-        });
-      }
-
       return result;
     }
   }
@@ -514,16 +468,6 @@ async function processSingleService(parsedServiceName, input, promoText) {
   // Jika repaint dan tidak ada model, beri hint
   if (service.usesModelPricing && !motorModel) {
     result.hint = 'Untuk harga yang lebih akurat, sertakan model motor (contoh: Scoopy, NMax, Beat).';
-  }
-
-  if (senderNumber && finalSize) {
-    await setPreferredSizeForService(senderNumber, category, finalSize);
-    await setMotorSizeForSender(senderNumber, {
-      serviceSize: category === 'repaint' ? null : finalSize,
-      repaintSize: category === 'repaint' ? finalSize : null,
-      motor_model: motorModel,
-      target_service: result.service_name,
-    });
   }
 
   return result;
@@ -578,30 +522,27 @@ const getServiceDetailsTool = {
     type: 'function',
     function: {
       name: "getServiceDetails",
-      description: "Dapatkan informasi harga dan layanan. Wajib dipanggil saat user tanya harga. Bisa kirim array of strings untuk cari banyak layanan sekaligus.",
+      description: "Cek harga/layanan.",
       parameters: {
         type: "object",
         properties: {
           service_name: {
             type: "array",
-            items: {
-              type: "string",
-            },
-            description: "Array dari nama layanan yang ingin dicek, misal: ['Coating Motor Doff'] atau ['Repaint Bodi Halus', 'Repaint Velg']. SELALU gunakan format array."
+            items: { type: "string" },
+            description: "Array nama layanan (contoh: ['Coating Motor Doff'])."
           },
           motor_model: {
             type: "string",
-            description: "Model motor spesifik (misal: 'Scoopy', 'NMax'). Wajib untuk repaint agar harga akurat."
+            description: "Model motor (untuk harga repaint)."
           },
           size: {
             type: "string",
-            description: "Ukuran motor (S/M/L/XL) jika sudah diketahui."
+            description: "Ukuran motor (S/M/L/XL)."
           },
           color_name: {
             type: "string",
-            description: "Nama warna repaint untuk cek biaya tambahan, misal: 'Candy Red'."
-          },
-          senderNumber: { type: "string", description: "Nomor WA pelanggan (otomatis)." }
+            description: "Nama warna repaint."
+          }
         },
         required: ["service_name"],
       },

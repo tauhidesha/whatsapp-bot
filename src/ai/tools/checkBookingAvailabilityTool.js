@@ -320,14 +320,14 @@ const checkBookingAvailabilityTool = {
     type: 'function',
     function: {
       name: 'checkBookingAvailability',
-      description: 'Cek ketersediaan slot untuk booking layanan.',
+      description: 'Cek ketersediaan slot booking.',
       parameters: {
         type: 'object',
         properties: {
-          bookingDate: { type: 'string', description: 'Tanggal booking (YYYY-MM-DD).' },
-          bookingTime: { type: 'string', description: 'Jam booking (HH:mm).' },
+          bookingDate: { type: 'string', description: 'Tgl (YYYY-MM-DD).' },
+          bookingTime: { type: 'string', description: 'Jam (HH:mm).' },
           serviceName: { type: 'string', description: 'Nama layanan.' },
-          estimatedDurationMinutes: { type: 'number', description: 'Estimasi durasi booking (menit).' },
+          estimatedDurationMinutes: { type: 'number', description: 'Durasi (menit).' },
         },
         required: ['bookingDate', 'bookingTime', 'serviceName', 'estimatedDurationMinutes'],
       },
@@ -336,6 +336,4 @@ const checkBookingAvailabilityTool = {
   implementation,
 };
 
-module.exports = {
-  checkBookingAvailabilityTool,
-};
+module.exports = { checkBookingAvailabilityTool };

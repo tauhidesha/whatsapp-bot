@@ -81,16 +81,16 @@ const createBookingTool = {
     type: 'function',
     function: {
       name: 'createBooking',
-      description: 'Membuat booking baru di sistem setelah ketersediaan dikonfirmasi.',
+      description: 'Buat booking baru.',
       parameters: {
         type: 'object',
         properties: {
-          customerPhone: { type: 'string', description: 'Nomor telepon pelanggan' },
-          customerName: { type: 'string', description: 'Nama pelanggan' },
-          serviceName: { type: 'string', description: 'Nama layanan yang dibooking (bisa lebih dari satu, dipisah koma)' },
-          bookingDate: { type: 'string', description: 'Tanggal booking, format YYYY-MM-DD' },
-          bookingTime: { type: 'string', description: 'Jam booking, format HH:mm' },
-          vehicleInfo: { type: 'string', description: "Informasi kendaraan, misalnya 'Vario 160 Merah'" },
+          customerPhone: { type: 'string', description: 'No telp pelanggan.' },
+          customerName: { type: 'string', description: 'Nama pelanggan.' },
+          serviceName: { type: 'string', description: 'Nama layanan (koma dipisah).' },
+          bookingDate: { type: 'string', description: 'Tgl (YYYY-MM-DD).' },
+          bookingTime: { type: 'string', description: 'Jam (HH:mm).' },
+          vehicleInfo: { type: 'string', description: "Info kendaraan." },
         },
         required: ['customerPhone', 'customerName', 'serviceName', 'bookingDate', 'bookingTime', 'vehicleInfo'],
       },

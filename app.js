@@ -256,11 +256,9 @@ function prepareToolSpecs(defs) {
     });
 }
 
-// Admin: semua tools (20). Customer: subset (10) — hemat token untuk model ringan.
+// Admin: semua tools (20). Customer: subset akan diproses secara dinamis di bawah.
 const adminToolSpecs = prepareToolSpecs(toolDefinitions);
-const customerToolSpecs = prepareToolSpecs(customerToolDefinitions);
 const adminModel = baseModel.bindTools(adminToolSpecs);
-const customerModel = baseModel.bindTools(customerToolSpecs);
 
 // Legacy alias agar kode lain yang referensi tetap jalan
 const geminiToolSpecifications = adminToolSpecs;
@@ -958,9 +956,12 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
 
         // Persistent Memory Injection (getState + customerContext)
         let memoryPart = "";
+        let customerCtx = null; // Declare at block scope to pass to router later
+        let state = null;
         if (senderNumber) {
             try {
-                const [state, customerCtx] = await Promise.all([
+                // Gunakan destructuring array karena Promise.all membalas dalam array
+                [state, customerCtx] = await Promise.all([
                     getState(senderNumber),
                     getCustomerContext(senderNumber),
                 ]);
@@ -1032,241 +1033,293 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
             new HumanMessage(humanMessageContent)
         ].filter(msg => !!msg); // Filter out null/undefined messages
 
-        const activeToolDefs = isAdmin ? toolDefinitions : customerToolDefinitions;
-        console.log(`🔧[AI_PROCESSING] Tools registered (${isAdmin ? 'ADMIN' : 'CUSTOMER'}, ${activeToolDefs.length} tools): ${activeToolDefs.map(t => t.function.name).join(', ')} `);
+        // --- DYNAMIC INTENT ROUTER ---
+        let activeModel;
+        let activeToolDefs;
+
+        if (isAdmin) {
+            activeModel = adminModel;
+            activeToolDefs = toolDefinitions;
+        } else {
+            // Function to route tools dynamically based on context and user message
+            const routeCustomerTools = (ctx, userMsg) => {
+                const routedTools = [];
+                const msgLower = (userMsg || '').toLowerCase();
+                const intent = ctx?.intent_level || 'null';
+
+                // 1. Always included baseline tools
+                routedTools.push(getStudioInfoToolTool);
+                routedTools.push(notifyVisitIntentToolTool);
+
+                // 2. Pricing & Service Info
+                // Include if feeling out (cold/null) OR they explicitly ask about price/service
+                if (intent === 'cold' || intent === 'null' || !ctx ||
+                    msgLower.includes('harga') || msgLower.includes('biaya') || msgLower.includes('berapa') ||
+                    msgLower.includes('jasa') || msgLower.includes('layanan') || msgLower.includes('repaint') || msgLower.includes('coating') || msgLower.includes('detailing')) {
+                    routedTools.push(getServiceDetailsTool);
+                }
+
+                // 3. Booking & Scheduling
+                // Include if warming up (warm/hot) OR they explicitly ask about booking/dates
+                if (intent === 'warm' || intent === 'hot' ||
+                    msgLower.includes('booking') || msgLower.includes('jadwal') || msgLower.includes('kapan') ||
+                    msgLower.includes('kosong') || msgLower.includes('besok') || msgLower.includes('hari ini')) {
+                    routedTools.push(checkBookingAvailabilityTool);
+                    routedTools.push(createBookingTool);
+                    routedTools.push(updateBookingTool);
+                }
+
+                // 4. Onsite Service
+                // Include if location data exists or explicitly mentioned
+                if ((ctx && ctx.location_hint) || msgLower.includes('home service') || msgLower.includes('rumah') || msgLower.includes('jemput')) {
+                    routedTools.push(calculateHomeServiceFeeTool);
+                }
+
+                // 5. Visual Analysis
+                if (msgLower.includes('foto') || msgLower.includes('lihat') || msgLower.includes('gambar')) {
+                    routedTools.push(sendStudioPhotoToolTool);
+                }
+
+                return routedTools;
+            };
+
+            const routedCustomerTools = routeCustomerTools(customerCtx, humanMessageContent);
+            activeToolDefs = routedCustomerTools;
+            const routedToolSpecs = prepareToolSpecs(routedCustomerTools);
+            activeModel = baseModel.bindTools(routedToolSpecs);
+        }
+
+        console.log(`🔧[AI_PROCESSING] Tools routed (${isAdmin ? 'ADMIN' : 'CUSTOMER'}, ${activeToolDefs.length} tools): ${activeToolDefs.map(t => t.function.name).join(', ')} `);
         let iteration = 0;
         const MAX_ITERATIONS = 8;
 
         let response;
-
         while (iteration < MAX_ITERATIONS) {
-            const traceLabel = iteration === 0 ? 'chat-response-initial' : `chat - response - iteration - ${iteration} `;
-            console.log(`🚀[AI_PROCESSING] Sending request to AI model... (iteration ${iteration + 1})`);
+            iteration++;
+            console.log(`\n⏳ Iteration ${iteration} of ${MAX_ITERATIONS}...`);
 
-            let lastError = null;
-            let responseReceived = false;
+            try {
+                let lastError = null;
+                let responseReceived = false;
 
-            // Try each API key in sequence
-            for (let apiKeyIndex = 0; apiKeyIndex < API_KEYS.length; apiKeyIndex++) {
-                const currentApiKey = API_KEYS[apiKeyIndex];
-                const isFirstKey = apiKeyIndex === 0;
-                const apiKeyLabel = isFirstKey ? 'primary' : `fallback #${apiKeyIndex} `;
+                // Try each API key in sequence
+                for (let apiKeyIndex = 0; apiKeyIndex < API_KEYS.length; apiKeyIndex++) {
+                    const currentApiKey = API_KEYS[apiKeyIndex];
+                    const isFirstKey = apiKeyIndex === 0;
+                    const apiKeyLabel = isFirstKey ? 'primary' : `fallback #${apiKeyIndex}`;
 
-                try {
-                    if (!isFirstKey) {
-                        console.log(`🔄[AI_PROCESSING] Trying ${apiKeyLabel} API key...`);
-                    }
+                    try {
+                        if (!isFirstKey) {
+                            console.log(`🔄[AI_PROCESSING] Trying ${apiKeyLabel} API key...`);
+                        }
 
-                    // Create model instance with current API key
-                    // Create model instance with current API key
-                    const targetModel = modelOverride || ACTIVE_AI_MODEL;
-                    let modelInstance;
-
-                    const activeToolSpecs = isAdmin ? adminToolSpecs : customerToolSpecs;
-                    if (!modelOverride && apiKeyIndex === 0) {
-                        modelInstance = isAdmin ? adminModel : customerModel;
-                    } else {
-                        modelInstance = new ChatGoogleGenerativeAI({
+                        // Create model instance with current API key
+                        const targetModel = modelOverride || ACTIVE_AI_MODEL;
+                        const currentModel = new ChatGoogleGenerativeAI({
                             model: targetModel,
                             temperature: ACTIVE_AI_TEMPERATURE,
                             apiKey: currentApiKey
-                        }).bindTools(activeToolSpecs);
-                    }
+                        });
 
-                    const tracingConfig = getTracingConfig(traceLabel, {
-                        metadata: {
-                            sender_number: senderNumber || 'anonymous',
-                            sender_name: senderName || 'User',
-                            iteration,
-                            model: targetModel,
-                            is_admin: isAdmin
-                        },
-                        tags: [isAdmin ? 'admin' : 'customer', targetModel]
-                    });
+                        // Bind the active tools to the current model
+                        const currentBoundModel = currentModel.bindTools(isAdmin ? adminToolSpecs : prepareToolSpecs(activeToolDefs));
+                        // Set runName explicitly for tracking
+                        response = await currentBoundModel.invoke(messages, getTracingConfig(traceLabel, {
+                            runName: isAdmin ? 'AdminResponse' : 'CustomerResponse',
+                            metadata: {
+                                sender_number: senderNumber || 'anonymous',
+                                sender_name: senderName || 'User',
+                                iteration,
+                                model: targetModel,
+                                api_key_index: apiKeyIndex
+                            },
+                            tags: [isAdmin ? 'admin' : 'customer', targetModel]
+                        }));
 
-                    response = await modelInstance.invoke(messages, tracingConfig);
+                        // Validate response
+                        const hasToolCalls = getToolCallsFromResponse(response).length > 0;
+                        if (!response || ((response.content === null || response.content === undefined) && !hasToolCalls)) {
+                            console.error('❌ [AI_PROCESSING] Invalid response structure:', response ? Object.keys(response) : 'null');
+                            throw new Error('Invalid response from AI model: empty or undefined content');
+                        }
 
-                    // Validate response
-                    const hasToolCalls = getToolCallsFromResponse(response).length > 0;
-                    // Relaxed validation: Allow empty string content. Only fail if strictly null/undefined.
-                    if (!response || ((response.content === null || response.content === undefined) && !hasToolCalls)) {
-                        console.error('❌ [AI_PROCESSING] Invalid response structure:', response ? Object.keys(response) : 'null');
-                        throw new Error('Invalid response from AI model: empty or undefined content');
-                    }
+                        if (!isFirstKey) {
+                            console.log(`✅[AI_PROCESSING] ${apiKeyLabel} API key succeeded!`);
+                        }
 
-                    if (!isFirstKey) {
-                        console.log(`✅[AI_PROCESSING] ${apiKeyLabel} API key succeeded!`);
-                    }
+                        responseReceived = true;
+                        break; // Success - exit API key retry loop
 
-                    responseReceived = true;
-                    break; // Success - exit API key retry loop
+                    } catch (error) {
+                        lastError = error;
 
-                } catch (error) {
-                    lastError = error;
+                        // Check if this is a retryable error
+                        const isQuotaError = error?.message?.includes('Quota exceeded') ||
+                            error?.message?.includes('429') ||
+                            error?.message?.includes('quota') ||
+                            error?.message?.includes('RESOURCE_EXHAUSTED');
 
-                    // Check if this is a retryable error
-                    const isQuotaError = error?.message?.includes('Quota exceeded') ||
-                        error?.message?.includes('429') ||
-                        error?.message?.includes('quota') ||
-                        error?.message?.includes('RESOURCE_EXHAUSTED');
+                        const isAuthError = error?.message?.includes('API key not valid') ||
+                            error?.message?.includes('authentication') ||
+                            error?.message?.includes('401');
 
-                    const isAuthError = error?.message?.includes('API key not valid') ||
-                        error?.message?.includes('authentication') ||
-                        error?.message?.includes('401');
+                        const isResponseError = error?.message?.includes('Cannot read properties') ||
+                            error?.message?.includes('undefined');
 
-                    const isResponseError = error?.message?.includes('Cannot read properties') ||
-                        error?.message?.includes('undefined');
+                        const isRetryableError = isQuotaError || isResponseError || isAuthError;
 
-                    const isRetryableError = isQuotaError || isResponseError || isAuthError;
+                        console.error(`❌[AI_PROCESSING] Error with ${apiKeyLabel} API key: `, error.message);
 
-                    console.error(`❌[AI_PROCESSING] Error with ${apiKeyLabel} API key: `, error.message);
+                        // If this is the last API key or non-retryable error, try model fallback
+                        if (apiKeyIndex === API_KEYS.length - 1 || !isRetryableError) {
+                            if (isRetryableError && (isQuotaError || isResponseError)) {
+                                console.error(`❌[AI_PROCESSING] All API keys exhausted, trying model fallback...`);
+                                const fallbackModel = 'gemini-2.0-flash';
 
-                    // If this is the last API key or non-retryable error, try model fallback
-                    if (apiKeyIndex === API_KEYS.length - 1 || !isRetryableError) {
-                        if (isRetryableError && (isQuotaError || isResponseError)) {
-                            console.error(`❌[AI_PROCESSING] All API keys exhausted, trying model fallback...`);
-                            const fallbackModel = 'gemini-2.0-flash';
-
-                            if (fallbackModel === ACTIVE_AI_MODEL) {
-                                break; // No point in model fallback
-                            }
-
-                            try {
-                                console.log(`🔄[AI_PROCESSING] Trying fallback model: ${fallbackModel} with primary API key`);
-                                const fallbackModelInstance = new ChatGoogleGenerativeAI({
-                                    model: fallbackModel,
-                                    temperature: ACTIVE_AI_TEMPERATURE,
-                                    apiKey: API_KEYS[0]
-                                });
-
-                                response = await fallbackModelInstance.invoke(messages, getTracingConfig(traceLabel));
-
-                                // Validate fallback response
-                                const hasFallbackToolCalls = getToolCallsFromResponse(response).length > 0;
-                                // Relaxed validation: Allow empty string content. Only fail if strictly null/undefined.
-                                if (!response || ((response.content === null || response.content === undefined) && !hasFallbackToolCalls)) {
-                                    console.error('❌ [AI_PROCESSING] Invalid fallback response structure:', response ? Object.keys(response) : 'null');
-                                    throw new Error('Invalid response from fallback model');
+                                if (fallbackModel === ACTIVE_AI_MODEL) {
+                                    break; // No point in model fallback
                                 }
 
-                                console.log(`✅[AI_PROCESSING] Fallback model ${fallbackModel} succeeded!`);
-                                responseReceived = true;
-                                break;
-                            } catch (fallbackError) {
-                                console.error(`❌[AI_PROCESSING] Fallback model ${fallbackModel} also failed: `, fallbackError.message);
-                                lastError = fallbackError;
+                                try {
+                                    console.log(`🔄[AI_PROCESSING] Trying fallback model: ${fallbackModel} with primary API key`);
+                                    const fallbackModelInstance = new ChatGoogleGenerativeAI({
+                                        model: fallbackModel,
+                                        temperature: ACTIVE_AI_TEMPERATURE,
+                                        apiKey: API_KEYS[0]
+                                    });
+
+                                    response = await fallbackModelInstance.invoke(messages, getTracingConfig(traceLabel));
+
+                                    // Validate fallback response
+                                    const hasFallbackToolCalls = getToolCallsFromResponse(response).length > 0;
+                                    // Relaxed validation: Allow empty string content. Only fail if strictly null/undefined.
+                                    if (!response || ((response.content === null || response.content === undefined) && !hasFallbackToolCalls)) {
+                                        console.error('❌ [AI_PROCESSING] Invalid fallback response structure:', response ? Object.keys(response) : 'null');
+                                        throw new Error('Invalid response from fallback model');
+                                    }
+
+                                    console.log(`✅[AI_PROCESSING] Fallback model ${fallbackModel} succeeded!`);
+                                    responseReceived = true;
+                                    break;
+                                } catch (fallbackError) {
+                                    console.error(`❌[AI_PROCESSING] Fallback model ${fallbackModel} also failed: `, fallbackError.message);
+                                    lastError = fallbackError;
+                                }
                             }
+                            break; // Exit API key retry loop
                         }
-                        break; // Exit API key retry loop
-                    }
 
-                    // Continue to next API key
-                    continue;
+                        // Continue to next API key
+                        continue;
+                    }
                 }
-            }
 
-            // If we still don't have a response after trying all options, throw error
-            if (!responseReceived) {
-                console.error(`❌[AI_PROCESSING] All retry attempts failed`);
-                throw lastError || new Error('Failed to get AI response after all retry attempts');
-            }
+                // If we still don't have a response after trying all options, throw error
+                if (!responseReceived) {
+                    console.error(`❌[AI_PROCESSING] All retry attempts failed`);
+                    throw lastError || new Error('Failed to get AI response after all retry attempts');
+                }
 
-            const toolCalls = getToolCallsFromResponse(response);
+                const toolCalls = getToolCallsFromResponse(response);
 
-            if (toolCalls.length === 0) {
-                const finalTextRaw = extractTextFromAIContent(response.content);
-                const finalText = typeof finalTextRaw === 'string' ? finalTextRaw.trim() : '';
+                if (toolCalls.length === 0) {
+                    const finalTextRaw = extractTextFromAIContent(response.content);
+                    const finalText = typeof finalTextRaw === 'string' ? finalTextRaw.trim() : '';
 
-                console.log(`📥[AI_PROCESSING] AI Response received`);
-                console.log(`📥[AI_PROCESSING] Response type: ${typeof response.content} `);
-                console.log(`📥[AI_PROCESSING] Response content: "${finalText}"`);
+                    console.log(`📥[AI_PROCESSING] AI Response received`);
+                    console.log(`📥[AI_PROCESSING] Response type: ${typeof response.content} `);
+                    console.log(`📥[AI_PROCESSING] Response content: "${finalText}"`);
 
-                const directive = parseToolDirectiveFromText(finalText);
-                if (directive) {
-                    const { toolName, args } = directive;
-                    console.log(`[AI_PROCESSING] Detected textual tool directive: ${toolName} `);
+                    const directive = parseToolDirectiveFromText(finalText);
+                    if (directive) {
+                        const { toolName, args } = directive;
+                        console.log(`[AI_PROCESSING] Detected textual tool directive: ${toolName} `);
 
-                    if (!availableTools[toolName]) {
-                        const safeText = sanitizeToolDirectiveOutput(finalText);
-                        console.log(`🎯[AI_PROCESSING] ===== AI PROCESSING COMPLETED =====\n`);
-                        return {
-                            content: safeText || 'Baik mas, Zoya akan bantu cek ke tim Bosmat.',
-                            id: response.id
-                        };
+                        if (!availableTools[toolName]) {
+                            const safeText = sanitizeToolDirectiveOutput(finalText);
+                            console.log(`🎯[AI_PROCESSING] ===== AI PROCESSING COMPLETED =====\n`);
+                            return {
+                                content: safeText || 'Baik mas, Zoya akan bantu cek ke tim Bosmat.',
+                                id: response.id
+                            };
+                        }
+
+                        messages.push(response);
+
+                        const enrichedArgs = { ...args };
+                        if (senderNumber && !enrichedArgs.senderNumber) {
+                            enrichedArgs.senderNumber = senderNumber;
+                        }
+                        if (senderName && !enrichedArgs.senderName) {
+                            enrichedArgs.senderName = senderName;
+                        }
+
+                        const toolCallId = `${toolName} -directive - ${Date.now()} `;
+                        console.log(`⚡[AI_PROCESSING] Executing directive tool ${toolName} dengan args: ${JSON.stringify(enrichedArgs, null, 2)} `);
+                        const toolResult = await executeToolCall(toolName, enrichedArgs, {
+                            senderNumber,
+                            senderName,
+                        });
+                        console.log(`✅[AI_PROCESSING] Directive tool ${toolName} completed`);
+                        console.log(`📊[AI_PROCESSING] Directive tool result: ${JSON.stringify(toolResult, null, 2)} `);
+
+                        messages.push(new ToolMessage({
+                            tool_call_id: toolCallId,
+                            content: JSON.stringify(toolResult),
+                        }));
+
+                        iteration += 1;
+                        continue;
                     }
 
-                    messages.push(response);
+                    console.log(`🎯[AI_PROCESSING] ===== AI PROCESSING COMPLETED =====\n`);
+                    return {
+                        content: finalText || 'Maaf, saya belum bisa memberikan jawaban.',
+                        id: response.id
+                    };
+                }
 
-                    const enrichedArgs = { ...args };
-                    if (senderNumber && !enrichedArgs.senderNumber) {
-                        enrichedArgs.senderNumber = senderNumber;
-                    }
-                    if (senderName && !enrichedArgs.senderName) {
-                        enrichedArgs.senderName = senderName;
-                    }
+                iteration += 1;
+                console.log(`🔧[AI_PROCESSING] ===== TOOL CALLS DETECTED(iteration ${iteration}) ===== `);
+                console.log(`🔧[AI_PROCESSING] Number of tool calls: ${toolCalls.length} `);
 
-                    const toolCallId = `${toolName} -directive - ${Date.now()} `;
-                    console.log(`⚡[AI_PROCESSING] Executing directive tool ${toolName} dengan args: ${JSON.stringify(enrichedArgs, null, 2)} `);
-                    const toolResult = await executeToolCall(toolName, enrichedArgs, {
+                messages.push(response);
+
+                for (let i = 0; i < toolCalls.length; i++) {
+                    const toolCall = toolCalls[i];
+                    const toolName = toolCall.name;
+                    let toolArgs = toolCall.args || {};
+                    if (typeof toolArgs === 'string') {
+                        try {
+                            toolArgs = JSON.parse(toolArgs);
+                        } catch (err) {
+                            console.warn(`⚠️[AI_PROCESSING] Failed to parse tool args string for ${toolName}: `, err.message);
+                            toolArgs = {};
+                        }
+                    }
+                    const toolCallId = toolCall.id || toolCall.tool_call_id || `${toolName} -${Date.now()} -${i} `;
+
+                    console.log(`⚡[AI_PROCESSING] Executing tool ${i + 1}/${toolCalls.length}: ${toolName}`);
+                    console.log(`   📝 Args: ${JSON.stringify(toolArgs, null, 2)}`);
+
+                    const toolResult = await executeToolCall(toolName, toolArgs, {
                         senderNumber,
                         senderName,
                     });
-                    console.log(`✅[AI_PROCESSING] Directive tool ${toolName} completed`);
-                    console.log(`📊[AI_PROCESSING] Directive tool result: ${JSON.stringify(toolResult, null, 2)} `);
+
+                    console.log(`✅ [AI_PROCESSING] Tool ${toolName} completed`);
+                    console.log(`📊 [AI_PROCESSING] Tool result: ${JSON.stringify(toolResult, null, 2)}`);
 
                     messages.push(new ToolMessage({
                         tool_call_id: toolCallId,
-                        content: JSON.stringify(toolResult),
+                        content: JSON.stringify(toolResult)
                     }));
-
-                    iteration += 1;
-                    continue;
-                }
-
-                console.log(`🎯[AI_PROCESSING] ===== AI PROCESSING COMPLETED =====\n`);
-                return {
-                    content: finalText || 'Maaf, saya belum bisa memberikan jawaban.',
-                    id: response.id
-                };
+                } // End of tool calls loop
+            } catch (error) {
+                console.error(`❌[AI_PROCESSING] Error parsing tool arguments: `, error);
+                throw error;
             }
-
-            iteration += 1;
-            console.log(`🔧[AI_PROCESSING] ===== TOOL CALLS DETECTED(iteration ${iteration}) ===== `);
-            console.log(`🔧[AI_PROCESSING] Number of tool calls: ${toolCalls.length} `);
-
-            messages.push(response);
-
-            for (let i = 0; i < toolCalls.length; i++) {
-                const toolCall = toolCalls[i];
-                const toolName = toolCall.name;
-                let toolArgs = toolCall.args || {};
-                if (typeof toolArgs === 'string') {
-                    try {
-                        toolArgs = JSON.parse(toolArgs);
-                    } catch (err) {
-                        console.warn(`⚠️[AI_PROCESSING] Failed to parse tool args string for ${toolName}: `, err.message);
-                        toolArgs = {};
-                    }
-                }
-                const toolCallId = toolCall.id || toolCall.tool_call_id || `${toolName} -${Date.now()} -${i} `;
-
-                console.log(`⚡[AI_PROCESSING] Executing tool ${i + 1}/${toolCalls.length}: ${toolName}`);
-                console.log(`   📝 Args: ${JSON.stringify(toolArgs, null, 2)}`);
-
-                const toolResult = await executeToolCall(toolName, toolArgs, {
-                    senderNumber,
-                    senderName,
-                });
-
-                console.log(`✅ [AI_PROCESSING] Tool ${toolName} completed`);
-                console.log(`📊 [AI_PROCESSING] Tool result: ${JSON.stringify(toolResult, null, 2)}`);
-
-                messages.push(new ToolMessage({
-                    tool_call_id: toolCallId,
-                    content: JSON.stringify(toolResult)
-                }));
-            }
-        }
+        } // End of while loop
 
         console.warn('⚠️ [AI_PROCESSING] Maximum iteration reached without final response.');
         return { content: 'Maaf, saya belum bisa memberikan jawaban.', id: null };
