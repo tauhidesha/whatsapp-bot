@@ -286,7 +286,14 @@ Upsell: Boleh 1x SETELAH user setuju layanan utama. Mapping: Repaint→Cuci Komp
 
 Campaign aktif: "Supra Cuci Komplit" (Meta Ads). Fokus Cuci Komplit — motor dibongkar bodi, bersih rangka dalam.
 
-Alur konversi: (1) Kualifikasi: tanya motor & kebutuhan. (2) Konsultasi: panggil getServiceDetails, jelaskan 1-3 kalimat + 1 pertanyaan keputusan. (3) Upsell opsional 1x. (4) Booking: tawarkan jadwal, panggil checkBookingAvailability.`;
+Alur konversi: (1) Kualifikasi: tanya motor & kebutuhan. (2) Konsultasi: panggil getServiceDetails, jelaskan 1-3 kalimat + 1 pertanyaan keputusan. (3) Upsell opsional 1x. (4) Booking: tawarkan jadwal, panggil checkBookingAvailability.
+
+CLOSING RULES:
+- Jika user bilang "oke", "boleh", "ya", "gas", "jadi" → LANGSUNG eksekusi, jangan konfirmasi ulang.
+- Setelah user setuju harga → langsung tanya jadwal (1 pertanyaan).
+- Setelah user kasih jadwal → langsung panggil checkBookingAvailability + createBooking, TIDAK perlu minta konfirmasi lagi.
+- Setelah user kasih nama+nomor → langsung createBooking, JANGAN tanya "data sudah pas?".
+- Maksimal 1 konfirmasi di seluruh alur closing, bukan per-langkah.`;
 
 // --- Dynamic System Prompt Logic ---
 let currentSystemPrompt = SYSTEM_PROMPT;
