@@ -269,9 +269,9 @@ function formatRepaintPriceResult(lookup) {
 
 // --- Implementation ---
 async function processSingleService(parsedServiceName, input, promoText) {
-  const motorModel = typeof input.motor_model === 'string' ? input.motor_model.trim() : null;
-  const colorNameInput = typeof input.color_name === 'string' ? input.color_name.trim() : null;
-  const sizeFromArgs = normalizeSizeInput(input.size);
+  const motorModel = (input.motor_model || input.motorModel || input.motor_type || input.motorType || '').toString().trim() || null;
+  const colorNameInput = (input.color_name || input.colorName || '').toString().trim() || null;
+  const sizeFromArgs = normalizeSizeInput(input.size || input.motorSize || input.motor_size);
 
   // Special case for "coating" generic query
   if (parsedServiceName.trim().toLowerCase() === 'coating') {
@@ -481,17 +481,22 @@ async function implementation(input) {
       return { success: false, error: 'generic_error', message: 'Input tidak valid' };
     }
 
-    // Ensure service_name is treated as an array
-    let serviceNames = input.service_name;
+    // Ensure service_name is treated as an array and handle camelCase variation
+    let serviceNames = input.service_name || input.serviceName;
     const promo = await getPromoInfo();
 
     if (!serviceNames) {
       return { success: false, error: 'generic_error', message: 'service_name tidak valid atau kosong' };
     }
 
-    // Convert string to array gracefully in case LLM hallucinations still send a string
+    // Convert string to array gracefully
     if (typeof serviceNames === 'string') {
-      serviceNames = [serviceNames];
+      // If the string contains a comma, the LLM likely concatenated multiple services
+      if (serviceNames.includes(',')) {
+        serviceNames = serviceNames.split(',').map(s => s.trim()).filter(Boolean);
+      } else {
+        serviceNames = [serviceNames];
+      }
     }
 
     // Initialize return object structure matching standard response
