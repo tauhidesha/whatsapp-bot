@@ -269,9 +269,25 @@ function formatRepaintPriceResult(lookup) {
 
 // --- Implementation ---
 async function processSingleService(parsedServiceName, input, promoText) {
-  const motorModel = (input.motor_model || input.motorModel || input.motor_type || input.motorType || '').toString().trim() || null;
+  let motorModel = (
+    input.motor_model || input.motorModel ||
+    input.motor_type || input.motorType ||
+    input.vehicle_type || input.vehicleType ||
+    input.vehicle_model || input.vehicleModel ||
+    input.motor_model_name ||
+    '').toString().trim() || null;
+
+  // Final fallback: Extract motor model from parsedServiceName if still null
+  if (!motorModel && parsedServiceName) {
+    const motorData = lookupMotorSizeFromData(parsedServiceName);
+    if (motorData) {
+      motorModel = motorData.model;
+      console.log(`[getServiceDetailsTool] Extracted motor model "${motorModel}" from service name "${parsedServiceName}"`);
+    }
+  }
+
   const colorNameInput = (input.color_name || input.colorName || '').toString().trim() || null;
-  const sizeFromArgs = normalizeSizeInput(input.size || input.motorSize || input.motor_size);
+  const sizeFromArgs = normalizeSizeInput(input.size || input.motorSize || input.motor_size || input.vehicle_size || input.vehicleSize);
 
   // Special case for "coating" generic query
   if (parsedServiceName.trim().toLowerCase() === 'coating') {
@@ -456,12 +472,12 @@ async function processSingleService(parsedServiceName, input, promoText) {
     estimated_duration: durationFormatted,
     motor_size: finalSize || null,
     price: basePrice || null,
-    price_formatted: basePrice ? `Rp${basePrice.toLocaleString('id-ID')}` : 'Harga perlu model motor',
+    price_formatted: (basePrice !== null && basePrice !== undefined) ? `Rp${basePrice.toLocaleString('id-ID')}` : 'Harga perlu model motor',
     color_name: surchargeMatch ? surchargeMatch.name : colorNameInput,
     color_surcharge: colorSurcharge,
     color_surcharge_formatted: `Rp${colorSurcharge.toLocaleString('id-ID')}`,
-    final_price: basePrice ? basePrice + colorSurcharge : null,
-    final_price_formatted: basePrice ? `Rp${(basePrice + colorSurcharge).toLocaleString('id-ID')}` : null,
+    final_price: (basePrice !== null && basePrice !== undefined) ? basePrice + colorSurcharge : null,
+    final_price_formatted: (basePrice !== null && basePrice !== undefined) ? `Rp${(basePrice + colorSurcharge).toLocaleString('id-ID')}` : null,
     promo_active: !!promoText,
   };
 
