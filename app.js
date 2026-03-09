@@ -891,6 +891,10 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
         console.log(`📱[AI_PROCESSING] Sender Number: ${senderNumber || 'N/A'} `);
 
 
+        // [DEPRECATION] Old Chat History Fetching block.
+        // History is no longer concatenated to the Prompt.
+        // We solely rely on contextExtractor to build `conversation_summary`.
+        /*
         let conversationHistoryMessages = [];
 
         if (senderNumber && db) {
@@ -907,6 +911,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
         } else {
             console.log(`🧠[AI_PROCESSING] No conversation history(new user, no DB, or no local history provided)`);
         }
+        */
 
         const userTextContent = context
             ? `${userMessage} \n\n[Context Internal]\n${context} `
@@ -971,6 +976,12 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
 
                 // Prioritas 1: customerContext (dari background extractor, lebih reliable)
                 if (customerCtx) {
+                    if (customerCtx.conversation_summary) {
+                        parts.push(`[RINGKASAN OBROLAN SEBELUMNYA]`);
+                        parts.push(customerCtx.conversation_summary);
+                        parts.push(`---------------------------`);
+                    }
+
                     // Motor identity
                     if (customerCtx.motor_model) parts.push(`- Motor: ${customerCtx.motor_model}`);
                     if (customerCtx.motor_year) parts.push(`- Tahun motor: ${customerCtx.motor_year}`);
@@ -1028,9 +1039,10 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
             console.warn('[AI_PROCESSING] Gagal mengambil promo config:', error.message);
         }
 
+        // Optimasi: Hanya gunakan prompt sistem, konteks dari extractor (termasuk ringkasan terbaru), dan pesan user saat ini.
+        // Hilangkan full raw chat history untuk penghematan token drastis.
         const messages = [
             new SystemMessage(effectiveSystemPrompt + dateTimePart + memoryPart),
-            ...conversationHistoryMessages,
             new HumanMessage(humanMessageContent)
         ].filter(msg => !!msg); // Filter out null/undefined messages
 

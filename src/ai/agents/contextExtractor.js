@@ -5,17 +5,23 @@
 
 const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
 const { HumanMessage } = require('@langchain/core/messages');
-const { mergeAndSaveContext } = require('../utils/mergeCustomerContext.js');
+const { mergeAndSaveContext, getCustomerContext } = require('../utils/mergeCustomerContext.js');
 const { getLangSmithCallbacks } = require('../utils/langsmith.js');
 
 // Model ringan untuk extraction — cepat dan murah
 const EXTRACTOR_MODEL = 'gemini-3.1-flash-lite-preview';
 
 const EXTRACTOR_PROMPT = `Kamu adalah data extractor untuk sistem CRM bengkel motor.
-Tugasmu HANYA mengekstrak fakta dari percakapan.
+Tugasmu ada dua:
+1. Mengekstrak fakta dari percakapan.
+2. Membuat/memperbarui ringkasan obrolan (conversation_summary).
+
 Kembalikan JSON saja. Tidak ada teks lain. Tidak ada markdown.
 
-Percakapan:
+Ringkasan Obrolan Sebelumnya:
+{currentSummary}
+
+Percakapan Saat Ini:
 User: "{userMessage}"
 AI: "{aiReply}"
 
@@ -34,24 +40,27 @@ Ekstrak ke format ini (isi null jika tidak disebutkan):
   "asked_availability": null,
   "shared_photo": null,
   "preferred_day": null,
-  "location_hint": null
+  "location_hint": null,
+  "conversation_summary": "Ringkasan SINGKAT dan PADAT tentang apa yang diobrolkan sejauh ini, gabungan dari ringkasan sebelumnya dan percakapan saat ini."
 }
 
 Aturan ketat:
-- Hanya isi field yang BENAR-BENAR ada di percakapan ini
-- Jangan inferensi atau mengarang
+- Hanya isi field fakta yang BENAR-BENAR ada di percakapan ini
+- Jangan inferensi atau mengarang fakta
 - intent_level: "hot" jika tanya jadwal/mau datang, 
                 "warm" jika tanya harga/detail,
                 "cold" jika hanya lihat-lihat
 - budget_signal: "ketat" jika bilang mahal/kemahalan,
                  "oke" jika setuju harga,
-                 null jika tidak disebut`;
+                 null jika tidak disebut
+- conversation_summary: WAJIB diisi. Gabungkan intisari "Ringkasan Obrolan Sebelumnya" (jika ada) dengan "Percakapan Saat Ini" menjadi 1-2 kalimat padat. Fokus pada apa yang diinginkan/ditanyakan customer.`;
 
 /**
  * Build the prompt with actual conversation data.
  */
-function buildPrompt(userMessage, aiReply) {
+function buildPrompt(userMessage, aiReply, currentSummary = '') {
     return EXTRACTOR_PROMPT
+        .replace('{currentSummary}', currentSummary || '(Belum ada ringkasan)')
         .replace('{userMessage}', (userMessage || '').replace(/"/g, '\\"'))
         .replace('{aiReply}', (aiReply || '').replace(/"/g, '\\"'));
 }
@@ -106,7 +115,10 @@ async function extractAndSaveContext(userMessage, aiReply, senderNumber) {
             apiKey,
         });
 
-        const prompt = buildPrompt(userMessage, aiReply);
+        const currentCtx = await getCustomerContext(senderNumber);
+        const currentSummary = currentCtx?.conversation_summary || '';
+
+        const prompt = buildPrompt(userMessage, aiReply, currentSummary);
 
         const callbacks = getLangSmithCallbacks('contextExtractor', {
             metadata: {
