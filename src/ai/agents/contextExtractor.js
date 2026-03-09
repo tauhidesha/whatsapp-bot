@@ -13,11 +13,12 @@ const EXTRACTOR_MODEL = 'gemini-3.1-flash-lite-preview';
 
 const EXTRACTOR_PROMPT = `Kamu adalah data extractor untuk sistem CRM bengkel motor.
 Tugasmu ada dua:
-1. Mengekstrak fakta dari percakapan.
+1. Mengekstrak fakta dari percakapan, termasuk harga yang dikutip oleh AI ke pelanggan.
 2. Membuat/memperbarui ringkasan obrolan (conversation_summary).
 
 Kembalikan JSON saja. Tidak ada teks lain. Tidak ada markdown.
 
+Waktu Sekarang: {timestamp}
 Ringkasan Obrolan Sebelumnya:
 {currentSummary}
 
@@ -41,12 +42,20 @@ Ekstrak ke format ini (isi null jika tidak disebutkan):
   "shared_photo": null,
   "preferred_day": null,
   "location_hint": null,
+  "quoted_services": [],
+  "quoted_total_normal": null,
+  "quoted_total_bundling": null,
+  "quoted_at": null,
   "conversation_summary": "Ringkasan SINGKAT dan PADAT tentang apa yang diobrolkan sejauh ini, gabungan dari ringkasan sebelumnya dan percakapan saat ini."
 }
 
 Aturan ketat:
 - Hanya isi field fakta yang BENAR-BENAR ada di percakapan ini
 - Jangan inferensi atau mengarang fakta
+- quoted_services: Hanya isi jika AI memberikan penawaran harga spesifik di "AI: {aiReply}". Format: [{"name": "Nama Layanan", "price": 1200000}]
+- quoted_total_normal: Total harga sebelum diskon.
+- quoted_total_bundling: Harga paket/bundling jika ditawarkan oleh AI.
+- quoted_at: Isi dengan "{timestamp}" jika ada quoted_services yang baru diberikan.
 - intent_level: "hot" jika tanya jadwal/mau datang, 
                 "warm" jika tanya harga/detail,
                 "cold" jika hanya lihat-lihat
@@ -58,8 +67,10 @@ Aturan ketat:
 /**
  * Build the prompt with actual conversation data.
  */
-function buildPrompt(userMessage, aiReply, currentSummary = '') {
+function buildPrompt(userMessage, aiReply, currentSummary = '', timestamp = '') {
     return EXTRACTOR_PROMPT
+        .replace('{timestamp}', timestamp || new Date().toISOString())
+        .replace(/\{timestamp\}/g, timestamp || new Date().toISOString())
         .replace('{currentSummary}', currentSummary || '(Belum ada ringkasan)')
         .replace('{userMessage}', (userMessage || '').replace(/"/g, '\\"'))
         .replace('{aiReply}', (aiReply || '').replace(/"/g, '\\"'));
@@ -117,8 +128,9 @@ async function extractAndSaveContext(userMessage, aiReply, senderNumber) {
 
         const currentCtx = await getCustomerContext(senderNumber);
         const currentSummary = currentCtx?.conversation_summary || '';
+        const timestamp = new Date().toISOString();
 
-        const prompt = buildPrompt(userMessage, aiReply, currentSummary);
+        const prompt = buildPrompt(userMessage, aiReply, currentSummary, timestamp);
 
         const callbacks = getLangSmithCallbacks('contextExtractor', {
             metadata: {

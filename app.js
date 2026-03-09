@@ -982,6 +982,20 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                     // Logistics
                     if (customerCtx.preferred_day) parts.push(`- Preferensi hari: ${customerCtx.preferred_day}`);
                     if (customerCtx.location_hint) parts.push(`- Lokasi: ${customerCtx.location_hint}`);
+
+                    // Price memory
+                    if (customerCtx.quoted_services?.length > 0) {
+                        const serviceList = customerCtx.quoted_services
+                            .map(s => `${s.name}: Rp${s.price?.toLocaleString('id-ID') || '?'}`)
+                            .join(', ');
+                        parts.push(`- Harga sudah dikutip: ${serviceList}`);
+                    }
+                    if (customerCtx.quoted_total_bundling) {
+                        parts.push(`- Total bundling (diskon): Rp${customerCtx.quoted_total_bundling.toLocaleString('id-ID')}`);
+                    }
+                    if (customerCtx.quoted_at) {
+                        parts.push(`- Penawaran terakhir: ${customerCtx.quoted_at}`);
+                    }
                 }
 
                 // Prioritas 2: Legacy state (fallback, hanya jika customerCtx belum punya)
