@@ -23,6 +23,9 @@ function mergeContextData(current, newData) {
         if (value === null || value === undefined || value === '') {
             // Pertahankan data lama kalau ekstraksi baru tidak dapat info
             merged[key] = current[key] ?? null;
+        } else if (key === 'upsell_offered' && current[key] === true) {
+            // Sticky true for upselling stage to avoid regression
+            merged[key] = true;
         } else {
             // Data baru lebih fresh, pakai yang baru
             merged[key] = value;

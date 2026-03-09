@@ -996,6 +996,30 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                     if (customerCtx.quoted_at) {
                         parts.push(`- Penawaran terakhir: ${customerCtx.quoted_at}`);
                     }
+
+                    // Stage signals
+                    if (customerCtx.conversation_stage) {
+                        parts.push(`- Stage percakapan: ${customerCtx.conversation_stage}`);
+                    }
+                    if (customerCtx.last_ai_action) {
+                        parts.push(`- Aksi AI terakhir: ${customerCtx.last_ai_action}`);
+                    }
+                    if (customerCtx.upsell_offered === true) {
+                        parts.push(`- ⚠️ Upsell sudah ditawarkan, JANGAN tawarkan lagi`);
+                    }
+
+                    // Add stage-aware instructions
+                    const stageInstructions = {
+                        'consulting': 'User sedang mempertimbangkan. Jawab pertanyaan, lalu tawarkan booking.',
+                        'booking': 'User sudah siap. FOKUS ke konfirmasi jadwal, jangan tanya hal lain.',
+                        'closing': 'User sudah setuju. LANGSUNG panggil checkBookingAvailability, STOP bertanya hal lain.',
+                        'done': 'Booking sudah confirmed. Cukup konfirmasi ulang dan tutup dengan ramah.',
+                    };
+
+                    const stageHint = stageInstructions[customerCtx?.conversation_stage];
+                    if (stageHint) {
+                        parts.push(`\n🎯 INSTRUKSI STAGE: ${stageHint}`);
+                    }
                 }
 
                 // Prioritas 2: Legacy state (fallback, hanya jika customerCtx belum punya)

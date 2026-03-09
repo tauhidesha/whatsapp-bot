@@ -46,12 +46,27 @@ Ekstrak ke format ini (isi null jika tidak disebutkan):
   "quoted_total_normal": null,
   "quoted_total_bundling": null,
   "quoted_at": null,
+  "conversation_stage": null,
+  "last_ai_action": null,
+  "upsell_offered": null,
+  "upsell_accepted": null,
   "conversation_summary": "Ringkasan SINGKAT dan PADAT tentang apa yang diobrolkan sejauh ini, gabungan dari ringkasan sebelumnya dan percakapan saat ini."
 }
 
 Aturan ketat:
 - Hanya isi field fakta yang BENAR-BENAR ada di percakapan ini
 - Jangan inferensi atau mengarang fakta
+- conversation_stage: 
+    "greeting"     → baru mulai
+    "qualifying"   → AI sedang tanya motor/kebutuhan
+    "consulting"   → AI sudah kasih info layanan/harga
+    "upselling"    → AI sedang tawarkan layanan tambahan
+    "booking"      → sedang proses jadwal
+    "closing"      → user sudah setuju, tinggal konfirmasi
+    "done"         → booking terkonfirmasi
+- last_ai_action: apa yang terakhir dilakukan AI ("asked_motor_type", "quoted_price", "offered_upsell", "offered_booking", etc)
+- upsell_offered: true jika AI sudah tawarkan upsell di conversation ini
+- upsell_accepted: true/false/null
 - quoted_services: Hanya isi jika AI memberikan penawaran harga spesifik di "AI: {aiReply}". Format: [{"name": "Nama Layanan", "price": 1200000}]
 - quoted_total_normal: Total harga sebelum diskon.
 - quoted_total_bundling: Harga paket/bundling jika ditawarkan oleh AI.
