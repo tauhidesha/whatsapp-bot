@@ -1048,8 +1048,8 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                 const intent = ctx?.intent_level || 'null';
 
                 // 1. Always included baseline tools
-                routedTools.push(getStudioInfoToolTool);
-                routedTools.push(notifyVisitIntentToolTool);
+                routedTools.push(getStudioInfoTool);
+                routedTools.push(notifyVisitIntentTool);
 
                 // 2. Pricing & Service Info
                 // Include if feeling out (cold/null) OR they explicitly ask about price/service
@@ -1077,7 +1077,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
 
                 // 5. Visual Analysis
                 if (msgLower.includes('foto') || msgLower.includes('lihat') || msgLower.includes('gambar')) {
-                    routedTools.push(sendStudioPhotoToolTool);
+                    routedTools.push(sendStudioPhotoTool);
                 }
 
                 return routedTools;
