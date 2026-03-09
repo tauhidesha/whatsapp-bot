@@ -1124,7 +1124,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                         // Bind the active tools to the current model
                         const currentBoundModel = currentModel.bindTools(isAdmin ? adminToolSpecs : prepareToolSpecs(activeToolDefs));
                         // Set runName explicitly for tracking
-                        response = await currentBoundModel.invoke(messages, getTracingConfig(traceLabel, {
+                        response = await currentBoundModel.invoke(messages, getTracingConfig(isAdmin ? 'AdminResponse' : 'CustomerResponse', {
                             runName: isAdmin ? 'AdminResponse' : 'CustomerResponse',
                             metadata: {
                                 sender_number: senderNumber || 'anonymous',
@@ -1188,7 +1188,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                                         apiKey: API_KEYS[0]
                                     });
 
-                                    response = await fallbackModelInstance.invoke(messages, getTracingConfig(traceLabel));
+                                    response = await fallbackModelInstance.invoke(messages, getTracingConfig(isAdmin ? 'AdminResponse' : 'CustomerResponse'));
 
                                     // Validate fallback response
                                     const hasFallbackToolCalls = getToolCallsFromResponse(response).length > 0;
