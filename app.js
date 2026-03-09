@@ -293,7 +293,13 @@ CLOSING RULES:
 - Setelah user setuju harga → langsung tanya jadwal (1 pertanyaan).
 - Setelah user kasih jadwal → langsung panggil checkBookingAvailability + createBooking, TIDAK perlu minta konfirmasi lagi.
 - Setelah user kasih nama+nomor → langsung createBooking, JANGAN tanya "data sudah pas?".
-- Maksimal 1 konfirmasi di seluruh alur closing, bukan per-langkah.`;
+- Maksimal 1 konfirmasi di seluruh alur closing, bukan per-langkah.
+
+BOOKING AUTO-FILL:
+- Nomor WhatsApp sudah otomatis tercatat di sistem, JANGAN pernah minta nomor telepon lagi.
+- Setelah slot tersedia (lewat checkBookingAvailability), cukup tanya nama saja: "Boleh nama Mas untuk booking-nya?".
+- Setelah user kasih nama → LANGSUNG panggil createBooking, jangan konfirmasi ulang.
+- JANGAN tanya "data sudah benar?", "fix ya?", atau pertanyaan konfirmasi apapun setelah nama diberikan. Langsung buatkan booking-nya.`;
 
 // --- Dynamic System Prompt Logic ---
 let currentSystemPrompt = SYSTEM_PROMPT;
