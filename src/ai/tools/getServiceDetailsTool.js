@@ -286,6 +286,15 @@ async function processSingleService(parsedServiceName, input, promoText) {
     }
   }
 
+  // Detect if the providing motorModel is actually just a category (halusination check)
+  const CATEGORY_KEYWORDS = ['matic', 'bebek', 'sport', 'besar', 'kecil', 'big', 'small', 'medium'];
+  const isCategoryOnly = motorModel && CATEGORY_KEYWORDS.some(k => motorModel.toLowerCase().includes(k) && motorModel.split(' ').length <= 2);
+
+  if (isCategoryOnly) {
+    console.log(`[getServiceDetailsTool] Detected category-only motor model: "${motorModel}". Flagging for clarification.`);
+    motorModel = null; // Treat as missing to trigger clarification
+  }
+
   const colorNameInput = (input.color_name || input.colorName || '').toString().trim() || null;
   const sizeFromArgs = normalizeSizeInput(input.size || input.motorSize || input.motor_size || input.vehicle_size || input.vehicleSize);
 
@@ -353,9 +362,9 @@ async function processSingleService(parsedServiceName, input, promoText) {
     if (!motorModel) {
       return {
         success: true,
-        multiple_candidates: true,
-        needs_motor_model: true,
-        message: 'Untuk memberikan estimasi harga repaint, mohon infokan tipe motornya (misal: Vario, NMax, Beat).'
+        needs_clarification: true,
+        message: 'Untuk memberikan estimasi harga repaint, mohon infokan tipe motornya (misal: Vario, NMAX, Scoopy, Beat).',
+        action: 'ASK_USER'
       };
     }
 
@@ -426,7 +435,16 @@ async function processSingleService(parsedServiceName, input, promoText) {
   const colorSurcharge = surchargeMatch ? surchargeMatch.surcharge : 0;
 
   // --- Model-based pricing for repaint services ---
-  if (service.usesModelPricing && motorModel) {
+  if (service.usesModelPricing) {
+    if (!motorModel) {
+      return {
+        success: true,
+        needs_clarification: true,
+        message: `Layanan "${service.name}" memerlukan model motor spesifik untuk menentukan harga. Sebutkan model motornya (contoh: NMAX, Scoopy, Vario).`,
+        action: "ASK_USER"
+      };
+    }
+
     const subcategory = service.subcategory || null;
     const lookup = lookupRepaintPrice(motorModel, subcategory, finalSize);
     const priceInfo = formatRepaintPriceResult(lookup);
@@ -554,7 +572,7 @@ const getServiceDetailsTool = {
           },
           motor_model: {
             type: "string",
-            description: "Model motor (untuk harga repaint)."
+            description: "Nama spesifik model motor WAJIB diisi (contoh: NMax, PCX, Scoopy, Beat, Vario). JANGAN isi dengan kategori seperti 'Matic Besar', 'Bebek', atau 'Sport'."
           },
           size: {
             type: "string",
