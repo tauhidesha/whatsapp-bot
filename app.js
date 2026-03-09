@@ -1089,7 +1089,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
             activeModel = baseModel.bindTools(routedToolSpecs);
         }
 
-        console.log(`🔧[AI_PROCESSING] Tools routed (${isAdmin ? 'ADMIN' : 'CUSTOMER'}, ${activeToolDefs.length} tools): ${activeToolDefs.map(t => t.function.name).join(', ')} `);
+        console.log(`🔧[AI_PROCESSING] Tools routed (${isAdmin ? 'ADMIN' : 'CUSTOMER'}, ${activeToolDefs.length} tools): ${activeToolDefs.map(t => t.toolDefinition?.function?.name || t.name || t.function?.name || 'UnknownTool').join(', ')} `);
         let iteration = 0;
         const MAX_ITERATIONS = 8;
 
