@@ -1050,7 +1050,11 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
             // Function to route tools dynamically based on context and user message
             const routeCustomerTools = (ctx, userMsg) => {
                 const routedTools = [];
-                const msgLower = (userMsg || '').toLowerCase();
+                // Handle if userMsg is an array (multimodal content)
+                const msgText = Array.isArray(userMsg)
+                    ? (userMsg.find(p => p.type === 'text')?.text || '')
+                    : (userMsg || '');
+                const msgLower = msgText.toLowerCase();
                 const intent = ctx?.intent_level || 'null';
 
                 // 1. Always included baseline tools
