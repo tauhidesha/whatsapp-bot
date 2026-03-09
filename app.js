@@ -280,7 +280,7 @@ Tools:
 - checkBookingAvailability: saat user mau atur jadwal.
 - triggerBosMat: jika user marah/komplain berat/nego keras.
 
-Layanan: Repaint (Bodi Halus/Kasar, Velg, Cover CVT, mulai 150rb) | Detailing (Mesin, Cuci Komplit, Full Detailing, mulai 100rb) | Coating (Doff/Glossy, Complete Service, mulai 350rb). Prioritaskan data dari getServiceDetails. Jika bundling/diskon, SELALU sebutkan total harga akhir.
+Layanan: Repaint (Bodi Halus/Kasar, Velg, Cover CVT, mulai 150rb) | Detailing (Mesin, Cuci Komplit, Full Detailing, mulai 100rb) | Coating (Doff/Glossy, Complete Service, mulai 350rb). Prioritaskan data dari getServiceDetails. Jika bundling/diskon, SELALU sebutkan total harga akhir. PENTING: Jika getServiceDetails gagal atau return error, JANGAN mengarang harga. Katakan: "Maaf Mas, coba Zoya cek dulu ya — motor tipe apa?" lalu panggil ulang tool dengan service_name yang benar.
 
 Upsell: Boleh 1x SETELAH user setuju layanan utama. Mapping: Repaint→Cuci Komplit, Cuci→Full Detailing, Poles→Coating, Coating→Complete. Ditolak → terima sopan, lanjut booking.
 
@@ -1082,10 +1082,17 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                 const intent = ctx?.intent_level || 'null';
 
                 // 1. Always included baseline tools
-                routedTools.push(getStudioInfoTool);
                 routedTools.push(notifyVisitIntentTool);
 
-                // 2. Pricing & Service Info
+                // 2. Info Studio (Only when asked about location/hours)
+                if (msgLower.includes('alamat') || msgLower.includes('lokasi') ||
+                    msgLower.includes('dimana') || msgLower.includes('jam') ||
+                    msgLower.includes('buka') || msgLower.includes('tutup') ||
+                    msgLower.includes('maps')) {
+                    routedTools.push(getStudioInfoTool);
+                }
+
+                // 3. Pricing & Service Info
                 // Include if feeling out (cold/null) OR they explicitly ask about price/service
                 if (intent === 'cold' || intent === 'null' || !ctx ||
                     msgLower.includes('harga') || msgLower.includes('biaya') || msgLower.includes('berapa') ||
@@ -1093,7 +1100,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                     routedTools.push(getServiceDetailsTool);
                 }
 
-                // 3. Booking & Scheduling
+                // 4. Booking & Scheduling
                 // Include if warming up (warm/hot) OR they explicitly ask about booking/dates
                 if (intent === 'warm' || intent === 'hot' ||
                     msgLower.includes('booking') || msgLower.includes('jadwal') || msgLower.includes('kapan') ||
@@ -1103,13 +1110,13 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                     routedTools.push(updateBookingTool);
                 }
 
-                // 4. Onsite Service
+                // 5. Onsite Service
                 // Include if location data exists or explicitly mentioned
                 if ((ctx && ctx.location_hint) || msgLower.includes('home service') || msgLower.includes('rumah') || msgLower.includes('jemput')) {
                     routedTools.push(calculateHomeServiceFeeTool);
                 }
 
-                // 5. Visual Analysis
+                // 6. Visual Analysis
                 if (msgLower.includes('foto') || msgLower.includes('lihat') || msgLower.includes('gambar')) {
                     routedTools.push(sendStudioPhotoTool);
                 }
