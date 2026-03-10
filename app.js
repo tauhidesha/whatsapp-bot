@@ -1923,6 +1923,8 @@ async function saveMessageToFirestore(senderNumber, message, senderType) {
             sender: senderType,
         });
 
+        const snoozeInfo = await getSnoozeInfo(senderNumber);
+
         await db.collection('directMessages').doc(docId).set({
             lastMessage: message,
             lastMessageSender: senderType,
@@ -1933,6 +1935,11 @@ async function saveMessageToFirestore(senderNumber, message, senderType) {
             platform: channel,
             platformId: platformId || docId,
             fullSenderId: senderNumber,
+            // Sync AI State
+            aiEnabled: !snoozeInfo.active,
+            aiPaused: snoozeInfo.active,
+            aiPausedUntil: snoozeInfo.expiresAt ? admin.firestore.Timestamp.fromDate(new Date(snoozeInfo.expiresAt)) : null,
+            aiPauseReason: snoozeInfo.reason,
         }, { merge: true });
     } catch (error) {
         console.error('Error saving to Firestore:', error);
@@ -1962,6 +1969,8 @@ async function saveSenderMeta(senderNumber, displayName, client = null) {
     try {
         const metaRef = db.collection('directMessages').doc(docId);
         
+        const snoozeInfo = await getSnoozeInfo(senderNumber);
+        
         const updateData = {
             name: displayName,
             channel,
@@ -1969,6 +1978,11 @@ async function saveSenderMeta(senderNumber, displayName, client = null) {
             platformId: platformId || docId,
             fullSenderId: senderNumber,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            // Sync AI State
+            aiEnabled: !snoozeInfo.active,
+            aiPaused: snoozeInfo.active,
+            aiPausedUntil: snoozeInfo.expiresAt ? admin.firestore.Timestamp.fromDate(new Date(snoozeInfo.expiresAt)) : null,
+            aiPauseReason: snoozeInfo.reason,
         };
 
         if (profilePicUrl) {
