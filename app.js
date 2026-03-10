@@ -2025,6 +2025,7 @@ async function listConversations(limit = 100) {
                 label: data.customerLabel || null,
                 labelReason: data.labelReason || null,
                 labelUpdatedAt: serializeTimestamp(data.labelUpdatedAt),
+                profilePicUrl: data.profilePicUrl?.eurl || data.profilePicUrl || null,
             };
         }));
 
