@@ -4,6 +4,7 @@
 // Jalan otomatis (fire & forget) setelah Context Extractor selesai.
 
 const admin = require('firebase-admin');
+const { syncLabelToDirectMessages } = require('../utils/mergeCustomerContext.js');
 
 // ─── Follow-Up Strategy Map ──────────────────────────────────────────────────
 
@@ -304,6 +305,9 @@ async function classifyAndSaveCustomer(senderNumber) {
         };
 
         await ctxRef.set(update, { merge: true });
+
+        // Synchronize to directMessages for dashboard labels
+        await syncLabelToDirectMessages(senderNumber, result.label);
 
         console.log(`[Classifier] ${docId} → ${result.label} (confidence: ${result.confidence}, reason: ${result.reason})`);
 

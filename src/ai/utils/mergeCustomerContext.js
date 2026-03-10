@@ -108,8 +108,53 @@ async function getCustomerContext(senderNumber) {
     }
 }
 
+/**
+ * Synchronize customer_label from customerContext to directMessages collection
+ * to ensure visual consistency in the dashboard.
+ * 
+ * @param {string} senderNumber - Raw sender number
+ * @param {string} aiLabel - Label from customerClassifier
+ */
+async function syncLabelToDirectMessages(senderNumber, aiLabel) {
+    if (!senderNumber || !aiLabel) return;
+
+    const db = admin.firestore();
+    const docId = senderNumber.replace(/[^0-9]/g, '');
+    if (!docId) return;
+
+    // AI to Frontend Label Mapping
+    const LABEL_MAPPING = {
+        'hot_lead': 'hot_lead',
+        'warm_lead': 'general',
+        'lead': 'general',
+        'window_shopper': 'cold_lead',
+        'existing': 'completed',
+        'existing_customer': 'completed',
+        'loyal': 'completed',
+        'churned': 'archive',
+        'dormant_lead': 'archive'
+    };
+
+    const frontendLabel = LABEL_MAPPING[aiLabel] || 'general';
+
+    try {
+        const dmRef = db.collection('directMessages').doc(docId);
+        
+        await dmRef.set({
+            customerLabel: frontendLabel,
+            labelReason: `AI Sync: ${aiLabel}`,
+            labelUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+
+        console.log(`[Context] Synced label for ${docId}: ${aiLabel} -> ${frontendLabel}`);
+    } catch (error) {
+        console.error(`[Context] Error syncing label for ${docId}:`, error.message);
+    }
+}
+
 module.exports = {
     mergeContextData,
     mergeAndSaveContext,
     getCustomerContext,
+    syncLabelToDirectMessages,
 };
