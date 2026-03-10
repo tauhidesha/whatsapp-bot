@@ -36,7 +36,8 @@ function getLogger(logger) {
 }
 
 async function sendMetaMessage(channel, recipientId, text, logger = console) {
-    const trimmed = (text || '').trim();
+    const rawText = (typeof text === 'object' && text !== null && text.content) ? text.content : text;
+    const trimmed = (rawText || '').toString().trim();
     if (!trimmed) {
         getLogger(logger).log('[MetaClient] Skipping empty message', { channel, recipientId });
         return { skipped: true };

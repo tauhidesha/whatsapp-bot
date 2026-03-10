@@ -164,7 +164,8 @@ function createMetaWebhookRouter(deps = {}) {
 
         if (text && typeof getAIResponse === 'function') {
             try {
-                const aiResponse = await getAIResponse(text, displayName, normalizedSenderId);
+                const aiResult = await getAIResponse(text, displayName, normalizedSenderId);
+                const aiResponse = aiResult.content;
                 log('AI response ready for outbound delivery', { channel, senderId });
                 await sendMetaMessage(channel, senderId, aiResponse, logger);
 
