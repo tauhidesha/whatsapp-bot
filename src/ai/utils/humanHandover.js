@@ -247,6 +247,20 @@ async function setSnoozeMode(senderNumber, durationMinutes = 60, options = {}) {
   }
 
   await docRef.set(payload, { merge: true });
+  
+  // SINKRONISASI KE directMessages UNTUK UI FRONTEND
+  try {
+    const docId = normalizedNumber.replace(/@c\.us$|@lid$/, '');
+    await db.collection('directMessages').doc(docId).update({
+      aiEnabled: !manual && !expiresAtValue,
+      aiPaused: true,
+      aiPausedUntil: expiresAtValue,
+      aiPauseReason: reason || (manual ? 'manual-toggle' : 'timed-toggle'),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (err) {
+    console.warn('[humanHandover] Gagal sinkronisasi snooze ke directMessages:', err.message);
+  }
 
   console.log('[humanHandover] Snooze mode aktif untuk', normalizedNumber, manual ? '(manual)' : `(durasi ${effectiveDuration} menit)`);
 }
@@ -257,6 +271,20 @@ async function clearSnoozeMode(senderNumber) {
   try {
     await db.collection('handoverSnoozes').doc(normalizedNumber).delete();
     console.log('[humanHandover] Snooze mode dinonaktifkan untuk', normalizedNumber);
+
+    // SINKRONISASI KE directMessages UNTUK UI FRONTEND
+    try {
+      const docId = normalizedNumber.replace(/@c\.us$|@lid$/, '');
+      await db.collection('directMessages').doc(docId).update({
+        aiEnabled: true,
+        aiPaused: false,
+        aiPausedUntil: null,
+        aiPauseReason: null,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (err) {
+      console.warn('[humanHandover] Gagal sinkronisasi clear-snooze ke directMessages:', err.message);
+    }
   } catch (error) {
     console.warn('[humanHandover] Gagal menonaktifkan snooze:', error);
   }

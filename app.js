@@ -48,6 +48,7 @@ const { startFollowUpScheduler, updateSignalsOnIncomingMessage } = require('./sr
 const { isSnoozeActive, setSnoozeMode, clearSnoozeMode, getSnoozeInfo } = require('./src/ai/utils/humanHandover.js');
 const { handleAdminHpMessage, markBotMessage } = require('./src/ai/utils/adminMessageSync.js');
 const { backfillAdminMessages } = require('./scripts/backfillAdminMessages.js');
+const { backfillProfilePics } = require('./scripts/backfillProfilePics.js');
 const { getLangSmithCallbacks } = require('./src/ai/utils/langsmith.js');
 const { saveCustomerLocation } = require('./src/ai/utils/customerLocations.js');
 const { parseSenderIdentity } = require('./src/lib/utils.js');
@@ -2614,6 +2615,16 @@ server.listen(PORT, '0.0.0.0', async () => {
                     .catch(err => console.error('❌ [Backfill] Backfill failed:', err.message))
                     .finally(() => {
                         console.log('💡 [Backfill] Set RUN_ADMIN_BACKFILL=false to disable');
+                    });
+            }
+
+            if (process.env.RUN_PROFILE_PIC_BACKFILL === 'true') {
+                console.log('🖼️  [Backfill] Starting profile picture backfill...');
+                backfillProfilePics(client)
+                    .then(() => console.log('✅ [Backfill] Profile picture backfill complete'))
+                    .catch(err => console.error('❌ [Backfill] Profile pic backfill failed:', err.message))
+                    .finally(() => {
+                        console.log('💡 [Backfill] Set RUN_PROFILE_PIC_BACKFILL=false to disable');
                     });
             }
 
