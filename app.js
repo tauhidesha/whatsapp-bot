@@ -1554,6 +1554,7 @@ async function processBufferedMessages(senderNumber, client) {
                 console.log(`[ADMIN] 📋 Audit trigger detected: "${lowerMsg}"`);
                 const targetNumber = toSenderNumberWithSuffix(senderNumber);
                 const auditResponse = await startAudit(normalizedAddress);
+                markBotMessage(targetNumber, auditResponse);
                 await client.sendText(targetNumber, auditResponse);
                 if (db) {
                     await saveMessageToFirestore(senderNumber, combinedMessage, 'user');
@@ -1567,6 +1568,7 @@ async function processBufferedMessages(senderNumber, client) {
                 console.log(`[ADMIN] 📋 Audit resume trigger detected`);
                 const targetNumber = toSenderNumberWithSuffix(senderNumber);
                 const auditResponse = await handleResumeAudit(normalizedAddress);
+                markBotMessage(targetNumber, auditResponse);
                 await client.sendText(targetNumber, auditResponse);
                 if (db) {
                     await saveMessageToFirestore(senderNumber, combinedMessage, 'user');
@@ -1583,6 +1585,7 @@ async function processBufferedMessages(senderNumber, client) {
                 if (auditResponse !== null) {
                     // Audit handled the message
                     const targetNumber = toSenderNumberWithSuffix(senderNumber);
+                    markBotMessage(targetNumber, auditResponse);
                     await client.sendText(targetNumber, auditResponse);
                     if (db) {
                         await saveMessageToFirestore(senderNumber, combinedMessage, 'user');
@@ -1840,6 +1843,7 @@ function start(client) {
         try {
             // Zoya tidak bisa angkat telepon, kirim pesan otomatis yang ramah
             const message = "Waduh, maaf ya Mas, Zoya nggak bisa angkat telepon 😅.\n\nKetik aja pertanyaannya di sini, nanti Zoya bantu jawab kok! 👇";
+            markBotMessage(call.peerJid, message);
             await client.sendText(call.peerJid, message);
         } catch (e) {
             console.error('[CALL] Error handling incoming call:', e);
@@ -2162,6 +2166,7 @@ app.post('/send-message', async (req, res) => {
             }
 
             const targetNumber = identity.normalizedAddress || toSenderNumberWithSuffix(number);
+            markBotMessage(targetNumber, finalMessage);
             await global.whatsappClient.sendText(targetNumber, finalMessage);
             await saveMessageToFirestore(targetNumber, finalMessage, 'admin');
             console.log(`[API] Successfully sent WhatsApp message to ${targetNumber}`);
