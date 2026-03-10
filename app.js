@@ -1696,7 +1696,7 @@ function start(client) {
         }
 
         // Save sender metadata
-        await saveSenderMeta(senderNumber, senderName);
+        await saveSenderMeta(senderNumber, senderName, client);
 
         let locationContext = null;
 
@@ -1934,7 +1934,9 @@ async function saveMessageToFirestore(senderNumber, message, senderType) {
     }
 }
 
-async function saveSenderMeta(senderNumber, displayName) {
+const fetchedProfilePics = new Set(); // Keep track of numbers we already fetched DP for
+
+async function saveSenderMeta(senderNumber, displayName, client = null) {
     if (!db) return;
 
     const { docId, channel, platformId } = parseSenderIdentity(senderNumber);
@@ -1942,16 +1944,33 @@ async function saveSenderMeta(senderNumber, displayName) {
         return;
     }
 
+    let profilePicUrl = null;
+    if (client && channel === 'whatsapp' && !fetchedProfilePics.has(senderNumber)) {
+        try {
+            profilePicUrl = await client.getProfilePicFromServer(senderNumber);
+            fetchedProfilePics.add(senderNumber); // Mark as fetched for this session
+        } catch (error) {
+            console.warn(`[ProfilePic] Gagal mengambil foto profil untuk ${senderNumber}:`, error.message);
+        }
+    }
+
     try {
         const metaRef = db.collection('directMessages').doc(docId);
-        await metaRef.set({
+        
+        const updateData = {
             name: displayName,
             channel,
             platform: channel,
             platformId: platformId || docId,
             fullSenderId: senderNumber,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        }, { merge: true });
+        };
+
+        if (profilePicUrl) {
+            updateData.profilePicUrl = profilePicUrl;
+        }
+
+        await metaRef.set(updateData, { merge: true });
     } catch (error) {
         console.error('Error saving sender meta:', error);
     }
