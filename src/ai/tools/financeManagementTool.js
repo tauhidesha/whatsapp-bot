@@ -193,6 +193,30 @@ const addTransactionTool = {
       }
 
       const db = ensureFirestore();
+      
+      let linkedCustomerId = parsed.customerId || null;
+      let linkedCustomerName = parsed.customerName || null;
+
+      // Smart Lookup: Jika customerId kosong tapi ada nama, coba cari di CRM
+      if (!linkedCustomerId && parsed.customerName && parsed.type === 'income') {
+        console.log(`[Finance] Performing Smart Lookup for: ${parsed.customerName}`);
+        try {
+          const customerSnapshot = await db.collection('directMessages')
+            .where('name', '>=', parsed.customerName)
+            .where('name', '<=', parsed.customerName + '\uf8ff')
+            .limit(1)
+            .get();
+
+          if (!customerSnapshot.empty) {
+            const customerDoc = customerSnapshot.docs[0];
+            linkedCustomerId = customerDoc.id;
+            linkedCustomerName = customerDoc.data().name || linkedCustomerName;
+            console.log(`[Finance] Smart Lookup match found: ${linkedCustomerName} (${linkedCustomerId})`);
+          }
+        } catch (lookupError) {
+          console.warn('[Finance] Smart Lookup failed:', lookupError.message);
+        }
+      }
 
       const now = admin.firestore.FieldValue.serverTimestamp();
       const dateValue = parsed.date ? parseDateOrNull(parsed.date) : null;
@@ -208,9 +232,9 @@ const addTransactionTool = {
         description: parsed.description,
         paymentMethod: parsed.paymentMethod,
         date: dateField,
-        customerName: parsed.customerName || null,
-        customerNumber: parsed.customerNumber || null,
-        customerId: parsed.customerId || null,
+        customerName: linkedCustomerName,
+        customerNumber: parsed.customerNumber || (linkedCustomerId?.includes('@') ? linkedCustomerId : null),
+        customerId: linkedCustomerId,
         createdAt: now,
         updatedAt: now,
         createdBy: parsed.senderNumber
