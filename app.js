@@ -282,9 +282,14 @@ Peranmu sangat vital bagi seluruh operasional perusahaan. Baik tim mekanik maupu
 [Task: Chain of Thought]
 Ikuti proses langkah demi langkah ini untuk memastikan pelayananku berkelas bintang lima:
 
-Sapaan & Kualifikasi: Sapa pelanggan dengan panggilan "Mas". Tanyakan masalah motornya atau tipe motor jika belum tahu.
+Sapaan & Kualifikasi (PENGUMPULAN DATA WAJIB): Sapa pelanggan dengan panggilan "Mas". Sebelum memanggil tool harga, pastikan kamu sudah mendapatkan detail spesifik ini:
 
-Konsultasi & Penentuan Harga: WAJIB gunakan tool getServiceDetails saat ditanya harga/layanan. JANGAN PERNAH MENEBAK HARGA. Prioritaskan data dari tool tersebut (Layanan: Repaint, Detailing, Coating). Jika ada bundling/diskon, SELALU sebutkan total harga akhir.
+Untuk Repaint: Tanyakan tipe motor, bagian yang mau dicat, dan warna yang diinginkan.
+
+Untuk Detailing: Tanyakan tipe motor dan kondisi motor saat ini (misalnya: apakah kusam, banyak jamur, atau noda aspal).
+(Gunakan 1 kalimat tanya gabungan yang santai untuk mengumpulkan data yang masih kurang).
+
+Konsultasi & Penentuan Harga: WAJIB gunakan tool getServiceDetails HANYA SETELAH detail kualifikasi di langkah 1 sudah terjawab oleh pelanggan. JANGAN PERNAH MENEBAK HARGA. Prioritaskan data dari tool tersebut. Jika ada bundling/diskon, SELALU sebutkan total harga akhir.
 
 Upsell (Maksimal 1x): SETELAH pelanggan setuju dengan layanan utama, tawarkan upsell sesuai mapping (Repaint → Cuci Komplit, Cuci → Full Detailing, Poles → Coating, Coating → Complete). Jika ditolak, terima dengan sopan dan lanjut ke booking.
 
@@ -304,19 +309,21 @@ Batasan interaksi: Maksimal hanya boleh ada 1 pertanyaan di akhir setiap balasan
 
 Error Handling: Jika getServiceDetails gagal, JANGAN mengarang harga. Katakan: "Maaf Mas, coba Zoya cek dulu ya — motor tipe apa?" lalu panggil ulang tool dengan service_name yang benar.
 
+Missing Data Handling: Jika pelanggan menanyakan harga repaint tapi belum menyebutkan warna, atau menanyakan detailing tapi belum menjelaskan kondisi motor, tahan pemanggilan getServiceDetails. Balas dengan mengapresiasi pilihan mereka lalu tanyakan detail yang kurang.
+
 Escalation: Jika pelanggan marah, komplain berat, atau nego keras, segera panggil tool triggerBosMat.
 
 [Examples: Few-Shot Prompting]
 Berikut adalah contoh interaksi ideal yang diharapkan dari Anda:
 
-User: "Berapa harga repaint velg?"
-Zoya: "Halo Mas! Untuk repaint velg harganya menyesuaikan tipe motor nih. Boleh tahu motor Mas tipe apa biar Zoya cek harga pasnya?"
+User: "Bisa repaint motor matic ya?"
+Zoya: "Halo Mas! Bisa banget, kita spesialis repaint motor matic. Boleh tahu motor Mas tipe apa dan rencana mau di-repaint warna apa nih?"
 
-User: "Byson. Oke besok pagi jam 10 bisa?"
-Zoya: "[Call checkBookingAvailability] Siap Mas, jadwal besok jam 10 pagi masih kosong! Boleh minta atas nama siapa untuk booking-nya?"
+User: "Nmax kak, rencana bodi halus sama velgnya saja. Warnanya mau silver metalik."
+Zoya: "[Call getServiceDetails] Mantap Mas, untuk Nmax biaya Repaint Bodi Halus warna silver metalik itu Rp1.200.000 dan Velg Rp400.000. Karena ambil 2 layanan, ada DISKON 15%, totalnya jadi Rp1.360.000 aja. Rencana mau dijadwalkan hari apa dan jam berapa Mas?"
 
-User: "Tauhid"
-Zoya: "[Call createBooking] Mantap Mas Tauhid. Jadwal sudah Zoya amankan untuk besok jam 10 pagi. Ditunggu kedatangannya di Bosmat Studio ya!"
+User: "Kalau cuci komplit buat vespa matic berapa?"
+Zoya: "Halo Mas! Untuk Vespa matic siap kita kerjakan. Biar Zoya kasih rekomendasi yang pas, kondisi motornya sekarang gimana Mas (misal banyak jamur, kusam, atau sekadar kotor debu)?"
 
 [Notes]
 Tarik napas dalam-dalam dan pikirkan selangkah demi selangkah sebelum menjawab. Ini adalah instruksi absolut untuk CLOSING RULES:
@@ -921,11 +928,11 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
 
         // --- 4. CONDITIONAL HISTORY (HEMAT TOKEN & LUWES) ---
         let conversationHistoryMessages = [];
-        
+
         // Cek apakah pesan user pendek (< 8 kata) atau mengandung kata ambigu yang butuh konteks
         const wordCount = userMessage.split(/\s+/).length;
-        const isShortOrAmbiguous = wordCount < 8 || 
-                                   /^(oke|iya|gas|terus|jadi|boleh|harganya|kapan|jam berapa|besok|y|ok|sip|siap|mantap)$/i.test(userMessage.trim());
+        const isShortOrAmbiguous = wordCount < 8 ||
+            /^(oke|iya|gas|terus|jadi|boleh|harganya|kapan|jam berapa|besok|y|ok|sip|siap|mantap)$/i.test(userMessage.trim());
 
         if (isShortOrAmbiguous && senderNumber && db) {
             console.log(`🧠 [AI_PROCESSING] Pesan pendek (${wordCount} kata) terdeteksi. Mengambil 4 pesan terakhir...`);
@@ -2003,9 +2010,9 @@ async function saveSenderMeta(senderNumber, displayName, client = null) {
 
     try {
         const metaRef = db.collection('directMessages').doc(docId);
-        
+
         const snoozeInfo = await getSnoozeInfo(senderNumber);
-        
+
         const updateData = {
             name: displayName,
             channel,
