@@ -80,6 +80,17 @@ Daftar harga di bawah ini adalah **HARGA TETAP (FIX)** per model motor untuk pen
 
 ---
 
+## 6. SPOT REPAIR (PER TITIK)
+*Solusi praktis untuk lecet/baret tanpa cat full panel.*
+
+| Layanan | Harga Mulai | Estimasi |
+| :--- | :--- | :--- |
+| **Spot Repair** | Rp 75.000 - Rp 150.000 | 1 - 2 Hari Kerja |
+
+*Harga final tergantung pada jenis warna (solid/candy/dll) dan tingkat kerusakan bodi.*
+
+---
+
 ## ⚠️ SYARAT & KETENTUAN
 1. Harga di atas adalah **Harga TETAP (FIX)** untuk Body Halus dalam kondisi normal.
 2. Kerusakan parah (pecah/penyok) akan dikenakan biaya Jasa Repair tambahan via kesepakatan.
