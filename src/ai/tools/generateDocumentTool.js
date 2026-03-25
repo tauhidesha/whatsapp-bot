@@ -41,7 +41,8 @@ const generateDocumentTool = {
           amountPaid: { type: 'number', description: 'Jumlah yang sudah dibayar. Isi 0 jika belum bayar. Isi sebagian jika DP. Isi sama dengan total jika Lunas.' },
           paymentMethod: { type: 'string', description: 'Metode pembayaran (Transfer, Tunai, QRIS).' },
           notes: { type: 'string', description: 'Catatan tambahan (keluhan, kondisi fisik, dll).' },
-          senderNumber: { type: 'string', description: 'Nomor pengirim (otomatis diisi sistem).' }
+          senderNumber: { type: 'string', description: 'Nomor pengirim (otomatis diisi sistem).' },
+          recipientNumber: { type: 'string', description: 'Nomor penerima dokumen (jika beda dari pengirim, misal kirim ke customer). Format: 628xxx@c.us' }
         },
         required: ['documentType', 'senderNumber']
       }
@@ -57,8 +58,11 @@ const generateDocumentTool = {
       amountPaid = 0,
       paymentMethod = '-',
       notes = '-',
-      senderNumber
+      senderNumber,
+      recipientNumber
     } = input;
+
+    const targetRecipient = recipientNumber || senderNumber;
 
     // 1. Security Check: Pastikan yang request adalah Admin
     if (!isAdmin(senderNumber)) {
@@ -401,10 +405,10 @@ const generateDocumentTool = {
     if (global.whatsappClient) {
       try {
         await global.whatsappClient.sendFile(
-          senderNumber,
+          targetRecipient,
           filePath,
           filename,
-          `Berikut dokumen *${title}* yang diminta.`
+          `Berikut dokumen *${title}* untuk Anda.`
         );
 
         // Cleanup: Hapus file temp setelah dikirim

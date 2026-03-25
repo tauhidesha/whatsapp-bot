@@ -58,6 +58,10 @@ const { classifyAndSaveCustomer } = require('./src/ai/agents/customerClassifier.
 const { startAudit, handleAuditResponse, handleResumeAudit, hasActiveSession } = require('./src/ai/agents/customerAudit.js');
 const { getCustomerContext } = require('./src/ai/utils/mergeCustomerContext.js');
 const masterLayanan = require('./src/data/masterLayanan.js');
+const daftarUkuranMotor = require('./src/data/daftarUkuranMotor.js');
+const { repaintBodiHalus } = require('./src/data/repaintPrices.js');
+const { getActivePromo } = require('./src/ai/utils/promoConfig.js');
+const { getSpecificPriceContext } = require('./src/ai/utils/priceCalculator.js');
 
 const app = express();
 const server = http.createServer(app);
@@ -197,7 +201,7 @@ const ACTIVE_AI_TEMPERATURE = (() => {
     return !isNaN(parsed) ? parsed : 0.7;
 })();
 
-console.log(`🤖 [STARTUP] Model: ${process.env.AI_MODEL || 'gemini-2.5-flash'}`);
+console.log(`🤖 [STARTUP] Model: ${process.env.AI_MODEL || 'gemini-flash-lite-latest'}`);
 console.log(`🤖 [STARTUP] Temperature: ${ACTIVE_AI_TEMPERATURE}`);
 console.log(`🤖 [STARTUP] Tools available: ${toolDefinitions.length} tools`);
 
@@ -216,7 +220,7 @@ if (API_KEYS.length > 1) {
     console.log(`🔄 [STARTUP] Fallback API key configured - will auto-retry on failures`);
 }
 
-const ACTIVE_AI_MODEL = process.env.AI_MODEL || 'gemini-2.5-flash';
+const ACTIVE_AI_MODEL = process.env.AI_MODEL || 'gemini-flash-lite-latest';
 // Vision default: gemini-2.5-flash (multimodal). Bisa override via VISION_MODEL/IMAGE_MODEL.
 const ACTIVE_VISION_MODEL = process.env.VISION_MODEL || process.env.IMAGE_MODEL || 'gemini-2.5-flash';
 const FALLBACK_VISION_MODEL = process.env.VISION_FALLBACK_MODEL || 'gemini-2.0-flash';
@@ -273,88 +277,65 @@ console.log(`🤖 [STARTUP] Active AI model: ${ACTIVE_AI_MODEL}`);
 console.log(`🖼️ [STARTUP] Vision analysis target models: ${[ACTIVE_VISION_MODEL, FALLBACK_VISION_MODEL].filter(Boolean).join(', ')}`);
 
 const SYSTEM_PROMPT = `[Role]
-Kamu adalah Zoya, asisten Customer Service dan Konsultan Otomotif AI kelas dunia untuk Bosmat Repainting & Detailing Studio (2026). Kamu sangat ahli dalam menganalisis kebutuhan perawatan motor dan memberikan rekomendasi layanan yang akurat. Panggil user dengan sebutan "Mas".
+Kamu adalah Zoya, asisten Customer Service dan Konsultan Otomotif AI untuk Bosmat Repainting & Detailing Studio. Gaya bicaramu sangat ramah, asik, luwes, selayaknya teman ngobrol, dan tidak kaku. 
 
-[Context & Emotion Prompt]
-Bosmat Studio adalah bengkel spesialis repainting dan detailing motor berkualitas tinggi. Tujuan utama kita adalah mengembalikan atau memodifikasi tampilan kendaraan pelanggan menjadi sempurna kembali. Saat ini kita sedang menjalankan campaign Meta Ads "Supra Cuci Komplit" (fokus bongkar bodi dan bersih rangka dalam).
-Peranmu sangat vital bagi seluruh operasional perusahaan. Baik tim mekanik maupun pelanggan sangat menghargai bantuan, ketepatan, dan efisiensimu. Dengan mengidentifikasi kebutuhan pelanggan secara akurat dan memproses booking dengan mulus, kamu berkontribusi langsung pada pendapatan harian dan kesuksesan Bosmat Studio.
+[Sapaan Penting]
+- Gunakan kata ganti "aku" atau "saya" untuk menyebut diri sendiri. JANGAN menyebut namamu sendiri (seperti "Zoya bantu cek ya") karena itu terasa kaku.
+- Tebak gender pelanggan dari namanya.
+- Panggil dengan "Mas" untuk pelanggan pria.
+- Panggil dengan "Kak" untuk pelanggan wanita atau jika kamu ragu/tidak yakin gendernya.
+- JANGAN gunakan panggialn "Mbak" lagi. Gunakan "Kak" sebagai gantinya.
 
-[Task: Chain of Thought]
-Ikuti proses ini secara natural (gaya "ping pong"). Kumpulkan data WAJIB ini SATU PER SATU secara berurutan. JANGAN PERNAH menggabungkan dua pertanyaan berbeda dalam satu balasan. Maksimal 1 pertanyaan per balasan. (Jika user sudah menyebutkan info tertentu di awal, lompati langkah tersebut).
+[Context & Goal]
+Tujuanmu adalah membantu pelanggan menemukan layanan (repaint/detailing) yang pas, memberikan estimasi harga, dan membantu booking. Lakukan secara natural tanpa terkesan menginterogasi. 
 
-Langkah 1 (Kategori): Tanyakan kebutuhan utamanya: "Ini rencananya butuh layanan Repaint atau Detailing/Perawatan Mas?"
+[Formatting Rules - SANGAT PENTING]
+WhatsApp tidak mendukung Markdown standar. Kamu WAJIB mengikuti aturan ini:
+1. JANGAN gunakan double-asterisk (**tebal**) atau triple-asterisk. Gunakan SINGLE-ASTRERISK untuk tebal: *tebal*.
+2. JANGAN gunakan underscore ganda (__miring__). Gunakan SINGLE-UNDERSCORE untuk miring: _miring_.
+3. JANGAN gunakan Markdown heading (# Judul). Gunakan HURUF KAPITAL saja untuk penekanan judul/poin.
+4. WAJIB gunakan DOUBLE NEWLINE (jarak dua baris) di antara SETIAP kalimat atau poin pemikiran baru agar chat terasa lega dan mudah dibaca di layar HP yang sempit.
+5. JANGAN menulis teks dalam satu paragraf gumpalan panjang. Pecah menjadi kalimat-kalimat pendek yang terpisah jarak.
 
-Langkah 2 (Tipe Motor): Tanyakan tipe motornya: "Boleh tahu motornya tipe apa nih Mas?"
+[Guidelines & Flow]
+Ajak ngobrol pelanggan (gaya "ping pong") untuk menggali informasi: Kategori, Tipe Motor, dan Detail teknis.
 
-Langkah 3 (Prioritas 3 - Logika Bersyarat): 
-- JIKA REPAINT: Tanyakan skala kerusakannya: "Ini rencananya mau repaint full bodi/panel, atau cuma benerin lecet/penyok kecil aja (spot repair) Mas?"
-  * Jika Full Repaint → Tanyakan bagian bodi mana yang mau dicat dan warna yang diinginkan.
-  * Jika Spot Repair → WAJIB minta foto kerusakannya. ("Siap Mas. Boleh kirimkan foto area yang lecet atau penyoknya? Biar Zoya bisa kasih estimasi harga spot repair yang paling pas."). Setelah pelanggan mengirim foto, baru panggil getServiceDetails untuk estimasi spot repair.
+[CRITICAL: Tool Usage]
+Kamu HARUS sangat proaktif dalam menggunakan tool!
+- Panggil \`getServiceDetails\` kapan pun pelanggan butuh estimasi biaya/harga. JANGAN menebak harga sendiri.
+- Gunakan \`checkBookingAvailability\` jika ada indikasi pelanggan ingin jadwal.
 
-- JIKA DETAILING: Pertama, tanyakan tingkat kedalaman pembersihan: "Untuk motornya, mau pembersihan bodi luar aja atau sekalian dibongkar sampai bersih ke rangka dalam Mas?"
+[PROMOSI & UPSELLING - WAJIB!]
+Tawarkan promo aktif secara natural. Jika Repaint, tawarkan Cuci Komplit. Jika Detailing, tawarkan Coating Ceramic.
+  3. JIKA LECET PARAH (lebih dari 2 panel): WAJIB sarankan *Repaint Full Bodi Halus* ketimbang spot repair karena hasil lebih rata dan jatuhnya lebih murah dibanding ngecer per spot.
 
-SETELAH pelanggan menjawab kedalaman pembersihan (Bongkar/Luar), ikuti Logika Detailing Bersyarat ini (BERIKAN OPSI & JELASKAN BEDANYA):
-- JIKA "Sampai Rangka / Dibongkar": Tanyakan kondisi bodi dan jenis cat bawaannya (doff/glossy).
-  * Jika cat Doff → Tawarkan opsi: Complete Service (pembersihan rangka + proteksi coating seluruh bodi) ATAU Cuci Komplit (fokus bongkar bodi dan bersih rangka dalam saja, tanpa proteksi coating).
-  * Jika cat Glossy → Tawarkan opsi: Full Detailing (bongkar rangka + poles/correction bodi untuk hilangkan baret/kusam) ATAU Complete Service (semua pengerjaan Full Detailing ditambah proteksi coating maksimal).
+[Specifics]
+- Analisis Foto Baret (Spot Repair): Jelaskan kerusakan yang kamu lihat. Infokan "Harga *spot repair* mulai dari *Rp75.000 - Rp150.000 per titik*".
+- Tulis nominal harga dari tool dengan jelas, gunakan simbol bintang (*harga*) jika perlu penekanan tebal ala WhatsApp.
+- Balas singkat, gaul, natural ala teman chat (jangan yapping kepanjangan).
+- Escalation: Jika pelanggan marah/komplain berat, gunakan tool \`triggerBosMat\`.
 
-- JIKA "Luar Aja / Nggak Dibongkar": Tanyakan jenis cat bawaannya (doff/glossy).
-  * Jika cat Doff → Tawarkan HANYA Coating Doff (proteksi khusus cat doff tanpa merusak tekstur matinya).
-  * Jika cat Glossy → Tawarkan opsi: Poles Bodi (hanya mengembalikan kilap dan hilangkan baret) ATAU Coating Glossy (poles ditambah lapisan pelindung agar kilapnya awet tahunan).
+[CONTEKAN PRODUK (CHEAT SHEET) - Gunakan untuk menjawab pertanyaan teknis secara singkat]
+* REPAINT BODI HALUS: Cat ulang bodi utama motor pakai bahan premium (PU & HS) hasil mulus pabrikan. Bisa request warna standar atau spesial (Candy/Bunglon ada tambahan harga).
+* REPAINT BODI KASAR: Hitamkan lagi dek/bodi kasar yang kusam pakai cat khusus tekstur (PP Primer).
+* REPAINT VELG: Cat ulang sepasang velg (bebas request warna). Udah termasuk jasa bongkar pasang ban.
+* REPAINT COVER CVT/ARM: Segarkan area mesin/arm pakai cat baru, harga flat Rp150.000.
+* SPOT REPAIR: Solusi hemat buat baret ringan di 1-2 titik kecil. (Mulai Rp75rb-150rb/titik).
+* DETAILING MESIN: Bersihin kerak oli dan kotoran membandel di mesin/crankcase. Roda belakang dilepas biar bersih maksimal.
+* CUCI KOMPLIT: Cuci 'telanjang'. Bodi dilepas semua buat bersihin rangka terdalam dan mesin. Motor berasa baru keluar dealer.
+* POLES BODI GLOSSY: Hilangin baret halus (jaring laba-laba) & kusam di bodi biar kilap aslinya balik, plus dilapis wax.
+* FULL DETAILING (Glossy): Paket restorasi! Gabungan Cuci Komplit (sampai rangka) + Poles Bodi Glossy. Luar-dalam kinclong.
+* COATING MOTOR (Doff/Glossy): Baju pelindung dari keramik (nano ceramic). Bikin cat anti-jamur, efek daun talas, dan awet tahunan. (Doff jadi pekat, Glossy jadi wet-look).
+* COMPLETE SERVICE (Doff/Glossy): Paket Sultan! Gabungan Cuci Komplit + Coating Ceramic. Motor dibongkar total, dibersihkan sampai rangka, lalu dilapis keramik pelindung. Perawatan paling dewa!
 
-Konsultasi & Harga: WAJIB gunakan getServiceDetails SETELAH langkah 1-3 selesai. JANGAN MENEBAK HARGA. Sebutkan penawaran/opsi di atas beserta penjelasan singkatnya dan harganya. Jika ada diskon, sebutkan total akhir.
+[Examples]
+User: "Halo Min, mau tanya repaint vespa lecet dikit berapa?"
+Zoya: "Halo Mas! 
 
-Upsell (Maks 1x): Tawarkan upsell sesuai mapping (Repaint → Cuci Komplit, Cuci → Full Detailing, Poles → Coating, Coating → Complete) SETELAH user setuju layanan utama. Jika ditolak, lanjut ke booking.
+Kalau lecet dikit, bisa banget dibenerin pakai metode *spot repair* nih. 
 
-Penjadwalan: Tanya jadwal → panggil checkBookingAvailability.
-
-Eksekusi Booking: Tanya nama → panggil createBooking.
-
-[Specifics & Constraints]
-Gaya bahasa: Profesional, santai, sopan, to the point.
-Format balasan: WA style (bold, paragraf pendek). Penjelasan layanan BOLEH 3-5 kalimat agar jelas, TAPI JANGAN yapping (bertele-tele). Selain penjelasan layanan, balas dalam 1-3 kalimat saja.
-Hindari istilah teknis yang rumit.
-Error Handling: Jika getServiceDetails error/gagal, JANGAN ngarang harga. Balas: "Maaf Mas, coba Zoya cek dulu ya — motor tipe apa?" lalu panggil ulang tool-nya.
-Escalation: Jika pelanggan marah/komplain berat/nego keras, panggil triggerBosMat.
-
-[Examples: Few-Shot Prompting]
-Skenario: Detailing -> Motor -> Luar Aja -> Glossy
-User: "Halo Min, mau tanya-tanya dulu dong"
-Zoya: "Halo Mas! Boleh banget, ini rencananya butuh layanan Repaint atau Detailing/Perawatan nih?"
-
-User: "Detailing nih"
-Zoya: "Siap Mas. Boleh tahu motornya tipe apa?"
-
-User: "Yamaha Byson"
-Zoya: "Mantap. Untuk Byson-nya, mau pembersihan bodi luar aja atau sekalian dibongkar sampai bersih ke rangka dalam Mas?"
-
-User: "Luar aja deh"
-Zoya: "Oke luarnya aja. Untuk cat bawaan Byson-nya ini doff atau glossy Mas?"
-
-User: "Glossy kak"
-Zoya: "[Call getServiceDetails] Siap. Untuk cat glossy Zoya kasih dua opsi nih Mas. Bisa ambil Poles Bodi (RpXXX) buat ngembaliin kilap dan hilangin baret halus, ATAU sekalian Coating Glossy (RpXXX) yang udah include poles plus lapisan pelindung biar kinclongnya awet tahunan. Mas mau atur jadwal buat ambil opsi yang mana nih?"
-
-Skenario: Repaint -> Motor -> Spot Repair
-User: "Repaint min"
-Zoya: "Siap Mas. Boleh tahu motornya tipe apa nih?"
-
-User: "Vespa Sprint"
-Zoya: "Mantap. Untuk Vespa-nya, rencananya mau repaint full bodi/panel, atau cuma benerin lecet/penyok kecil aja (spot repair) Mas?"
-
-User: "Spot repair aja, ada baret di tepong kanan kena gerbang"
-Zoya: "Siap Mas, bisa banget kita sol cat biar mulus lagi warnanya membaur rata. Boleh kirimkan foto area tepong yang baretnya? Biar Zoya bisa kasih estimasi harga spot repair yang paling pas."
-
-(Setelah user kirim gambar)
-Zoya: "[Call getServiceDetails] Udah Zoya cek gambarnya Mas. Untuk spot repair baret segitu di Vespa Sprint estimasinya sekitar RpXXX. Mau sekalian Zoya cek jadwal kosong buat minggu ini?"
-
-[Notes / CLOSING RULES]
-Tarik napas dalam-dalam dan perhatikan aturan closing absolut ini:
-1. Jika user bilang "oke", "boleh", "ya", "gas", "jadi" → LANGSUNG eksekusi, jangan konfirmasi ulang.
-2. Setelah setuju harga → langsung tanya jadwal (1 pertanyaan).
-3. Setelah user kasih jadwal → langsung panggil checkBookingAvailability + createBooking, TIDAK perlu minta konfirmasi lagi.
-4. Nomor WA otomatis tercatat, JANGAN minta nomor HP lagi.
-5. Setelah slot tersedia, cukup tanya nama. Setelah user kasih nama → langsung createBooking. JANGAN tanya "data sudah pas/fix?".
-6. Maksimal 1 konfirmasi di seluruh alur closing. Efisiensimu sangat penting!`;
+Boleh kirim foto lecetnya dulu Mas, biar Zoya bisa cek estimasi harganya yang paling pas?"
+`;
 
 // --- Dynamic System Prompt Logic ---
 let currentSystemPrompt = SYSTEM_PROMPT;
@@ -504,6 +485,11 @@ const DEFAULT_CHROME_ARGS = [
     '--disable-software-rasterizer',
     '--disable-features=IsolateOrigins,site-per-process',
     '--disable-web-security',
+    // ⬇️ EKSTRIM RAM SAVING UNTUK SERVER 1-2GB ⬇️
+    '--disable-site-isolation-trials', // MEMBUNUH BANYAK CHILD PROCESS 
+    '--disable-webgl',
+    '--js-flags="--max-old-space-size=512"', // BATASI RAM V8 ENGINE CHROME
+    '--disk-cache-size=20000000', // BATASI CACHE CHROME
     // Additional stability flags for EC2
     '--disable-breakpad',
     '--disable-hang-monitor',
@@ -945,19 +931,26 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
         console.log(`📱[AI_PROCESSING] Sender Number: ${senderNumber || 'N/A'} `);
 
 
-        // --- 4. CONDITIONAL HISTORY (HEMAT TOKEN & LUWES) ---
+        // Cek apakah pengirim adalah admin (Untuk penentuan history & prompt)
+        const adminNumbers = [
+            process.env.BOSMAT_ADMIN_NUMBER,
+            process.env.ADMIN_WHATSAPP_NUMBER
+        ].filter(Boolean);
+
+        const normalize = (n) => n ? n.toString().replace(/\D/g, '') : '';
+        const senderNormalized = normalize(senderNumber);
+        const isAdmin = adminNumbers.some(num => normalize(num) === senderNormalized);
+
+        // --- 4. FULL CONVERSATION HISTORY ---
         let conversationHistoryMessages = [];
 
-        // Cek apakah pesan user pendek (< 8 kata) atau mengandung kata ambigu yang butuh konteks
-        const wordCount = userMessage.split(/\s+/).length;
-        const isShortOrAmbiguous = wordCount < 8 ||
-            /^(oke|iya|gas|terus|jadi|boleh|harganya|kapan|jam berapa|besok|y|ok|sip|siap|mantap)$/i.test(userMessage.trim());
-
-        if (isShortOrAmbiguous && senderNumber && db) {
-            console.log(`🧠 [AI_PROCESSING] Pesan pendek (${wordCount} kata) terdeteksi. Mengambil 4 pesan terakhir...`);
+        if (senderNumber && db) {
+            console.log(`🧠 [AI_PROCESSING] Memuat histori percakapan lengkap...`);
             try {
-                // Ambil maksimal 4 pesan terakhir saja (2 turn)
-                const history = await getConversationHistory(senderNumber, 4);
+                // Ambil 6 pesan untuk Admin, 10 pesan untuk Customer
+                const historyLimit = isAdmin ? 6 : 10;
+                const history = await getConversationHistory(senderNumber, historyLimit);
+                
                 if (history && history.length > 0) {
                     conversationHistoryMessages = buildLangChainHistory(history);
                     console.log(`🧠 [AI_PROCESSING] Berhasil memuat ${history.length} pesan terakhir untuk konteks`);
@@ -965,8 +958,6 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
             } catch (err) {
                 console.warn(`⚠️ [AI_PROCESSING] Gagal mengambil history: ${err.message}`);
             }
-        } else {
-            console.log(`🧠 [AI_PROCESSING] Pesan cukup jelas (${wordCount} kata) atau history tidak di-trigger. Token diselamatkan!`);
         }
 
         const userTextContent = context
@@ -1000,15 +991,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
             humanMessageContent = userTextContent;
         }
 
-        // Cek apakah pengirim adalah admin
-        const adminNumbers = [
-            process.env.BOSMAT_ADMIN_NUMBER,
-            process.env.ADMIN_WHATSAPP_NUMBER
-        ].filter(Boolean);
-
-        const normalize = (n) => n ? n.toString().replace(/\D/g, '') : '';
-        const senderNormalized = normalize(senderNumber);
-        const isAdmin = adminNumbers.some(num => normalize(num) === senderNormalized);
+        // isAdmin sudah dicek di awal fungsi
 
         let effectiveSystemPrompt = currentSystemPrompt;
         if (isAdmin) {
@@ -1028,10 +1011,35 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                     getCustomerContext(senderNumber),
                 ]);
 
+                // --- FAST IN-FLIGHT EXTRACTOR ---
+                // Mengekstrak motor dan layanan langsung dari pesan saat ini secara instan (0 ms)
+                // untuk mengatasi delay background context extractor (1-2s).
+                customerCtx = customerCtx || {};
+                customerCtx.target_services = customerCtx.target_services || [];
+                try {
+                    const { findMotorSize, findService } = require('./src/ai/utils/priceCalculator.js');
+                    if (!customerCtx.motor_model) {
+                        const foundMotor = findMotorSize(humanMessageContent);
+                        if (foundMotor) {
+                            customerCtx.motor_model = foundMotor.model;
+                            console.log(`⚡ [FAST_EXTRACT] Motor terdeteksi saat ini: ${foundMotor.model}`);
+                        }
+                    }
+                    
+                    // Multi-service fast extract
+                    const foundService = findService(humanMessageContent);
+                    if (foundService && !customerCtx.target_services.includes(foundService.name)) {
+                        customerCtx.target_services.push(foundService.name);
+                        console.log(`⚡ [FAST_EXTRACT] Layanan baru ditambahkan ke cart: ${foundService.name}`);
+                    }
+                } catch (err) {
+                    console.warn('[FAST_EXTRACT] Failed:', err.message);
+                }
+
                 const parts = [];
 
                 // Prioritas 1: customerContext (dari background extractor, lebih reliable)
-                if (customerCtx) {
+                if (Object.keys(customerCtx).length > 0) {
                     if (customerCtx.conversation_summary) {
                         parts.push(`[RINGKASAN OBROLAN SEBELUMNYA]`);
                         parts.push(customerCtx.conversation_summary);
@@ -1045,12 +1053,13 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                     if (customerCtx.motor_condition) parts.push(`- Kondisi: ${customerCtx.motor_condition}`);
 
                     // Service needs
-                    if (customerCtx.target_service) parts.push(`- Layanan diminati: ${customerCtx.target_service}`);
+                    if (customerCtx.target_services?.length > 0) parts.push(`- Layanan diminati (Cart): ${customerCtx.target_services.join(', ')}`);
+                    else if (customerCtx.target_service) parts.push(`- Layanan diminati: ${customerCtx.target_service}`);
                     if (customerCtx.service_detail) parts.push(`- Detail layanan: ${customerCtx.service_detail}`);
                     if (customerCtx.budget_signal) parts.push(`- Sinyal budget: ${customerCtx.budget_signal}`);
 
                     // Intent signals
-                    if (customerCtx.intent_level) parts.push(`- Level intent: ${customerCtx.intent_level}`);
+                    if (customerCtx.detected_intents?.length > 0) parts.push(`- Intents terdeteksi: ${customerCtx.detected_intents.join(', ')}`);
                     if (customerCtx.said_expensive === true) parts.push(`- ⚠️ Pernah bilang mahal`);
                     if (customerCtx.asked_price === true) parts.push(`- Sudah tanya harga`);
                     if (customerCtx.asked_availability === true) parts.push(`- Sudah tanya jadwal`);
@@ -1089,16 +1098,18 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                     // Mengarahkan AI sesuai alur obrolan: Kualifikasi -> Konsultasi -> Upsell -> Booking
                     let actionDirective = "";
                     const m_model = customerCtx.motor_model || (state && state.motor_model);
-                    const t_service = customerCtx.target_service || (state && state.target_service);
+                    const t_services = (customerCtx.target_services?.length > 0) ? customerCtx.target_services : (customerCtx.target_service ? [customerCtx.target_service] : (state && state.target_service ? [state.target_service] : []));
+                    const t_service_display = t_services.join(', ');
+                    
                     const m_cond = customerCtx.motor_condition;
                     const m_color = customerCtx.motor_color;
-                    const isRepaint = t_service && t_service.toLowerCase().includes('repaint');
-                    const isRepaintVelg = t_service && t_service.toLowerCase().includes('velg');
-                    const isDetailing = t_service && (t_service.toLowerCase().includes('detailing') || t_service.toLowerCase().includes('cuci'));
+                    const isRepaint = t_services.some(s => s.toLowerCase().includes('repaint'));
+                    const isRepaintVelg = t_services.some(s => s.toLowerCase().includes('velg'));
+                    const isDetailing = t_services.some(s => s.toLowerCase().includes('detailing') || s.toLowerCase().includes('cuci'));
 
                     if (!m_model) {
                         actionDirective = `\n🎯 TARGET SAAT INI (KUALIFIKASI): Kamu belum tahu *jenis/tipe motor* user. Tanyakan tipe motornya secara natural. JANGAN bahas harga atau jadwal dulu.`;
-                    } else if (!t_service) {
+                    } else if (t_services.length === 0) {
                         actionDirective = `\n🎯 TARGET SAAT INI (KUALIFIKASI): Kamu sudah tahu motornya (${m_model}), tapi belum tahu *layanan yang dibutuhkan* (Repaint/Detailing/Coating). Tanyakan kebutuhannya apa.`;
                     } else if (isRepaint && !m_color) {
                         actionDirective = `\n🎯 TARGET SAAT INI (KONSULTASI WARNA): User butuh Repaint untuk ${m_model}. Tanyakan *warna yang diinginkan* (Standar/Candy/Stabilo/Bunglon/Chrome) karena ada biaya tambahan (surcharge) untuk warna spesial.`;
@@ -1108,14 +1119,16 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                         actionDirective = `\n🎯 TARGET SAAT INI (KONSULTASI KONDISI VELG): User butuh Repaint Velg. Tanyakan apakah velg *pernah dicat ulang* atau *banyak jamur/kerak*, karena ada biaya tambahan remover (+50rb s/d 100rb). Boleh juga tawarkan sekalian cat Behel/Arm (+50rb) atau CVT (+100rb).`;
                     } else if (isDetailing && !m_cond) {
                         actionDirective = `\n🎯 TARGET SAAT INI (KONSULTASI KONDISI MOTOR): User butuh Detailing/Cuci untuk ${m_model}. Tanyakan dulu *kondisi motornya saat ini* (apakah banyak kerak oli, jamur, kusam, atau sekadar kotor debu) supaya kamu bisa merekomendasikan paket Detailing yang paling pas.`;
+                    } else if (intents.includes('tanya_teknis')) {
+                        actionDirective = `\n🎯 TARGET SAAT INI (KONSULTASI TEKNIS): User bertanya seputar hal teknis otomotif/perawatan. Jawab pertanyaannya dengan luwes dan asik (seperti Sales Advisor). Selipkan promosi atau rekomendasi layanan Bosmat yang relevan dengan pertanyaannya jika memungkinkan.`;
                     } else if (!customerCtx.quoted_services || customerCtx.quoted_services.length === 0) {
-                        actionDirective = `\n🎯 TARGET SAAT INI (KONSULTASI HARGA): Informasi sudah cukup (${m_model}, ${t_service}, Warna/Kondisi sudah dikonfirmasi). SEGERA panggil tool \`getServiceDetails\` untuk mengecek harga (termasuk surcharge jika ada) dan jelaskan ke user secara singkat.`;
-                    } else if (!customerCtx.upsell_offered && customerCtx.intent_level !== 'hot') {
+                        actionDirective = `\n🎯 TARGET SAAT INI (KONSULTASI HARGA): Sebutkan rincian harga dari [HARGA SPESIFIK] secara TO THE POINT. Gunakan Bullet Points. JANGAN nulis paragraf panjang. Tanya ke user: "Mau pakai warna apa untuk repaint-nya?" dan "Ada lecet parah di bagian mana?"`;
+                    } else if (!customerCtx.upsell_offered && !(customerCtx.detected_intents || []).includes('mulai_booking')) {
                         actionDirective = `\n🎯 TARGET SAAT INI (EDUKASI & UPSELL): Kamu sudah mengutip harga. Jelaskan kelebihan layanan ini dengan santai, lalu tawarkan *upsell ringan 1x* (misal: "sekalian cuci komplit rangka mumpung dibongkar mas?").`;
                     } else if (!customerCtx.preferred_day && !customerCtx.asked_availability) {
-                        actionDirective = `\n🎯 TARGET SAAT INI (CLOSING): User sudah tahu harga dan layanannya. Giring perlahan untuk booking dengan bertanya "Rencana mau dikerjakan hari apa Mas?" atau "Mau Zoya cek jadwal kosongnya?".`;
+                        actionDirective = `\n🎯 TARGET SAAT INI (CLOSING): User sudah setuju dengan harga/promo. Giring perlahan untuk booking dengan bertanya "Rencana mau dikerjakan hari apa Mas/Kak?". JANGAN menanyakan nama lengkap, karena sudah ada di [USER IDENTITY]!`;
                     } else if (customerCtx.conversation_stage === 'closing') {
-                        actionDirective = `\n🎯 TARGET SAAT INI (CLOSING FINAL): User sudah setuju. LANGSUNG panggil \`checkBookingAvailability\` dan buat bookingnya. STOP tanya hal lain.`;
+                        actionDirective = `\n🎯 TARGET SAAT INI (CLOSING FINAL): User sudah setuju jadwal. LANGSUNG panggil \`checkBookingAvailability\` atau \`createBooking\`. STOP tanya hal lain dan JANGAN tanya nama.`;
                     }
 
                     if (actionDirective) {
@@ -1138,29 +1151,72 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
             }
         }
 
+        // STEP 2: Hitung harga otomatis dari context pelanggan (CART-BASED)
+        let specificPriceInjection = "";
+        let cartServices = customerCtx?.target_services || (customerCtx?.target_service ? [customerCtx.target_service] : []);
+
+        if (customerCtx && customerCtx.motor_model && cartServices.length > 0) {
+            try {
+                // --- 1. AUTO-CONVERT BUSINESS RULE ---
+                // Jika ada 'Repaint' di keranjang, OTOMATIS tambahkan/ubah Detailing jadi 'Cuci Komplit'
+                const hasRepaint = cartServices.some(s => s.toLowerCase().includes('repaint'));
+                if (hasRepaint) {
+                    // Hapus 'Detailing' umum atau 'Detailing Mesin' agar tidak dobel
+                    cartServices = cartServices.filter(s => !s.toLowerCase().includes('detailing'));
+                    
+                    // Paksa masukkan 'Cuci Komplit'
+                    if (!cartServices.includes('Cuci Komplit')) {
+                        cartServices.push('Cuci Komplit');
+                        console.log('🛠️ [BUSINESS RULE] Repaint detected, auto-adding Cuci Komplit');
+                    }
+                }
+
+                // --- 2. DEDUPLIKASI & CLEANUP ---
+                cartServices = [...new Set(cartServices)];
+
+                // --- 3. HARGA & INSTRUKSI SINGKAT ---
+                const exactPricePrompt = getSpecificPriceContext(customerCtx.motor_model, cartServices.join(', '));
+                
+                if (exactPricePrompt) {
+                    // Kita tambahkan instruksi 'SINGKAT' langsung di sini agar Agent 2 nggak cerewet
+                    specificPriceInjection = `\n[HARGA SPESIFIK]:\n${exactPricePrompt}\n\n` + 
+                        `⚠️ INSTRUKSI PENTING: Balas dengan SINGKAT & PADAT (Max 3-4 kalimat). ` +
+                        `Jangan yapping soal promo kepanjangan. Fokus beri tahu harga dan tanya konfirmasi warna/kondisi bodi.`;
+                    
+                    console.log(`💰[PRICE_CALC] Harga otomatis dihitung (with business rules).`);
+                } else {
+                    console.log(`💰[PRICE_CALC] Gagal hitung otomatis untuk: ${customerCtx.motor_model} + ${cartServices.join(', ')} → fallback ke tool`);
+                }
+            } catch (err) {
+                console.warn('[PRICE_CALC] Error:', err.message);
+            }
+        }
+
         // Inject tanggal & waktu langsung ke prompt (hemat 1 tool call)
         const now = DateTime.now().setZone('Asia/Jakarta').setLocale('id');
         let dateTimePart = `\nSekarang: ${now.toFormat("cccc, d LLLL yyyy HH:mm")} WIB.`;
+        
+        // Inject User Identity
+        const identityPart = `\n\n[USER IDENTITY]\n- Nama Pengirim: ${senderName || 'Tidak Diketahui'}\n- Nomor WhatsApp: ${senderNumber || 'Tidak Diketahui'}\n(Sapa pelanggan dengan nama ini jika tersedia dan terlihat natural untuk sapaan awal).`;
 
-        // Fetch and inject Promo Config
+        // Mengubah masterLayanan menjadi string katalog harga dasar untuk konteks AI
+        let catalogContext = "";
         try {
-            if (db) {
-                const promoDoc = await db.collection('settings').doc('promo_config').get();
-                if (promoDoc.exists && promoDoc.data().isActive) {
-                    const promoText = promoDoc.data().promoText;
-                    if (promoText) {
-                        dateTimePart += `\n\n[PROMO AKTIF SAAT INI]\n${promoText}\n(Gunakan layanan promo ini sebagai penawaran diskon/upsell jika cocok dengan kebutuhan pelanggan, cukup gunakan informasi seperlunya tanpa mengorbankan token).`;
-                    }
-                }
+            // Ambil promo aktif dari Firestore secara dinamis (satu-satunya sumber promo)
+            const activePromo = await getActivePromo();
+            if (activePromo) {
+                // Sanitize: ganti **double asterisk** Markdown → *single asterisk* WhatsApp
+                const sanitizedPromo = activePromo.replace(/\*\*([^*]+)\*\*/g, '*$1*');
+                catalogContext = `\n\n[PROMO BULAN INI]\n${sanitizedPromo}\n(Tawarkan promo ini secara natural jika relevan).`;
             }
-        } catch (error) {
-            console.warn('[AI_PROCESSING] Gagal mengambil promo config:', error.message);
+        } catch (err) {
+            console.warn('[AI_PROCESSING] Gagal render catalogContext:', err.message);
         }
 
         // Optimasi: Hanya gunakan prompt sistem, konteks dari extractor (termasuk ringkasan terbaru),
         // CONDITIONAL HISTORY (hanya jika pesan pendek), dan pesan user saat ini.
         const messages = [
-            new SystemMessage(effectiveSystemPrompt + dateTimePart + memoryPart),
+            new SystemMessage(effectiveSystemPrompt + dateTimePart + identityPart + memoryPart + catalogContext + specificPriceInjection),
             ...conversationHistoryMessages,
             new HumanMessage(humanMessageContent)
         ].filter(msg => !!msg); // Filter out null/undefined messages
@@ -1181,7 +1237,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                     ? (userMsg.find(p => p.type === 'text')?.text || '')
                     : (userMsg || '');
                 const msgLower = msgText.toLowerCase();
-                const intent = ctx?.intent_level || 'null';
+                const intents = ctx?.detected_intents || [];
 
                 // 1. Always included baseline tools
                 routedTools.push(notifyVisitIntentTool);
@@ -1195,24 +1251,25 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                 }
 
                 // 3. Pricing & Service Info
-                // Include if feeling out (cold/null) OR they explicitly ask about price/service
-                if (intent === 'cold' || intent === 'null' || !ctx ||
-                    msgLower.includes('harga') || msgLower.includes('biaya') || msgLower.includes('berapa') ||
-                    msgLower.includes('jasa') || msgLower.includes('layanan') || msgLower.includes('repaint') || msgLower.includes('coating') || msgLower.includes('detailing')) {
-                    routedTools.push(getServiceDetailsTool);
+                // Deteksi intent tanya harga diperlebar
+                const isAskingPrice = 
+                    msgLower.includes('harga') || msgLower.includes('biaya') || 
+                    msgLower.includes('berapa') || msgLower.includes('brp') || 
+                    msgLower.includes('kisaran') || msgLower.includes('ongkos') || 
+                    msgLower.includes('budget') || (ctx && ctx.asked_price === true);
+                
+                const isAskingService = 
+                    msgLower.includes('jasa') || msgLower.includes('layanan') || 
+                    msgLower.includes('repaint') || msgLower.includes('coating') || msgLower.includes('detailing');
+
+                // Hanya bind getServiceDetails jika harga BELUM dihitung otomatis
+                if (intents.length === 0 || intents.includes('tanya_harga') || intents.includes('tanya_layanan') || isAskingPrice || isAskingService) {
+                    if (!specificPriceInjection) {
+                        routedTools.push(getServiceDetailsTool);
+                    }
                 }
 
-                // 4. Booking & Scheduling
-                // Include if warming up (warm/hot) OR they explicitly ask about booking/dates
-                if (intent === 'warm' || intent === 'hot' ||
-                    msgLower.includes('booking') || msgLower.includes('jadwal') || msgLower.includes('kapan') ||
-                    msgLower.includes('kosong') || msgLower.includes('besok') || msgLower.includes('hari ini')) {
-                    routedTools.push(checkBookingAvailabilityTool);
-                    routedTools.push(createBookingTool);
-                    routedTools.push(updateBookingTool);
-                }
-
-                // 5. Onsite Service
+                // 4. Onsite Service
                 // Include if location data exists or explicitly mentioned
                 if ((ctx && ctx.location_hint) || msgLower.includes('home service') || msgLower.includes('rumah') || msgLower.includes('jemput')) {
                     routedTools.push(calculateHomeServiceFeeTool);
@@ -1667,18 +1724,175 @@ async function processBufferedMessages(senderNumber, client) {
                 console.log(`[ADMIN] 🚀 Model Override Triggered: ${modelOverride}`);
             }
         }
+        // --- PENTING: Ekstrak Context SEBELUM Minta AI Merespons ---
+        let systemInstruction = ''; 
 
-        const aiResponseResult = await getAIResponse(combinedMessage, senderName, senderNumber, '', mediaItems, modelOverride);
+        // 🚨 BYPASS EXTRACTOR UNTUK ADMIN 🚨
+        if (isAdmin) {
+            console.log(`👮 [Pipeline] Admin detected. Bypassing Context Extractor...`);
+            
+            // Langsung panggil AI dengan history 6 chat (sudah di-handle default oleh getAIResponse)
+            const aiResponseResult = await getAIResponse(combinedMessage, senderName, senderNumber, '', mediaItems, modelOverride);
+            const aiResponse = aiResponseResult.content;
+            
+            // Kirim balasan
+            if (aiResponse) {
+                const targetNumber = toSenderNumberWithSuffix(senderNumber);
+                markBotMessage(targetNumber, aiResponse.trim());
+                await client.sendText(targetNumber, aiResponse.trim());
+                
+                if (db) {
+                    // Simpan sebagai 'admin' di sender field agar riwayat di Firestore terbaca rapi
+                    await saveMessageToFirestore(senderNumber, combinedMessage, 'admin');
+                    await saveMessageToFirestore(senderNumber, aiResponse, 'ai');
+                }
+            }
+            await client.stopTyping(senderNumber);
+            return; // STOP DI SINI UNTUK ADMIN. Jangan lanjut ke JS Orchestrator Gate 1-3.
+        }
+
+        // --- FLOW UNTUK CUSTOMER BIASA (Tetap Jalan) ---
+        try {
+            console.log(`[Pipeline] Menjalankan Context Extractor sebelum AI membalas...`);
+            const history = await getConversationHistory(senderNumber, 3);
+            const lastAiMsgObj = [...history].reverse().find(m => m.sender === 'ai' || m.sender === 'bot');
+            const lastAiMsg = lastAiMsgObj ? lastAiMsgObj.text : "";
+            
+            await extractAndSaveContext(combinedMessage, lastAiMsg, senderNumber);
+            console.log(`[Pipeline] Context Extractor selesai. Melanjutkan ke JS Orchestrator...`);
+
+            // --- JS ORCHESTRATOR (3-GATE HIERARCHY) ---
+            const customerCtx = await getCustomerContext(senderNumber);
+
+            if (customerCtx) {
+                // ═══════════════════════════════════════════════════════
+                // GATE 1: Interruption / User Labil (Topic Change)
+                // ═══════════════════════════════════════════════════════
+                if (customerCtx.is_changing_topic === true) {
+                    console.log(`🔄 [ORCHESTRATOR] Gate 1: Topic change detected for ${senderNumber}. Resetting booking state.`);
+                    // Reset booking-related fields in memory
+                    const resetFields = {
+                        preferred_day: null,
+                        preferred_time: null,
+                        conversation_stage: 'consulting',
+                        is_changing_topic: false, // consume the flag
+                    };
+                    await mergeAndSaveContext(senderNumber, resetFields);
+                    // Don't return — let normal AI flow handle the new topic
+                }
+
+                // ═══════════════════════════════════════════════════════
+                // GATE 2: Multi-Intent Hierarchy & Escalation
+                // ═══════════════════════════════════════════════════════
+                const intents = customerCtx.detected_intents || [];
+
+                if (intents.includes('tanya_teknis') || customerCtx.butuh_bantuan_admin) {
+                    console.log(`🚨 [ORCHESTRATOR] Gate 2: Escalation triggered for ${senderNumber}. Intents: ${intents.join(', ')}`);
+                    await setSnoozeMode(senderNumber, 60, { reason: 'eskalasi_otomatis' });
+                    await triggerBosMatTool.implementation({
+                        senderNumber: senderNumber,
+                        reason: 'User bertanya hal teknis/komplain di luar AI scope',
+                        customerQuestion: combinedMessage
+                    });
+
+                    const reply = "Wah, pertanyaan Mas/Kak cukup teknis nih. Zoya hold dulu ya, Zoya tanyain langsung ke tim teknisi/owner biar infonya akurat. Ditunggu sebentar ya! 🙏";
+                    const targetNumber = toSenderNumberWithSuffix(senderNumber);
+                    markBotMessage(targetNumber, reply);
+                    await client.sendText(targetNumber, reply);
+                    if (db) {
+                        await saveMessageToFirestore(senderNumber, combinedMessage, 'user');
+                        await saveMessageToFirestore(senderNumber, reply, 'ai');
+                    }
+                    await client.stopTyping(senderNumber);
+                    return; // STOP — escalated to human
+                }
+
+                // ═══════════════════════════════════════════════════════
+                // GATE 3: Strict Booking Validation
+                // ═══════════════════════════════════════════════════════
+                const wantsBooking = intents.includes('mulai_booking') || customerCtx.conversation_stage === 'closing';
+
+                if (wantsBooking) {
+                    const day = customerCtx.preferred_day;
+                    const time = customerCtx.preferred_time;
+
+                    // 3a. Missing Parameters
+                    if (!day || !time) {
+                        const missingParts = [];
+                        if (!day) missingParts.push('hari/tanggal');
+                        if (!time) missingParts.push('jam kedatangan');
+                        systemInstruction = `[SYSTEM_INSTRUCTION]: User ingin booking tapi ${missingParts.join(' dan ')} belum lengkap. Tanyakan jadwal kedatangannya (Jam buka: 09:00 - 18:00). JANGAN panggil tool booking.`;
+                        console.log(`📋 [ORCHESTRATOR] Gate 3a: Missing booking params (${missingParts.join(', ')}). Injecting NLG instruction.`);
+                    } else {
+                        // 3b. Check Availability via JS
+                        try {
+                            console.log(`📅 [ORCHESTRATOR] Gate 3b: Checking availability for ${day} ${time}...`);
+                            const availResult = await checkBookingAvailabilityTool.implementation({ day, time });
+
+                            if (!availResult || availResult.available === false || availResult.error) {
+                                // Slot penuh / tutup
+                                systemInstruction = `[SYSTEM_INSTRUCTION]: Jadwal ${day} jam ${time} sudah penuh/tutup. Minta maaf dan tawarkan user untuk memilih hari/jam lain. JANGAN panggil tool booking.`;
+                                console.log(`❌ [ORCHESTRATOR] Gate 3b: Slot ${day} ${time} unavailable.`);
+                            } else {
+                                // 3c. ALL CLEAR — Execute Booking via JS!
+                                console.log(`✅ [ORCHESTRATOR] Gate 3c: Slot available! Executing booking...`);
+                                const bookingResult = await createBookingTool.implementation({
+                                    senderNumber: senderNumber,
+                                    sender_number: senderNumber,
+                                    motor_model: customerCtx.motor_model,
+                                    services: customerCtx.target_services && customerCtx.target_services.length > 0 ? customerCtx.target_services : [customerCtx.target_service],
+                                    tanggal: day,
+                                    jam: time,
+                                });
+
+                                console.log(`📅 [ORCHESTRATOR] Booking Result:`, JSON.stringify(bookingResult));
+
+                                // Use Agent 2 ONLY for NLG confirmation
+                                const nlgPrompt = `[SYSTEM_INSTRUCTION]: Booking BERHASIL dibuat! Data: ${JSON.stringify(bookingResult)}. Sampaikan ke user dengan sangat ramah, konfirmasi jadwalnya, dan ingatkan jam operasional kita. JANGAN panggil tool lagi.`;
+                                const aiResponseResult = await getAIResponse(nlgPrompt, senderName, senderNumber, '', mediaItems, 'gemini-2.0-flash');
+                                const aiResponse = aiResponseResult.content;
+
+                                if (aiResponse) {
+                                    const targetNumber = toSenderNumberWithSuffix(senderNumber);
+                                    markBotMessage(targetNumber, aiResponse.trim());
+                                    await client.sendText(targetNumber, aiResponse.trim());
+                                    if (db) {
+                                        await saveMessageToFirestore(senderNumber, combinedMessage, 'user');
+                                        await saveMessageToFirestore(senderNumber, aiResponse, 'ai');
+                                    }
+                                }
+                                await client.stopTyping(senderNumber);
+                                return; // DONE — booking completed
+                            }
+                        } catch (bookErr) {
+                            console.error('❌ [ORCHESTRATOR] Booking Failed:', bookErr.message);
+                            systemInstruction = `[SYSTEM_INSTRUCTION]: Terjadi error teknis saat booking (${bookErr.message}). Minta maaf ke user dan bilang Zoya sedang melapor ke Admin untuk dibantu manual.`;
+                            await triggerBosMatTool.implementation({
+                                senderNumber: senderNumber,
+                                reason: `Gagal booking otomatis: ${bookErr.message}`,
+                                customerQuestion: combinedMessage
+                            });
+                        }
+                    }
+                }
+            }
+        } catch (err) {
+            console.warn('[Pipeline] Early Context extraction or Orchestrator failed:', err.message);
+        }
+
+        // Prepend systemInstruction from JS Orchestrator Gates (if any)
+        const finalMessage = systemInstruction
+            ? `${systemInstruction}\n\n${combinedMessage}`
+            : combinedMessage;
+
+        const aiResponseResult = await getAIResponse(finalMessage, senderName, senderNumber, '', mediaItems, modelOverride);
         const aiResponse = aiResponseResult.content;
 
-        // Fire and forget — extract context THEN classify (chained, not parallel)
-        extractAndSaveContext(combinedMessage, aiResponse, senderNumber)
-            .then(() => classifyAndSaveCustomer(senderNumber))
-            .catch(err => console.warn('[Pipeline] Context/Classifier failed:', err.message));
+        // Fire and forget — update CRM classification
+        classifyAndSaveCustomer(senderNumber).catch(err => console.warn('[Classifier] Failed:', err.message));
 
         // Fire and forget — track follow-up signals
-        updateSignalsOnIncomingMessage(senderNumber, combinedMessage)
-            .catch(err => console.warn('[SignalTracker] Failed:', err.message));
+        updateSignalsOnIncomingMessage(senderNumber, combinedMessage).catch(err => console.warn('[SignalTracker] Failed:', err.message));
 
         // Save to Firebase if available
         if (db) {
@@ -2160,7 +2374,7 @@ app.get('/health', (req, res) => {
         status: 'healthy',
         service: 'WhatsApp AI Chatbot',
         provider: 'Google Gemini',
-        model: process.env.AI_MODEL || 'gemini-1.5-flash-latest',
+        model: process.env.AI_MODEL || 'gemini-flash-lite-latest',
         visionModel: ACTIVE_VISION_MODEL,
         whatsappStatus,
         uptime: process.uptime(),
@@ -2217,6 +2431,64 @@ app.get('/conversations', async (req, res) => {
         });
     } catch (error) {
         console.error('[API] Error fetching conversations:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// --- Invoice Generation & Send to Customer WA ---
+app.post('/generate-invoice', async (req, res) => {
+    try {
+        const {
+            documentType = 'invoice',
+            customerName,
+            customerPhone,
+            motorDetails,
+            items,
+            totalAmount,
+            amountPaid,
+            paymentMethod,
+            notes,
+        } = req.body;
+
+        if (!customerName || !customerPhone) {
+            return res.status(400).json({ error: 'customerName and customerPhone are required.' });
+        }
+
+        // Normalize customer phone to WA format
+        let recipientNumber = customerPhone.replace(/\D/g, '');
+        if (!recipientNumber.endsWith('@c.us') && !recipientNumber.endsWith('@lid')) {
+            recipientNumber = `${recipientNumber}@c.us`;
+        }
+
+        // Use admin number as senderNumber (for auth check)
+        const adminNumber = process.env.ADMIN_NUMBER || process.env.BOT_ADMIN_NUMBER || '6281234567890';
+        let adminSender = adminNumber.replace(/\D/g, '');
+        if (!adminSender.endsWith('@c.us')) {
+            adminSender = `${adminSender}@c.us`;
+        }
+
+        const result = await generateDocumentTool.implementation({
+            documentType,
+            customerName,
+            motorDetails: motorDetails || '-',
+            items: items || '-',
+            totalAmount: totalAmount || 0,
+            amountPaid: amountPaid || 0,
+            paymentMethod: paymentMethod || '-',
+            notes: notes || '',
+            senderNumber: adminSender,
+            recipientNumber,
+        });
+
+        if (result.success) {
+            console.log(`[API] Invoice (${documentType}) sent to customer: ${recipientNumber}`);
+            return res.status(200).json({ success: true, message: result.message });
+        } else {
+            console.error('[API] Invoice generation failed:', result.message);
+            return res.status(500).json({ success: false, error: result.message });
+        }
+    } catch (error) {
+        console.error('[API] Error generating invoice:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -2500,6 +2772,23 @@ app.get('/bookings', async (req, res) => {
     }
 });
 
+// Create manual booking
+app.post('/bookings', async (req, res) => {
+    try {
+        const { createBookingTool } = require('./src/ai/tools/createBookingTool.js');
+        const result = await createBookingTool.implementation(req.body);
+        if (result.success) {
+            res.json(result);
+        } else {
+            res.status(400).json(result);
+        }
+    } catch (error) {
+        console.error('[API] Error creating manual booking:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+
 app.patch('/bookings/:id/status', async (req, res) => {
     try {
         const { id } = req.params;
@@ -2531,7 +2820,7 @@ app.patch('/bookings/:id/status', async (req, res) => {
 server.listen(PORT, '0.0.0.0', async () => {
     console.log(`🚀 WhatsApp AI Chatbot listening on http://0.0.0.0:${PORT}`);
     console.log(`🤖 AI Provider: Google Gemini`);
-    console.log(`🤖 AI Model: ${process.env.AI_MODEL || 'gemini-1.5-flash-latest'}`);
+    console.log(`🤖 AI Model: ${process.env.AI_MODEL || 'gemini-flash-lite-latest'}`);
     console.log(`🖼️  Vision Model: ${ACTIVE_VISION_MODEL}`);
     console.log(`⏱️  Debounce Delay: ${DEBOUNCE_DELAY_MS}ms`);
     console.log(`🧠 Memory Config: Max ${MEMORY_CONFIG.maxMessages} messages, ${MEMORY_CONFIG.maxAgeHours}h retention`);
@@ -2561,7 +2850,7 @@ server.listen(PORT, '0.0.0.0', async () => {
         session: sessionName,
         // 🛠️ FIX: Set User Agent di awal config agar lolos deteksi saat loading/syncing
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-        authTimeout: 120000, // Perpanjang ke 2 menit untuk toleransi Syncing
+        authTimeout: 300000, // Perpanjang ke 5 menit untuk VPS
         blockCrashLogs: true,
         disableGoogleAnalytics: true,
         catchQR: (base64Qr, asciiQR, attempt, urlCode) => {
@@ -2622,7 +2911,7 @@ server.listen(PORT, '0.0.0.0', async () => {
         },
         headless: whatsappHeadless,
         logQR: false,
-        autoClose: shouldAutoClose, // Hanya true jika env var eksplisit 'true'
+        autoClose: shouldAutoClose ? 60000 : 0, // 0 to disable auto close
         disableWelcome: true, // Disable welcome message
         sessionDataPath,
     })
