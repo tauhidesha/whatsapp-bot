@@ -168,31 +168,31 @@ const generateDocumentTool = {
       }
 
       // Title next to logo
-      doc.fillColor(primaryColor).fontSize(14).font('Helvetica-Bold')
+      doc.fillColor(primaryColor).fontSize(16).font('Helvetica-Bold')
         .text(warrantyData.title, 180, 35, { width: 365 });
-      doc.fillColor(mutedColor).fontSize(8).font('Helvetica')
+      doc.fillColor(mutedColor).fontSize(10).font('Helvetica')
         .text('Bosmat Detailing & Repainting Studio', 180, 55, { width: 365 });
 
       title = warrantyData.title;
-      generateHr(doc, 80);
+      generateHr(doc, 85);
 
       // --- CUSTOMER INFO ---
-      let y = 95;
-      doc.fillColor(primaryColor).fontSize(10).font('Helvetica-Bold').text('Informasi Pelanggan & Kendaraan', 50, y);
-      y += 18;
-      doc.font('Helvetica').fontSize(9).fillColor(secondaryColor);
+      let y = 105;
+      doc.fillColor(primaryColor).fontSize(11).font('Helvetica-Bold').text('Informasi Pelanggan & Kendaraan', 50, y);
+      y += 22;
+      doc.font('Helvetica').fontSize(10).fillColor(secondaryColor);
       
       // Left column
       doc.text(`Nama: ${customerName}`, 50, y);
-      doc.text(`Kendaraan: ${motorDetails}`, 50, y + 14);
-      doc.text(`Tanggal Berlaku: ${now.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, 50, y + 28);
+      doc.text(`Kendaraan: ${motorDetails}`, 50, y + 18);
+      doc.text(`Tanggal Berlaku: ${now.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, 50, y + 36);
       
       // Right column
-      doc.text(`No. WA: ${senderNumber}`, 320, y);
-      doc.text(`Masa Berlaku: ${warrantyData.duration}`, 320, y + 14);
+      doc.text(`No. WA: ${senderNumber}`, 280, y);
+      doc.text(`Masa Berlaku: ${warrantyData.duration}`, 280, y + 18);
 
-      generateHr(doc, y + 48);
-      y += 60;
+      generateHr(doc, y + 65);
+      y += 85;
 
       for (const section of warrantyData.sections) {
         if (y > 700) { doc.addPage(); y = 50; }
