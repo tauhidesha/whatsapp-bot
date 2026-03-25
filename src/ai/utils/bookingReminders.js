@@ -132,12 +132,8 @@ function startBookingReminderScheduler() {
   }, intervalMs);
 
   console.log(`[bookingReminders] Scheduler dimulai. Interval ${REMINDER_INTERVAL_MINUTES} menit, pengingat jam ${REMINDER_HOUR}:00 ${TIMEZONE}`);
-
-  setTimeout(() => {
-    sendBookingReminders(true).catch(error => {
-      console.error('[bookingReminders] Error saat run awal:', error);
-    });
-  }, 30000);
+  // Removed immediate execution at startup to allow WA DB to fully synchronize.
+  // The first execution will happen naturally after REMINDER_INTERVAL_MINUTES.
 }
 
 module.exports = {

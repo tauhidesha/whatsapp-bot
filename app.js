@@ -3201,7 +3201,7 @@ function startWhatsAppKeepAlive(client) {
 // Mencegah server idle timeout saat tidak ada aktivitas
 function startKeepAlive() {
     const KEEP_ALIVE_INTERVAL_MS = parseInt(process.env.KEEP_ALIVE_INTERVAL_MS || '300000', 10); // Default 5 menit
-    const KEEP_ALIVE_URL = process.env.KEEP_ALIVE_URL || `http://localhost:${PORT}/ping`;
+    const KEEP_ALIVE_URL = process.env.KEEP_ALIVE_URL || `http://127.0.0.1:${PORT}/ping`;
 
     console.log(`🔄 [Keep-Alive] Starting keep-alive mechanism (interval: ${KEEP_ALIVE_INTERVAL_MS}ms)`);
 
