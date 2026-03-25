@@ -171,7 +171,7 @@ const generateDocumentTool = {
       doc.fillColor(primaryColor).fontSize(16).font('Helvetica-Bold')
         .text(warrantyData.title, 250, 35, { width: 365 });
       doc.fillColor(mutedColor).fontSize(10).font('Helvetica')
-        .text('Bosmat Detailing & Repainting Studio', 165, 55, { width: 365 });
+        .text('Bosmat Detailing & Repainting Studio', 250, 55, { width: 365 });
 
       title = warrantyData.title;
       generateHr(doc, 85);
@@ -188,7 +188,7 @@ const generateDocumentTool = {
       doc.text(`Tanggal Berlaku: ${now.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, 50, y + 36);
 
       // Right column
-      const rightColumnX = 320;
+      const rightColumnX = 360;
       doc.text(`No. WA: ${senderNumber}`, rightColumnX, y);
       doc.text(`Masa Berlaku: ${warrantyData.duration}`, rightColumnX, y + 18);
 
