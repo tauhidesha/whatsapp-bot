@@ -161,29 +161,38 @@ const generateDocumentTool = {
       // --- WARRANTY PDF ---
       const warrantyData = documentType === 'garansi_repaint' ? warrantyRepaint : warrantyCoating;
       
+      // --- HEADER: Logo centered on top ---
       const logoPath = path.join(__dirname, '../../../data/boS Mat (1000 x 500 px) (1).png');
       if (fs.existsSync(logoPath)) {
-        doc.image(logoPath, 50, 30, { width: 140 });
+        doc.image(logoPath, 50, 25, { width: 120 });
       }
 
-      doc.fillColor(primaryColor).fontSize(16).font('Helvetica-Bold').text(warrantyData.title, 50, 45, { align: 'right', width: 495 });
+      // Title next to logo
+      doc.fillColor(primaryColor).fontSize(14).font('Helvetica-Bold')
+        .text(warrantyData.title, 180, 35, { width: 365 });
+      doc.fillColor(mutedColor).fontSize(8).font('Helvetica')
+        .text('Bosmat Detailing & Repainting Studio', 180, 55, { width: 365 });
+
       title = warrantyData.title;
-      generateHr(doc, 85);
+      generateHr(doc, 80);
 
-      let y = 100;
-      doc.fontSize(10).font('Helvetica-Bold').text('Informasi Pelanggan & Kendaraan:', 50, y);
-      y += 20;
-      doc.font('Helvetica').fontSize(10);
+      // --- CUSTOMER INFO ---
+      let y = 95;
+      doc.fillColor(primaryColor).fontSize(10).font('Helvetica-Bold').text('Informasi Pelanggan & Kendaraan', 50, y);
+      y += 18;
+      doc.font('Helvetica').fontSize(9).fillColor(secondaryColor);
+      
+      // Left column
       doc.text(`Nama: ${customerName}`, 50, y);
-      doc.text(`No. WA: ${senderNumber}`, 280, y);
-      y += 15;
-      doc.text(`Kendaraan: ${motorDetails}`, 50, y);
-      y += 15;
-      doc.text(`Tanggal Berlaku: ${now.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, 50, y);
-      doc.text(`Masa Berlaku: ${warrantyData.duration}`, 280, y);
+      doc.text(`Kendaraan: ${motorDetails}`, 50, y + 14);
+      doc.text(`Tanggal Berlaku: ${now.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, 50, y + 28);
+      
+      // Right column
+      doc.text(`No. WA: ${senderNumber}`, 320, y);
+      doc.text(`Masa Berlaku: ${warrantyData.duration}`, 320, y + 14);
 
-      generateHr(doc, y + 25);
-      y += 40;
+      generateHr(doc, y + 48);
+      y += 60;
 
       for (const section of warrantyData.sections) {
         if (y > 700) { doc.addPage(); y = 50; }

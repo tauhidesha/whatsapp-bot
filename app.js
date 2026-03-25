@@ -950,7 +950,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                 // Ambil 6 pesan untuk Admin, 10 pesan untuk Customer
                 const historyLimit = isAdmin ? 6 : 10;
                 const history = await getConversationHistory(senderNumber, historyLimit);
-                
+
                 if (history && history.length > 0) {
                     conversationHistoryMessages = buildLangChainHistory(history);
                     console.log(`🧠 [AI_PROCESSING] Berhasil memuat ${history.length} pesan terakhir untuk konteks`);
@@ -1025,7 +1025,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                             console.log(`⚡ [FAST_EXTRACT] Motor terdeteksi saat ini: ${foundMotor.model}`);
                         }
                     }
-                    
+
                     // Multi-service fast extract
                     const foundService = findService(humanMessageContent);
                     if (foundService && !customerCtx.target_services.includes(foundService.name)) {
@@ -1100,7 +1100,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                     const m_model = customerCtx.motor_model || (state && state.motor_model);
                     const t_services = (customerCtx.target_services?.length > 0) ? customerCtx.target_services : (customerCtx.target_service ? [customerCtx.target_service] : (state && state.target_service ? [state.target_service] : []));
                     const t_service_display = t_services.join(', ');
-                    
+
                     const m_cond = customerCtx.motor_condition;
                     const m_color = customerCtx.motor_color;
                     const isRepaint = t_services.some(s => s.toLowerCase().includes('repaint'));
@@ -1163,7 +1163,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                 if (hasRepaint) {
                     // Hapus 'Detailing' umum atau 'Detailing Mesin' agar tidak dobel
                     cartServices = cartServices.filter(s => !s.toLowerCase().includes('detailing'));
-                    
+
                     // Paksa masukkan 'Cuci Komplit'
                     if (!cartServices.includes('Cuci Komplit')) {
                         cartServices.push('Cuci Komplit');
@@ -1176,13 +1176,13 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
 
                 // --- 3. HARGA & INSTRUKSI SINGKAT ---
                 const exactPricePrompt = getSpecificPriceContext(customerCtx.motor_model, cartServices.join(', '));
-                
+
                 if (exactPricePrompt) {
                     // Kita tambahkan instruksi 'SINGKAT' langsung di sini agar Agent 2 nggak cerewet
-                    specificPriceInjection = `\n[HARGA SPESIFIK]:\n${exactPricePrompt}\n\n` + 
+                    specificPriceInjection = `\n[HARGA SPESIFIK]:\n${exactPricePrompt}\n\n` +
                         `⚠️ INSTRUKSI PENTING: Balas dengan SINGKAT & PADAT (Max 3-4 kalimat). ` +
                         `Jangan yapping soal promo kepanjangan. Fokus beri tahu harga dan tanya konfirmasi warna/kondisi bodi.`;
-                    
+
                     console.log(`💰[PRICE_CALC] Harga otomatis dihitung (with business rules).`);
                 } else {
                     console.log(`💰[PRICE_CALC] Gagal hitung otomatis untuk: ${customerCtx.motor_model} + ${cartServices.join(', ')} → fallback ke tool`);
@@ -1195,7 +1195,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
         // Inject tanggal & waktu langsung ke prompt (hemat 1 tool call)
         const now = DateTime.now().setZone('Asia/Jakarta').setLocale('id');
         let dateTimePart = `\nSekarang: ${now.toFormat("cccc, d LLLL yyyy HH:mm")} WIB.`;
-        
+
         // Inject User Identity
         const identityPart = `\n\n[USER IDENTITY]\n- Nama Pengirim: ${senderName || 'Tidak Diketahui'}\n- Nomor WhatsApp: ${senderNumber || 'Tidak Diketahui'}\n(Sapa pelanggan dengan nama ini jika tersedia dan terlihat natural untuk sapaan awal).`;
 
@@ -1252,14 +1252,14 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
 
                 // 3. Pricing & Service Info
                 // Deteksi intent tanya harga diperlebar
-                const isAskingPrice = 
-                    msgLower.includes('harga') || msgLower.includes('biaya') || 
-                    msgLower.includes('berapa') || msgLower.includes('brp') || 
-                    msgLower.includes('kisaran') || msgLower.includes('ongkos') || 
+                const isAskingPrice =
+                    msgLower.includes('harga') || msgLower.includes('biaya') ||
+                    msgLower.includes('berapa') || msgLower.includes('brp') ||
+                    msgLower.includes('kisaran') || msgLower.includes('ongkos') ||
                     msgLower.includes('budget') || (ctx && ctx.asked_price === true);
-                
-                const isAskingService = 
-                    msgLower.includes('jasa') || msgLower.includes('layanan') || 
+
+                const isAskingService =
+                    msgLower.includes('jasa') || msgLower.includes('layanan') ||
                     msgLower.includes('repaint') || msgLower.includes('coating') || msgLower.includes('detailing');
 
                 // Hanya bind getServiceDetails jika harga BELUM dihitung otomatis
@@ -1725,22 +1725,22 @@ async function processBufferedMessages(senderNumber, client) {
             }
         }
         // --- PENTING: Ekstrak Context SEBELUM Minta AI Merespons ---
-        let systemInstruction = ''; 
+        let systemInstruction = '';
 
         // 🚨 BYPASS EXTRACTOR UNTUK ADMIN 🚨
         if (isAdmin) {
             console.log(`👮 [Pipeline] Admin detected. Bypassing Context Extractor...`);
-            
+
             // Langsung panggil AI dengan history 6 chat (sudah di-handle default oleh getAIResponse)
             const aiResponseResult = await getAIResponse(combinedMessage, senderName, senderNumber, '', mediaItems, modelOverride || 'gemini-flash-latest');
             const aiResponse = aiResponseResult.content;
-            
+
             // Kirim balasan
             if (aiResponse) {
                 const targetNumber = toSenderNumberWithSuffix(senderNumber);
                 markBotMessage(targetNumber, aiResponse.trim());
                 await client.sendText(targetNumber, aiResponse.trim());
-                
+
                 if (db) {
                     // Simpan sebagai 'admin' di sender field agar riwayat di Firestore terbaca rapi
                     await saveMessageToFirestore(senderNumber, combinedMessage, 'admin');
@@ -1757,7 +1757,7 @@ async function processBufferedMessages(senderNumber, client) {
             const history = await getConversationHistory(senderNumber, 3);
             const lastAiMsgObj = [...history].reverse().find(m => m.sender === 'ai' || m.sender === 'bot');
             const lastAiMsg = lastAiMsgObj ? lastAiMsgObj.text : "";
-            
+
             await extractAndSaveContext(combinedMessage, lastAiMsg, senderNumber);
             console.log(`[Pipeline] Context Extractor selesai. Melanjutkan ke JS Orchestrator...`);
 
