@@ -133,9 +133,11 @@ function startBookingReminderScheduler() {
 
   console.log(`[bookingReminders] Scheduler dimulai. Interval ${REMINDER_INTERVAL_MINUTES} menit, pengingat jam ${REMINDER_HOUR}:00 ${TIMEZONE}`);
 
-  sendBookingReminders(true).catch(error => {
-    console.error('[bookingReminders] Error saat run awal:', error);
-  });
+  setTimeout(() => {
+    sendBookingReminders(true).catch(error => {
+      console.error('[bookingReminders] Error saat run awal:', error);
+    });
+  }, 30000);
 }
 
 module.exports = {
