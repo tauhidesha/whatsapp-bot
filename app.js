@@ -1732,7 +1732,7 @@ async function processBufferedMessages(senderNumber, client) {
             console.log(`👮 [Pipeline] Admin detected. Bypassing Context Extractor...`);
             
             // Langsung panggil AI dengan history 6 chat (sudah di-handle default oleh getAIResponse)
-            const aiResponseResult = await getAIResponse(combinedMessage, senderName, senderNumber, '', mediaItems, modelOverride);
+            const aiResponseResult = await getAIResponse(combinedMessage, senderName, senderNumber, '', mediaItems, modelOverride || 'gemini-flash-latest');
             const aiResponse = aiResponseResult.content;
             
             // Kirim balasan
