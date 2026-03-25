@@ -2461,7 +2461,7 @@ app.post('/generate-invoice', async (req, res) => {
         }
 
         // Use admin number as senderNumber (for auth check)
-        const adminNumber = process.env.ADMIN_NUMBER || process.env.BOT_ADMIN_NUMBER || '6281234567890';
+        const adminNumber = process.env.BOSMAT_ADMIN_NUMBER || process.env.ADMIN_WHATSAPP_NUMBER || process.env.ADMIN_NUMBER || '628179481010';
         let adminSender = adminNumber.replace(/\D/g, '');
         if (!adminSender.endsWith('@c.us')) {
             adminSender = `${adminSender}@c.us`;
