@@ -29,3 +29,7 @@ Thumbs.db
 .vscode/
 *.swp
 awscliv2.zip
+
+# Antigravity & GitHub
+.agent/
+.github/
