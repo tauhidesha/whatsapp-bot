@@ -92,7 +92,7 @@ async function sendBookingReminders(force = false) {
     if (data.reminderSent) return;
 
     const status = (data.status || '').toLowerCase();
-    if (status === 'cancelled') return;
+    if (['cancelled', 'in_progress', 'done', 'paid'].includes(status)) return;
 
     operations.push({ id: doc.id, data });
   });
