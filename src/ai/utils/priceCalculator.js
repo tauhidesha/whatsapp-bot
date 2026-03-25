@@ -158,12 +158,15 @@ function getSpecificPriceContext(motorModel, targetServicesStr) {
         let sizeLabel = '';
         let pricingNote = '';
 
-        // === CASE 1: Repaint Bodi Halus ===
-        if (service.subcategory === 'bodi_halus' || (service.usesModelPricing && service.category === 'repaint')) {
-            const repaintEntry = findRepaintBodiHalusPrice(motorModel);
-            if (repaintEntry) {
-                price = repaintEntry.price;
-                pricingNote = repaintEntry.note || 'Full Body Halus';
+        // === CASE 1: Repaint Velg (check FIRST before generic repaint) ===
+        if (service.subcategory === 'velg') {
+            const normMotor = normalizeModel(motorModel);
+            for (const [key, velgPrice] of Object.entries(VELG_PRICE_MAP)) {
+                if (normMotor.includes(key) || key.includes(normMotor)) {
+                    price = velgPrice;
+                    pricingNote = 'Sepasang velg (termasuk bongkar pasang ban)';
+                    break;
+                }
             }
         }
         // === CASE 2: Repaint Bodi Kasar ===
@@ -178,15 +181,12 @@ function getSpecificPriceContext(motorModel, targetServicesStr) {
                 }
             }
         }
-        // === CASE 3: Repaint Velg ===
-        else if (service.subcategory === 'velg') {
-            const normMotor = normalizeModel(motorModel);
-            for (const [key, velgPrice] of Object.entries(VELG_PRICE_MAP)) {
-                if (normMotor.includes(key) || key.includes(normMotor)) {
-                    price = velgPrice;
-                    pricingNote = 'Sepasang velg (termasuk bongkar pasang ban)';
-                    break;
-                }
+        // === CASE 3: Repaint Bodi Halus ===
+        else if (service.subcategory === 'bodi_halus' || (service.usesModelPricing && service.category === 'repaint')) {
+            const repaintEntry = findRepaintBodiHalusPrice(motorModel);
+            if (repaintEntry) {
+                price = repaintEntry.price;
+                pricingNote = repaintEntry.note || 'Full Body Halus';
             }
         }
         // === CASE 4: Layanan berbasis SIZE ===
