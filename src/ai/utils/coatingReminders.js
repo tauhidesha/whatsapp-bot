@@ -1,4 +1,5 @@
-const { db } = require('../../../config/firebase');
+const { getFirebaseAdmin } = require('../../lib/firebaseAdmin.js');
+const db = getFirebaseAdmin().firestore();
 
 const COATING_MAINTENANCE_MESSAGES = {
   h7: (name, vehicle) => `Halo Kak ${name},\n\nIni dari admin Bosmat Detailing. Sekedar mengingatkan bahwa jadwal *Coating Maintenance* untuk kendaraan ${vehicle} Kakak jatuh tempo dalam *7 hari* lagi.\n\nAgar kualitas coating tetap prima dan garansi tetap berlaku, yuk jadwalkan maintenance-nya sekarang. Kakak bisa balas pesan ini untuk booking jadwal ya!`,

@@ -155,6 +155,8 @@ const generateDocumentTool = {
     const mutedColor = '#71717a'; // Zinc-500
     const lightBg = '#f4f4f5'; // Zinc-100
 
+    let title = 'Dokumen';
+
     if (documentType.startsWith('garansi_')) {
       // --- WARRANTY PDF ---
       const warrantyData = documentType === 'garansi_repaint' ? warrantyRepaint : warrantyCoating;
@@ -165,6 +167,7 @@ const generateDocumentTool = {
       }
 
       doc.fillColor(primaryColor).fontSize(16).font('Helvetica-Bold').text(warrantyData.title, 50, 45, { align: 'right', width: 495 });
+      title = warrantyData.title;
       generateHr(doc, 85);
 
       let y = 100;
@@ -225,7 +228,7 @@ const generateDocumentTool = {
       }
 
       // Document Title & Company Info: Top Right
-      let title = 'Invoice';
+      title = 'Invoice';
       let docCode = 'INV';
       if (documentType === 'tanda_terima') { title = 'Surat Tanda Terima'; docCode = 'STT'; }
       else if (documentType === 'bukti_bayar') { title = 'Kuitansi'; docCode = 'RCP'; }
