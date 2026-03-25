@@ -160,7 +160,7 @@ const generateDocumentTool = {
     if (documentType.startsWith('garansi_')) {
       // --- WARRANTY PDF ---
       const warrantyData = documentType === 'garansi_repaint' ? warrantyRepaint : warrantyCoating;
-      
+
       // --- HEADER: Logo centered on top ---
       const logoPath = path.join(__dirname, '../../../data/boS Mat (1000 x 500 px) (1).png');
       if (fs.existsSync(logoPath)) {
@@ -169,7 +169,7 @@ const generateDocumentTool = {
 
       // Title next to logo
       doc.fillColor(primaryColor).fontSize(16).font('Helvetica-Bold')
-        .text(warrantyData.title, 165, 35, { width: 365 });
+        .text(warrantyData.title, 250, 35, { width: 365 });
       doc.fillColor(mutedColor).fontSize(10).font('Helvetica')
         .text('Bosmat Detailing & Repainting Studio', 165, 55, { width: 365 });
 
@@ -181,14 +181,14 @@ const generateDocumentTool = {
       doc.fillColor(primaryColor).fontSize(11).font('Helvetica-Bold').text('Informasi Pelanggan & Kendaraan', 50, y);
       y += 22;
       doc.font('Helvetica').fontSize(10).fillColor(secondaryColor);
-      
+
       // Left column
       doc.text(`Nama: ${customerName}`, 50, y);
       doc.text(`Kendaraan: ${motorDetails}`, 50, y + 18);
       doc.text(`Tanggal Berlaku: ${now.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, 50, y + 36);
-      
+
       // Right column
-      const rightColumnX = 250;
+      const rightColumnX = 320;
       doc.text(`No. WA: ${senderNumber}`, rightColumnX, y);
       doc.text(`Masa Berlaku: ${warrantyData.duration}`, rightColumnX, y + 18);
 
@@ -197,10 +197,10 @@ const generateDocumentTool = {
 
       for (const section of warrantyData.sections) {
         if (y > 700) { doc.addPage(); y = 50; }
-        
+
         doc.fillColor(primaryColor).fontSize(11).font('Helvetica-Bold').text(section.heading, 50, y);
         y += 15;
-        
+
         if (section.body) {
           if (y > 750) { doc.addPage(); y = 50; }
           doc.fillColor(secondaryColor).fontSize(9).font('Helvetica').text(section.body, 50, y, { width: 495, align: 'justify' });
@@ -209,12 +209,12 @@ const generateDocumentTool = {
 
         if (section.items && section.items.length > 0) {
           for (const item of section.items) {
-             const itemText = `• ${item}`;
-             const h = doc.heightOfString(itemText, { width: 480 });
-             if (y + h > 750) { doc.addPage(); doc.fillColor(secondaryColor).fontSize(9).font('Helvetica'); y = 50; }
-             doc.fillColor(secondaryColor).fontSize(9).text('•', 50, y);
-             doc.text(item, 60, y, { width: 480, align: 'justify' });
-             y += h + 3;
+            const itemText = `• ${item}`;
+            const h = doc.heightOfString(itemText, { width: 480 });
+            if (y + h > 750) { doc.addPage(); doc.fillColor(secondaryColor).fontSize(9).font('Helvetica'); y = 50; }
+            doc.fillColor(secondaryColor).fontSize(9).text('•', 50, y);
+            doc.text(item, 60, y, { width: 480, align: 'justify' });
+            y += h + 3;
           }
           y += 5;
         }
