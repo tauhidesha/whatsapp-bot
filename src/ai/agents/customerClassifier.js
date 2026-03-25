@@ -1,137 +1,104 @@
 // File: src/ai/agents/customerClassifier.js
 // Background customer classifier agent.
 // Rule-based scoring engine — 0 token cost, deterministik.
-// Jalan otomatis (fire & forget) setelah Context Extractor selesai.
+// Menggunakan Prisma untuk semua database operations.
 
-const admin = require('firebase-admin');
-const { syncLabelToDirectMessages } = require('../utils/mergeCustomerContext.js');
-
-// ─── Follow-Up Strategy Map ──────────────────────────────────────────────────
+const prisma = require('../../lib/prisma');
+const { syncLabelToDirectMessages, getGhostedCount, updateGhostedCountInContext, normalizePhone } = require('../utils/mergeCustomerContext.js');
 
 const STRATEGY_MAP = {
-    window_shopper: 'minimal',    // 1x setelah 7 hari, lalu stop
-    warm_lead: 'nurture',    // 1x setelah 2 hari
-    hot_lead: 'aggressive', // 1x setelah 24 jam
-    existing: 'retention',  // berbasis waktu sejak servis terakhir
-    loyal: 'vip',        // exclusive treatment
-    churned: 'winback',    // angle berbeda, bukan jualan
-    dormant_lead: 'stop',       // jangan follow up
+    window_shopper: 'minimal',
+    warm_lead: 'nurture',
+    hot_lead: 'aggressive',
+    existing: 'retention',
+    loyal: 'vip',
+    churned: 'winback',
+    dormant_lead: 'stop',
 };
 
-// ─── Ghost Tracking ──────────────────────────────────────────────────────────
+async function getCustomerTransactions(docId, customerName) {
+    let transactions = [];
 
-/**
- * Update ghosted count. Hindari double increment (48h cooldown).
- * @returns {number} Updated ghosted_times count
- */
+    let results = await prisma.transaction.findMany({
+        where: {
+            customer: {
+                phone: docId
+            }
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 50
+    });
+
+    if (results.length > 0) {
+        transactions = results;
+    } else {
+        results = await prisma.transaction.findMany({
+            where: {
+                customer: {
+                    whatsappLid: docId
+                }
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 50
+        });
+
+        if (results.length > 0) {
+            transactions = results;
+        }
+    }
+
+    if (transactions.length === 0 && customerName && customerName.length > 2) {
+        results = await prisma.transaction.findMany({
+            where: {
+                customer: {
+                    name: {
+                        contains: customerName,
+                        mode: 'insensitive'
+                    }
+                }
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 50
+        });
+
+        if (results.length > 0) {
+            transactions = results;
+        }
+    }
+
+    return transactions;
+}
+
 async function updateGhostedCount(docId, currentContext, metadata) {
     const lastSender = metadata.lastMessageSender;
-    const lastChat = metadata.lastMessageAt?.toDate?.()
-        || (metadata.lastMessageAt ? new Date(metadata.lastMessageAt) : null);
+    const lastChat = metadata.lastMessageAt instanceof Date 
+        ? metadata.lastMessageAt 
+        : (metadata.lastMessageAt ? new Date(metadata.lastMessageAt) : null);
+    
     const daysSince = lastChat
         ? Math.floor((Date.now() - lastChat.getTime()) / 86400000)
         : 0;
 
-    // Ghosted = AI yang terakhir balas, sudah > 2 hari
     const isCurrentlyGhosted = lastSender === 'ai' && daysSince > 2;
 
-    if (!isCurrentlyGhosted) return currentContext.ghosted_times || 0;
-
-    // Hindari increment berulang untuk ghost yang sama
-    const alreadyCounted = currentContext.last_ghost_counted_at;
-    if (alreadyCounted) {
-        const lastCounted = new Date(alreadyCounted).getTime();
-        const hoursSince = (Date.now() - lastCounted) / 3600000;
-        if (hoursSince < 48) return currentContext.ghosted_times || 0;
+    if (!isCurrentlyGhosted) {
+        return currentContext.ghostedTimes || currentContext.ghosted_times || 0;
     }
 
-    const newCount = (currentContext.ghosted_times || 0) + 1;
+    const { count: existingCount, lastCounted } = await getGhostedCount(docId);
+    
+    if (lastCounted) {
+        const lastDate = lastCounted instanceof Date ? lastCounted : new Date(lastCounted);
+        const hoursSince = (Date.now() - lastDate.getTime()) / 3600000;
+        if (hoursSince < 48) return existingCount;
+    }
 
-    const db = admin.firestore();
-    await db.collection('customerContext').doc(docId).update({
-        ghosted_times: newCount,
-        last_ghost_counted_at: new Date().toISOString(),
-    });
+    const newCount = existingCount + 1;
+    await updateGhostedCountInContext(docId, newCount);
 
     return newCount;
 }
 
-// ─── Transaction Query ───────────────────────────────────────────────────────
-
-/**
- * Query transactions untuk customer dengan fallback strategy:
- * 1. Exact match by customerNumber (normalized)
- * 2. Fuzzy match by customerName
- * 3. Return empty array jika tidak ditemukan
- */
-async function getCustomerTransactions(docId, customerName) {
-    const db = admin.firestore();
-
-    // Strategy 1: Exact match by customerNumber (normalized docId)
-    let snap = await db.collection('transactions')
-        .where('customerNumber', '==', docId)
-        .orderBy('date', 'desc')
-        .limit(50)
-        .get();
-
-    if (!snap.empty) {
-        return snap.docs.map(d => d.data());
-    }
-
-    // Try with @c.us suffix
-    snap = await db.collection('transactions')
-        .where('customerNumber', '==', docId + '@c.us')
-        .orderBy('date', 'desc')
-        .limit(50)
-        .get();
-
-    if (!snap.empty) {
-        return snap.docs.map(d => d.data());
-    }
-
-    // Try with 0-prefixed version (e.g. 628xxx -> 08xxx)
-    if (docId.startsWith('62')) {
-        const altNumber = '0' + docId.substring(2);
-        snap = await db.collection('transactions')
-            .where('customerNumber', '==', altNumber)
-            .orderBy('date', 'desc')
-            .limit(50)
-            .get();
-
-        if (!snap.empty) {
-            return snap.docs.map(d => d.data());
-        }
-    }
-
-    // Strategy 2: Fuzzy match by customerName (case-insensitive check in-app)
-    if (customerName && customerName.length > 2) {
-        const allTxSnap = await db.collection('transactions')
-            .where('customerName', '!=', null)
-            .limit(200)
-            .get();
-
-        const nameLower = customerName.toLowerCase();
-        const matched = allTxSnap.docs
-            .filter(d => {
-                const txName = (d.data().customerName || '').toLowerCase();
-                return txName === nameLower || txName.includes(nameLower) || nameLower.includes(txName);
-            })
-            .map(d => d.data());
-
-        if (matched.length > 0) {
-            return matched;
-        }
-    }
-
-    // Strategy 3: No transactions found
-    return [];
-}
-
-// ─── Scoring Engine ──────────────────────────────────────────────────────────
-
-/**
- * Rule-based scoring. No LLM, no token cost.
- */
 function scoreCustomer(context, metadata, transactions) {
     const scores = {
         window_shopper: 0,
@@ -144,8 +111,10 @@ function scoreCustomer(context, metadata, transactions) {
     };
 
     const now = Date.now();
-    const lastChat = metadata.lastMessageAt?.toDate?.()
-        || (metadata.lastMessageAt ? new Date(metadata.lastMessageAt) : null);
+    const lastChat = metadata.lastMessageAt instanceof Date
+        ? metadata.lastMessageAt
+        : (metadata.lastMessageAt ? new Date(metadata.lastMessageAt) : null);
+    
     const daysSinceLastChat = lastChat
         ? Math.floor((now - lastChat.getTime()) / 86400000)
         : 999;
@@ -153,21 +122,20 @@ function scoreCustomer(context, metadata, transactions) {
     const completedTx = transactions.filter(t => t.type === 'income');
     const txCount = completedTx.length;
 
-    // Get last tx date
     let daysSinceLastTx = 999;
     if (completedTx.length > 0) {
-        const lastTxRaw = completedTx[0].date;
-        const lastTxDate = lastTxRaw?.toDate?.()
-            || (lastTxRaw ? new Date(lastTxRaw) : null);
+        const lastTxDate = completedTx[0].createdAt instanceof Date
+            ? completedTx[0].createdAt
+            : new Date(completedTx[0].createdAt);
+        
         if (lastTxDate && !isNaN(lastTxDate.getTime())) {
             daysSinceLastTx = Math.floor((now - lastTxDate.getTime()) / 86400000);
         }
     }
 
     const ghosted = metadata.lastMessageSender === 'ai' && daysSinceLastChat > 2;
-    const ghostedTimes = context.ghosted_times || (ghosted ? 1 : 0);
+    const ghostedTimes = context.ghostedTimes || context.ghosted_times || (ghosted ? 1 : 0);
 
-    // ── Transaction-based (prioritas tertinggi) ──
     if (txCount >= 2) {
         if (daysSinceLastTx > 90) {
             scores.churned += 100;
@@ -182,25 +150,25 @@ function scoreCustomer(context, metadata, transactions) {
         }
     }
 
-    // ── Lead scoring (hanya kalau 0 transaksi) ──
     if (txCount === 0) {
-        // Ambil data intent baru dari Extractor
-        const intents = context.detected_intents || [];
-        const stage = context.conversation_stage || '';
+        const intents = context.detectedIntents || context.detected_intents || [];
+        const stage = context.conversationStage || context.conversation_stage || '';
 
-        // Dormant: ghosted berkali-kali
         if (ghostedTimes >= 2) {
             scores.dormant_lead += 100;
         }
 
-        // Hot lead (Sinyal Booking & Deal)
-        if (context.asked_availability || intents.includes('mulai_booking') || stage === 'closing' || stage === 'done') {
+        const askedAvailability = context.askedAvailability || context.asked_availability;
+        if (askedAvailability || intents.includes('mulai_booking') || stage === 'closing' || stage === 'done') {
             scores.hot_lead += 60;
         }
-        if (context.shared_photo) scores.hot_lead += 30;
 
-        // Warm lead (Tanya Detail & Harga, Belum Booking)
-        if ((context.asked_price || intents.includes('tanya_harga') || intents.includes('tanya_layanan')) && !context.said_expensive) {
+        const sharedPhoto = context.sharedPhoto || context.shared_photo;
+        if (sharedPhoto) scores.hot_lead += 30;
+
+        const askedPrice = context.askedPrice || context.asked_price;
+        const saidExpensive = context.saidExpensive || context.said_expensive;
+        if ((askedPrice || intents.includes('tanya_harga') || intents.includes('tanya_layanan')) && !saidExpensive) {
             scores.warm_lead += 50;
         }
         if (stage === 'qualifying' || stage === 'consulting') {
@@ -208,35 +176,31 @@ function scoreCustomer(context, metadata, transactions) {
         }
         if (daysSinceLastChat <= 3) scores.warm_lead += 20;
 
-        // Window shopper (Cuma nanya-nanya ringan atau keberatan harga)
-        if (context.said_expensive) scores.window_shopper += 60;
-        if (context.budget_signal === 'ketat') scores.window_shopper += 30;
+        const budgetSignal = context.budgetSignal || context.budget_signal;
+        if (saidExpensive) scores.window_shopper += 60;
+        if (budgetSignal === 'ketat') scores.window_shopper += 30;
         if (intents.length === 0 || (intents.includes('tanya_lokasi') && !intents.includes('tanya_harga'))) {
-            scores.window_shopper += 20; // Kasih poin dikit buat yang cuma iseng nanya lokasi
+            scores.window_shopper += 20;
         }
         if (ghosted && ghostedTimes === 1) scores.window_shopper += 40;
     }
 
-    // ── Label Reset Conditions ──
-    // Hot lead yang tidak jadi → turun ke warm setelah 7 hari
-    if (context.customer_label === 'hot_lead' && daysSinceLastChat > 7 && txCount === 0) {
+    const customerLabel = context.customerLabel || context.customer_label;
+    if (customerLabel === 'hot_lead' && daysSinceLastChat > 7 && txCount === 0) {
         scores.hot_lead = 0;
         scores.warm_lead = Math.max(scores.warm_lead, 50);
     }
 
-    // Warm lead yang ghosted → turun ke window_shopper
-    if (context.customer_label === 'warm_lead' && ghostedTimes >= 1 && daysSinceLastChat > 14) {
+    if (customerLabel === 'warm_lead' && ghostedTimes >= 1 && daysSinceLastChat > 14) {
         scores.warm_lead = 0;
         scores.window_shopper = Math.max(scores.window_shopper, 50);
     }
 
-    // Existing yang lama tidak balik → churned
-    if (context.customer_label === 'existing' && daysSinceLastTx > 90) {
+    if (customerLabel === 'existing' && daysSinceLastTx > 90) {
         scores.existing = 0;
         scores.churned = Math.max(scores.churned, 80);
     }
 
-    // Ambil label tertinggi
     const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
     const [topLabel, topScore] = sorted[0];
     const totalScore = sorted.reduce((sum, [, s]) => sum + s, 0);
@@ -244,16 +208,19 @@ function scoreCustomer(context, metadata, transactions) {
         ? Math.round((topScore / totalScore) * 100) / 100
         : 0;
 
-    // Buat reason string untuk debugging
     const activeSignals = [];
     if (txCount > 0) activeSignals.push(`transactions=${txCount}`);
-    if (context.asked_availability) activeSignals.push('asked_availability');
-    if (context.asked_price) activeSignals.push('asked_price');
-    if (context.said_expensive) activeSignals.push('said_expensive');
+    if (context.askedAvailability || context.asked_availability) activeSignals.push('asked_availability');
+    if (context.askedPrice || context.asked_price) activeSignals.push('asked_price');
+    if (context.saidExpensive || context.said_expensive) activeSignals.push('said_expensive');
     if (ghostedTimes > 0) activeSignals.push(`ghosted=${ghostedTimes}x`);
-    if (context.shared_photo) activeSignals.push('shared_photo');
-    if (context.detected_intents && context.detected_intents.length > 0) activeSignals.push(`intents=${context.detected_intents.join('|')}`);
-    if (context.conversation_stage) activeSignals.push(`stage=${context.conversation_stage}`);
+    if (context.sharedPhoto || context.shared_photo) activeSignals.push('shared_photo');
+    
+    const intents = context.detectedIntents || context.detected_intents || [];
+    if (intents.length > 0) activeSignals.push(`intents=${intents.join('|')}`);
+    
+    const stage = context.conversationStage || context.conversation_stage;
+    if (stage) activeSignals.push(`stage=${stage}`);
 
     return {
         label: topLabel,
@@ -266,59 +233,69 @@ function scoreCustomer(context, metadata, transactions) {
     };
 }
 
-// ─── Main Entry Point ────────────────────────────────────────────────────────
-
-/**
- * Classify a customer and save results to Firestore.
- * Designed to be called fire & forget, chained after extractAndSaveContext.
- */
 async function classifyAndSaveCustomer(senderNumber) {
     if (!senderNumber) return;
 
-    const docId = senderNumber.replace(/[^0-9]/g, '');
+    const docId = normalizePhone(senderNumber);
     if (!docId) return;
 
-    const db = admin.firestore();
-
     try {
-        // 1. Fetch customerContext
-        const ctxRef = db.collection('customerContext').doc(docId);
-        const ctxDoc = await ctxRef.get();
-        const context = ctxDoc.exists ? ctxDoc.data() : {};
+        const ctxData = await prisma.customerContext.findUnique({
+            where: { id: docId }
+        });
+        const context = ctxData || {};
 
-        // 2. Fetch directMessages metadata
-        const dmRef = db.collection('directMessages').doc(docId);
-        const dmDoc = await dmRef.get();
-        const metadata = dmDoc.exists ? dmDoc.data() : {};
+        const customerData = await prisma.customer.findUnique({
+            where: { phone: docId },
+            select: {
+                name: true,
+                lastMessage: true,
+                lastMessageAt: true,
+                lastMessageSender: true,
+                whatsappLid: true
+            }
+        });
 
-        // 3. Fetch transactions (with fallback strategy)
-        const customerName = metadata.name || context.customer_name || null;
+        const metadata = customerData || {};
+
+        const customerName = metadata.name || null;
         const transactions = await getCustomerTransactions(docId, customerName);
 
-        // 4. Update ghost count
         const ghostedTimes = await updateGhostedCount(docId, context, metadata);
-        context.ghosted_times = ghostedTimes;
-
-        // 5. Score
-        const result = scoreCustomer(context, metadata, transactions);
-
-        // 6. Save to customerContext
-        const update = {
-            customer_label: result.label,
-            label_confidence: result.confidence,
-            label_reason: result.reason,
-            label_scores: result.scores,
-            follow_up_strategy: STRATEGY_MAP[result.label] || 'minimal',
-            tx_count: result.txCount,
-            days_since_last_chat: result.daysSinceLastChat,
-            days_since_last_tx: result.daysSinceLastTx,
-            label_updated_at: admin.firestore.FieldValue.serverTimestamp(),
-            labeled_by: 'classifier',
+        
+        const mappedContext = {
+            ...context,
+            ghostedTimes,
         };
 
-        await ctxRef.set(update, { merge: true });
+        const result = scoreCustomer(mappedContext, metadata, transactions);
 
-        // Synchronize to directMessages for dashboard labels
+        await prisma.customerContext.upsert({
+            where: { id: docId },
+            create: {
+                id: docId,
+                phone: docId,
+                customerLabel: result.label,
+                labelConfidence: result.confidence,
+                labelReason: result.reason,
+                labelScores: result.scores,
+                followUpStrategy: STRATEGY_MAP[result.label] || 'minimal',
+                txCount: result.txCount,
+                daysSinceLastChat: result.daysSinceLastChat,
+                daysSinceLastTx: result.daysSinceLastTx,
+            },
+            update: {
+                customerLabel: result.label,
+                labelConfidence: result.confidence,
+                labelReason: result.reason,
+                labelScores: result.scores,
+                followUpStrategy: STRATEGY_MAP[result.label] || 'minimal',
+                txCount: result.txCount,
+                daysSinceLastChat: result.daysSinceLastChat,
+                daysSinceLastTx: result.daysSinceLastTx,
+            }
+        });
+
         await syncLabelToDirectMessages(senderNumber, result.label);
 
         console.log(`[Classifier] ${docId} → ${result.label} (confidence: ${result.confidence}, reason: ${result.reason})`);
@@ -332,7 +309,6 @@ async function classifyAndSaveCustomer(senderNumber) {
 
 module.exports = {
     classifyAndSaveCustomer,
-    // Exported for testing
     scoreCustomer,
     updateGhostedCount,
     getCustomerTransactions,

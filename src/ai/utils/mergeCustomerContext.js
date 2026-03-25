@@ -1,8 +1,89 @@
 // File: src/ai/utils/mergeCustomerContext.js
 // Merge logic untuk customer context extraction.
-// Tidak overwrite data lama jika ekstraksi baru tidak menemukan info.
+// Menggunakan Prisma CustomerContext model.
 
-const admin = require('firebase-admin');
+const prisma = require('../../lib/prisma');
+const { normalizePlate } = require('../../lib/vehicleService');
+
+/**
+ * Normalize phone number for use as ID.
+ */
+function normalizePhone(senderNumber) {
+    if (!senderNumber) return null;
+    return senderNumber.replace(/[^0-9]/g, '');
+}
+
+/**
+ * Map LLM snake_case output to Prisma camelCase field names.
+ */
+function mapExtractedToPrismaFields(extracted) {
+    return {
+        motorModel: extracted.motor_model || null,
+        motorPlate: extracted.motor_plate ? normalizePlate(extracted.motor_plate) : null,
+        motorYear: extracted.motor_year || null,
+        motorColor: extracted.motor_color || null,
+        motorCondition: extracted.motor_condition || null,
+        targetServices: Array.isArray(extracted.target_services) ? extracted.target_services : [],
+        serviceDetail: extracted.service_detail || null,
+        budgetSignal: extracted.budget_signal || null,
+        detectedIntents: Array.isArray(extracted.detected_intents) ? extracted.detected_intents : [],
+        isChangingTopic: extracted.is_changing_topic === true,
+        saidExpensive: extracted.said_expensive === true ? true : extracted.said_expensive === false ? false : null,
+        askedPrice: extracted.asked_price === true ? true : extracted.asked_price === false ? false : null,
+        askedAvailability: extracted.asked_availability === true ? true : extracted.asked_availability === false ? false : null,
+        sharedPhoto: extracted.shared_photo === true ? true : extracted.shared_photo === false ? false : null,
+        preferredDay: extracted.preferred_day || null,
+        preferredTime: extracted.preferred_time || null,
+        locationHint: extracted.location_hint || null,
+        quotedServices: extracted.quoted_services || null,
+        quotedTotalNormal: extracted.quoted_total_normal || null,
+        quotedTotalBundling: extracted.quoted_total_bundling || null,
+        quotedAt: extracted.quoted_at ? new Date(extracted.quoted_at) : null,
+        conversationStage: extracted.conversation_stage || null,
+        lastAiAction: extracted.last_ai_action || null,
+        upsellOffered: extracted.upsell_offered === true ? true : extracted.upsell_offered === false ? false : null,
+        upsellAccepted: extracted.upsell_accepted === true ? true : extracted.upsell_accepted === false ? false : null,
+        butuhBantuanAdmin: extracted.butuh_bantuan_admin === true,
+        conversationSummary: extracted.conversation_summary || null,
+    };
+}
+
+/**
+ * Map Prisma camelCase fields to LLM snake_case output.
+ */
+function mapPrismaToLLMFields(data) {
+    if (!data) return null;
+    return {
+        motor_model: data.motorModel,
+        motor_plate: data.motorPlate,
+        motor_year: data.motorYear,
+        motor_color: data.motorColor,
+        motor_condition: data.motorCondition,
+        target_services: data.targetServices || [],
+        service_detail: data.serviceDetail,
+        budget_signal: data.budgetSignal,
+        detected_intents: data.detectedIntents || [],
+        is_changing_topic: data.isChangingTopic,
+        said_expensive: data.saidExpensive,
+        asked_price: data.askedPrice,
+        asked_availability: data.askedAvailability,
+        shared_photo: data.sharedPhoto,
+        preferred_day: data.preferredDay,
+        preferred_time: data.preferredTime,
+        location_hint: data.locationHint,
+        quoted_services: data.quotedServices,
+        quoted_total_normal: data.quotedTotalNormal,
+        quoted_total_bundling: data.quotedTotalBundling,
+        quoted_at: data.quotedAt?.toISOString(),
+        conversation_stage: data.conversationStage,
+        last_ai_action: data.lastAiAction,
+        upsell_offered: data.upsellOffered,
+        upsell_accepted: data.upsellAccepted,
+        butuh_bantuan_admin: data.butuhBantuanAdmin,
+        conversation_summary: data.conversationSummary,
+        customer_label: data.customerLabel,
+    };
+}
 
 /**
  * Merge new extracted data with existing data.
@@ -10,29 +91,20 @@ const admin = require('firebase-admin');
  * - If new value is null/undefined/'' → keep old value
  * - If new value exists → use new (fresher)
  * - Fields in existing but not in newData → preserve
- * 
- * @param {Object} current - Existing data from Firestore
- * @param {Object} newData - Newly extracted data
- * @returns {Object} Merged data
  */
 function mergeContextData(current, newData) {
     const merged = {};
 
-    // Process incoming fields
     for (const [key, value] of Object.entries(newData)) {
         if (value === null || value === undefined || value === '') {
-            // Pertahankan data lama kalau ekstraksi baru tidak dapat info
             merged[key] = current[key] ?? null;
         } else if (key === 'upsell_offered' && current[key] === true) {
-            // Sticky true for upselling stage to avoid regression
             merged[key] = true;
         } else {
-            // Data baru lebih fresh, pakai yang baru
             merged[key] = value;
         }
     }
 
-    // Field yang ada di existing tapi tidak di newData → pertahankan
     for (const [key, value] of Object.entries(current)) {
         if (!(key in merged)) {
             merged[key] = value;
@@ -43,37 +115,60 @@ function mergeContextData(current, newData) {
 }
 
 /**
- * Merge extracted context and save to Firestore.
- * Collection: customerContext/{docId}
- * 
- * @param {string} senderNumber - Raw sender number (e.g. "6281234567890@c.us")
- * @param {Object} newData - Extracted context data
+ * Merge extracted context and save to Prisma CustomerContext.
+ * Uses upsert to avoid duplicate key errors.
  */
 async function mergeAndSaveContext(senderNumber, newData) {
     if (!senderNumber || !newData || typeof newData !== 'object') return;
 
-    const db = admin.firestore();
-    const docId = senderNumber.replace(/[^0-9]/g, '');
+    const docId = normalizePhone(senderNumber);
     if (!docId) return;
 
-    const ref = db.collection('customerContext').doc(docId);
-
     try {
-        const existing = await ref.get();
-        const current = existing.exists ? existing.data() : {};
+        const existing = await prisma.customerContext.findUnique({
+            where: { id: docId }
+        });
 
-        // Remove internal fields from merging
-        const { updatedAt, senderNumber: _, ...cleanCurrent } = current;
+        // Convert new LLM output to Prisma format (camelCase)
+        const newPrisma = mapExtractedToPrismaFields(newData);
+        
+        // Existing data is already in Prisma format (camelCase)
+        const existingPrisma = existing || {};
 
-        const merged = mergeContextData(cleanCurrent, newData);
+        // Merge: keep existing if new value is null/empty
+        const merged = {};
+        
+        // Start with existing data
+        for (const [key, value] of Object.entries(existingPrisma)) {
+            merged[key] = value;
+        }
+        
+        // Override with new data (only if not null/undefined/empty)
+        for (const [key, value] of Object.entries(newPrisma)) {
+            if (value === null || value === undefined || value === '' || 
+                (Array.isArray(value) && value.length === 0)) {
+                // Keep existing value
+                continue;
+            } else if (key === 'upsell_offered' && merged.upsellOffered === true) {
+                // Sticky true for upselling
+                continue;
+            } else {
+                merged[key] = value;
+            }
+        }
 
-        await ref.set({
-            ...merged,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            senderNumber,
-        }, { merge: true });
+        await prisma.customerContext.upsert({
+            where: { id: docId },
+            create: {
+                id: docId,
+                phone: docId,
+                ...merged,
+            },
+            update: merged,
+        });
 
-        console.log(`[Context] Saved context for ${docId}:`, Object.keys(merged).filter(k => merged[k] !== null).join(', '));
+        console.log(`[Context] Saved context for ${docId}:`, 
+            Object.keys(merged).filter(k => merged[k] !== null && merged[k] !== false && merged[k] !== '').join(', '));
     } catch (error) {
         console.error(`[Context] Error saving context for ${docId}:`, error.message);
         throw error;
@@ -81,25 +176,21 @@ async function mergeAndSaveContext(senderNumber, newData) {
 }
 
 /**
- * Retrieve customer context from Firestore.
- * 
- * @param {string} senderNumber - Raw sender number
- * @returns {Object|null} Context data or null
+ * Retrieve customer context from Prisma.
  */
 async function getCustomerContext(senderNumber) {
     if (!senderNumber) return null;
 
-    const db = admin.firestore();
-    const docId = senderNumber.replace(/[^0-9]/g, '');
+    const docId = normalizePhone(senderNumber);
     if (!docId) return null;
 
     try {
-        const doc = await db.collection('customerContext').doc(docId).get();
-        if (doc.exists) {
-            const data = doc.data();
-            // Remove internal fields
-            const { updatedAt, senderNumber: _, ...context } = data;
-            return context;
+        const data = await prisma.customerContext.findUnique({
+            where: { id: docId }
+        });
+
+        if (data) {
+            return mapPrismaToLLMFields(data);
         }
         return null;
     } catch (error) {
@@ -109,20 +200,15 @@ async function getCustomerContext(senderNumber) {
 }
 
 /**
- * Synchronize customer_label from customerContext to directMessages collection
- * to ensure visual consistency in the dashboard.
- * 
- * @param {string} senderNumber - Raw sender number
- * @param {string} aiLabel - Label from customerClassifier
+ * Synchronize customer_label from CustomerContext to Customer table
+ * for frontend dashboard compatibility.
  */
 async function syncLabelToDirectMessages(senderNumber, aiLabel) {
     if (!senderNumber || !aiLabel) return;
 
-    const db = admin.firestore();
-    const docId = senderNumber.replace(/[^0-9]/g, '');
+    const docId = normalizePhone(senderNumber);
     if (!docId) return;
 
-    // AI to Frontend Label Mapping
     const LABEL_MAPPING = {
         'hot_lead': 'hot_lead',
         'warm_lead': 'general',
@@ -138,13 +224,12 @@ async function syncLabelToDirectMessages(senderNumber, aiLabel) {
     const frontendLabel = LABEL_MAPPING[aiLabel] || 'general';
 
     try {
-        const dmRef = db.collection('directMessages').doc(docId);
-        
-        await dmRef.set({
-            customerLabel: frontendLabel,
-            labelReason: `AI Sync: ${aiLabel}`,
-            labelUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
+        await prisma.customer.update({
+            where: { phone: docId },
+            data: { 
+                status: frontendLabel === 'completed' ? 'active' : undefined
+            }
+        });
 
         console.log(`[Context] Synced label for ${docId}: ${aiLabel} -> ${frontendLabel}`);
     } catch (error) {
@@ -152,9 +237,38 @@ async function syncLabelToDirectMessages(senderNumber, aiLabel) {
     }
 }
 
+/**
+ * Get ghosted times count from context.
+ */
+async function getGhostedCount(docId) {
+    const ctx = await prisma.customerContext.findUnique({
+        where: { id: docId },
+        select: { ghostedTimes: true, lastGhostCountedAt: true }
+    });
+    return ctx?.ghostingData || { count: 0, lastCounted: null };
+}
+
+/**
+ * Update ghosted count in context.
+ */
+async function updateGhostedCountInContext(docId, newCount) {
+    await prisma.customerContext.update({
+        where: { id: docId },
+        data: {
+            ghostedTimes: newCount,
+            lastGhostCountedAt: new Date()
+        }
+    });
+}
+
 module.exports = {
     mergeContextData,
     mergeAndSaveContext,
     getCustomerContext,
     syncLabelToDirectMessages,
+    getGhostedCount,
+    updateGhostedCountInContext,
+    normalizePhone,
+    mapExtractedToPrismaFields,
+    mapPrismaToLLMFields,
 };

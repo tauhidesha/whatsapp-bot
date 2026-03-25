@@ -29,6 +29,7 @@ AI: "{aiReply}"
 Ekstrak ke format ini (isi null jika tidak disebutkan):
 {
   "motor_model": null,
+  "motor_plate": null,
   "motor_year": null,
   "motor_color": null,
   "motor_condition": null,
@@ -60,7 +61,11 @@ Aturan ketat:
 - Hanya isi field fakta yang BENAR-BENAR ada di percakapan ini
 - Jangan inferensi atau mengarang fakta
 
-PENTING (ANTI-HALUSINASI): Hanya ekstrak motor_model dan target_services jika itu adalah kendaraan MILIK USER yang akan dikerjakan. ABAIKAN kendaraan milik teman, keluarga, cerita masa lalu, atau sekadar perbandingan harga.
+PENTING (ANTI-HALUSINASI): 
+- Hanya ekstrak motor_model, motor_plate, motor_color, dan target_services jika itu adalah kendaraan MILIK USER yang akan dikerjakan.
+- ABAIKAN kendaraan milik teman, keluarga, cerita masa lalu, atau sekadar perbandingan harga.
+- Untuk motor_plate: Ekstrak JIKA user menyebut nomor plat secara eksplisit. Format Indonesia: "B 1234 ABC", "D 5678 XY", "B 1234". Jika plat mention adalah milik orang lain/teman, ABAIKAN.
+- motor_color: Bisa dalam format "hitam doff", "merah", "putih glossy", dll.
 
 NORMALISASI LAYANAN (SANGAT PENTING):
 1. JANGAN PERNAH MENGHAPUS layanan yang sudah ada di "Ringkasan Obrolan Sebelumnya". Jika sebelumnya ada "Repaint dan Detailing", pastikan KEDUANYA tetap masuk di array \`target_services\`.
@@ -136,7 +141,7 @@ function parseExtractedJSON(text) {
 }
 
 /**
- * Extract context from a single user+AI exchange and save to Firestore.
+ * Extract context from a single user+AI exchange and save to Prisma.
  * This function is designed to be called in a fire-and-forget manner.
  * 
  * @param {string} userMessage - The user's message

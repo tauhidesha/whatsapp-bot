@@ -1,16 +1,16 @@
 // File: src/ai/tools/updateBookingTool.js
-// Tool to modify existing booking records in Firestore.
+// Tool to modify existing booking records in Prisma.
 
 const { z } = require('zod');
-const admin = require('firebase-admin');
-const { getFirebaseAdmin } = require('../../lib/firebaseAdmin.js');
+const prisma = require('../../lib/prisma');
 const { parseDateTime } = require('../utils/dateTime.js');
 const { getServiceCategory } = require('./createBookingTool.js');
 const { normalizeWhatsappNumber } = require('../utils/humanHandover.js');
 const { calculateHomeServiceFee } = require('../utils/distanceMatrix.js');
 const { saveCustomerLocation, saveHomeServiceQuote, getCustomerLocation } = require('../utils/customerLocations.js');
+const { createOrUpdateVehicle, extractPlateFromText } = require('../../lib/vehicleService');
 
-const STATUS_ALLOWLIST = ['pending', 'confirmed', 'in progress', 'completed', 'cancelled'];
+const STATUS_ALLOWLIST = ['PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 
 const UpdateBookingSchema = z.object({
   bookingId: z.string().min(1, 'bookingId wajib diisi'),
@@ -21,6 +21,8 @@ const UpdateBookingSchema = z.object({
   customerName: z.string().optional(),
   customerPhone: z.string().optional(),
   vehicleInfo: z.string().optional(),
+  motorModel: z.string().optional(),
+  motorPlate: z.string().optional(),
   notes: z.string().optional(),
   estimatedDurationMinutes: z.number().int().positive().optional(),
   subtotal: z.number().optional(),
@@ -38,13 +40,6 @@ const UpdateBookingSchema = z.object({
     })
     .optional(),
 });
-
-function ensureFirestore() {
-  if (!admin.apps.length) {
-    admin.initializeApp();
-  }
-  return getFirebaseAdmin().firestore();
-}
 
 function formatDate(date) {
   const d = new Date(date);
@@ -70,14 +65,16 @@ const updateBookingTool = {
       parameters: {
         type: 'object',
         properties: {
-          bookingId: { type: 'string', description: 'ID booking di Firestore yang ingin diubah.' },
+          bookingId: { type: 'string', description: 'ID booking yang ingin diubah.' },
           bookingDate: { type: 'string', description: 'Tanggal baru (YYYY-MM-DD atau frasa natural).' },
           bookingTime: { type: 'string', description: 'Jam baru (HH:mm atau frasa natural).' },
           serviceName: { type: 'string', description: 'Nama layanan baru (bisa dipisah koma).' },
-          status: { type: 'string', description: 'Status booking baru (pending, confirmed, in progress, completed, cancelled).' },
+          status: { type: 'string', description: 'Status booking baru (PENDING, CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED).' },
           customerName: { type: 'string', description: 'Nama pelanggan (opsional).' },
           customerPhone: { type: 'string', description: 'Nomor pelanggan (opsional).' },
           vehicleInfo: { type: 'string', description: 'Info kendaraan (opsional).' },
+          motorModel: { type: 'string', description: 'Model motor (opsional).' },
+          motorPlate: { type: 'string', description: 'Plat nomor motor (opsional).' },
           notes: { type: 'string', description: 'Catatan tambahan (opsional).' },
           estimatedDurationMinutes: { type: 'number', description: 'Durasi estimasi baru (menit).' },
         },
@@ -90,142 +87,118 @@ const updateBookingTool = {
       const parsed = UpdateBookingSchema.parse(args || {});
       const { bookingId } = parsed;
 
-      const firestore = ensureFirestore();
-      const docRef = firestore.collection('bookings').doc(bookingId);
-      const snapshot = await docRef.get();
+      const existing = await prisma.booking.findUnique({
+        where: { id: bookingId },
+        include: { customer: true, vehicle: true }
+      });
 
-      if (!snapshot.exists) {
+      if (!existing) {
         return {
           success: false,
           error: `Booking dengan ID ${bookingId} tidak ditemukan.`,
         };
       }
 
-      const updatePayload = {};
-      const existingData = snapshot.data() || {};
+      const updateData = {};
 
-      if (parsed.customerName) updatePayload.customerName = parsed.customerName;
-      let updatedNormalizedPhone = null;
+      if (parsed.customerName) updateData.customerName = parsed.customerName;
       if (parsed.customerPhone) {
-        updatePayload.customerPhone = parsed.customerPhone;
-        updatedNormalizedPhone = normalizeWhatsappNumber(parsed.customerPhone);
-        updatePayload.customerPhoneNormalized = updatedNormalizedPhone;
+        updateData.customerPhone = normalizeWhatsappNumber(parsed.customerPhone);
       }
-      if (parsed.vehicleInfo) updatePayload.vehicleInfo = parsed.vehicleInfo;
-      if (parsed.notes !== undefined) updatePayload.notes = parsed.notes;
-      if (typeof parsed.estimatedDurationMinutes === 'number') {
-        updatePayload.estimatedDurationMinutes = parsed.estimatedDurationMinutes;
+      if (parsed.notes !== undefined) updateData.notes = parsed.notes;
+
+      // Handle vehicle update
+      let vehicleId = existing.vehicleId;
+      let vehicleModel = parsed.motorModel || existing.vehicleModel;
+      let vehiclePlate = parsed.motorPlate || existing.plateNumber;
+
+      if (parsed.motorModel || parsed.motorPlate || parsed.vehicleInfo) {
+        const modelToUse = parsed.motorModel || (parsed.vehicleInfo ? parsed.vehicleInfo.split('(')[0].trim() : null);
+        const plateToUse = parsed.motorPlate || extractPlateFromText(parsed.vehicleInfo);
+
+        if (modelToUse || plateToUse) {
+          try {
+            // Get customer phone from the customer relation
+            const customer = await prisma.customer.findUnique({
+              where: { id: existing.customerId },
+              select: { phone: true }
+            });
+            
+            if (customer?.phone) {
+              const vehicle = await createOrUpdateVehicle({
+                phone: customer.phone,
+                modelName: modelToUse || existing.vehicleModel,
+                plateNumber: plateToUse,
+              });
+              vehicleId = vehicle.id;
+              vehicleModel = vehicle.modelName;
+              vehiclePlate = vehicle.plateNumber;
+            }
+          } catch (err) {
+            console.warn('[updateBookingTool] Vehicle update failed:', err.message);
+          }
+        }
       }
 
-      const effectiveNormalizedPhone =
-        updatedNormalizedPhone || existingData.customerPhoneNormalized || normalizeWhatsappNumber(existingData.customerPhone);
+      updateData.vehicleId = vehicleId;
+      updateData.vehicleModel = vehicleModel;
+      updateData.plateNumber = vehiclePlate;
+
+      // Handle home service
+      const customerData = await prisma.customer.findUnique({
+        where: { id: existing.customerId },
+        select: { phone: true }
+      });
+      const effectiveNormalizedPhone = customerData?.phone;
 
       if (parsed.homeService) {
         const homeServiceInput = parsed.homeService;
-        const target = { ...existingData.homeService };
 
         if (typeof homeServiceInput.requested === 'boolean') {
-          target.requested = homeServiceInput.requested;
+          updateData.homeService = homeServiceInput.requested;
         }
 
-        let lat = homeServiceInput.latitude;
-        let lng = homeServiceInput.longitude;
-        let address = homeServiceInput.address;
-        let label = homeServiceInput.label;
-        const subtotalOverride = homeServiceInput.subtotal ?? parsed.subtotal;
-
-        if ((!Number.isFinite(lat) || !Number.isFinite(lng)) && effectiveNormalizedPhone) {
-          const storedLocation = await getCustomerLocation(effectiveNormalizedPhone);
-          if (storedLocation) {
-            lat = lat ?? storedLocation.latitude;
-            lng = lng ?? storedLocation.longitude;
-            address = address || storedLocation.address || null;
-            label = label || storedLocation.label || null;
-          }
-        }
-
-        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        if (homeServiceInput.requested && (Number.isFinite(homeServiceInput.latitude) || Number.isFinite(homeServiceInput.longitude))) {
           const calculation = await calculateHomeServiceFee({
-            latitude: Number(lat),
-            longitude: Number(lng),
-            subtotal: subtotalOverride,
+            latitude: homeServiceInput.latitude,
+            longitude: homeServiceInput.longitude,
+            subtotal: homeServiceInput.subtotal ?? parsed.subtotal,
             freeRadiusKm: homeServiceInput.freeRadiusKm,
             feePerKm: homeServiceInput.feePerKm,
             baseFee: homeServiceInput.baseFee,
           });
 
-          if (!calculation.success) {
-            return {
-              success: false,
-              error: calculation.error || 'home_service_fee_failed',
-              message: calculation.message || 'Gagal menghitung biaya home service saat update booking.',
+          if (calculation.success) {
+            // Store as JSON in notes or create separate tracking
+            const homeServiceData = {
+              ...calculation,
+              latitude: homeServiceInput.latitude,
+              longitude: homeServiceInput.longitude,
+              address: homeServiceInput.address,
+              label: homeServiceInput.label,
             };
+            updateData.notes = (updateData.notes || existing.notes || '') + `\n[Home Service Update] ${JSON.stringify(homeServiceData)}`;
           }
-
-          const merged = {
-            ...target,
-            requested: target.requested !== false,
-            latitude: Number(lat),
-            longitude: Number(lng),
-            address: address || null,
-            label: label || null,
-            distanceKm: calculation.distanceKm,
-            distanceText: calculation.distanceText,
-            durationText: calculation.durationText,
-            additionalFee: calculation.additionalFee,
-            freeRadiusKm: calculation.freeRadiusKm,
-            extraDistanceKm: calculation.extraDistanceKm,
-            feePerKm: calculation.feePerKm,
-            baseFee: calculation.baseFee,
-            subtotal: calculation.subtotal,
-            totalWithFee: calculation.totalWithFee,
-            summary: calculation.summary,
-          };
-
-          updatePayload.homeService = merged;
-
-          if (effectiveNormalizedPhone) {
-            try {
-              await saveCustomerLocation(effectiveNormalizedPhone, {
-                latitude: Number(lat),
-                longitude: Number(lng),
-                address: address || null,
-                label: label || null,
-                raw: homeServiceInput,
-                source: 'booking-update',
-              }, { skipHistory: false });
-              await saveHomeServiceQuote(effectiveNormalizedPhone, merged);
-            } catch (error) {
-              console.warn('[updateBookingTool] Gagal menyimpan info home service ke Firestore:', error);
-            }
-          }
-        } else if (typeof homeServiceInput.requested === 'boolean') {
-          updatePayload.homeService = {
-            ...target,
-            requested: homeServiceInput.requested,
-          };
         }
       }
 
+      // Handle service update
       if (parsed.serviceName) {
         const servicesArray = parsed.serviceName.split(',').map(s => s.trim()).filter(Boolean);
         if (servicesArray.length > 0) {
-          updatePayload.services = servicesArray;
-          updatePayload.category = getServiceCategory(servicesArray[0]);
+          updateData.serviceType = servicesArray.join(', ');
+          updateData.category = getServiceCategory(servicesArray[0]);
         }
       }
 
+      // Handle date/time update
       let bookingDate = parsed.bookingDate;
       let bookingTime = parsed.bookingTime;
 
       if (bookingDate || bookingTime) {
-        const existingDate = existingData.bookingDateTime?.toDate
-          ? existingData.bookingDateTime.toDate()
-          : existingData.bookingDateTime
-            ? new Date(existingData.bookingDateTime)
-            : new Date();
-
-        let baseDate = existingDate;
+        const existingDate = existing.bookingDate instanceof Date 
+          ? existing.bookingDate 
+          : new Date(existing.bookingDate);
 
         const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
         const timeRegex = /^\d{2}:\d{2}$/;
@@ -240,8 +213,8 @@ const updateBookingTool = {
           if (parsedTime.time) bookingTime = parsedTime.time;
         }
 
-        const finalDate = bookingDate || formatDate(baseDate);
-        const finalTime = bookingTime || formatTime(baseDate);
+        const finalDate = bookingDate || formatDate(existingDate);
+        const finalTime = bookingTime || formatTime(existingDate);
         const combined = new Date(`${finalDate}T${finalTime}:00`);
 
         if (Number.isNaN(combined.getTime())) {
@@ -251,52 +224,76 @@ const updateBookingTool = {
           };
         }
 
-        updatePayload.bookingDateTime = admin.firestore.Timestamp.fromDate(combined);
-        updatePayload.bookingDate = formatDate(combined);
-        updatePayload.bookingTime = formatTime(combined);
-        updatePayload.reminderSent = false;
+        updateData.bookingDate = combined;
       }
 
+      // Handle status update
       if (parsed.status) {
-        const normalizedStatus = parsed.status.trim().toLowerCase();
-        if (!STATUS_ALLOWLIST.includes(normalizedStatus)) {
+        const normalizedStatus = parsed.status.trim().toUpperCase().replace(' ', '_');
+        
+        // Map common status variations
+        const statusMap = {
+          'PENDING': 'PENDING',
+          'CONFIRMED': 'CONFIRMED',
+          'IN_PROGRESS': 'IN_PROGRESS',
+          'INPROGRESS': 'IN_PROGRESS',
+          'IN_PROG': 'IN_PROGRESS',
+          'DONE': 'COMPLETED',
+          'COMPLETED': 'COMPLETED',
+          'SELESAI': 'COMPLETED',
+          'CANCELLED': 'CANCELLED',
+          'CANCELED': 'CANCELLED',
+          'BATAL': 'CANCELLED',
+        };
+
+        const mappedStatus = statusMap[normalizedStatus] || normalizedStatus;
+        
+        if (!STATUS_ALLOWLIST.includes(mappedStatus)) {
           return {
             success: false,
             error: `Status tidak dikenali. Gunakan salah satu dari: ${STATUS_ALLOWLIST.join(', ')}`,
           };
         }
-        updatePayload.status = normalizedStatus;
-        if (normalizedStatus === 'cancelled') {
-          updatePayload.reminderSent = true;
-        }
+        updateData.status = mappedStatus;
       }
 
-      if (Object.keys(updatePayload).length === 0) {
+      if (Object.keys(updateData).length === 0) {
         return {
           success: false,
           error: 'Tidak ada field yang diubah. Sertakan minimal satu field yang ingin diperbarui.',
         };
       }
 
-      updatePayload.updatedAt = admin.firestore.FieldValue.serverTimestamp();
-
-      await docRef.update(updatePayload);
+      const updated = await prisma.booking.update({
+        where: { id: bookingId },
+        data: updateData,
+      });
 
       let summaryParts = [`Booking ${bookingId} berhasil diperbarui.`];
-      if (updatePayload.bookingDateTime) {
-        const updatedDate = updatePayload.bookingDateTime.toDate();
+      if (updateData.bookingDate) {
+        const updatedDate = updated.bookingDate instanceof Date ? updated.bookingDate : new Date(updated.bookingDate);
         summaryParts.push(`Jadwal baru: ${formatDate(updatedDate)} jam ${formatTime(updatedDate)}.`);
       }
-      if (updatePayload.services) {
-        summaryParts.push(`Layanan: ${updatePayload.services.join(', ')}.`);
+      if (updateData.serviceType) {
+        summaryParts.push(`Layanan: ${updateData.serviceType}.`);
       }
-      if (updatePayload.status) {
-        summaryParts.push(`Status: ${updatePayload.status}.`);
+      if (updateData.status) {
+        summaryParts.push(`Status: ${updateData.status}.`);
+      }
+      if (updateData.vehicleModel || updateData.plateNumber) {
+        summaryParts.push(`Kendaraan: ${updateData.vehicleModel || '-'}${updateData.plateNumber ? ` (${updateData.plateNumber})` : ''}.`);
       }
 
       return {
         success: true,
         summary: summaryParts.join(' '),
+        booking: {
+          id: updated.id,
+          status: updated.status,
+          bookingDate: updated.bookingDate,
+          vehicleModel: updated.vehicleModel,
+          plateNumber: updated.plateNumber,
+        },
       };
     } catch (error) {
       console.error('[updateBookingTool] Error:', error);

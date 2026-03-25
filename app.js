@@ -1046,8 +1046,17 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                         parts.push(`---------------------------`);
                     }
 
-                    // Motor identity
-                    if (customerCtx.motor_model) parts.push(`- Motor: ${customerCtx.motor_model}`);
+                    // Motor identity (with plate number)
+                    if (customerCtx.motor_model) {
+                        let motorInfo = `- Motor: ${customerCtx.motor_model}`;
+                        if (customerCtx.motor_plate) {
+                            motorInfo += ` (Plat: ${customerCtx.motor_plate})`;
+                        }
+                        parts.push(motorInfo);
+                    }
+                    if (customerCtx.motor_plate && !customerCtx.motor_model) {
+                        parts.push(`- Plat Nomor: ${customerCtx.motor_plate}`);
+                    }
                     if (customerCtx.motor_year) parts.push(`- Tahun motor: ${customerCtx.motor_year}`);
                     if (customerCtx.motor_color) parts.push(`- Warna motor: ${customerCtx.motor_color}`);
                     if (customerCtx.motor_condition) parts.push(`- Kondisi: ${customerCtx.motor_condition}`);
@@ -1098,6 +1107,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                     // Mengarahkan AI sesuai alur obrolan: Kualifikasi -> Konsultasi -> Upsell -> Booking
                     let actionDirective = "";
                     const m_model = customerCtx.motor_model || (state && state.motor_model);
+                    const m_plate = customerCtx.motor_plate;
                     const t_services = (customerCtx.target_services?.length > 0) ? customerCtx.target_services : (customerCtx.target_service ? [customerCtx.target_service] : (state && state.target_service ? [state.target_service] : []));
                     const t_service_display = t_services.join(', ');
 
@@ -1108,7 +1118,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                     const isDetailing = t_services.some(s => s.toLowerCase().includes('detailing') || s.toLowerCase().includes('cuci'));
 
                     if (!m_model) {
-                        actionDirective = `\n🎯 TARGET SAAT INI (KUALIFIKASI): Kamu belum tahu *jenis/tipe motor* user. Tanyakan tipe motornya secara natural. JANGAN bahas harga atau jadwal dulu.`;
+                        actionDirective = `\n🎯 TARGET SAAT INI (KUALIFIKASI): Kamu belum tahu *jenis/tipe motor* user. Tanyakan tipe motornya secara natural, termasuk plat nomornya jika memungkinkan. JANGAN bahas harga atau jadwal dulu.`;
                     } else if (t_services.length === 0) {
                         actionDirective = `\n🎯 TARGET SAAT INI (KUALIFIKASI): Kamu sudah tahu motornya (${m_model}), tapi belum tahu *layanan yang dibutuhkan* (Repaint/Detailing/Coating). Tanyakan kebutuhannya apa.`;
                     } else if (isRepaint && !m_color) {
@@ -1940,16 +1950,21 @@ function start(client) {
         }
 
         let senderNumber = msg.from;
+        let originalLid = senderNumber.endsWith('@lid') ? senderNumber : null;
+        let realPhoneFallback = '';
 
         // Resolve @lid (Linked Devices / Meta Business) ke nomor asli
         if (senderNumber.endsWith('@lid')) {
             try {
-                // Coba ambil pnJid dari payload message (lazy load)
-                if (msg.sender && msg.sender.pnJid) {
+                const contact = await client.getContact(msg.from);
+                
+                if (contact && contact.id && contact.id._serialized && contact.id._serialized.includes('@c.us')) {
+                    senderNumber = contact.id._serialized;
+                } else if (msg.sender && msg.sender.pnJid) {
                     senderNumber = msg.sender.pnJid;
                 } else {
-                    // Fallback: minta nomor aslinya ke WPPConnect
-                    const realPhone = await client.requestPhoneNumber(senderNumber);
+                    // Fallback WPPConnect
+                    const realPhone = await client.requestPhoneNumber(msg.from);
                     if (realPhone) {
                         senderNumber = realPhone;
                     }
@@ -1958,6 +1973,21 @@ function start(client) {
                 console.warn(`[WPP] Warning: Gagal resolve nomor asli dari LID ${msg.from}:`, err.message);
             }
         }
+
+        // Standardize to 62...
+        const { normalizePhone } = require('./src/server/firestoreTriggers.js');
+        const normalized = normalizePhone(senderNumber);
+        
+        if (normalized) {
+            // Keep suffix for parseSenderIdentity if it had one, or force it
+            senderNumber = senderNumber.endsWith('@c.us') || senderNumber.endsWith('@lid') 
+                ? `${normalized}${senderNumber.substring(senderNumber.indexOf('@'))}` 
+                : `${normalized}@c.us`; 
+        } else if (originalLid) {
+            // Unresolved lid, set fallback empty so AI can ask
+            realPhoneFallback = '';
+        }
+
         const senderName = msg.sender.pushname || msg.notifyName || senderNumber;
         let messageContent = msg.body;
         const isMedia = msg.isMedia || msg.type === 'image' || msg.type === 'video' || msg.type === 'tv' || msg.type === 'document';
@@ -2187,92 +2217,99 @@ function start(client) {
     });
 }
 
-// --- Firebase Functions ---
-async function saveMessageToFirestore(senderNumber, message, senderType) {
-    if (!db) return;
-
+// --- Prisma Message Saving ---
+async function saveMessageToPrisma(senderNumber, message, senderType) {
+    const prisma = require('./src/lib/prisma');
+    
     const { docId, channel, platformId } = parseSenderIdentity(senderNumber);
-    if (!docId) {
-        return;
-    }
+    if (!docId) return;
 
     try {
-        const messagesRef = db.collection('directMessages').doc(docId).collection('messages');
-        const serverTimestamp = admin.firestore.FieldValue.serverTimestamp();
-
-        await messagesRef.add({
-            text: message,
-            timestamp: serverTimestamp,
-            sender: senderType,
-        });
-
         const snoozeInfo = await getSnoozeInfo(senderNumber);
 
-        await db.collection('directMessages').doc(docId).set({
-            lastMessage: message,
-            lastMessageSender: senderType,
-            lastMessageAt: serverTimestamp,
-            updatedAt: serverTimestamp,
-            messageCount: admin.firestore.FieldValue.increment(1),
-            channel,
-            platform: channel,
-            platformId: platformId || docId,
-            fullSenderId: senderNumber,
-            // Sync AI State
-            aiEnabled: !snoozeInfo.active,
-            aiPaused: snoozeInfo.active,
-            aiPausedUntil: snoozeInfo.expiresAt ? admin.firestore.Timestamp.fromDate(new Date(snoozeInfo.expiresAt)) : null,
-            aiPauseReason: snoozeInfo.reason,
-        }, { merge: true });
+        const roleMap = {
+            'user': 'user',
+            'ai': 'assistant',
+            'admin': 'admin',
+        };
+
+        const customer = await prisma.customer.findUnique({
+            where: { phone: docId }
+        });
+
+        if (customer) {
+            await prisma.directMessage.create({
+                data: {
+                    customerId: customer.id,
+                    senderId: senderNumber,
+                    role: roleMap[senderType] || 'user',
+                    content: message,
+                }
+            });
+
+            await prisma.customer.update({
+                where: { id: customer.id },
+                data: {
+                    lastMessage: message,
+                    lastMessageAt: new Date(),
+                    lastMessageSender: senderType,
+                    aiPaused: snoozeInfo.active || false,
+                    aiPausedUntil: snoozeInfo.expiresAt ? new Date(snoozeInfo.expiresAt) : null,
+                    aiPauseReason: snoozeInfo.reason,
+                }
+            });
+        }
     } catch (error) {
-        console.error('Error saving to Firestore:', error);
+        console.error('Error saving message to Prisma:', error);
     }
+}
+
+// Alias for backward compatibility
+async function saveMessageToFirestore(senderNumber, message, senderType) {
+    return saveMessageToPrisma(senderNumber, message, senderType);
 }
 
 const fetchedProfilePics = new Set(); // Keep track of numbers we already fetched DP for
 
 async function saveSenderMeta(senderNumber, displayName, client = null) {
-    if (!db) return;
+    const prisma = require('./src/lib/prisma');
 
     const { docId, channel, platformId } = parseSenderIdentity(senderNumber);
-    if (!docId) {
-        return;
-    }
+    if (!docId) return;
 
     let profilePicUrl = null;
     if (client && channel === 'whatsapp' && !fetchedProfilePics.has(senderNumber)) {
         try {
             profilePicUrl = await client.getProfilePicFromServer(senderNumber);
-            fetchedProfilePics.add(senderNumber); // Mark as fetched for this session
+            fetchedProfilePics.add(senderNumber);
         } catch (error) {
             console.warn(`[ProfilePic] Gagal mengambil foto profil untuk ${senderNumber}:`, error.message);
         }
     }
 
     try {
-        const metaRef = db.collection('directMessages').doc(docId);
-
         const snoozeInfo = await getSnoozeInfo(senderNumber);
 
-        const updateData = {
-            name: displayName,
-            channel,
-            platform: channel,
-            platformId: platformId || docId,
-            fullSenderId: senderNumber,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            // Sync AI State
-            aiEnabled: !snoozeInfo.active,
-            aiPaused: snoozeInfo.active,
-            aiPausedUntil: snoozeInfo.expiresAt ? admin.firestore.Timestamp.fromDate(new Date(snoozeInfo.expiresAt)) : null,
-            aiPauseReason: snoozeInfo.reason,
-        };
+        const customer = await prisma.customer.upsert({
+            where: { phone: docId },
+            create: {
+                phone: docId,
+                name: displayName || docId,
+                profilePicUrl: profilePicUrl,
+                aiPaused: snoozeInfo.active || false,
+                aiPausedUntil: snoozeInfo.expiresAt ? new Date(snoozeInfo.expiresAt) : null,
+                aiPauseReason: snoozeInfo.reason,
+            },
+            update: {
+                name: displayName,
+                profilePicUrl: profilePicUrl || undefined,
+                aiPaused: snoozeInfo.active || false,
+                aiPausedUntil: snoozeInfo.expiresAt ? new Date(snoozeInfo.expiresAt) : null,
+                aiPauseReason: snoozeInfo.reason,
+            }
+        });
 
-        if (profilePicUrl) {
-            updateData.profilePicUrl = profilePicUrl;
-        }
-
-        await metaRef.set(updateData, { merge: true });
+        console.log(`[Prisma] Sender meta saved for ${docId}:`, customer.id);
     } catch (error) {
         console.error('Error saving sender meta:', error);
     }
@@ -2827,6 +2864,15 @@ app.patch('/bookings/:id/status', async (req, res) => {
 // --- Server Startup ---
 server.listen(PORT, '0.0.0.0', async () => {
     console.log(`🚀 WhatsApp AI Chatbot listening on http://0.0.0.0:${PORT}`);
+    
+    // Start real-time Firestore triggers for unified CRM
+    try {
+        const { startFirestoreTriggers } = require('./src/server/firestoreTriggers.js');
+        startFirestoreTriggers();
+    } catch (e) {
+        console.error('Failed to start Firestore Triggers:', e);
+    }
+
     console.log(`🤖 AI Provider: Google Gemini`);
     console.log(`🤖 AI Model: ${process.env.AI_MODEL || 'gemini-flash-lite-latest'}`);
     console.log(`🖼️  Vision Model: ${ACTIVE_VISION_MODEL}`);

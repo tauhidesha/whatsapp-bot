@@ -1,45 +1,55 @@
 // File: src/ai/utils/firestoreUtils.js
-// Shared Firestore utility functions, extracted from app.js for cross-module usage.
-
-const admin = require('firebase-admin');
+// Transitioned to Prisma! Keeping filename temporarily.
+const prisma = require('../../lib/prisma.js');
 const { parseSenderIdentity } = require('../../lib/utils.js');
 
 /**
- * Save a message to Firestore directMessages collection.
- * @param {string} senderNumber - Raw sender number
+ * Save a message to Supabase DirectMessage table.
+ * @param {string} senderNumber - Raw sender number (@c.us or @lid)
  * @param {string} message - Message text
- * @param {string} senderType - 'user', 'ai', or 'admin'
+ * @param {string} senderType - 'user', 'assistant', or 'admin'
  */
 async function saveMessageToFirestore(senderNumber, message, senderType) {
-    const db = admin.firestore();
-    if (!db) return;
-
-    const { docId, channel, platformId } = parseSenderIdentity(senderNumber);
+    const role = senderType === 'ai' ? 'assistant' : senderType;
+    const { docId } = parseSenderIdentity(senderNumber);
     if (!docId) return;
 
     try {
-        const messagesRef = db.collection('directMessages').doc(docId).collection('messages');
-        const serverTimestamp = admin.firestore.FieldValue.serverTimestamp();
-
-        await messagesRef.add({
-            text: message,
-            timestamp: serverTimestamp,
-            sender: senderType,
+        let customer = await prisma.customer.findFirst({
+            where: {
+                OR: [
+                    { phone: docId },
+                    { whatsappLid: senderNumber }
+                ]
+            }
         });
 
-        await db.collection('directMessages').doc(docId).set({
-            lastMessage: message,
-            lastMessageSender: senderType,
-            lastMessageAt: serverTimestamp,
-            updatedAt: serverTimestamp,
-            messageCount: admin.firestore.FieldValue.increment(1),
-            channel,
-            platform: channel,
-            platformId: platformId || docId,
-            fullSenderId: senderNumber,
-        }, { merge: true });
+        if (!customer) {
+            customer = await prisma.customer.create({
+                data: {
+                    phone: docId,
+                    whatsappLid: senderNumber.includes('@lid') ? senderNumber : null,
+                    status: 'new'
+                }
+            });
+        }
+
+        await prisma.directMessage.create({
+            data: {
+                customerId: customer.id,
+                senderId: senderNumber,
+                role: role,
+                content: typeof message === 'string' ? message : JSON.stringify(message)
+            }
+        });
+        
+        await prisma.customer.update({
+             where: { id: customer.id },
+             data: { updatedAt: new Date() }
+        });
+
     } catch (error) {
-        console.error('Error saving to Firestore:', error);
+        console.error('Error saving to Prisma DB:', error);
     }
 }
 

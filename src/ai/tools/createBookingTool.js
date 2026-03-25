@@ -1,10 +1,10 @@
 // File: src/ai/tools/createBookingTool.js
-// Tool to create a new booking entry in Firestore.
+// Tool to create a new booking entry in Prisma (with vehicle linking).
 
 const { z } = require('zod');
-const admin = require('firebase-admin');
-const { getFirebaseAdmin } = require('../../lib/firebaseAdmin.js');
-const { notifyNewBooking, normalizeWhatsappNumber } = require('../utils/humanHandover.js');
+const prisma = require('../../lib/prisma');
+const { createOrUpdateVehicle, extractPlateFromText } = require('../../lib/vehicleService');
+const { normalizeWhatsappNumber } = require('../utils/humanHandover.js');
 const { calculateHomeServiceFee, formatCurrency } = require('../utils/distanceMatrix.js');
 const { saveCustomerLocation, getCustomerLocation, saveHomeServiceQuote } = require('../utils/customerLocations.js');
 
@@ -45,6 +45,27 @@ function formatTime(date) {
   return `${hours}:${minutes}`;
 }
 
+function extractModelFromText(text) {
+  if (!text) return null;
+  const patterns = [
+    /(?:motor|mobil|vehicle)\s+(?:nya\s+)?(.+?)(?:\s+plat|\s*$)/i,
+    /(?:beat|nmax|vario|scoopy|vespa|cbr|vixion|supra|custom)\b/gi,
+  ];
+  
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) {
+      return match[1] ? match[1].trim() : match[0].trim();
+    }
+  }
+  
+  const words = text.split(/\s+/);
+  if (words.length >= 2) {
+    return words.slice(0, 3).join(' ');
+  }
+  return text.trim();
+}
+
 const LocationSchema = z.object({
   latitude: z.number(),
   longitude: z.number(),
@@ -64,7 +85,9 @@ const BookingArgsSchema = z.object({
   serviceName: z.string(),
   bookingDate: z.string(),
   bookingTime: z.string(),
-  vehicleInfo: z.string(),
+  vehicleInfo: z.string().optional(),
+  motorModel: z.string().optional(),
+  motorPlate: z.string().optional(),
   clientId: z.string().optional(),
   notes: z.string().optional(),
   subtotal: z.number().optional(),
@@ -90,9 +113,11 @@ const createBookingTool = {
           serviceName: { type: 'string', description: 'Nama layanan (koma dipisah).' },
           bookingDate: { type: 'string', description: 'Tgl (YYYY-MM-DD).' },
           bookingTime: { type: 'string', description: 'Jam (HH:mm).' },
-          vehicleInfo: { type: 'string', description: "Info kendaraan." },
+          vehicleInfo: { type: 'string', description: "Info kendaraan (model & plat)." },
+          motorModel: { type: 'string', description: "Model motor (optional, extracted from vehicleInfo)." },
+          motorPlate: { type: 'string', description: "Plat nomor motor (optional, extracted from vehicleInfo)." },
         },
-        required: ['customerPhone', 'customerName', 'serviceName', 'bookingDate', 'bookingTime', 'vehicleInfo'],
+        required: ['serviceName', 'bookingDate', 'bookingTime'],
       },
     },
   },
@@ -117,6 +142,8 @@ const createBookingTool = {
         bookingDate,
         bookingTime,
         vehicleInfo,
+        motorModel,
+        motorPlate,
         notes,
         subtotal,
         homeService,
@@ -162,8 +189,6 @@ const createBookingTool = {
         };
       }
 
-      const servicesArray = primaryServices;
-
       if (!customerName) {
         return {
           success: false,
@@ -180,6 +205,8 @@ const createBookingTool = {
         };
       }
 
+      const normalizedPhone = normalizeWhatsappNumber(customerPhone);
+
       const dateTimeString = `${bookingDate}T${bookingTime}:00`;
       const bookingDateTime = new Date(dateTimeString);
       if (Number.isNaN(bookingDateTime.getTime())) {
@@ -189,49 +216,53 @@ const createBookingTool = {
         };
       }
 
-      if (!admin.apps.length) {
-        admin.initializeApp();
+      // Get or create customer
+      const customer = await prisma.customer.upsert({
+        where: { phone: normalizedPhone },
+        create: {
+          phone: normalizedPhone,
+          name: customerName,
+        },
+        update: {
+          name: customerName,
+        }
+      });
+
+      // Extract vehicle info
+      let vehicleModel = motorModel || null;
+      let vehiclePlate = motorPlate || null;
+      let vehicleId = null;
+
+      if (!vehicleModel && vehicleInfo) {
+        vehicleModel = extractModelFromText(vehicleInfo);
       }
-      const firestore = getFirebaseAdmin().firestore();
-
-      const bookingData = {
-        customerName,
-        customerPhone,
-        vehicleInfo,
-        bookingDateTime: admin.firestore.Timestamp.fromDate(bookingDateTime),
-        customerPhoneNormalized: normalizeWhatsappNumber(customerPhone),
-        bookingDate: formatDate(bookingDateTime),
-        bookingTime: formatTime(bookingDateTime),
-        status: 'pending',
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        services: primaryServices,
-        category: getServiceCategory(primaryServices[0]),
-        reminderSent: false,
-      };
-
-      if (notes) {
-        bookingData.notes = notes;
+      if (!vehiclePlate && vehicleInfo) {
+        vehiclePlate = extractPlateFromText(vehicleInfo);
       }
 
-      const inspectionLabel = typeof inspection === 'string' && inspection.trim()
-        ? inspection.trim()
-        : detectedInspection;
+      // Create or update vehicle
+      if (vehicleModel) {
+        try {
+          const vehicle = await createOrUpdateVehicle({
+            phone: normalizedPhone,
+            modelName: vehicleModel,
+            plateNumber: vehiclePlate,
+          });
+          vehicleId = vehicle.id;
+          vehiclePlate = vehicle.plateNumber;
+          vehicleModel = vehicle.modelName;
+        } catch (err) {
+          console.warn('[createBookingTool] Vehicle creation failed:', err.message);
+        }
+      }
 
+      // Handle additional services
       const pickupIsObject = pickup && typeof pickup === 'object' && !Array.isArray(pickup);
       const pickupExplicitFalse = pickup === false;
       const effectiveHomeService = homeService === true || (homeService === undefined && detectedHomeService);
 
-      if (effectiveHomeService) {
-        bookingData.additionalService = 'Home Service';
-      } else if (!effectiveHomeService && !pickupExplicitFalse && (pickupIsObject || detectedPickup)) {
-        bookingData.additionalService = 'Jemput-Antar';
-      } else if (inspectionLabel) {
-        bookingData.additionalService = inspectionLabel;
-      }
-
       let homeServiceDetails = null;
       let pickupDetails = null;
-      const normalizedPhone = normalizeWhatsappNumber(customerPhone);
 
       if (effectiveHomeService || customerLocation) {
         const effectiveLocation = customerLocation || (normalizedPhone ? await getCustomerLocation(normalizedPhone) : null);
@@ -245,13 +276,6 @@ const createBookingTool = {
         }
 
         const { latitude, longitude } = effectiveLocation;
-        if (typeof latitude !== 'number' || typeof longitude !== 'number') {
-          return {
-            success: false,
-            error: 'invalid_coordinates',
-            message: 'Koordinat lokasi pelanggan tidak valid.',
-          };
-        }
 
         if (normalizedPhone) {
           await saveCustomerLocation(normalizedPhone, {
@@ -295,20 +319,12 @@ const createBookingTool = {
           subtotal: calculation.subtotal,
           totalWithFee: calculation.totalWithFee,
           summary: calculation.summary,
-        };
-
-        bookingData.homeService = {
-          ...homeServiceDetails,
           type: 'Home Service',
         };
 
         if (normalizedPhone) {
           await saveHomeServiceQuote(normalizedPhone, homeServiceDetails);
         }
-      } else if (homeService === false) {
-        bookingData.homeService = {
-          requested: false,
-        };
       }
 
       if (!pickupExplicitFalse && (pickupIsObject || detectedPickup)) {
@@ -321,56 +337,79 @@ const createBookingTool = {
           notes: pickupSource.notes || (detectedPickup ? 'Auto-detected dari layanan tambahan.' : null),
           type: 'Jemput-Antar',
         };
-
-        bookingData.pickupService = pickupDetails;
-
-        if (!bookingData.additionalService) {
-          bookingData.additionalService = 'Jemput-Antar';
-        }
-      } else if (pickupExplicitFalse) {
-        bookingData.pickupService = {
-          requested: false,
-        };
       }
 
-      if (inspectionLabel) {
-        bookingData.inspectionService = {
-          requested: true,
-          type: inspectionLabel,
-        };
+      const inspectionLabel = typeof inspection === 'string' && inspection.trim()
+        ? inspection.trim()
+        : detectedInspection;
 
-        if (!bookingData.additionalService) {
-          bookingData.additionalService = inspectionLabel;
+      const additionalServiceLabel = effectiveHomeService ? 'Home Service' 
+        : (!effectiveHomeService && !pickupExplicitFalse && (pickupIsObject || detectedPickup)) ? 'Jemput-Antar'
+        : inspectionLabel || null;
+
+      // Create booking in Prisma
+      const booking = await prisma.booking.create({
+        data: {
+          customerId: customer.id,
+          vehicleId,
+          customerName,
+          plateNumber: vehiclePlate,
+          vehicleModel,
+          bookingDate: bookingDateTime,
+          serviceType: primaryServices.join(', '),
+          status: 'PENDING',
+          notes,
+          subtotal,
+          homeService: effectiveHomeService || false,
+          pickupService: pickupDetails?.requested || false,
+          category: getServiceCategory(primaryServices[0]),
         }
+      });
+
+      console.log(`[createBookingTool] Booking berhasil dibuat dengan ID: ${booking.id}`);
+
+      // Notify admin (from humanHandover)
+      try {
+        const { notifyNewBooking } = require('../utils/humanHandover.js');
+        const vehicleInfo = vehicleModel ? `${vehicleModel}${vehiclePlate ? ` (${vehiclePlate})` : ''}` : null;
+        await notifyNewBooking({
+          bookingId: booking.id,
+          customerName,
+          customerPhone: normalizedPhone,
+          vehicleInfo,
+          bookingDate: formatDate(bookingDateTime),
+          bookingTime: formatTime(bookingDateTime),
+          services: primaryServices,
+        });
+      } catch (err) {
+        console.warn('[createBookingTool] Notify failed:', err.message);
       }
 
-      const bookingRef = await firestore.collection('bookings').add(bookingData);
-      console.log(`[createBookingTool] Booking berhasil dibuat dengan ID: ${bookingRef.id}`);
-
-      await notifyNewBooking(bookingData);
-
-      let successMessage = `Booking untuk ${customerName} pada ${bookingData.bookingDate} jam ${bookingData.bookingTime} berhasil dibuat.`;
+      let successMessage = `Booking untuk ${customerName} pada ${formatDate(bookingDateTime)} jam ${formatTime(bookingDateTime)} berhasil dibuat.`;
+      if (vehicleModel) {
+        successMessage += ` Motor: ${vehicleModel}${vehiclePlate ? ` (${vehiclePlate})` : ''}.`;
+      }
       if (homeServiceDetails && homeServiceDetails.additionalFee > 0) {
         successMessage += ` Biaya home service tambahan: ${formatCurrency(homeServiceDetails.additionalFee)}.`;
       }
-
       if (pickupDetails?.shareLocationUrl) {
         successMessage += ` Share lokasi jemput: ${pickupDetails.shareLocationUrl}`;
       } else if (pickupDetails?.requested) {
         successMessage += ' Jemput-antar dijadwalkan.';
       }
-
       if (inspectionLabel) {
         successMessage += ` Inspeksi: ${inspectionLabel}.`;
       }
 
       return {
         success: true,
-        bookingId: bookingRef.id,
+        bookingId: booking.id,
         message: successMessage,
+        vehicleId,
+        plateNumber: vehiclePlate,
+        vehicleModel,
         homeService: homeServiceDetails,
         pickupService: pickupDetails,
-        additionalService: bookingData.additionalService,
       };
     } catch (error) {
       console.error('[createBookingTool] Gagal menyimpan booking:', error);
@@ -386,4 +425,6 @@ module.exports = {
   createBookingTool,
   getServiceCategory,
   stringSimilarity,
+  extractModelFromText,
+  extractPlateFromText,
 };
