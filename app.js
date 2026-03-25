@@ -1921,6 +1921,10 @@ async function processBufferedMessages(senderNumber, client) {
 
 // --- WhatsApp Event Handlers ---
 function start(client) {
+    // Initialize Coating Maintenance Reminders
+    const { initCoatingRemindersSchedule } = require('./src/ai/utils/coatingReminders');
+    initCoatingRemindersSchedule(client);
+
     const debounceQueue = new DebounceQueue(DEBOUNCE_DELAY_MS, async (senderNumber) => {
         await processBufferedMessages(senderNumber, client);
     });
@@ -1976,6 +1980,10 @@ function start(client) {
 
         // Save sender metadata
         await saveSenderMeta(senderNumber, senderName, client);
+
+        // Mark coating reminders as replied
+        const { markCoatingReminderAsReplied } = require('./src/ai/utils/coatingReminders');
+        markCoatingReminderAsReplied(senderNumber).catch(e => console.error('[ReminderAck]', e.message));
 
         let locationContext = null;
 

@@ -5,6 +5,7 @@ const admin = require('firebase-admin');
 const { generateFollowUpMessage, getDaysSince } = require('./messageGenerator.js');
 const { shouldStop, handleStopAction } = require('./stopCondition.js');
 const { saveMessageToFirestore } = require('../../utils/firestoreUtils.js');
+const { markBotMessage } = require('../../utils/adminMessageSync.js');
 
 // ─── Strategy Config ─────────────────────────────────────────────────────────
 
@@ -227,6 +228,7 @@ async function processFollowUp(customer) {
         return;
     }
 
+    markBotMessage(senderNumber, message);
     await global.whatsappClient.sendText(senderNumber, message);
     console.log(`[Scheduler] ✅ Sent to ${docId}: "${message.substring(0, 50)}..."`);
 

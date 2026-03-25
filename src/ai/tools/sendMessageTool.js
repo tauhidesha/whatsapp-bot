@@ -3,6 +3,7 @@ const { z } = require('zod');
 const admin = require('firebase-admin');
 const { isAdmin, ensureFirestore } = require('../utils/adminAuth.js');
 const { normalizeWhatsappNumber } = require('../utils/humanHandover.js');
+const { markBotMessage } = require('../utils/adminMessageSync.js');
 
 const sendMessageSchema = z.object({
   destination: z.string().describe('Nomor tujuan (contoh: 08123456789)'),
@@ -67,6 +68,8 @@ const sendMessageTool = {
         };
       }
 
+      // Mark pesan agar onAnyMessage tidak trigger auto-snooze
+      markBotMessage(target, message);
       await client.sendText(target, message);
 
       // --- Simpan ke Firestore agar AI punya konteks ---

@@ -1,10 +1,8 @@
 node_modules
-logs
+sessions
 tokens
-admin-ui
 .git
-.gitmodules
-.gitignore
-README.md
 .env
-
+evolution-db-data
+evolution_store
+admin-frontend

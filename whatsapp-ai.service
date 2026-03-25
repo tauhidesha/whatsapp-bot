@@ -13,6 +13,8 @@ Environment="NODE_ENV=production"
 Environment="WHATSAPP_AUTO_CLOSE=false"
 Environment="WHATSAPP_HEADLESS=true"
 Environment="WHATSAPP_KEEP_ONLINE=true"
+# Batasi heap Node.js ke 512MB agar GC jalan sebelum OOM
+Environment="NODE_OPTIONS=--max-old-space-size=512"
 # Load env vars lainnya dari file
 EnvironmentFile=/home/ec2-user/whatsapp-bot/.env
 # Gunakan 'which node' untuk cek path node
@@ -22,6 +24,13 @@ RestartSec=10
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=whatsapp-ai
+
+# ---- Memory limits di level systemd ----
+# Batasi total memory proses ini (termasuk Chromium child processes)
+MemoryMax=1400M
+MemorySwapMax=512M
+# Jika OOM tetap terjadi, restart otomatis (bukan crash seluruh OS)
+OOMPolicy=restart
 
 # Security settings
 NoNewPrivileges=true

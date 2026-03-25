@@ -9,7 +9,7 @@ const { mergeAndSaveContext, getCustomerContext } = require('../utils/mergeCusto
 const { getLangSmithCallbacks } = require('../utils/langsmith.js');
 
 // Model ringan untuk extraction — cepat dan murah
-const EXTRACTOR_MODEL = 'gemini-3.1-flash-lite-preview';
+const EXTRACTOR_MODEL = 'gemini-flash-lite-latest';
 
 const EXTRACTOR_PROMPT = `Kamu adalah data extractor untuk sistem CRM bengkel motor.
 Tugasmu ada dua:
@@ -32,15 +32,17 @@ Ekstrak ke format ini (isi null jika tidak disebutkan):
   "motor_year": null,
   "motor_color": null,
   "motor_condition": null,
-  "target_service": null,
+  "target_services": [],
   "service_detail": null,
   "budget_signal": null,
-  "intent_level": null,
+  "detected_intents": [],
+  "is_changing_topic": false,
   "said_expensive": null,
   "asked_price": null,
   "asked_availability": null,
   "shared_photo": null,
   "preferred_day": null,
+  "preferred_time": null,
   "location_hint": null,
   "quoted_services": [],
   "quoted_total_normal": null,
@@ -50,12 +52,24 @@ Ekstrak ke format ini (isi null jika tidak disebutkan):
   "last_ai_action": null,
   "upsell_offered": null,
   "upsell_accepted": null,
-  "conversation_summary": "Ringkasan SINGKAT dan PADAT tentang apa yang diobrolkan sejauh ini, gabungan dari ringkasan sebelumnya dan percakapan saat ini."
+  "butuh_bantuan_admin": false,
+  "conversation_summary": "Ringkasan SINGKAT dan PADAT."
 }
 
 Aturan ketat:
 - Hanya isi field fakta yang BENAR-BENAR ada di percakapan ini
 - Jangan inferensi atau mengarang fakta
+
+PENTING (ANTI-HALUSINASI): Hanya ekstrak motor_model dan target_services jika itu adalah kendaraan MILIK USER yang akan dikerjakan. ABAIKAN kendaraan milik teman, keluarga, cerita masa lalu, atau sekadar perbandingan harga.
+
+NORMALISASI LAYANAN (SANGAT PENTING):
+1. JANGAN PERNAH MENGHAPUS layanan yang sudah ada di "Ringkasan Obrolan Sebelumnya". Jika sebelumnya ada "Repaint dan Detailing", pastikan KEDUANYA tetap masuk di array \`target_services\`.
+2. Jika user hanya menyebut umum "detailing", tulis saja "Detailing" (Jangan otomatis diubah jadi Full Detailing).
+3. Jika user hanya menyebut umum "repaint", tulis saja "Repaint".
+4. Jika user minta: "bersihin mesin", "bersihin rangka", "bongkar bodi" -> Ekstrak sebagai: "Cuci Komplit".
+5. Jika user minta: "poles bodi", "hilangin kusam" -> Ekstrak sebagai: "Poles Bodi Glossy".
+6. Jika user minta: "cat velg" -> Ekstrak sebagai: "Repaint Velg".
+
 - conversation_stage: 
     "greeting"     → baru mulai
     "qualifying"   → AI sedang tanya motor/kebutuhan
@@ -71,13 +85,17 @@ Aturan ketat:
 - quoted_total_normal: Total harga sebelum diskon.
 - quoted_total_bundling: Harga paket/bundling jika ditawarkan oleh AI.
 - quoted_at: Isi dengan "{timestamp}" jika ada quoted_services yang baru diberikan.
-- intent_level: "hot" jika tanya jadwal/mau datang, 
-                "warm" jika tanya harga/detail,
-                "cold" jika hanya lihat-lihat
-- budget_signal: "ketat" jika bilang mahal/kemahalan,
-                 "oke" jika setuju harga,
-                 null jika tidak disebut
-- conversation_summary: WAJIB diisi. Gabungkan intisari "Ringkasan Obrolan Sebelumnya" (jika ada) dengan "Percakapan Saat Ini" menjadi 1-2 kalimat padat. Fokus pada apa yang diinginkan/ditanyakan customer.`;
+- detected_intents: Array intent yang terdeteksi di chat TERAKHIR user. Pilih dari enum: ["tanya_harga", "tanya_lokasi", "mulai_booking", "tanya_teknis", "tanya_layanan", "lainnya"]. Boleh lebih dari satu.
+- is_changing_topic: Set true JIKA user tiba-tiba mengubah topik (misal: dari booking tiba-tiba tanya hal lain), membatalkan niat booking, atau berubah pikiran soal layanan/motor.
+- butuh_bantuan_admin: set ke true HANYA JIKA memenuhi salah satu syarat ini:
+  1. User marah / komplain berat.
+  2. User secara EKSPLISIT meminta bicara dengan admin, owner, atau manusia.
+  3. User memaksa meminta harga FIX/PASTI untuk layanan "Spot Repair" atau kerusakan spesifik (Zoya hanya boleh memberi rentang estimasi harga spot repair. Jika user memaksa harga pasti, set ke true).
+  JIKA user HANYA bertanya seputar teknis motor (misal: "cat doff perawatannya gimana?", "bedanya candy sama stabilo apa?", "kalau mesin kotor bagusnya diapain?"), biarkan AI yang menjawab (set ke false).
+- budget_signal: "ketat" jika bilang mahal/kemahalan, "oke" jika setuju harga, null jika tidak disebut
+- target_services: JIKA user menyebutkan lebih dari satu layanan, masukkan SEMUANYA ke dalam array strings ini. JANGAN gabung menjadi satu string.
+- preferred_time: Waktu spesifik jika disebutkan user (misal: "pagi", "siang", "10:00"). Null jika tidak disebut.
+- conversation_summary: WAJIB diisi. Gabungkan intisari "Ringkasan Obrolan Sebelumnya" dengan "Percakapan Saat Ini" menjadi 1-2 kalimat padat.`;
 
 /**
  * Build the prompt with actual conversation data.

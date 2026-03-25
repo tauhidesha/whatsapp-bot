@@ -184,25 +184,36 @@ function scoreCustomer(context, metadata, transactions) {
 
     // ── Lead scoring (hanya kalau 0 transaksi) ──
     if (txCount === 0) {
+        // Ambil data intent baru dari Extractor
+        const intents = context.detected_intents || [];
+        const stage = context.conversation_stage || '';
+
         // Dormant: ghosted berkali-kali
         if (ghostedTimes >= 2) {
             scores.dormant_lead += 100;
         }
 
-        // Hot lead
-        if (context.asked_availability) scores.hot_lead += 50;
+        // Hot lead (Sinyal Booking & Deal)
+        if (context.asked_availability || intents.includes('mulai_booking') || stage === 'closing' || stage === 'done') {
+            scores.hot_lead += 60;
+        }
         if (context.shared_photo) scores.hot_lead += 30;
-        if (context.intent_level === 'hot') scores.hot_lead += 20;
 
-        // Warm lead
-        if (context.asked_price
-            && !context.said_expensive) scores.warm_lead += 50;
-        if (context.intent_level === 'warm') scores.warm_lead += 30;
+        // Warm lead (Tanya Detail & Harga, Belum Booking)
+        if ((context.asked_price || intents.includes('tanya_harga') || intents.includes('tanya_layanan')) && !context.said_expensive) {
+            scores.warm_lead += 50;
+        }
+        if (stage === 'qualifying' || stage === 'consulting') {
+            scores.warm_lead += 20;
+        }
         if (daysSinceLastChat <= 3) scores.warm_lead += 20;
 
-        // Window shopper
+        // Window shopper (Cuma nanya-nanya ringan atau keberatan harga)
         if (context.said_expensive) scores.window_shopper += 60;
         if (context.budget_signal === 'ketat') scores.window_shopper += 30;
+        if (intents.length === 0 || (intents.includes('tanya_lokasi') && !intents.includes('tanya_harga'))) {
+            scores.window_shopper += 20; // Kasih poin dikit buat yang cuma iseng nanya lokasi
+        }
         if (ghosted && ghostedTimes === 1) scores.window_shopper += 40;
     }
 
@@ -241,7 +252,8 @@ function scoreCustomer(context, metadata, transactions) {
     if (context.said_expensive) activeSignals.push('said_expensive');
     if (ghostedTimes > 0) activeSignals.push(`ghosted=${ghostedTimes}x`);
     if (context.shared_photo) activeSignals.push('shared_photo');
-    if (context.intent_level) activeSignals.push(`intent=${context.intent_level}`);
+    if (context.detected_intents && context.detected_intents.length > 0) activeSignals.push(`intents=${context.detected_intents.join('|')}`);
+    if (context.conversation_stage) activeSignals.push(`stage=${context.conversation_stage}`);
 
     return {
         label: topLabel,

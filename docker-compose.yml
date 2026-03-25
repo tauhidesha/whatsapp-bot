@@ -1,32 +1,10 @@
-version: '3.8'
-
 services:
-  whatsapp-ai-chatbot:
+  whatsapp-bot:
     build: .
-    ports:
-      - "4000:4000"
+    container_name: whatsapp-bot
+    restart: always
     env_file:
       - .env
     volumes:
-      - /home/ec2-user/whatsapp-bot/tokens:/app/tokens
-      - /home/ec2-user/whatsapp-bot/logs:/app/logs
-
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  ngrok:
-    image: ngrok/ngrok:latest
-    restart: unless-stopped
-    environment:
-      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
-    command:
-      - "http"
-      - "--domain=${NGROK_DOMAIN}"
-      - "whatsapp-ai-chatbot:4000"
-    depends_on:
-      - whatsapp-ai-chatbot
+      - ./sessions:/app/sessions
+      - ./tokens:/app/tokens
