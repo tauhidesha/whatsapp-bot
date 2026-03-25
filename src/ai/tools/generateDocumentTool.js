@@ -160,7 +160,7 @@ const generateDocumentTool = {
     }
 
     // Document Title & Company Info: Top Right
-    let title = 'Faktur';
+    let title = 'Invoice';
     let docCode = 'INV';
     if (documentType === 'tanda_terima') { title = 'Surat Tanda Terima'; docCode = 'STT'; }
     else if (documentType === 'bukti_bayar') { title = 'Kuitansi'; docCode = 'RCP'; }
@@ -220,7 +220,7 @@ const generateDocumentTool = {
       .fillColor(primaryColor)
       .fontSize(9)
       .font('Helvetica-Bold')
-      .text('Faktur #', 350, 195, { width: 80, align: 'right' })
+      .text('Invoice #', 350, 195, { width: 80, align: 'right' })
       .text(docNumber, 440, 195, { width: 100, align: 'right' })
       .text('Tanggal', 350, 208, { width: 80, align: 'right' })
       .text(now.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }), 440, 208, { width: 100, align: 'right' })
@@ -383,16 +383,7 @@ const generateDocumentTool = {
       .fillColor(secondaryColor)
       .text('Penjadwalan pengerjaan menyusul sesuai ketersediaan slot (TBA).', 50, y);
 
-    y += 40;
-    doc
-      .fillColor(primaryColor)
-      .font('Helvetica-Bold')
-      .text('Detail Pembayaran', 50, y);
-    doc
-      .font('Helvetica')
-      .text('Bank: BCA', 50, y + 14)
-      .text('Nomor Rekening: 1662515412', 50, y + 28)
-      .text('Atas Nama: Muhammad Tauhid Haryadesa', 50, y + 42);
+
 
     doc.end();
 
