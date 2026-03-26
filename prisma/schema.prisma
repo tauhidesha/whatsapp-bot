@@ -95,6 +95,7 @@ model Booking {
   paymentMethod   String?
   category        String?
   reminderSent    Boolean   @default(false)
+  reminderSentAt  DateTime?
 
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -105,12 +106,13 @@ model Booking {
 
 model Transaction {
   id          String   @id @default(uuid())
-  customerId  String
-  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  customerId  String?
+  customer    Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   bookingId   String?  @unique
   booking     Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
 
   amount      Float
+  category    String?
   type        String
   status      String   @default("UNPAID")
   description String?

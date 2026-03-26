@@ -1,11 +1,11 @@
 // File: src/ai/tools/checkBookingAvailabilityTool.js
-// Check availability for booking slots with Firestore-backed constraints.
+// Check availability for booking slots with Prisma-backed constraints.
 
 const { z } = require('zod');
-const admin = require('firebase-admin');
+const prisma = require('../../lib/prisma');
 const { parseDateTime } = require('../utils/dateTime');
 
-const STATUS_ACTIVE = ['Pending', 'Confirmed', 'In Progress', 'In Queue'];
+const STATUS_ACTIVE = ['PENDING', 'CONFIRMED', 'IN_PROGRESS', 'IN_QUEUE'];
 
 const InputSchema = z.object({
   bookingDate: z.string().describe('Tanggal booking. Format YYYY-MM-DD atau bahasa alami seperti "besok".'),
@@ -13,13 +13,6 @@ const InputSchema = z.object({
   serviceName: z.string().describe('Nama layanan yang ingin dibooking'),
   estimatedDurationMinutes: z.number().describe('Estimasi durasi layanan dalam menit'),
 });
-
-function ensureFirestore() {
-  if (!admin.apps.length) {
-    admin.initializeApp();
-  }
-  return admin.firestore();
-}
 
 function formatDate(date) {
   const d = new Date(date);
@@ -74,95 +67,107 @@ function hasOverlap(startA, endA, startB, endB) {
 }
 
 async function getDailyBookings(date, category) {
-  const db = ensureFirestore();
   const startOfDay = new Date(`${date}T00:00:00.000Z`);
   const endOfDay = new Date(`${date}T23:59:59.999Z`);
 
-  let query = db.collection('bookings')
-    .where('bookingDateTime', '>=', admin.firestore.Timestamp.fromDate(startOfDay))
-    .where('bookingDateTime', '<=', admin.firestore.Timestamp.fromDate(endOfDay));
+  const where = {
+    bookingDate: {
+      gte: startOfDay,
+      lte: endOfDay,
+    },
+    status: { in: STATUS_ACTIVE }
+  };
 
   if (category) {
-    query = query.where('category', '==', category);
+    where.category = category;
   }
 
-  const snapshot = await query.get();
-  const bookings = [];
-  snapshot.forEach(doc => {
-    const data = doc.data();
-    if (data && STATUS_ACTIVE.includes(data.status || '')) {
-      bookings.push({ id: doc.id, ...data });
+  const bookings = await prisma.booking.findMany({
+    where,
+    select: {
+      id: true,
+      bookingDate: true,
+      serviceType: true,
+      estimatedDurationMinutes: true,
+      status: true
     }
   });
 
+  // Add duration to each booking
+  const bookingsWithDuration = bookings.map(b => ({
+    ...b,
+    estimatedDurationMinutes: extractDurationMinutes(b)
+  }));
+
   console.log(`[checkBookingAvailability] Ditemukan ${bookings.length} booking kategori ${category || 'semua'} pada ${date}`);
-  return bookings;
+  return bookingsWithDuration;
 }
 
 async function getRepaintBookingsOverlap(dates) {
-  const db = ensureFirestore();
   const startDate = new Date(`${dates[0]}T00:00:00.000Z`);
   const endDate = new Date(`${dates[dates.length - 1]}T23:59:59.999Z`);
 
-  const snapshot = await db.collection('bookings')
-    .where('category', '==', 'repaint')
-    .where('status', 'in', STATUS_ACTIVE)
-    .where('bookingDateTime', '<=', admin.firestore.Timestamp.fromDate(endDate))
-    .get();
+  const bookings = await prisma.booking.findMany({
+    where: {
+      category: 'repaint',
+      status: { in: STATUS_ACTIVE },
+      bookingDate: { lte: endDate }
+    }
+  });
 
   const overlapping = [];
-  snapshot.forEach(doc => {
-    const data = doc.data();
-    if (!data || !data.bookingDateTime) return;
+  for (const data of bookings) {
+    if (!data.bookingDate) continue;
 
-    const bookingStart = data.bookingDateTime.toDate ? data.bookingDateTime.toDate() : new Date(data.bookingDateTime);
-    const durationDays = data.estimatedDurationDays
-      ? Number(data.estimatedDurationDays)
-      : Math.max(5, Math.ceil(extractDurationMinutes(data) / (60 * 24)));
+    const bookingStart = new Date(data.bookingDate);
+    const durationMinutes = extractDurationMinutes(data);
+    const durationDays = Math.max(5, Math.ceil(durationMinutes / (60 * 24)));
     const bookingEnd = new Date(bookingStart);
     bookingEnd.setDate(bookingEnd.getDate() + durationDays);
 
     if (bookingStart < endDate && bookingEnd > startDate) {
-      overlapping.push({ id: doc.id, ...data });
+      overlapping.push(data);
     }
-  });
+  }
 
   console.log(`[checkBookingAvailability] Repaint overlap ditemukan: ${overlapping.length}`);
   return overlapping;
 }
 
 async function checkSimpleSlotAvailability(input) {
-  const db = ensureFirestore();
   const start = new Date(`${input.bookingDate}T${input.bookingTime}:00`);
   const end = computeFinishDate(start, input.estimatedDurationMinutes);
   const startOfDay = new Date(`${input.bookingDate}T00:00:00.000Z`);
   const endOfDay = new Date(`${input.bookingDate}T23:59:59.999Z`);
 
-  const snapshot = await db.collection('bookings')
-    .where('bookingDateTime', '>=', admin.firestore.Timestamp.fromDate(startOfDay))
-    .where('bookingDateTime', '<=', admin.firestore.Timestamp.fromDate(endOfDay))
-    .get();
+  const bookings = await prisma.booking.findMany({
+    where: {
+      bookingDate: {
+        gte: startOfDay,
+        lte: endOfDay,
+      },
+      status: { in: STATUS_ACTIVE }
+    }
+  });
 
   let conflict = null;
 
-  snapshot.forEach(doc => {
-    const data = doc.data();
-    if (!data || !STATUS_ACTIVE.includes(data.status || '')) return;
-    if (!data.bookingDateTime) return;
+  for (const data of bookings) {
+    if (!data.bookingDate) continue;
 
-    const existingStart = data.bookingDateTime.toDate ? data.bookingDateTime.toDate() : new Date(data.bookingDateTime);
+    const existingStart = new Date(data.bookingDate);
     const durationMinutes = extractDurationMinutes(data);
     const existingEnd = computeFinishDate(existingStart, durationMinutes);
 
     if (hasOverlap(start, end, existingStart, existingEnd)) {
       conflict = {
-        id: doc.id,
-        serviceName: data.serviceName || data.service || 'Booking lain',
+        id: data.id,
+        serviceName: data.serviceType || 'Booking lain',
         start: formatTime(existingStart),
         end: formatTime(existingEnd),
       };
     }
-  });
+  }
 
   if (conflict) {
     return {

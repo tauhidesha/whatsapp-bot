@@ -533,31 +533,8 @@ const generateDocumentTool = {
 
     if (global.whatsappClient) {
       try {
-        // Resolve LID to phone number if needed (3-layer approach)
-        let recipient = targetRecipient;
-        if (recipient && recipient.endsWith('@lid')) {
-          console.log(`[generateDocument] LID detected: ${recipient}, attempting to resolve...`);
-          try {
-            // LAYER 1: Try requestPhoneNumber
-            if (typeof global.whatsappClient.requestPhoneNumber === 'function') {
-              const realPhone = await global.whatsappClient.requestPhoneNumber(recipient);
-              if (realPhone) {
-                recipient = realPhone.includes('@') ? realPhone : `${realPhone}@c.us`;
-                console.log(`[generateDocument] LID resolved via requestPhoneNumber: ${recipient}`);
-              }
-            }
-            // LAYER 2: Try getContact
-            else if (recipient.endsWith('@lid')) {
-              const contact = await global.whatsappClient.getContact(recipient);
-              if (contact && contact.id && contact.id._serialized && contact.id._serialized.includes('@c.us')) {
-                recipient = contact.id._serialized;
-                console.log(`[generateDocument] LID resolved via getContact: ${recipient}`);
-              }
-            }
-          } catch (err) {
-            console.log(`[generateDocument] LID resolution error: ${err.message}`);
-          }
-        }
+        // Use recipient as-is (LID stays LID, @c.us stays @c.us)
+        const recipient = targetRecipient;
 
         await global.whatsappClient.sendFile(
           recipient,

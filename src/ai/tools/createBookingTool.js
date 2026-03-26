@@ -368,6 +368,14 @@ const createBookingTool = {
 
       console.log(`[createBookingTool] Booking berhasil dibuat dengan ID: ${booking.id}`);
 
+      // Sync customer statistics
+      try {
+        const { syncCustomer } = require('../utils/customerSync.js');
+        await syncCustomer(customer.id);
+      } catch (syncErr) {
+        console.warn('[createBookingTool] Sync failed:', syncErr.message);
+      }
+
       // Notify admin (from humanHandover)
       try {
         const { notifyNewBooking } = require('../utils/humanHandover.js');

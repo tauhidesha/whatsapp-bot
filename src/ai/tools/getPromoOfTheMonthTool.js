@@ -1,14 +1,20 @@
 // File: src/ai/tools/getPromoOfTheMonthTool.js
-// Tool untuk mengambil promo bulan ini dari Firestore
+// Tool untuk mengambil promo bulan ini dari Prisma
 
-const admin = require('firebase-admin');
+const prisma = require('../../lib/prisma');
 
 async function implementation() {
     try {
-        const db = admin.firestore();
-        const doc = await db.collection('settings').doc('promo_config').get();
+        const kv = await prisma.keyValueStore.findUnique({
+            where: {
+                collection_key: {
+                    collection: 'settings',
+                    key: 'promo_config'
+                }
+            }
+        });
 
-        if (!doc.exists) {
+        if (!kv) {
             return {
                 success: true,
                 message: 'Tidak ada promo aktif bulan ini.',
@@ -17,7 +23,7 @@ async function implementation() {
             };
         }
 
-        const data = doc.data();
+        const data = kv.value;
 
         if (!data.isActive) {
             return {

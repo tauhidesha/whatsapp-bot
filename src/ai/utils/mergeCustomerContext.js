@@ -157,6 +157,13 @@ async function mergeAndSaveContext(senderNumber, newData) {
             }
         }
 
+        // Ensure customer exists before creating context (FK constraint)
+        await prisma.customer.upsert({
+            where: { phone: docId },
+            create: { phone: docId, name: 'New Customer' },
+            update: {}
+        });
+
         await prisma.customerContext.upsert({
             where: { id: docId },
             create: {

@@ -1,4 +1,4 @@
-const admin = require('firebase-admin');
+const prisma = require('../../lib/prisma');
 
 const updateSystemPromptTool = {
     name: "updateSystemPrompt",
@@ -47,17 +47,33 @@ async function updateSystemPrompt(args) {
     }
 
     try {
-        const db = admin.firestore();
+        // 2. Simpan ke Prisma KeyValueStore
+        await prisma.keyValueStore.upsert({
+            where: {
+                collection_key: {
+                    collection: 'settings',
+                    key: 'ai_config'
+                }
+            },
+            create: {
+                collection: 'settings',
+                key: 'ai_config',
+                value: {
+                    systemPrompt: newPrompt,
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: senderNumber
+                }
+            },
+            update: {
+                value: {
+                    systemPrompt: newPrompt,
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: senderNumber
+                }
+            }
+        });
 
-        // 2. Simpan ke Firestore
-        await db.collection('settings').doc('ai_config').set({
-            systemPrompt: newPrompt,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            updatedBy: senderNumber
-        }, { merge: true });
-
-        // 3. Return sukses (app.js akan mendeteksi perubahan via listener atau reload manual, 
-        // tapi untuk sekarang kita return pesan sukses dulu)
+        // 3. Return sukses
         return {
             status: "success",
             message: "✅ System Prompt berhasil diperbarui! Perubahan sudah tersimpan di database dan akan aktif untuk percakapan selanjutnya.\n\nPreview awal:\n" + newPrompt.substring(0, 100) + "..."

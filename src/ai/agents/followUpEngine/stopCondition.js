@@ -1,7 +1,7 @@
 // File: src/ai/agents/followUpEngine/stopCondition.js
 // Stop logic untuk follow-up: hard stops & soft stops.
 
-const admin = require('firebase-admin');
+const prisma = require('../../../lib/prisma');
 
 /**
  * Cek apakah customer harus di-stop dari follow up.
@@ -12,33 +12,33 @@ function shouldStop(context) {
     const { STRATEGY_CONFIG } = require('./scheduler.js');
 
     // ─── Hard stops — tidak pernah kirim ───
-    if (context.explicitly_rejected) {
+    if (context.explicitlyRejected) {
         return { stop: true, reason: 'explicitly_rejected' };
     }
     if (context.blocked) {
         return { stop: true, reason: 'blocked' };
     }
-    if (context.customer_label === 'dormant_lead') {
+    if (context.customerLabel === 'dormant_lead') {
         return { stop: true, reason: 'dormant_lead' };
     }
-    if (context.follow_up_strategy === 'stop') {
+    if (context.followUpStrategy === 'stop') {
         return { stop: true, reason: 'strategy_stop' };
     }
 
     // ─── Soft stops — ghost setelah max follow up ───
-    const followupCount = context.followup_count || 0;
-    const repliedAfter = context.replied_after_followup || false;
-    const strategy = STRATEGY_CONFIG[context.customer_label];
+    const followUpCount = context.followUpCount || 0;
+    const repliedAfter = context.repliedAfterFollowup || false;
+    const strategy = STRATEGY_CONFIG[context.customerLabel];
 
     if (
         strategy &&
         strategy.maxFollowUps &&
-        followupCount >= strategy.maxFollowUps &&
+        followUpCount >= strategy.maxFollowUps &&
         !repliedAfter
     ) {
         return {
             stop: true,
-            reason: `ghost_${followupCount}x`,
+            reason: `ghost_${followUpCount}x`,
             action: 'downgrade_to_dormant',
         };
     }
@@ -53,14 +53,17 @@ async function handleStopAction(docId, stopResult, currentLabel) {
     if (!stopResult.stop) return;
 
     if (stopResult.action === 'downgrade_to_dormant') {
-        const db = admin.firestore();
-        await db.collection('customerContext').doc(docId).update({
-            customer_label: 'dormant_lead',
-            follow_up_strategy: 'stop',
-            label_reason: stopResult.reason,
-            previous_label: currentLabel || 'unknown',
-            labeled_by: 'stop_condition',
-            label_updated_at: admin.firestore.FieldValue.serverTimestamp(),
+        await prisma.customerContext.update({
+            where: { id: docId },
+            data: {
+                customerLabel: 'dormant_lead',
+                followUpStrategy: 'stop',
+                labelReason: stopResult.reason,
+                labelScores: {
+                    previousLabel: currentLabel || 'unknown',
+                    labeledBy: 'stop_condition'
+                }
+            }
         });
         console.log(`[StopCondition] ${docId} downgraded to dormant_lead (${stopResult.reason})`);
     }

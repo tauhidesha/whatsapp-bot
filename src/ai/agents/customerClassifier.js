@@ -70,7 +70,7 @@ async function getCustomerTransactions(docId, customerName) {
 }
 
 async function updateGhostedCount(docId, currentContext, metadata) {
-    const lastSender = metadata.lastMessageSender;
+    const lastSender = metadata.lastMessageSender || null;
     const lastChat = metadata.lastMessageAt instanceof Date 
         ? metadata.lastMessageAt 
         : (metadata.lastMessageAt ? new Date(metadata.lastMessageAt) : null);
@@ -251,7 +251,6 @@ async function classifyAndSaveCustomer(senderNumber) {
                 name: true,
                 lastMessage: true,
                 lastMessageAt: true,
-                lastMessageSender: true,
                 whatsappLid: true
             }
         });
@@ -269,6 +268,13 @@ async function classifyAndSaveCustomer(senderNumber) {
         };
 
         const result = scoreCustomer(mappedContext, metadata, transactions);
+
+        // Ensure customer exists before creating context (FK constraint)
+        await prisma.customer.upsert({
+            where: { phone: docId },
+            create: { phone: docId, name: customerName || 'New Customer' },
+            update: {}
+        });
 
         await prisma.customerContext.upsert({
             where: { id: docId },

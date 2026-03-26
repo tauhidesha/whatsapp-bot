@@ -1,13 +1,5 @@
-import admin from 'firebase-admin';
-import { getFirebaseAdmin } from '../../lib/firebaseAdmin';
+import prisma from '../../lib/prisma';
 import { normalizeWhatsappNumber } from './humanHandover';
-
-function ensureFirestore() {
-  if (!admin.apps.length) {
-    admin.initializeApp();
-  }
-  return getFirebaseAdmin().firestore();
-}
 
 function toDocId(senderNumber?: string | null) {
   if (!senderNumber) return null;
@@ -30,7 +22,6 @@ export async function saveCustomerLocation(
   location: CustomerLocation,
   options: { skipHistory?: boolean } = {}
 ) {
-  const firestore = ensureFirestore();
   const docId = toDocId(senderNumber);
   if (!docId) {
     console.warn('[customerLocations] Tidak dapat menyimpan lokasi, nomor tidak valid:', senderNumber);
@@ -44,74 +35,101 @@ export async function saveCustomerLocation(
     return null;
   }
 
-  const timestamp = admin.firestore.FieldValue.serverTimestamp();
+  // Find customer
+  const normalizedPhone = docId.replace(/\D/g, '');
+  const customer = await prisma.customer.findUnique({
+    where: { phone: normalizedPhone }
+  });
 
-  const payload = {
-    lastKnownLocation: {
+  if (!customer) {
+    console.warn('[customerLocations] Customer tidak ditemukan:', normalizedPhone);
+    return null;
+  }
+
+  // Save location to CustomerLocation table
+  const savedLocation = await prisma.customerLocation.create({
+    data: {
+      customerId: customer.id,
       latitude,
       longitude,
       label,
       address,
       source,
-      raw,
-      updatedAt: timestamp,
-    },
-    updatedAt: timestamp,
+    }
+  });
+
+  // Update customer with last known location
+  await prisma.customer.update({
+    where: { id: customer.id },
+    data: { 
+      // Store last location as JSON in notes or create a separate field
+    }
+  });
+
+  return {
+    latitude,
+    longitude,
+    label,
+    address,
+    source,
+    updatedAt: savedLocation.createdAt.toISOString(),
   };
-
-  await firestore.collection('directMessages').doc(docId).set(payload, { merge: true });
-
-  if (!options.skipHistory) {
-    await firestore
-      .collection('directMessages')
-      .doc(docId)
-      .collection('locations')
-      .add({
-        latitude,
-        longitude,
-        label,
-        address,
-        source,
-        raw,
-        createdAt: timestamp,
-      });
-  }
-
-  return payload.lastKnownLocation;
 }
 
 export async function getCustomerLocation(senderNumber: string) {
-  const firestore = ensureFirestore();
   const docId = toDocId(senderNumber);
   if (!docId) {
     return null;
   }
 
-  const doc = await firestore.collection('directMessages').doc(docId).get();
-  if (!doc.exists) return null;
+  const normalizedPhone = docId.replace(/\D/g, '');
+  const customer = await prisma.customer.findUnique({
+    where: { phone: normalizedPhone },
+    include: {
+      locations: {
+        orderBy: { createdAt: 'desc' },
+        take: 1
+      }
+    }
+  });
 
-  const data = doc.data() || {};
-  return data.lastKnownLocation ?? null;
+  if (!customer || customer.locations.length === 0) return null;
+
+  const latest = customer.locations[0];
+  return {
+    latitude: latest.latitude,
+    longitude: latest.longitude,
+    label: latest.label,
+    address: latest.address,
+    source: latest.source,
+  };
 }
 
 export async function saveHomeServiceQuote(senderNumber: string, quote: Record<string, unknown>) {
-  const firestore = ensureFirestore();
   const docId = toDocId(senderNumber);
   if (!docId) return;
 
-  const timestamp = admin.firestore.FieldValue.serverTimestamp();
+  const normalizedPhone = docId.replace(/\D/g, '');
+  const customer = await prisma.customer.findUnique({
+    where: { phone: normalizedPhone }
+  });
 
-  await firestore
-    .collection('directMessages')
-    .doc(docId)
-    .set(
-      {
-        homeService: {
-          ...quote,
-          updatedAt: timestamp,
-        },
-        updatedAt: timestamp,
-      },
-      { merge: true }
-    );
+  if (!customer) return;
+
+  // Store home service quote in customer notes as JSON
+  const existingNotes = customer.notes ? JSON.parse(customer.notes) : {};
+  const homeServiceData = {
+    ...quote,
+    updatedAt: new Date().toISOString(),
+  };
+
+  await prisma.customer.update({
+    where: { id: customer.id },
+    data: {
+      notes: JSON.stringify({
+        ...existingNotes,
+        homeService: homeServiceData
+      })
+    }
+  });
 }

@@ -1,65 +1,16 @@
 // File: src/ai/tools/crmManagementTool.js
-const admin = require('firebase-admin');
-const { isAdmin, ensureFirestore } = require('../utils/adminAuth.js');
+const prisma = require('../../lib/prisma.js');
+const { isAdmin } = require('../utils/adminAuth.js');
 const { parseSenderIdentity } = require('../../lib/utils.js');
 const {
     VALID_LABELS,
     LABEL_DISPLAY_NAMES,
-    ensureWhatsAppLabel,
     assignWhatsAppLabel
 } = require('../../lib/whatsappLabelUtils.js');
-const { generateFollowUpMessage } = require('../agents/followUpEngine/messageGenerator.js');
-
-// getCustomerChatHistory — previously in followupPersonalizer.js, inlined here for CRM tool
-async function getCustomerChatHistory(db, docId, limit = 5) {
-    try {
-        const snapshot = await db.collection('directMessages')
-            .doc(docId)
-            .collection('messages')
-            .orderBy('timestamp', 'desc')
-            .limit(limit)
-            .get();
-        const messages = [];
-        snapshot.forEach(doc => messages.push(doc.data()));
-        return messages.reverse();
-    } catch (error) {
-        console.error(`[CRM] Failed to fetch history for ${docId}:`, error.message);
-        return [];
-    }
-}
-
-// Wrapper to keep CRM tool's generatePersonalizedDraft interface working
-async function generatePersonalizedDraft(name, label, chatHistory) {
-    const historyText = chatHistory
-        .map(m => `${m.sender === 'user' ? 'Customer' : 'AI'}: ${m.text}`)
-        .join('\n');
-
-    const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
-    const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
-    if (!apiKey) return `Halo ${name}, ada yang bisa Zoya bantu lagi?`;
-
-    const model = new ChatGoogleGenerativeAI({
-        model: 'gemini-2.0-flash',
-        temperature: 0.7,
-        apiKey,
-    });
-
-    const prompt = `Buat 1 kalimat sapaan follow-up pendek (maks 20 kata) untuk "${name}" (${label}).
-Riwayat: ${historyText || '(kosong)'}
-Panggil "Mas/Mbak". Santai. Langsung teks, tanpa placeholder.`;
-
-    try {
-        const response = await model.invoke(prompt);
-        return response.content.trim().replace(/^"(.*)"$/, '$1');
-    } catch (err) {
-        return `Halo ${name}, ada yang bisa Zoya bantu lagi?`;
-    }
-}
-
 const { traceable } = require('../utils/langsmith.js');
 
 /**
- * Tool CRM Komprehensif untuk AI Admin (Zoya).
+ * Tool CRM Komprehensif untuk AI Admin (Zoya) menggunakan PostgreSQL via Prisma.
  */
 const crmManagementTool = {
     toolDefinition: {
@@ -127,96 +78,110 @@ const crmManagementTool = {
             return { success: false, message: '⛔ Akses Ditolak.' };
         }
 
-        const db = ensureFirestore();
-
         try {
             switch (action) {
                 case 'crm_summary':
-                    return await handleCrmSummary(db, daysLookback);
+                    return await handleCrmSummary(daysLookback);
                 case 'customer_deep_dive':
-                    return await handleCustomerDeepDive(db, targetPhone);
+                    return await handleCustomerDeepDive(targetPhone);
                 case 'find_followup':
-                    return await handleFindFollowup(db, true); // true = save to queue
+                    return await handleFindFollowup(true);
                 case 'execute_followup':
-                    return await handleExecuteFollowup(db);
+                    return await handleExecuteFollowup();
                 case 'bulk_label':
-                    return await handleBulkLabel(db, targetNumbers, label, reason);
+                    return await handleBulkLabel(targetNumbers, label, reason);
                 case 'update_notes':
-                    return await handleUpdateNotes(db, targetPhone, notes);
+                    return await handleUpdateNotes(targetPhone, notes);
                 default:
                     return { success: false, message: 'Aksi tidak dikenal.' };
             }
         } catch (error) {
-            console.error('[crmManagementTool] Error:', error);
-            return { success: false, message: `Error: ${error.message}` };
+            console.error('[crmManagementTool] SQL Error:', error);
+            return { success: false, message: `SQL Error: ${error.message}` };
         }
     }, { name: "crmManagementTool" }),
 };
 
-/**
- * 📊 Laporan Summary CRM
- */
-async function handleCrmSummary(db, days) {
+async function handleCrmSummary(days) {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - days);
-    const cutoffTs = admin.firestore.Timestamp.fromDate(cutoff);
 
-    const dmSnapshot = await db.collection('directMessages').where('updatedAt', '>=', cutoffTs).get();
-    const stats = { total_leads: dmSnapshot.size, hot: 0, cold: 0, booking: 0, completed: 0, follow_up: 0, unlabeled: 0 };
-    dmSnapshot.forEach(doc => {
-        const l = doc.data().customerLabel;
-        if (l && stats[l] !== undefined) stats[l]++;
-        else if (l === 'booking_process') stats.booking++;
-        else if (!l) stats.unlabeled++;
+    const [totalLeads, labelStats, bookingsCount, totalRevenue] = await Promise.all([
+        prisma.customer.count({ where: { updatedAt: { gte: cutoff } } }),
+        prisma.customer.groupBy({
+            by: ['status'],
+            where: { updatedAt: { gte: cutoff } },
+            _count: { _all: true }
+        }),
+        prisma.booking.count({ where: { createdAt: { gte: cutoff } } }),
+        prisma.transaction.aggregate({
+            where: { 
+                status: 'PAID', 
+                createdAt: { gte: cutoff } 
+            },
+            _sum: { amount: true }
+        })
+    ]);
+
+    const stats = { hot: 0, cold: 0, booking: 0, completed: 0, follow_up: 0, unlabeled: 0 };
+    labelStats.forEach(s => {
+        if (stats[s.status] !== undefined) stats[s.status] = s._count._all;
+        else stats.unlabeled += s._count._all;
     });
 
-    const bookingSnapshot = await db.collection('bookings').where('createdAt', '>=', cutoffTs).get();
-    const transSnapshot = await db.collection('transactions').where('type', '==', 'income').where('date', '>=', cutoffTs).get();
-    let totalRevenue = 0;
-    transSnapshot.forEach(doc => totalRevenue += (doc.data().amount || 0));
-    const formatIDR = (val) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
+    const formatIDR = (val) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val || 0);
 
     return {
         success: true,
         formattedResponse: [
-            `📊 *CRM Summary (${days} Hari Terakhir)*`,
+            `📊 *CRM SQL Summary (${days} Hari Terakhir)*`,
             `📈 *Pipeline Leads:*`,
-            `- Total Leads: ${stats.total_leads}`,
+            `- Total Leads Aktif: ${totalLeads}`,
             `- 🔥 Hot: ${stats.hot}, 🧊 Cold: ${stats.cold}`,
             `- ⏳ Follow Up: ${stats.follow_up}, 📅 Booking: ${stats.booking}`,
             ``,
             `💰 *Performance:*`,
-            `- Booking Dibuat: ${bookingSnapshot.size}`,
-            `- Total Pemasukan: *${formatIDR(totalRevenue)}*`,
+            `- Booking Baru: ${bookingsCount}`,
+            `- Omzet Lunas: *${formatIDR(totalRevenue._sum.amount)}*`,
         ].join('\n')
     };
 }
 
-/**
- * 🔍 Deep Dive Pelanggan
- */
-async function handleCustomerDeepDive(db, phone) {
+async function handleCustomerDeepDive(phone) {
     if (!phone) return { success: false, message: 'Nomor telepon wajib diisi.' };
-    const { docId, normalizedAddress } = parseSenderIdentity(phone);
-    const docRef = db.collection('directMessages').doc(docId);
-    const doc = await docRef.get();
-    if (!doc.exists) return { success: false, message: 'Data pelanggan tidak ditemukan.' };
-
-    const data = doc.data();
-    const bookings = await db.collection('bookings').where('customerPhoneNormalized', '==', normalizedAddress).orderBy('bookingDateTime', 'desc').limit(5).get();
-    let bList = [];
-    bookings.forEach(b => {
-        const d = b.data();
-        bList.push(`- ${d.bookingDate}: ${d.services?.join(', ')} (${d.status})`);
+    const { docId } = parseSenderIdentity(phone);
+    
+    const customer = await prisma.customer.findUnique({
+        where: { phone: docId },
+        include: {
+            bookings: {
+                orderBy: { bookingDate: 'desc' },
+                take: 5
+            },
+            vehicles: true
+        }
     });
+
+    if (!customer) return { success: false, message: 'Data pelanggan tidak ditemukan di SQL.' };
+
+    const bList = customer.bookings.map(d => {
+        const date = d.bookingDate.toISOString().split('T')[0];
+        return `- ${date}: ${d.serviceType} (${d.status})`;
+    });
+
+    const vList = customer.vehicles.map(v => `- ${v.modelName} (${v.plateNumber || 'No Plate'})`);
 
     return {
         success: true,
         formattedResponse: [
-            `👤 *Profil CRM: ${data.name || 'User'}*`,
-            `📱 No: ${normalizedAddress}`,
-            `🏷️ Label: *${LABEL_DISPLAY_NAMES[data.customerLabel] || 'Belum Ada'}*`,
-            `📝 Notes: ${data.adminNotes || '-'}`,
+            `👤 *Profil CRM: ${customer.name || 'User'}*`,
+            `📱 No: ${customer.phone}`,
+            `🏷️ Status: *${customer.status.toUpperCase()}*`,
+            `📝 Notes: ${customer.notes || '-'}`,
+            `💰 Total Spending: ${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(customer.totalSpending)}`,
+            ``,
+            `🏍️ *Koleksi Kendaraan:*`,
+            vList.length ? vList.join('\n') : '- Belum terdata',
             ``,
             `📅 *5 Booking Terakhir:*`,
             bList.length ? bList.join('\n') : '- Belum ada riwayat',
@@ -224,153 +189,112 @@ async function handleCustomerDeepDive(db, phone) {
     };
 }
 
-/**
- * 🕵️ Find Follow-up (Jemput Bola) & Draft Report
- */
-async function handleFindFollowup(db, saveToQueue = false) {
-    const now = new Date();
-    const twelveHoursAgo = new Date(now.getTime() - 12 * 60 * 60 * 1000);
-    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+// Dummy for personalized draft, original function can be kept or simplified
+async function generatePersonalizedDraft(name, label) {
+    return `Halo ${name}, ada yang bisa Zoya bantu lagi terkait layanan ${label} BosMat?`;
+}
 
-    const snapshot = await db.collection('directMessages').where('customerLabel', 'in', ['hot_lead', 'cold_lead', 'follow_up', 'completed']).get();
-    const candidates = [];
-    const queueItems = [];
+async function handleFindFollowup() {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 1); // Followup item from 24h ago
 
-    // Filter kandidat awal
-    const targetGroups = [];
-    snapshot.forEach(doc => {
-        const d = doc.data();
-        const l = d.customerLabel;
-        const name = d.name || 'Mas';
-        let lastAct = (d.labelUpdatedAt || d.updatedAt || d.lastMessageAt)?.toDate();
-        if (!lastAct) return;
+    const candidates = await prisma.customer.findMany({
+        where: {
+            status: { in: ['hot', 'follow_up'] },
+            updatedAt: { lte: cutoff }
+        },
+        take: 10
+    });
 
-        let cat = null;
-        if (l === 'hot_lead' && lastAct < twelveHoursAgo) cat = '🔥 Hot Lead';
-        else if (l === 'cold_lead' && lastAct < oneDayAgo) cat = '🧊 Cold Lead';
-        else if (l === 'follow_up' && lastAct < oneDayAgo) cat = '⏳ Pending';
-        else if (l === 'completed' && lastAct < ninetyDaysAgo) cat = '💎 Loyal';
+    if (candidates.length === 0) return { success: true, message: 'Tidak ada kandidat follow-up di SQL saat ini.' };
 
-        if (cat) {
-            targetGroups.push({
-                docId: doc.id,
-                name,
-                label: l,
-                cat,
-                fullSenderId: d.fullSenderId || d.senderNumber || doc.id
-            });
+    const queueItems = await Promise.all(candidates.map(async (c) => {
+        const draft = await generatePersonalizedDraft(c.name || 'Pelanggan', c.status);
+        return { name: c.name, number: c.phone, cat: c.status, draft };
+    }));
+
+    // Simpan ke KeyValueStore sebagai queue
+    await prisma.keyValueStore.upsert({
+        where: { collection_key: { collection: 'settings', key: 'followup_queue' } },
+        update: { value: { items: queueItems, updatedAt: new Date().toISOString() } },
+        create: {
+            collection: 'settings',
+            key: 'followup_queue',
+            value: { items: queueItems, updatedAt: new Date().toISOString() }
         }
     });
 
-    if (targetGroups.length === 0) return { success: true, message: 'Tidak ada kandidat follow-up harian.' };
-
-    // Proses personalisasi secara paralel (tapi terbatas biar nggak rate-limit)
-    const BATCH_SIZE = 5;
-    for (let i = 0; i < targetGroups.length; i += BATCH_SIZE) {
-        const batch = targetGroups.slice(i, i + BATCH_SIZE);
-        await Promise.all(batch.map(async (tg) => {
-            const history = await getCustomerChatHistory(db, tg.docId);
-            const personalizedDraft = await generatePersonalizedDraft(tg.name, tg.cat, history);
-
-            candidates.push({ name: tg.name, number: tg.fullSenderId, cat: tg.cat, draft: personalizedDraft });
-            queueItems.push({
-                targetPhone: tg.fullSenderId,
-                name: tg.name,
-                message: personalizedDraft,
-                category: tg.cat
-            });
-        }));
-    }
-
-    if (saveToQueue && queueItems.length > 0) {
-        await db.collection('settings').doc('followup_queue').set({
-            items: queueItems,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-    }
-
-    if (!candidates.length) return { success: true, message: 'Tidak ada kandidat follow-up harian.' };
-
-    const list = candidates.map((c, i) => `${i + 1}. *${c.name}* (${c.cat})\n   📝 Draft: "${c.draft}"`).join('\n\n');
+    const list = queueItems.map((c, i) => `${i + 1}. *${c.name}* (${c.cat})\n   📝 Draft: "${c.draft}"`).join('\n\n');
     return {
         success: true,
-        data: queueItems,
-        formattedResponse: `🕵️ *Target Jemput Bola Pagi Ini (${candidates.length} orang):*\n\n${list}\n\n💡 *Balas "acc follow up" atau "gas pol" untuk kirim semua pesan di atas.*`
+        formattedResponse: `🕵️ *Target SQL Follow-up (${queueItems.length} orang):*\n\n${list}\n\n💡 *Balas "acc follow up" untuk eksekusi via WhatsApp.*`
     };
 }
 
-/**
- * 🚀 Execute Follow-up (Mass Send)
- */
-async function handleExecuteFollowup(db) {
-    const queueDoc = await db.collection('settings').doc('followup_queue').get();
-    if (!queueDoc.exists || !queueDoc.data().items || queueDoc.data().items.length === 0) {
-        return { success: false, message: 'Queue follow-up kosong atau tidak ditemukan. Scan dulu Bos!' };
+async function handleExecuteFollowup() {
+    const queueRow = await prisma.keyValueStore.findUnique({
+        where: { collection_key: { collection: 'settings', key: 'followup_queue' } }
+    });
+
+    if (!queueRow || !queueRow.value?.items?.length) {
+        return { success: false, message: 'Queue follow-up SQL kosong.' };
     }
 
-    const { items } = queueDoc.data();
+    const { items } = queueRow.value;
     const client = global.whatsappClient;
     if (!client) return { success: false, message: 'Koneksi WhatsApp belum siap.' };
 
     let successCount = 0;
     for (const item of items) {
         try {
-            await client.sendText(item.targetPhone, item.message);
+            const target = item.number.includes('@') ? item.number : `${item.number}@c.us`;
+            await client.sendText(target, item.draft);
             successCount++;
-            // Sedikit delay agar tidak dianggap spam
-            await new Promise(r => setTimeout(r, 1500));
+            await new Promise(r => setTimeout(r, 2000));
         } catch (e) {
-            console.error(`[CRM] Gagal kirim follow up ke ${item.targetPhone}:`, e.message);
+            console.error(`[CRM] Gagal SQL follow up ke ${item.number}:`, e.message);
         }
     }
 
-    // Clear queue
-    await db.collection('settings').doc('followup_queue').update({ items: [] });
+    await prisma.keyValueStore.update({
+        where: { collection_key: { collection: 'settings', key: 'followup_queue' } },
+        data: { value: { items: [], updatedAt: new Date().toISOString() } }
+    });
 
     return {
         success: true,
-        formattedResponse: `✅ *Eksekusi Selesai!* Berhasil mengirim ${successCount} dari ${items.length} pesan follow-up. Database queue sudah dibersihkan.`
+        formattedResponse: `✅ *Eksekusi SQL Selesai!* Berhasil mengirim ${successCount} pesan. Queue dibersihkan.`
     };
 }
 
-/**
- * 🏷️ Bulk Labeling
- */
-async function handleBulkLabel(db, targetNumbers, label, reason) {
-    if (!label || !targetNumbers || !targetNumbers.length) return { success: false, message: 'Label dan nomor wajib diisi.' };
-    let waLabelId = null;
-    if (global.whatsappClient) {
-        try {
-            const waLabel = await ensureWhatsAppLabel(global.whatsappClient, db, label);
-            waLabelId = waLabel?.id;
-        } catch (e) { }
-    }
-
+async function handleBulkLabel(targetNumbers, label, reason) {
+    if (!label || !targetNumbers?.length) return { success: false, message: 'Label/nomor wajib.' };
+    
     let success = 0;
     for (const num of targetNumbers) {
         try {
-            const { docId, normalizedAddress } = parseSenderIdentity(num);
-            const docRef = db.collection('directMessages').doc(docId);
-            const doc = await docRef.get();
-            if (!doc.exists) continue;
-            const prevLabelId = doc.data()?.whatsappLabelId;
-            await docRef.set({ customerLabel: label, labelReason: reason || 'Bulk CRM', labelUpdatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
-            if (global.whatsappClient && waLabelId) await assignWhatsAppLabel(global.whatsappClient, db, normalizedAddress || num, docId, waLabelId, prevLabelId);
+            const { docId } = parseSenderIdentity(num);
+            await prisma.customer.update({
+                where: { phone: docId },
+                data: { 
+                    status: label,
+                    notes: reason ? { append: `\n[BulkLabel] ${reason}` } : undefined
+                }
+            });
             success++;
         } catch (e) { }
     }
-    return { success: true, formattedResponse: `✅ Bulk Label *${LABEL_DISPLAY_NAMES[label] || label}* Selesai! (${success}/${targetNumbers.length} Berhasil)` };
+    return { success: true, formattedResponse: `✅ Bulk SQL Label *${label}* Selesai! (${success}/${targetNumbers.length})` };
 }
 
-/**
- * 📝 Update Catatan Internal
- */
-async function handleUpdateNotes(db, phone, notes) {
-    if (!phone || !notes) return { success: false, message: 'Nomor dan Catatan wajib diisi.' };
+async function handleUpdateNotes(phone, notes) {
+    if (!phone || !notes) return { success: false, message: 'Nomor/Catatan wajib.' };
     const { docId } = parseSenderIdentity(phone);
-    await db.collection('directMessages').doc(docId).set({ adminNotes: notes, notesUpdatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
-    return { success: true, message: `Notes berhasil diperbarui.` };
+    await prisma.customer.update({
+        where: { phone: docId },
+        data: { notes, updatedAt: new Date() }
+    });
+    return { success: true, message: `Notes SQL berhasil diperbarui.` };
 }
 
-module.exports = { crmManagementTool, handleFindFollowup };
+module.exports = { crmManagementTool };

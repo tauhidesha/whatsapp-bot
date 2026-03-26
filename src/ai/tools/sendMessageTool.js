@@ -1,7 +1,7 @@
 // File: src/ai/tools/sendMessageTool.js
 const { z } = require('zod');
-const admin = require('firebase-admin');
-const { isAdmin, ensureFirestore } = require('../utils/adminAuth.js');
+const prisma = require('../../lib/prisma');
+const { isAdmin } = require('../utils/adminAuth.js');
 const { normalizeWhatsappNumber } = require('../utils/humanHandover.js');
 const { markBotMessage } = require('../utils/adminMessageSync.js');
 
@@ -72,30 +72,46 @@ const sendMessageTool = {
       markBotMessage(target, message);
       await client.sendText(target, message);
 
-      // --- Simpan ke Firestore agar AI punya konteks ---
+      // --- Simpan ke Prisma agar AI punya konteks ---
       try {
-        const db = ensureFirestore();
-        // Hapus suffix @c.us untuk mendapatkan docId standar
-        const docId = target.replace(/@c\.us$|@lid$/, '');
-        const timestamp = admin.firestore.FieldValue.serverTimestamp();
-
-        // 1. Simpan di subcollection messages
-        await db.collection('directMessages').doc(docId).collection('messages').add({
-          text: message,
-          sender: 'admin', // Ditandai 'admin' karena dikirim manual/via tool
-          timestamp: timestamp,
+        const normalizedPhone = target.replace(/@c\.us$|@lid$/, '').replace(/\D/g, '');
+        
+        // Find or create customer
+        let customer = await prisma.customer.findUnique({
+          where: { phone: normalizedPhone }
         });
 
-        // 2. Update metadata percakapan
-        await db.collection('directMessages').doc(docId).set({
-          lastMessage: message,
-          lastMessageSender: 'admin',
-          lastMessageAt: timestamp,
-          updatedAt: timestamp,
-          messageCount: admin.firestore.FieldValue.increment(1),
-        }, { merge: true });
+        if (!customer) {
+          customer = await prisma.customer.create({
+            data: {
+              phone: normalizedPhone,
+              name: normalizedPhone,
+              status: 'new'
+            }
+          });
+        }
+
+        // 1. Simpan message
+        await prisma.directMessage.create({
+          data: {
+            customerId: customer.id,
+            senderId: target,
+            role: 'admin',
+            content: message
+          }
+        });
+
+        // 2. Update metadata customer
+        await prisma.customer.update({
+          where: { id: customer.id },
+          data: {
+            lastMessage: message,
+            lastMessageAt: new Date()
+          }
+        });
+
       } catch (err) {
-        console.warn('[sendMessageTool] Gagal menyimpan pesan ke Firestore:', err.message);
+        console.warn('[sendMessageTool] Gagal menyimpan pesan ke Prisma:', err.message);
       }
 
       return {

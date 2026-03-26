@@ -1,7 +1,6 @@
 // File: src/ai/tools/updateCustomerLabelTool.js
 const { z } = require('zod');
-const admin = require('firebase-admin');
-const { ensureFirestore } = require('../utils/adminAuth.js');
+const prisma = require('../../lib/prisma');
 const { parseSenderIdentity } = require('../../lib/utils.js');
 const {
   VALID_LABELS,
@@ -56,20 +55,36 @@ const updateCustomerLabelTool = {
         return { success: false, message: 'Gagal mem-parsing nomor pelanggan.' };
       }
 
-      const db = ensureFirestore();
-      const docRef = db.collection('directMessages').doc(docId);
+      // Get customer from Prisma
+      const normalizedPhone = docId.replace(/\D/g, '');
+      const customer = await prisma.customer.findUnique({
+        where: { phone: normalizedPhone }
+      });
 
-      // Get current data to check for existing label
-      const docSnapshot = await docRef.get();
-      const prevLabelId = docSnapshot.exists ? docSnapshot.data()?.whatsappLabelId : null;
+      if (!customer) {
+        return { success: false, message: 'Pelanggan tidak ditemukan.' };
+      }
 
-      const updatePayload = {
-        customerLabel: label,
-        labelReason: reason || null,
-        labelUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      };
+      // Get previous label from customerContext
+      const customerContext = await prisma.customerContext.findUnique({
+        where: { id: normalizedPhone }
+      });
+      const prevLabelId = customerContext?.customerLabel || null;
 
-      await docRef.set(updatePayload, { merge: true });
+      // Update customerContext
+      await prisma.customerContext.upsert({
+        where: { id: normalizedPhone },
+        create: {
+          id: normalizedPhone,
+          phone: normalizedPhone,
+          customerLabel: label,
+          labelReason: reason || null,
+        },
+        update: {
+          customerLabel: label,
+          labelReason: reason || null,
+        }
+      });
 
       // --- Sync label ke WhatsApp Business via WPPConnect ---
       let waSynced = false;
@@ -79,27 +94,17 @@ const updateCustomerLabelTool = {
         try {
           const whatsappNumber = normalizedAddress || senderNumber;
 
+          // Need to pass a mock db for WhatsApp label functions - they still use WA SDK
+          const mockDb = { collection: () => ({ doc: () => ({ set: () => {} }) }) };
+          
           // 1. Ensure label exists in WA
-          const waLabel = await ensureWhatsAppLabel(global.whatsappClient, db, label);
+          const waLabel = await ensureWhatsAppLabel(global.whatsappClient, mockDb, label);
 
           if (waLabel && waLabel.id) {
-            // 2. Assign label to chat
-            const assigned = await assignWhatsAppLabel(
-              global.whatsappClient, // Pass client
-              db, // Pass db (although assignWhatsAppLabel might not strictly need it if we pass docId, but current impl uses it) FIXME: check signature
-              whatsappNumber, // Pass phone number for WPPConnect
-              docId, // Pass docId for Firestore update inside? checks implementation
-              waLabel.id, // labelId
-              prevLabelId // oldLabelId
-            );
-            // Wait, let me double check assignWhatsAppLabel signature:
-            // async function assignWhatsAppLabel(client, db, senderNumber, docId, labelId, prevLabelId = null)
-
-            // So I should pass:
             const success = await assignWhatsAppLabel(
               global.whatsappClient,
-              db,
-              whatsappNumber, // This must be the phone number used by WPPConnect
+              mockDb,
+              whatsappNumber,
               docId,
               waLabel.id,
               prevLabelId
@@ -111,7 +116,6 @@ const updateCustomerLabelTool = {
             } else {
               syncMessage = 'gagal assign label di WA';
             }
-
           } else {
             syncMessage = 'gagal membuat/menemukan label di WA';
           }
@@ -128,7 +132,8 @@ const updateCustomerLabelTool = {
         data: {
           docId,
           waSynced,
-          ...updatePayload,
+          customerLabel: label,
+          labelReason: reason || null,
         },
       };
     } catch (error) {

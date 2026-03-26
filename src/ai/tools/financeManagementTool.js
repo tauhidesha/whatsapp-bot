@@ -1,85 +1,48 @@
+// File: src/ai/tools/financeManagementTool.js
 const { z } = require('zod');
-const admin = require('firebase-admin');
-const { isAdmin, ensureFirestore } = require('../utils/adminAuth.js');
+const prisma = require('../../lib/prisma.js');
+const { isAdmin } = require('../utils/adminAuth.js');
 const { traceable } = require('../utils/langsmith.js');
+const { parseSenderIdentity } = require('../../lib/utils.js');
+const { syncCustomer } = require('../utils/customerSync.js');
 
 const TransactionTypeEnum = z.enum(['income', 'expense']);
 
-
 const addTransactionSchema = z.object({
-  type: TransactionTypeEnum.describe("Tipe transaksi: 'income' (pemasukan) atau 'expense' (pengeluaran)."),
-  amount: z.number().positive().describe('Nominal transaksi dalam rupiah (IDR), tanpa titik/koma pemisah.'),
-  category: z
-    .string()
-    .min(1)
-    .describe("Kategori, contoh: 'repaint', 'detailing', 'sparepart', 'listrik', 'gaji', dll."),
-  description: z
-    .string()
-    .min(1)
-    .describe('Deskripsi singkat transaksi (boleh bahasa natural).'),
-  paymentMethod: z
-    .string()
-    .min(1)
-    .describe("Metode pembayaran, contoh: 'cash', 'transfer', 'qris'."),
-  date: z
-    .string()
-    .optional()
-    .describe('Tanggal transaksi dalam ISO string (opsional). Jika kosong, pakai waktu server sekarang.'),
-  customerName: z.string().optional().describe('Nama customer (opsional/jika ada).'),
-  customerNumber: z.string().optional().describe('Nomor WhatsApp customer (opsional/jika ada).'),
-  customerId: z.string().optional().describe('ID Customer di Firestore jika ada link ke directMessages/{docId} (opsional).'),
-  senderNumber: z.string().describe('Nomor pengirim (otomatis diisi sistem).'),
+  type: TransactionTypeEnum,
+  amount: z.number().positive(),
+  category: z.string().min(1),
+  description: z.string().min(1),
+  paymentMethod: z.string().min(1),
+  date: z.string().optional(),
+  customerName: z.string().optional(),
+  customerNumber: z.string().optional(),
+  customerId: z.string().optional(), // In SQL this will be the customer.id (phone)
+  senderNumber: z.string(),
 });
 
 const getTransactionHistorySchema = z.object({
-  fromDate: z
-    .string()
-    .optional()
-    .describe('Tanggal awal (ISO). Jika kosong, default 30 hari ke belakang dari hari ini.'),
-  toDate: z
-    .string()
-    .optional()
-    .describe('Tanggal akhir (ISO). Jika kosong, default hari ini.'),
-  type: TransactionTypeEnum.optional().describe("Filter tipe transaksi: 'income' atau 'expense' (opsional)."),
-  category: z.string().optional().describe('Filter kategori spesifik (opsional).'),
-  limit: z
-    .number()
-    .int()
-    .min(1)
-    .max(500)
-    .optional()
-    .describe('Batas jumlah transaksi yang diambil (default 100, max 500).'),
-  senderNumber: z.string().describe('Nomor pengirim (otomatis diisi sistem).'),
+  fromDate: z.string().optional(),
+  toDate: z.string().optional(),
+  type: TransactionTypeEnum.optional(),
+  category: z.string().optional(),
+  limit: z.number().int().min(1).max(500).optional(),
+  senderNumber: z.string(),
 });
 
 const calculateFinancesSchema = z.object({
-  fromDate: z
-    .string()
-    .optional()
-    .describe('Tanggal awal periode (ISO). Jika kosong, gunakan awal bulan berjalan.'),
-  toDate: z
-    .string()
-    .optional()
-    .describe('Tanggal akhir periode (ISO). Jika kosong, gunakan akhir bulan berjalan (hari ini).'),
-  period: z
-    .enum(['day', 'week', 'month'])
-    .optional()
-    .describe(
-      "Periode ringkas untuk laporan: 'day' (hari ini), 'week' (7 hari terakhir), 'month' (bulan berjalan). Akan override fromDate/toDate jika diisi.",
-    ),
-  senderNumber: z.string().describe('Nomor pengirim (otomatis diisi sistem).'),
+  fromDate: z.string().optional(),
+  toDate: z.string().optional(),
+  period: z.enum(['day', 'week', 'month']).optional(),
+  senderNumber: z.string(),
 });
 
 function formatCurrencyIDR(amount) {
-  try {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      minimumFractionDigits: 0,
-    }).format(Math.round(amount));
-  } catch {
-    return `${amount} IDR`;
-  }
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    minimumFractionDigits: 0,
+  }).format(Math.round(amount || 0));
 }
 
 function parseDateOrNull(value) {
@@ -88,93 +51,24 @@ function parseDateOrNull(value) {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-function getDefaultRangeFromPeriod(period) {
-  const now = new Date();
-  let from;
-  let to;
-
-  if (period === 'day') {
-    from = new Date(now);
-    from.setHours(0, 0, 0, 0);
-    to = new Date(now);
-    to.setHours(23, 59, 59, 999);
-  } else if (period === 'week') {
-    to = new Date(now);
-    to.setHours(23, 59, 59, 999);
-    from = new Date(to);
-    from.setDate(from.getDate() - 6);
-    from.setHours(0, 0, 0, 0);
-  } else {
-    // default month
-    from = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-    to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-  }
-
-  return { from, to };
-}
-
-function getDefaultHistoryRange() {
-  const now = new Date();
-  const to = new Date(now);
-  to.setHours(23, 59, 59, 999);
-  const from = new Date(now);
-  from.setDate(from.getDate() - 30);
-  from.setHours(0, 0, 0, 0);
-  return { from, to };
-}
-
 const addTransactionTool = {
   toolDefinition: {
     type: 'function',
     function: {
       name: 'addTransaction',
-      description:
-        'KHUSUS ADMIN. Mencatat transaksi pemasukan atau pengeluaran keuangan Bosmat ke koleksi "transactions" di Firestore.',
+      description: 'KHUSUS ADMIN. Mencatat keuangan BosMat (income/expense) ke SQL.',
       parameters: {
         type: 'object',
         properties: {
-          type: {
-            type: 'string',
-            enum: ['income', 'expense'],
-            description: "Tipe transaksi: 'income' (pemasukan) atau 'expense' (pengeluaran).",
-          },
-          amount: {
-            type: 'number',
-            description: 'Nominal transaksi dalam rupiah (IDR), tanpa titik/koma pemisah.',
-          },
-          category: {
-            type: 'string',
-            description: "Kategori, contoh: 'repaint', 'detailing', 'sparepart', 'listrik', 'gaji', dll.",
-          },
-          description: {
-            type: 'string',
-            description: 'Deskripsi singkat transaksi.',
-          },
-          paymentMethod: {
-            type: 'string',
-            description: "Metode pembayaran, contoh: 'cash', 'transfer', 'qris'.",
-          },
-          date: {
-            type: 'string',
-            description:
-              'Tanggal transaksi dalam ISO string (opsional). Jika tidak diisi, otomatis pakai waktu server sekarang.',
-          },
-          customerName: {
-            type: 'string',
-            description: 'Nama customer (opsional/jika ada).',
-          },
-          customerNumber: {
-            type: 'string',
-            description: 'Nomor WhatsApp customer (opsional/jika ada).',
-          },
-          customerId: {
-            type: 'string',
-            description: 'Link ID ke directMessages/{docId} (opsional).',
-          },
-          senderNumber: {
-            type: 'string',
-            description: 'Nomor pengirim (otomatis diisi sistem).',
-          },
+          type: { type: 'string', enum: ['income', 'expense'], description: "income atau expense." },
+          amount: { type: 'number', description: 'Nominal Rp.' },
+          category: { type: 'string', description: "Kategori (repaint, detailing, dll)." },
+          description: { type: 'string', description: 'Deskripsi transaksi.' },
+          paymentMethod: { type: 'string', description: "cash, transfer, qris." },
+          date: { type: 'string', description: 'ISO string (opsional).' },
+          customerName: { type: 'string', description: 'Nama customer (pilihan).' },
+          customerNumber: { type: 'string', description: 'Nomor WA (pilihan).' },
+          senderNumber: { type: 'string', description: 'Otomatis.' },
         },
         required: ['type', 'amount', 'category', 'description', 'paymentMethod', 'senderNumber'],
       },
@@ -182,81 +76,57 @@ const addTransactionTool = {
   },
   implementation: traceable(async (input = {}) => {
     try {
-      const parsed = addTransactionSchema.parse(input || {});
+      const parsed = addTransactionSchema.parse(input);
 
-      // Security Check
       if (!isAdmin(parsed.senderNumber)) {
-        return {
-          success: false,
-          message: "⛔ Akses Ditolak. Fitur ini hanya untuk Admin."
-        };
+        return { success: false, message: "⛔ Akses Ditolak. Khusus Admin." };
       }
 
-      const db = ensureFirestore();
-      
-      let linkedCustomerId = parsed.customerId || null;
-      let linkedCustomerName = parsed.customerName || null;
+      let linkedPhone = parsed.customerId || parsed.customerNumber;
+      if (linkedPhone) {
+        const { docId } = parseSenderIdentity(linkedPhone);
+        linkedPhone = docId;
+      }
 
-      // Smart Lookup: Jika customerId kosong tapi ada nama, coba cari di CRM
-      if (!linkedCustomerId && parsed.customerName && parsed.type === 'income') {
-        console.log(`[Finance] Performing Smart Lookup for: ${parsed.customerName}`);
-        try {
-          const customerSnapshot = await db.collection('directMessages')
-            .where('name', '>=', parsed.customerName)
-            .where('name', '<=', parsed.customerName + '\uf8ff')
-            .limit(1)
-            .get();
+      // If no ID but name exists, try to find customer if it's income
+      if (!linkedPhone && parsed.customerName && parsed.type === 'income') {
+        const fuzzy = await prisma.customer.findFirst({
+           where: { name: { contains: parsed.customerName, mode: 'insensitive' } }
+        });
+        if (fuzzy) linkedPhone = fuzzy.phone;
+      }
 
-          if (!customerSnapshot.empty) {
-            const customerDoc = customerSnapshot.docs[0];
-            linkedCustomerId = customerDoc.id;
-            linkedCustomerName = customerDoc.data().name || linkedCustomerName;
-            console.log(`[Finance] Smart Lookup match found: ${linkedCustomerName} (${linkedCustomerId})`);
-          }
-        } catch (lookupError) {
-          console.warn('[Finance] Smart Lookup failed:', lookupError.message);
+      const txDate = parsed.date ? new Date(parsed.date) : new Date();
+
+      const tx = await prisma.transaction.create({
+        data: {
+          type: parsed.type === 'income' ? 'INCOME' : 'EXPENSE',
+          status: 'PAID',
+          amount: parsed.amount,
+          category: parsed.category,
+          description: parsed.description,
+          paymentMethod: parsed.paymentMethod,
+          createdAt: txDate,
+          customerName: parsed.customerName,
+          customerId: linkedPhone,
+          createdBy: parsed.senderNumber
         }
+      });
+
+      // SYNC CUSTOMER statistics after income
+      if (linkedPhone && parsed.type === 'income') {
+        await syncCustomer(linkedPhone);
       }
-
-      const now = admin.firestore.FieldValue.serverTimestamp();
-      const dateValue = parsed.date ? parseDateOrNull(parsed.date) : null;
-      const dateField = dateValue ? admin.firestore.Timestamp.fromDate(dateValue) : now;
-
-      const docRef = db.collection('transactions').doc();
-
-      const payload = {
-        id: docRef.id,
-        type: parsed.type,
-        amount: parsed.amount,
-        category: parsed.category,
-        description: parsed.description,
-        paymentMethod: parsed.paymentMethod,
-        date: dateField,
-        customerName: linkedCustomerName,
-        customerNumber: parsed.customerNumber || (linkedCustomerId?.includes('@') ? linkedCustomerId : null),
-        customerId: linkedCustomerId,
-        createdAt: now,
-        updatedAt: now,
-        createdBy: parsed.senderNumber
-      };
-
-      await docRef.set(payload);
-
-      const summary = `[Finance] Tercatat ${parsed.type === 'income' ? 'pemasukan' : 'pengeluaran'} ` +
-        `${formatCurrencyIDR(parsed.amount)} kategori "${parsed.category}".`;
 
       return {
         success: true,
-        message: 'Transaksi berhasil dicatat.',
-        summary,
-        data: payload,
+        message: 'Transaksi SQL berhasil dicatat.',
+        summary: `[Finance] Tercatat SQL ${parsed.type} ${formatCurrencyIDR(parsed.amount)} kategori "${parsed.category}".`,
+        data: tx,
       };
-    } catch (error) {
-      console.error('[addTransactionTool] Error:', error);
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Gagal mencatat transaksi.',
-      };
+    } catch (err) {
+      console.error('[addTransactionTool] SQL Error:', err);
+      return { success: false, message: `SQL Error: ${err.message}` };
     }
   }, { name: "addTransactionTool" }),
 };
@@ -266,37 +136,16 @@ const getTransactionHistoryTool = {
     type: 'function',
     function: {
       name: 'getTransactionHistory',
-      description:
-        'KHUSUS ADMIN. Mengambil riwayat transaksi keuangan Bosmat dari koleksi "transactions" dengan filter tanggal, tipe, dan kategori.',
+      description: 'KHUSUS ADMIN. Riwayat keuangan SQL.',
       parameters: {
         type: 'object',
         properties: {
-          fromDate: {
-            type: 'string',
-            description:
-              'Tanggal awal (ISO). Jika kosong, default 30 hari ke belakang dari hari ini (zona waktu server).',
-          },
-          toDate: {
-            type: 'string',
-            description: 'Tanggal akhir (ISO). Jika kosong, default hari ini.',
-          },
-          type: {
-            type: 'string',
-            enum: ['income', 'expense'],
-            description: "Filter tipe transaksi: 'income' atau 'expense' (opsional).",
-          },
-          category: {
-            type: 'string',
-            description: 'Filter kategori tertentu (opsional).',
-          },
-          limit: {
-            type: 'number',
-            description: 'Batas jumlah transaksi (default 100, maksimal 500).',
-          },
-          senderNumber: {
-            type: 'string',
-            description: 'Nomor pengirim (otomatis diisi sistem).',
-          },
+          fromDate: { type: 'string' },
+          toDate: { type: 'string' },
+          type: { type: 'string', enum: ['income', 'expense'] },
+          category: { type: 'string' },
+          limit: { type: 'number' },
+          senderNumber: { type: 'string' },
         },
         required: ['senderNumber']
       },
@@ -304,108 +153,33 @@ const getTransactionHistoryTool = {
   },
   implementation: traceable(async (input = {}) => {
     try {
-      const parsed = getTransactionHistorySchema.parse(input || {});
+      const parsed = getTransactionHistorySchema.parse(input);
+      if (!isAdmin(parsed.senderNumber)) return { success: false, message: "⛔ Akses Ditolak." };
 
-      // Security Check
-      if (!isAdmin(parsed.senderNumber)) {
-        return {
-          success: false,
-          message: "⛔ Akses Ditolak. Fitur ini hanya untuk Admin."
-        };
-      }
+      const from = parseDateOrNull(parsed.fromDate) || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const to = parseDateOrNull(parsed.toDate) || new Date();
 
-      const db = ensureFirestore();
-
-      let from = parseDateOrNull(parsed.fromDate || '');
-      let to = parseDateOrNull(parsed.toDate || '');
-
-      if (!from || !to) {
-        const fallback = getDefaultHistoryRange();
-        from = from || fallback.from;
-        to = to || fallback.to;
-      }
-
-      const fromTs = admin.firestore.Timestamp.fromDate(from);
-      const toTs = admin.firestore.Timestamp.fromDate(to);
-
-      let query = db
-        .collection('transactions')
-        .where('date', '>=', fromTs)
-        .where('date', '<=', toTs)
-        .orderBy('date', 'desc');
-
-      if (parsed.type) {
-        query = query.where('type', '==', parsed.type);
-      }
-
-      if (parsed.category) {
-        query = query.where('category', '==', parsed.category);
-      }
-
-      const limit = parsed.limit || 100;
-      query = query.limit(limit);
-
-      const snapshot = await query.get();
-      if (snapshot.empty) {
-        return {
-          success: true,
-          message: 'Tidak ada transaksi pada rentang waktu tersebut.',
-          data: [],
-          summary: 'Tidak ditemukan transaksi dalam periode yang diminta.',
-        };
-      }
-
-      const transactions = [];
-      let totalIncome = 0;
-      let totalExpense = 0;
-
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        const dateJs = data.date?.toDate ? data.date.toDate() : null;
-        const clean = {
-          id: data.id || doc.id,
-          type: data.type,
-          amount: data.amount,
-          category: data.category,
-          description: data.description,
-          paymentMethod: data.paymentMethod,
-          date: dateJs ? dateJs.toISOString() : null,
-        };
-        transactions.push(clean);
-
-        if (data.type === 'income') {
-          totalIncome += data.amount || 0;
-        } else if (data.type === 'expense') {
-          totalExpense += data.amount || 0;
-        }
+      const txs = await prisma.transaction.findMany({
+        where: {
+          createdAt: { gte: from, lte: to },
+          type: parsed.type ? (parsed.type === 'income' ? 'INCOME' : 'EXPENSE') : undefined,
+          category: parsed.category || undefined
+        },
+        orderBy: { createdAt: 'desc' },
+        take: parsed.limit || 100
       });
 
-      const net = totalIncome - totalExpense;
+      const income = txs.filter(t => t.type === 'INCOME').reduce((s, t) => s + (t.amount || 0), 0);
+      const expense = txs.filter(t => t.type === 'EXPENSE').reduce((s, t) => s + (t.amount || 0), 0);
 
-      const summary =
-        `[Finance] Periode ${from.toISOString().slice(0, 10)} s/d ${to.toISOString().slice(0, 10)}:\n` +
-        `- Total pemasukan: ${formatCurrencyIDR(totalIncome)}\n` +
-        `- Total pengeluaran: ${formatCurrencyIDR(totalExpense)}\n` +
-        `- Selisih (net): ${formatCurrencyIDR(net)}\n` +
-        `- Jumlah transaksi: ${transactions.length}`;
+      const summary = `📊 *Laporan SQL (${from.toISOString().slice(0, 10)} - ${to.toISOString().slice(0, 10)})*:\n` +
+        `- Total Pemasukan: ${formatCurrencyIDR(income)}\n` +
+        `- Total Pengeluaran: ${formatCurrencyIDR(expense)}\n` +
+        `- Net Profit: *${formatCurrencyIDR(income - expense)}*`;
 
-      return {
-        success: true,
-        message: 'Riwayat transaksi berhasil diambil.',
-        data: {
-          transactions,
-          totalIncome,
-          totalExpense,
-          netProfit: net,
-        },
-        summary,
-      };
-    } catch (error) {
-      console.error('[getTransactionHistoryTool] Error:', error);
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Gagal mengambil riwayat transaksi.',
-      };
+      return { success: true, data: { transactions: txs, income, expense, net: income - expense }, summary };
+    } catch (err) {
+      return { success: false, message: err.message };
     }
   }, { name: "getTransactionHistoryTool" }),
 };
@@ -415,31 +189,12 @@ const calculateFinancesTool = {
     type: 'function',
     function: {
       name: 'calculateFinances',
-      description:
-        'KHUSUS ADMIN. Menghitung total pemasukan, pengeluaran, dan profit bersih pada periode tertentu (harian, mingguan, bulanan, atau custom).',
+      description: 'Menghitung laporan laba rugi SQL.',
       parameters: {
         type: 'object',
         properties: {
-          fromDate: {
-            type: 'string',
-            description:
-              'Tanggal awal periode (ISO). Jika kosong dan tidak ada period, gunakan awal bulan berjalan.',
-          },
-          toDate: {
-            type: 'string',
-            description:
-              'Tanggal akhir periode (ISO). Jika kosong dan tidak ada period, gunakan akhir bulan berjalan/hari ini.',
-          },
-          period: {
-            type: 'string',
-            enum: ['day', 'week', 'month'],
-            description:
-              "Opsi cepat: 'day' (hari ini), 'week' (7 hari terakhir), 'month' (bulan berjalan). Jika ini diisi, fromDate/toDate akan diabaikan.",
-          },
-          senderNumber: {
-            type: 'string',
-            description: 'Nomor pengirim (otomatis diisi sistem).',
-          },
+          period: { type: 'string', enum: ['day', 'week', 'month'] },
+          senderNumber: { type: 'string' },
         },
         required: ['senderNumber']
       },
@@ -447,110 +202,36 @@ const calculateFinancesTool = {
   },
   implementation: traceable(async (input = {}) => {
     try {
-      const parsed = calculateFinancesSchema.parse(input || {});
+      const parsed = calculateFinancesSchema.parse(input);
+      if (!isAdmin(parsed.senderNumber)) return { success: false, message: "⛔ Akses Ditolak." };
 
-      // Security Check
-      if (!isAdmin(parsed.senderNumber)) {
-        return {
-          success: false,
-          message: "⛔ Akses Ditolak. Fitur ini hanya untuk Admin."
-        };
-      }
+      let from = new Date();
+      if (parsed.period === 'week') from.setDate(from.getDate() - 7);
+      else if (parsed.period === 'month') from.setDate(1);
+      else from.setHours(0, 0, 0, 0);
 
-      const db = ensureFirestore();
-
-      let from;
-      let to;
-
-      if (parsed.period) {
-        const range = getDefaultRangeFromPeriod(parsed.period);
-        from = range.from;
-        to = range.to;
-      } else {
-        from = parseDateOrNull(parsed.fromDate || '');
-        to = parseDateOrNull(parsed.toDate || '');
-
-        if (!from || !to) {
-          const fallback = getDefaultRangeFromPeriod('month');
-          from = from || fallback.from;
-          to = to || fallback.to;
-        }
-      }
-
-      const fromTs = admin.firestore.Timestamp.fromDate(from);
-      const toTs = admin.firestore.Timestamp.fromDate(to);
-
-      let query = db
-        .collection('transactions')
-        .where('date', '>=', fromTs)
-        .where('date', '<=', toTs);
-
-      const snapshot = await query.get();
-
-      if (snapshot.empty) {
-        const emptySummary =
-          `[Finance] Tidak ada transaksi pada periode ` +
-          `${from.toISOString().slice(0, 10)} s/d ${to.toISOString().slice(0, 10)}.`;
-
-        return {
-          success: true,
-          message: 'Tidak ada transaksi pada periode tersebut.',
-          data: {
-            totalIncome: 0,
-            totalExpense: 0,
-            netProfit: 0,
-            transactionCount: 0,
-          },
-          summary: emptySummary,
-        };
-      }
-
-      let totalIncome = 0;
-      let totalExpense = 0;
-      let countIncome = 0;
-      let countExpense = 0;
-
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        const amount = data.amount || 0;
-        if (data.type === 'income') {
-          totalIncome += amount;
-          countIncome += 1;
-        } else if (data.type === 'expense') {
-          totalExpense += amount;
-          countExpense += 1;
-        }
+      const stats = await prisma.transaction.groupBy({
+        by: ['type'],
+        where: { createdAt: { gte: from } },
+        _sum: { amount: true },
+        _count: { _all: true }
       });
 
-      const net = totalIncome - totalExpense;
-
-      const summaryLines = [
-        `[Finance] Laporan keuangan ${from.toISOString().slice(0, 10)} s/d ${to.toISOString().slice(0, 10)}:`,
-        `1) Total pemasukan: ${formatCurrencyIDR(totalIncome)} (${countIncome} transaksi)`,
-        `2) Total pengeluaran: ${formatCurrencyIDR(totalExpense)} (${countExpense} transaksi)`,
-        `3) Profit bersih (net): ${formatCurrencyIDR(net)}`,
-      ];
+      let income = 0, expense = 0;
+      stats.forEach(s => {
+        if (s.type === 'INCOME') income = s._sum.amount || 0;
+        else if (s.type === 'EXPENSE') expense = s._sum.amount || 0;
+      });
 
       return {
         success: true,
-        message: 'Perhitungan keuangan berhasil.',
-        data: {
-          totalIncome,
-          totalExpense,
-          netProfit: net,
-          incomeCount: countIncome,
-          expenseCount: countExpense,
-          from: from.toISOString(),
-          to: to.toISOString(),
-        },
-        summary: summaryLines.join('\n'),
+        summary: `📈 *SQL Profit Report (${parsed.period || 'custom'})*:\n` +
+          `- Pemasukan: ${formatCurrencyIDR(income)}\n` +
+          `- Pengeluaran: ${formatCurrencyIDR(expense)}\n` +
+          `- Net: *${formatCurrencyIDR(income - expense)}*`
       };
-    } catch (error) {
-      console.error('[calculateFinancesTool] Error:', error);
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Gagal menghitung laporan keuangan.',
-      };
+    } catch (err) {
+      return { success: false, message: err.message };
     }
   }, { name: "calculateFinancesTool" }),
 };

@@ -1,9 +1,6 @@
 // File: src/ai/utils/bookingReminders.js
-// Periodically send WhatsApp reminders for bookings scheduled for today.
-
 const { DateTime } = require('luxon');
-const admin = require('firebase-admin');
-const { getFirebaseAdmin } = require('../../lib/firebaseAdmin.js');
+const prisma = require('../../lib/prisma.js');
 const { normalizeWhatsappNumber } = require('./humanHandover.js');
 
 const REMINDER_ENABLED = process.env.BOOKING_REMINDER_ENABLED !== 'false';
@@ -14,13 +11,6 @@ const TIMEZONE = process.env.APP_TIMEZONE || 'Asia/Jakarta';
 
 let reminderIntervalHandle = null;
 
-function ensureFirestore() {
-  if (!admin.apps.length) {
-    admin.initializeApp();
-  }
-  return getFirebaseAdmin().firestore();
-}
-
 async function sendReminderMessage(booking) {
   const client = global.whatsappClient;
   if (!client || typeof client.sendText !== 'function') {
@@ -28,89 +18,90 @@ async function sendReminderMessage(booking) {
     return false;
   }
 
-  const target = booking.customerPhoneNormalized || normalizeWhatsappNumber(booking.customerPhone);
-  if (!target) {
+  const target = booking.customerPhone || (booking.customer && booking.customer.phone);
+  const normalizedTarget = normalizeWhatsappNumber(target);
+  if (!normalizedTarget) {
     console.warn('[bookingReminders] Nomor pelanggan tidak valid, reminder dilewati');
     return false;
   }
 
-  const customerName = booking.customerName || 'BosMat Friend';
-  const layanan = Array.isArray(booking.services) && booking.services.length > 0
-    ? booking.services.join(', ')
-    : booking.serviceName || 'Layanan Bosmat';
+  const customerName = booking.customerName || (booking.customer && booking.customer.name) || 'BosMat Friend';
+  const layanan = booking.serviceType || 'Layanan Bosmat';
+  
   const message = [
     `Halo ${customerName}! 👋`,
     '',
     'Reminder booking kamu hari ini di *Bosmat*:',
-    `• Tanggal: ${booking.bookingDate || '-'}`,
-    `• Jam: ${booking.bookingTime || '-'}`,
+    `• Tanggal: ${DateTime.fromJSDate(booking.bookingDate).setZone(TIMEZONE).toFormat('dd MMM yyyy')}`,
+    `• Jam: ${DateTime.fromJSDate(booking.bookingDate).setZone(TIMEZONE).toFormat('HH:mm')}`,
     `• Layanan: ${layanan}`,
     '',
     'Kalau perlu reschedule, kabari Zoya ya mas. Ditunggu kedatangannya! 🙌'
   ].join('\n');
 
   try {
-    await client.sendText(target, message);
-    console.log('[bookingReminders] Reminder terkirim ke', target);
+    await client.sendText(normalizedTarget, message);
+    console.log('[bookingReminders] Reminder terkirim ke', normalizedTarget);
     return true;
   } catch (error) {
-    console.error('[bookingReminders] Gagal mengirim reminder ke', target, error);
+    console.error('[bookingReminders] Gagal mengirim reminder ke', normalizedTarget, error);
     return false;
   }
 }
 
 async function sendBookingReminders(force = false) {
-  if (!REMINDER_ENABLED) {
-    return;
-  }
+  if (!REMINDER_ENABLED) return;
 
   const now = DateTime.now().setZone(TIMEZONE);
-  // Reaksi normal: hanya jam 8 pagi di menit 0-30
-  // Jika force: lompati pengecekan jam (berguna buat startup atau testing)
   if (!force && (now.hour !== REMINDER_HOUR || now.minute >= REMINDER_WINDOW_MINUTES)) {
     return;
   }
 
-  const today = now.toISODate();
-  const firestore = ensureFirestore();
+  // Find bookings for today (local time)
+  // Since SQL stores as UTC, we need to find the range.
+  const startOfDayLocal = now.startOf('day');
+  const endOfDayLocal = now.endOf('day');
 
-  const snapshot = await firestore
-    .collection('bookings')
-    .where('bookingDate', '==', today)
-    .get();
+  const startOfDayUTC = startOfDayLocal.toJSDate();
+  const endOfDayUTC = endOfDayLocal.toJSDate();
 
-  if (snapshot.empty) {
-    return;
-  }
+  try {
+    const bookings = await prisma.booking.findMany({
+      where: {
+        bookingDate: {
+          gte: startOfDayUTC,
+          lte: endOfDayUTC
+        },
+        reminderSent: false,
+        status: {
+          notIn: ['CANCELLED', 'COMPLETED', 'IN_PROGRESS']
+        }
+      },
+      include: {
+        customer: {
+          select: { phone: true, name: true }
+        }
+      }
+    });
 
-  const operations = [];
+    if (bookings.length === 0) return;
 
-  snapshot.forEach(doc => {
-    const data = doc.data();
-    if (!data) return;
+    console.log(`[bookingReminders] Menemukan ${bookings.length} booking SQL untuk diingatkan`);
 
-    if (data.reminderSent) return;
-
-    const status = (data.status || '').toLowerCase();
-    if (['cancelled', 'in_progress', 'done', 'paid'].includes(status)) return;
-
-    operations.push({ id: doc.id, data });
-  });
-
-  if (operations.length === 0) {
-    return;
-  }
-
-  console.log(`[bookingReminders] Menemukan ${operations.length} booking untuk diingatkan`);
-
-  for (const op of operations) {
-    const sent = await sendReminderMessage(op.data);
-    if (sent) {
-      await firestore.collection('bookings').doc(op.id).update({
-        reminderSent: true,
-        reminderSentAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+    for (const booking of bookings) {
+      const sent = await sendReminderMessage(booking);
+      if (sent) {
+        await prisma.booking.update({
+          where: { id: booking.id },
+          data: {
+            reminderSent: true,
+            reminderSentAt: new Date(),
+          }
+        });
+      }
     }
+  } catch (err) {
+    console.error('[bookingReminders] SQL Error:', err.message);
   }
 }
 
@@ -120,9 +111,7 @@ function startBookingReminderScheduler() {
     return;
   }
 
-  if (reminderIntervalHandle) {
-    return;
-  }
+  if (reminderIntervalHandle) return;
 
   const intervalMs = REMINDER_INTERVAL_MINUTES * 60 * 1000;
   reminderIntervalHandle = setInterval(() => {
@@ -131,9 +120,7 @@ function startBookingReminderScheduler() {
     });
   }, intervalMs);
 
-  console.log(`[bookingReminders] Scheduler dimulai. Interval ${REMINDER_INTERVAL_MINUTES} menit, pengingat jam ${REMINDER_HOUR}:00 ${TIMEZONE}`);
-  // Removed immediate execution at startup to allow WA DB to fully synchronize.
-  // The first execution will happen naturally after REMINDER_INTERVAL_MINUTES.
+  console.log(`[bookingReminders] SQL Scheduler dimulai. Interval ${REMINDER_INTERVAL_MINUTES} menit, pengingat jam ${REMINDER_HOUR}:00 ${TIMEZONE}`);
 }
 
 module.exports = {

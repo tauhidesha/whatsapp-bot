@@ -1,6 +1,6 @@
 // File: src/ai/tools/readDirectMessagesTool.js
-const admin = require('firebase-admin');
-const { isAdmin, ensureFirestore } = require('../utils/adminAuth.js');
+const prisma = require('../../lib/prisma');
+const { isAdmin } = require('../utils/adminAuth.js');
 
 
 const readDirectMessagesTool = {
@@ -49,39 +49,37 @@ const readDirectMessagesTool = {
       };
     }
 
-    const db = ensureFirestore();
-
     try {
       if (action === 'list_recent') {
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() - days);
 
-        const snapshot = await db.collection('directMessages')
-          .where('updatedAt', '>=', admin.firestore.Timestamp.fromDate(cutoffDate))
-          .orderBy('updatedAt', 'desc')
-          .limit(limit)
-          .get();
+        const customers = await prisma.customer.findMany({
+          where: {
+            updatedAt: { gte: cutoffDate }
+          },
+          orderBy: { updatedAt: 'desc' },
+          take: limit,
+          include: {
+            messages: {
+              orderBy: { createdAt: 'desc' },
+              take: 1
+            }
+          }
+        });
 
-        if (snapshot.empty) {
+        if (customers.length === 0) {
           return { success: true, message: `Tidak ada percakapan aktif dalam ${days} hari terakhir.` };
         }
 
-        const conversations = [];
-        snapshot.forEach(doc => {
-          const data = doc.data();
-
-          // Fix: Jika di Firestore @lid hilang (hanya ID angka panjang), kita format ulang
-          let senderId = data.fullSenderId || doc.id;
-          if (!data.fullSenderId && /^\d{15,}$/.test(doc.id) && !doc.id.startsWith('62')) {
-            senderId = `${doc.id}@lid`;
-          }
-
-          conversations.push({
-            number: senderId,
-            name: data.name || 'Tanpa Nama',
-            lastMessage: data.lastMessage || '-',
-            time: data.updatedAt ? data.updatedAt.toDate().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : '-'
-          });
+        const conversations = customers.map(c => {
+          const lastMessage = c.messages[0];
+          return {
+            number: c.phone + '@c.us',
+            name: c.name || 'Tanpa Nama',
+            lastMessage: lastMessage?.content || '-',
+            time: c.updatedAt.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })
+          };
         });
 
         // Format output agar mudah dibaca AI
@@ -107,33 +105,26 @@ const readDirectMessagesTool = {
           cleanTarget = '62' + cleanTarget.slice(1);
         }
 
-        const docId = cleanTarget;
-
-        const messagesRef = db.collection('directMessages').doc(docId).collection('messages');
-        const snapshot = await messagesRef
-          .orderBy('timestamp', 'desc')
-          .limit(limit)
-          .get();
-
-        if (snapshot.empty) {
-          return { success: true, message: `Belum ada riwayat pesan tersimpan dengan ID: ${docId}.` };
-        }
-
-        const messages = [];
-        snapshot.forEach(doc => {
-          const data = doc.data();
-          messages.push({
-            sender: data.sender, // 'user', 'ai', 'admin'
-            text: data.text,
-            time: data.timestamp ? data.timestamp.toDate().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : '-'
-          });
+        // Find customer
+        const customer = await prisma.customer.findUnique({
+          where: { phone: cleanTarget },
+          include: {
+            messages: {
+              orderBy: { createdAt: 'desc' },
+              take: limit
+            }
+          }
         });
 
-        // Urutkan dari lama ke baru untuk pembacaan
-        const sortedMessages = messages.reverse();
+        if (!customer || customer.messages.length === 0) {
+          return { success: true, message: `Belum ada riwayat pesan tersimpan dengan nomor: ${cleanTarget}.` };
+        }
+
+        // Urutkan dari lama ke baru
+        const sortedMessages = customer.messages.reverse();
 
         const chatLog = sortedMessages.map(m =>
-          `[${m.time}] ${m.sender.toUpperCase()}: ${m.text}`
+          `[${m.createdAt.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}] ${m.role.toUpperCase()}: ${m.content}`
         ).join('\n');
 
         return {

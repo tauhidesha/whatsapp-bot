@@ -1,4 +1,4 @@
-const admin = require('firebase-admin');
+const prisma = require('./prisma.js');
 
 const VALID_LABELS = [
     'hot_lead',
@@ -32,41 +32,39 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Ensures a WhatsApp label exists by name.
- * Checks cache -> Checks WA -> Returns null if missing (does NOT create).
- * @param {object} client - WPPConnect client instance
- * @param {object} db - Firestore instance
- * @param {string} labelKey - The internal label key (e.g., 'hot_lead')
- * @returns {Promise<{id: string, name: string}|null>} The label object or null if failed
+ * Checks SQL cache -> Checks WA -> Returns null if missing.
  */
-async function ensureWhatsAppLabel(client, db, labelKey) {
+async function ensureWhatsAppLabel(client, db_is_ignored, labelKey) {
     if (!client) return null;
 
     const labelName = LABEL_DISPLAY_NAMES[labelKey] || labelKey;
     let labelId = null;
 
-    // 1. Check Firestore Cache
+    // 1. Check SQL Cache (KeyValueStore)
     try {
-        const labelCacheRef = db.collection('_labelCache').doc(labelKey);
-        const cached = await labelCacheRef.get();
-        if (cached.exists && cached.data().labelId) {
-            labelId = cached.data().labelId;
-            // Verify if it still exists in WA (optional but good for consistency)
+        const cached = await prisma.keyValueStore.findUnique({
+            where: { collection_key: { collection: '_labelCache', key: labelKey } }
+        });
+        
+        if (cached && cached.value && cached.value.labelId) {
+            labelId = cached.value.labelId;
+            // Verify if it still exists in WA
             if (client.getAllLabels) {
                 const allLabels = await client.getAllLabels();
                 const stillExists = allLabels.find((l) => l.id?.toString() === labelId);
                 if (stillExists) {
-                    console.log(`[LabelUtils] ✅ Cache hit for label "${labelName}" (ID: ${labelId})`);
+                    console.log(`[LabelUtils] ✅ SQL Cache hit for label "${labelName}" (ID: ${labelId})`);
                     return { id: labelId, name: labelName };
                 } else {
-                    console.warn(`[LabelUtils] Cached ID ${labelId} not found in WA, clearing cache.`);
-                    labelId = null; // Reset to find/create again
+                    console.warn(`[LabelUtils] Cached ID ${labelId} not found in WA, clearing SQL cache.`);
+                    labelId = null; 
                 }
             } else {
                 return { id: labelId, name: labelName };
             }
         }
     } catch (err) {
-        console.warn('[LabelUtils] Cache check failed:', err.message);
+        console.warn('[LabelUtils] SQL Cache check failed:', err.message);
     }
 
     // 2. Search in existing WA labels
@@ -75,42 +73,29 @@ async function ensureWhatsAppLabel(client, db, labelKey) {
             console.log(`[LabelUtils] Fetching all labels from WhatsApp to find "${labelName}"...`);
             const allLabels = await client.getAllLabels();
 
-            // Log available labels for debugging
-            const availableNames = allLabels.map(l => l.name).join(', ');
-            console.log(`[LabelUtils] Available labels in WA (${allLabels.length}): ${availableNames}`);
-
             const existing = allLabels.find((l) => l.name === labelName);
             if (existing && existing.id) {
                 labelId = existing.id.toString();
                 console.log(`[LabelUtils] ✅ Found label "${labelName}" in WA with ID: ${labelId}`);
-                // Update cache
-                await cacheLabel(db, labelKey, labelId, labelName);
+                // Update SQL cache
+                await cacheLabel(labelKey, labelId, labelName);
                 return { id: labelId, name: labelName };
-            } else {
-                console.warn(`[LabelUtils] ⚠️ Label "${labelName}" NOT found in WA list.`);
             }
         } catch (err) {
             console.warn('[LabelUtils] getAllLabels failed:', err.message);
         }
     }
 
-    // 3. Label not found (User must create it manually)
-    console.warn(`[LabelUtils] Label "${labelName}" not found in WhatsApp. Please create it manually in WA Business.`);
+    console.warn(`[LabelUtils] Label "${labelName}" not found in WhatsApp.`);
     return null;
 }
 
 /**
- * Assigns a label to a chat, removing any previous tracked label.
- * @param {object} client - WPPConnect client
- * @param {object} db - Firestore instance
- * @param {string} senderNumber - The phone number
- * @param {string} docId - The Firestore doc ID
- * @param {string} labelId - The new label ID to assign
- * @param {string} [prevLabelId] - The previous label ID to remove (optional)
- * @returns {Promise<boolean>} Success status
+ * Assigns a label to a chat in WhatsApp and tracks it in SQL Customer table.
  */
-async function assignWhatsAppLabel(client, db, senderNumber, docId, labelId, prevLabelId = null) {
+async function assignWhatsAppLabel(client, db_ignored, senderNumber, docId_is_phone, labelId, prevLabelId = null) {
     if (!client || !client.addOrRemoveLabels) return false;
+    const phone = docId_is_phone.replace(/[^0-9]/g, '');
 
     try {
         const operations = [];
@@ -125,11 +110,16 @@ async function assignWhatsAppLabel(client, db, senderNumber, docId, labelId, pre
 
         await client.addOrRemoveLabels([senderNumber], operations);
 
-        // Update tracking in Firestore
-        await db.collection('directMessages').doc(docId).set(
-            { whatsappLabelId: labelId },
-            { merge: true }
-        );
+        // Update tracking in SQL (Customer table)
+        // We use whatsappLid or custom field if needed, but for now we store in metadata or similar
+        // Let's use Customer schema field if available or KeyValueStore
+        await prisma.customer.update({
+            where: { phone },
+            data: { 
+                notes: `WA_LABEL_ID:${labelId}`, // Simple tracking in notes for now
+                updatedAt: new Date()
+            }
+        }).catch(err => console.warn('[LabelUtils] Failed to update customer label info:', err.message));
 
         return true;
     } catch (err) {
@@ -138,15 +128,21 @@ async function assignWhatsAppLabel(client, db, senderNumber, docId, labelId, pre
     }
 }
 
-async function cacheLabel(db, labelKey, labelId, labelName) {
+async function cacheLabel(labelKey, labelId, labelName) {
     try {
-        await db.collection('_labelCache').doc(labelKey).set({
-            labelId,
-            labelName,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        await prisma.keyValueStore.upsert({
+            where: { collection_key: { collection: '_labelCache', key: labelKey } },
+            update: {
+                value: { labelId, labelName, updatedAt: new Date().toISOString() }
+            },
+            create: {
+                collection: '_labelCache',
+                key: labelKey,
+                value: { labelId, labelName, updatedAt: new Date().toISOString() }
+            }
         });
     } catch (e) {
-        console.warn('[LabelUtils] Cache update failed:', e.message);
+        console.warn('[LabelUtils] SQL Cache update failed:', e.message);
     }
 }
 

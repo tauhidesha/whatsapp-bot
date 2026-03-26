@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Settings - Bosmat Admin</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ec5b13",
+                        "background-light": "#f8f6f6",
+                        "background-dark": "#221610",
+                        "navy-sidebar": "#221311",
+                    },
+                    fontFamily: {
+                        "display": ["Public Sans", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Public Sans', sans-serif; }
+        .sidebar-active { background-color: #472724; }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display">
+<div class="flex min-h-screen">
+<!-- Sidebar: Identical to SCREEN_4 style -->
+<aside class="w-64 bg-[#0f172a] flex flex-col justify-between py-6 sticky top-0 h-screen shrink-0 border-r border-slate-800">
+<div class="flex flex-col gap-8"><!-- Logo -->
+<div class="flex items-center gap-3 px-6 mb-8">
+<div class="bg-primary rounded-lg size-9 flex items-center justify-center text-white shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined text-xl">rocket_launch</span>
+</div>
+<h1 class="text-white text-lg font-bold tracking-tight">Bosmat Admin</h1>
+</div>
+<!-- Navigation Menu -->
+<nav class="flex flex-col px-3 gap-1">
+<a class="flex items-center gap-3 px-3 py-2.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all group" href="#">
+<span class="material-symbols-outlined text-[22px] group-hover:scale-110 transition-transform">dashboard</span>
+<p class="text-sm font-semibold tracking-wide">Dashboard</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all group" href="#">
+<span class="material-symbols-outlined text-[22px] group-hover:scale-110 transition-transform">calendar_today</span>
+<p class="text-sm font-semibold tracking-wide">Bookings</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all group" href="#">
+<span class="material-symbols-outlined text-[22px] group-hover:scale-110 transition-transform">groups</span>
+<p class="text-sm font-semibold tracking-wide">CRM</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all group" href="#">
+<span class="material-symbols-outlined text-[22px] group-hover:scale-110 transition-transform">chat_bubble</span>
+<p class="text-sm font-semibold tracking-wide">Messages</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 bg-slate-800 text-white rounded-lg transition-all group" href="#">
+<span class="material-symbols-outlined text-[22px] group-hover:scale-110 transition-transform">settings</span>
+<p class="text-sm font-semibold tracking-wide">Settings</p>
+</a>
+</nav></div>
+<!-- Logout -->
+<div class="flex flex-col px-3 gap-1 border-t border-slate-800 pt-6"><a class="flex items-center gap-3 px-3 py-2.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all group" href="#">
+<span class="material-symbols-outlined text-[22px] group-hover:scale-110 transition-transform">logout</span>
+<p class="text-sm font-semibold tracking-wide">Logout</p>
+</a></div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col overflow-x-hidden">
+<!-- Header -->
+<header class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-background-dark px-8 py-4 sticky top-0 z-10">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">settings</span>
+<h2 class="text-slate-900 dark:text-slate-100 text-lg font-bold">Settings</h2>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+<input class="pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-xl text-sm focus:ring-2 focus:ring-primary w-64 text-slate-900 dark:text-slate-100" placeholder="Search settings..." type="text"/>
+</div>
+<div class="size-10 rounded-full bg-slate-200 overflow-hidden border border-slate-300">
+<img class="w-full h-full object-cover" data-alt="Admin user profile picture portrait" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD2aJ3T94D8e_U1czk7GiPHulbCQXqk-5U5Ob-r9-ihF4cr9HQ0HJpNZAqwryBJ1A14ByMor80CmF9lVVyeVh2JhCqkdT9iaxEOxVd7nShbJ0FNllOyYmIAVqivuVXKl6Ow6cH7DhTG30b06fDR1YHLObE0RO-JniNLfsIEs_f_mMTz1KkPpNhHVrCsr-2W7oFXKxGy1PwM0cXMTdQAkYZF5NSZtixg1a_xZXXc-4xJ1ucfTLlfMI3g6_TvObqCd2BNNytdFSNv9v0"/>
+</div>
+</div>
+</header>
+<div class="p-8 max-w-5xl mx-auto w-full space-y-8">
+<!-- Page Title -->
+<div>
+<h1 class="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">Settings</h1>
+<p class="text-slate-500 dark:text-slate-400 mt-1">Manage your AI configurations, marketing promotions, and service offerings.</p>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<!-- Left Column: AI & Promotions -->
+<div class="lg:col-span-2 space-y-8">
+<!-- AI System Configuration -->
+<section class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+<div class="flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-primary">smart_toy</span>
+<h3 class="text-lg font-bold text-slate-900 dark:text-slate-100">System Configuration</h3>
+</div>
+<div class="space-y-4">
+<div>
+<label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">AI System Prompt</label>
+<textarea class="w-full rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:ring-primary focus:border-primary placeholder-slate-400" placeholder="Define how the AI should interact with customers..." rows="8">You are a helpful assistant for Bosmat. Your goal is to help users book services like detailing and repainting. Be professional, concise, and friendly. Always confirm pricing before finalizing a booking. If a user asks for something outside our scope, politely decline and offer relevant alternatives.</textarea>
+<p class="mt-2 text-xs text-slate-400 italic">This prompt guides the behavior of your customer-facing AI chatbot.</p>
+</div>
+</div>
+</section>
+<!-- Promotions Section -->
+<section class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+<div class="flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-primary">campaign</span>
+<h3 class="text-lg font-bold text-slate-900 dark:text-slate-100">Promotions</h3>
+</div>
+<div class="space-y-4">
+<div>
+<label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Current Promotion Text</label>
+<input class="w-full rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:ring-primary focus:border-primary" type="text" value="Summer Special: 20% off all Full Detailing services until August 31st!"/>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex-1">
+<label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Discount Code</label>
+<input class="w-full rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:ring-primary focus:border-primary" type="text" value="SUMMER20"/>
+</div>
+<div class="w-32">
+<label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Status</label>
+<div class="flex items-center h-10">
+<span class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+<span class="ml-3 text-sm font-medium text-slate-900 dark:text-slate-300">Active</span>
+</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- Right Column: Service Catalog -->
+<div class="lg:col-span-1">
+<section class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm h-full flex flex-col">
+<div class="flex items-center justify-between mb-6">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">inventory_2</span>
+<h3 class="text-lg font-bold text-slate-900 dark:text-slate-100">Services</h3>
+</div>
+<button class="p-1 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+<span class="material-symbols-outlined">add</span>
+</button>
+</div>
+<div class="space-y-3 flex-1 overflow-y-auto">
+<!-- Service Item -->
+<div class="p-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between group">
+<div>
+<p class="text-sm font-bold text-slate-900 dark:text-slate-100">Full Detailing</p>
+<p class="text-xs text-slate-500">$199.00 • 4 hrs</p>
+</div>
+<div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 text-slate-400 hover:text-primary"><span class="material-symbols-outlined text-sm">edit</span></button>
+<button class="p-1 text-slate-400 hover:text-red-500"><span class="material-symbols-outlined text-sm">delete</span></button>
+</div>
+</div>
+<!-- Service Item -->
+<div class="p-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between group">
+<div>
+<p class="text-sm font-bold text-slate-900 dark:text-slate-100">Body Repainting</p>
+<p class="text-xs text-slate-500">From $850.00</p>
+</div>
+<div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 text-slate-400 hover:text-primary"><span class="material-symbols-outlined text-sm">edit</span></button>
+<button class="p-1 text-slate-400 hover:text-red-500"><span class="material-symbols-outlined text-sm">delete</span></button>
+</div>
+</div>
+<!-- Service Item -->
+<div class="p-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between group">
+<div>
+<p class="text-sm font-bold text-slate-900 dark:text-slate-100">Ceramic Coating</p>
+<p class="text-xs text-slate-500">$450.00 • 6 hrs</p>
+</div>
+<div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 text-slate-400 hover:text-primary"><span class="material-symbols-outlined text-sm">edit</span></button>
+<button class="p-1 text-slate-400 hover:text-red-500"><span class="material-symbols-outlined text-sm">delete</span></button>
+</div>
+</div>
+<!-- Service Item -->
+<div class="p-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between group">
+<div>
+<p class="text-sm font-bold text-slate-900 dark:text-slate-100">Interior Deep Clean</p>
+<p class="text-xs text-slate-500">$120.00 • 2 hrs</p>
+</div>
+<div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 text-slate-400 hover:text-primary"><span class="material-symbols-outlined text-sm">edit</span></button>
+<button class="p-1 text-slate-400 hover:text-red-500"><span class="material-symbols-outlined text-sm">delete</span></button>
+</div>
+</div>
+</div>
+<button class="mt-6 w-full py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl text-sm font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                                View Full Catalog
+                            </button>
+</section>
+</div>
+</div>
+<!-- Footer Actions -->
+<div class="flex items-center justify-end gap-4 pt-6 border-t border-slate-200 dark:border-slate-800">
+<button class="px-6 py-2 text-slate-600 dark:text-slate-400 font-semibold hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
+                        Cancel
+                    </button>
+<button class="px-8 py-2.5 bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/25 hover:brightness-110 active:scale-95 transition-all">
+                        Save Changes
+                    </button>
+</div>
+</div>
+</main>
+</div>
+</body></html>

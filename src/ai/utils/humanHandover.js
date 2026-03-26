@@ -1,27 +1,15 @@
-// File: src/ai/utils/humanHandover.js
-// Utilities to handoff conversations to human (BosMat) support.
-
-const admin = require('firebase-admin');
+const prisma = require('../../lib/prisma.js');
 const { DateTime } = require('luxon');
-const { getFirebaseAdmin } = require('../../lib/firebaseAdmin.js');
 
 const BOSMAT_ADMIN_NUMBER = process.env.BOSMAT_ADMIN_NUMBER || process.env.ADMIN_WHATSAPP_NUMBER;
 const NOTIFY_BOOKING_CREATION = process.env.NOTIFY_BOOKING_CREATION !== 'true';
 const DEFAULT_ADDITIONAL_SERVICE = process.env.BOOKING_DEFAULT_ADDITIONAL_SERVICE || null;
-
-function ensureFirestore() {
-  if (!admin.apps.length) {
-    admin.initializeApp();
-  }
-  return getFirebaseAdmin().firestore();
-}
 
 function normalizeWhatsappNumber(number) {
   if (!number) return null;
   let trimmed = number.trim();
   if (!trimmed) return null;
 
-  // If it already has the suffix, just remove any accidental spaces
   if (trimmed.endsWith('@c.us') || trimmed.endsWith('@lid')) {
     return trimmed.replace(/\s+/g, '');
   }
@@ -29,13 +17,10 @@ function normalizeWhatsappNumber(number) {
   const isPlus = trimmed.startsWith('+');
   let digits = trimmed.replace(/[^0-9]/g, '');
 
-  // If local Indonesian number starting with 0, change to 62
   if (!isPlus && digits.startsWith('0')) {
     digits = '62' + digits.slice(1);
   }
 
-  // Heuristik untuk Linked Devices (@lid)
-  // ID Facebook/IG (Meta) biasanya 14-15 digit dan acak (bisa tidak berawalan 62)
   if (digits.length >= 14 && !digits.startsWith('62')) {
     return `${digits}@lid`;
   }
@@ -65,36 +50,37 @@ async function sendWhatsappNotification(message) {
     await client.sendText(target, message);
     console.log('[humanHandover] Notifikasi WA terkirim ke admin:', target);
 
-    // --- Simpan juga ke Firestore directMessages admin agar AI punya konteks ---
+    // --- Simpan ke SQL tabel DirectMessage ---
     try {
-      const db = ensureFirestore();
-      // docId tanpa suffix @c.us/@lid, mengikuti pola directMessages lain
-      const docId = target.replace(/@c\.us$|@lid$/, '');
-      const timestamp = admin.firestore.FieldValue.serverTimestamp();
-
-      // Simpan ke subcollection messages
-      await db.collection('directMessages').doc(docId).collection('messages').add({
-        text: message,
-        sender: 'ai', // dikirim oleh sistem/AI ke admin
-        direction: 'outbound_admin',
-        timestamp,
+      const phone = target.replace(/@c\.us$|@lid$/, '');
+      
+      // Get or create admin customer record
+      const customer = await prisma.customer.upsert({
+        where: { phone },
+        update: {
+          lastMessage: message,
+          lastMessageAt: new Date(),
+          updatedAt: new Date(),
+        },
+        create: {
+          phone,
+          name: 'Admin BosMat',
+          lastMessage: message,
+          lastMessageAt: new Date(),
+        }
       });
 
-      // Update metadata percakapan admin
-      await db.collection('directMessages').doc(docId).set(
-        {
-          lastMessage: message,
-          lastMessageSender: 'ai',
-          lastMessageAt: timestamp,
-          updatedAt: timestamp,
-          fullSenderId: target,
-          isAdmin: true,
-          messageCount: admin.firestore.FieldValue.increment(1),
-        },
-        { merge: true }
-      );
+      await prisma.directMessage.create({
+        data: {
+          customerId: customer.id,
+          senderId: 'ai',
+          role: 'ai',
+          content: message,
+          createdAt: new Date(),
+        }
+      });
     } catch (err) {
-      console.warn('[humanHandover] Gagal menyimpan notifikasi admin ke Firestore:', err);
+      console.warn('[humanHandover] Gagal menyimpan notifikasi admin ke SQL:', err.message);
     }
   } catch (error) {
     console.error('[humanHandover] Gagal mengirim notifikasi WA ke admin:', error);
@@ -102,17 +88,27 @@ async function sendWhatsappNotification(message) {
 }
 
 async function notifyBosMat(senderNumber, customerQuestion, reason) {
-  const db = ensureFirestore();
-  const payload = {
-    senderNumber,
-    customerQuestion,
-    reason,
-    status: 'pending',
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-  };
-
-  await db.collection('humanHandovers').add(payload);
-  console.log('[humanHandover] Notifikasi handover tersimpan:', payload);
+  // Notifikasi via key-value store untuk audit atau tabel khusus
+  try {
+    const phone = senderNumber.replace(/[^0-9]/g, '');
+    await prisma.keyValueStore.upsert({
+      where: { collection_key: { collection: 'humanHandovers', key: `${phone}_${Date.now()}` } },
+      update: {},
+      create: {
+        collection: 'humanHandovers',
+        key: `${phone}_${Date.now()}`,
+        value: {
+          senderNumber,
+          customerQuestion,
+          reason,
+          status: 'pending',
+          createdAt: new Date().toISOString()
+        }
+      }
+    });
+  } catch (err) {
+    console.warn('[humanHandover] Gagal catat handover ke KVStore:', err.message);
+  }
 
   const messageLines = [
     '🔔 *Human Handover Request*',
@@ -160,8 +156,8 @@ async function notifyNewBooking(bookingData) {
     return;
   }
 
-  const additionalService = bookingData.additionalService
-    || bookingData.homeService?.requested && bookingData.homeService?.type
+  const additionalService = bookingData.additionalService 
+    || (bookingData.homeService?.requested && bookingData.homeService?.type)
     || DEFAULT_ADDITIONAL_SERVICE;
 
   const lines = [
@@ -218,127 +214,118 @@ async function notifyNewBooking(bookingData) {
 
 async function setSnoozeMode(senderNumber, durationMinutes = 60, options = {}) {
   const { reason = null, manual = false } = options;
-  const db = ensureFirestore();
   const normalizedNumber = normalizeWhatsappNumber(senderNumber) || senderNumber;
-  const docRef = db.collection('handoverSnoozes').doc(normalizedNumber);
+  const phone = normalizedNumber.replace(/@c\.us$|@lid$/, '');
 
-  let effectiveDuration = null;
-  let expiresAtValue = null;
+  let expiresAtDate = null;
 
   if (!manual) {
-    effectiveDuration = typeof durationMinutes === 'number' && durationMinutes > 0 ? durationMinutes : 60;
-    const expiresAtDate = DateTime.now().plus({ minutes: effectiveDuration }).toJSDate();
-    expiresAtValue = admin.firestore.Timestamp.fromDate(expiresAtDate);
+    const effectiveDuration = typeof durationMinutes === 'number' && durationMinutes > 0 ? durationMinutes : 60;
+    expiresAtDate = DateTime.now().plus({ minutes: effectiveDuration }).toJSDate();
   }
 
-  const payload = {
-    senderNumber: normalizedNumber,
-    durationMinutes: effectiveDuration,
-    manual,
-    reason: reason || null,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-  };
-
-  if (manual) {
-    payload.expiresAt = null;
-  } else if (expiresAtValue) {
-    payload.expiresAt = expiresAtValue;
-  }
-
-  await docRef.set(payload, { merge: true });
+  // 1. Update HandoverSnooze table
+  await prisma.handoverSnooze.upsert({
+    where: { id: normalizedNumber },
+    update: {
+      expiresAt: expiresAtDate,
+      manual,
+      reason,
+      createdAt: new Date(),
+    },
+    create: {
+      id: normalizedNumber,
+      customerId: phone,
+      expiresAt: expiresAtDate,
+      manual,
+      reason,
+    }
+  });
   
-  // SINKRONISASI KE directMessages UNTUK UI FRONTEND
+  // 2. Sync to Customer table
   try {
-    const docId = normalizedNumber.replace(/@c\.us$|@lid$/, '');
-    await db.collection('directMessages').doc(docId).update({
-      aiEnabled: !manual && !expiresAtValue,
-      aiPaused: true,
-      aiPausedUntil: expiresAtValue,
-      aiPauseReason: reason || (manual ? 'manual-toggle' : 'timed-toggle'),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    await prisma.customer.update({
+      where: { phone },
+      data: {
+        aiPaused: true,
+        aiPausedUntil: expiresAtDate,
+        aiPauseReason: reason || (manual ? 'manual-toggle' : 'timed-toggle'),
+        updatedAt: new Date(),
+      }
     });
   } catch (err) {
-    console.warn('[humanHandover] Gagal sinkronisasi snooze ke directMessages:', err.message);
+    console.warn('[humanHandover] Gagal sinkronisasi snooze ke Customer:', err.message);
   }
 
-  console.log('[humanHandover] Snooze mode aktif untuk', normalizedNumber, manual ? '(manual)' : `(durasi ${effectiveDuration} menit)`);
+  console.log('[humanHandover] Snooze SQL aktif untuk', normalizedNumber, manual ? '(manual)' : `(durasi ${durationMinutes} menit)`);
 }
 
 async function clearSnoozeMode(senderNumber) {
-  const db = ensureFirestore();
   const normalizedNumber = normalizeWhatsappNumber(senderNumber) || senderNumber;
+  const phone = normalizedNumber.replace(/@c\.us$|@lid$/, '');
+  
   try {
-    await db.collection('handoverSnoozes').doc(normalizedNumber).delete();
-    console.log('[humanHandover] Snooze mode dinonaktifkan untuk', normalizedNumber);
-
-    // SINKRONISASI KE directMessages UNTUK UI FRONTEND
+    await prisma.handoverSnooze.delete({ where: { id: normalizedNumber } }).catch(() => {});
+    
+    // Sync to Customer table
     try {
-      const docId = normalizedNumber.replace(/@c\.us$|@lid$/, '');
-      await db.collection('directMessages').doc(docId).update({
-        aiEnabled: true,
-        aiPaused: false,
-        aiPausedUntil: null,
-        aiPauseReason: null,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      await prisma.customer.update({
+        where: { phone },
+        data: {
+          aiPaused: false,
+          aiPausedUntil: null,
+          aiPauseReason: null,
+          updatedAt: new Date(),
+        }
       });
     } catch (err) {
-      console.warn('[humanHandover] Gagal sinkronisasi clear-snooze ke directMessages:', err.message);
+      // Ignored
     }
+    console.log('[humanHandover] Snooze SQL dinonaktifkan untuk', normalizedNumber);
   } catch (error) {
-    console.warn('[humanHandover] Gagal menonaktifkan snooze:', error);
+    console.warn('[humanHandover] Gagal menonaktifkan snooze SQL:', error);
   }
 }
 
 async function getSnoozeInfo(senderNumber, { cleanExpired = false } = {}) {
-  const db = ensureFirestore();
   const normalizedNumber = normalizeWhatsappNumber(senderNumber) || senderNumber;
-  const docRef = db.collection('handoverSnoozes').doc(normalizedNumber);
-  const snapshot = await docRef.get();
+  
+  try {
+    const snooze = await prisma.handoverSnooze.findUnique({
+      where: { id: normalizedNumber }
+    });
 
-  if (!snapshot.exists) {
-    return {
-      active: false,
-      manual: false,
-      durationMinutes: null,
-      expiresAt: null,
-      reason: null,
-      createdAt: null,
-      updatedAt: null,
-    };
-  }
+    if (!snooze) {
+      return { active: false, manual: false, durationMinutes: null, expiresAt: null, reason: null };
+    }
 
-  const data = snapshot.data() || {};
-  const manual = Boolean(data.manual);
-  const expiresAtDate = data.expiresAt?.toDate ? data.expiresAt.toDate() : null;
-  const now = new Date();
+    const { manual, expiresAt, reason, createdAt, updatedAt } = snooze;
+    const now = new Date();
 
-  let active = manual;
-
-  if (!manual) {
-    if (expiresAtDate && expiresAtDate > now) {
-      active = true;
-    } else {
-      active = false;
-      if (cleanExpired) {
-        try {
-          await docRef.delete();
-        } catch (error) {
-          console.warn('[humanHandover] Gagal menghapus snooze yang kadaluarsa:', error);
+    let active = manual;
+    if (!manual) {
+      if (expiresAt && expiresAt > now) {
+        active = true;
+      } else {
+        active = false;
+        if (cleanExpired) {
+          await clearSnoozeMode(senderNumber);
         }
       }
     }
-  }
 
-  return {
-    active,
-    manual,
-    durationMinutes: typeof data.durationMinutes === 'number' ? data.durationMinutes : null,
-    expiresAt: expiresAtDate ? expiresAtDate.toISOString() : null,
-    reason: data.reason || null,
-    createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : null,
-    updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : null,
-  };
+    return {
+      active,
+      manual,
+      expiresAt: expiresAt ? expiresAt.toISOString() : null,
+      reason,
+      createdAt: createdAt ? createdAt.toISOString() : null,
+      updatedAt: updatedAt ? updatedAt.toISOString() : null,
+    };
+  } catch (error) {
+    console.error('[humanHandover] Error getting snooze info:', error);
+    return { active: false };
+  }
 }
 
 async function isSnoozeActive(senderNumber) {

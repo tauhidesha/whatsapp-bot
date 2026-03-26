@@ -1,6 +1,3 @@
-const admin = require('firebase-admin');
-const { getFirebaseAdmin } = require('../../lib/firebaseAdmin.js');
-
 /**
  * Memvalidasi apakah nomor pengirim adalah admin.
  * @param {string} senderNumber - Nomor WhatsApp pengirim (e.g., '62812345678@c.us')
@@ -22,40 +19,11 @@ function isAdmin(senderNumber) {
 }
 
 /**
- * Mengembalikan instance Firestore yang valid.
- * Menangani berbagai cara inisialisasi Firebase Admin.
- * @returns {admin.firestore.Firestore} Instance Firestore.
+ * @deprecated Migrated to Prisma
  */
 function ensureFirestore() {
-    if (!admin.apps.length) {
-        try {
-            // Coba inisialisasi dengan BASE64 service account (prioritas deployment)
-            const serviceAccountBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
-            if (serviceAccountBase64) {
-                const serviceAccountJson = Buffer.from(serviceAccountBase64, 'base64').toString('utf-8');
-                const serviceAccount = JSON.parse(serviceAccountJson);
-                admin.initializeApp({
-                    credential: admin.credential.cert(serviceAccount)
-                });
-            } else {
-                // Fallback ke GOOGLE_APPLICATION_CREDENTIALS atau default env
-                const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-                const config = serviceAccountPath
-                    ? { credential: admin.credential.cert(serviceAccountPath) }
-                    : {};
-                admin.initializeApp(config);
-            }
-        } catch (e) {
-            console.warn('[AdminAuth] Firebase init warning:', e.message);
-        }
-    }
-
-    // Gunakan helper project jika ada, atau fallback ke admin default
-    try {
-        return getFirebaseAdmin().firestore();
-    } catch (e) {
-        return admin.firestore();
-    }
+    console.warn('[AdminAuth] ensureFirestore() is DEPRECATED. Use Prisma instead.');
+    return null;
 }
 
 module.exports = { isAdmin, ensureFirestore };

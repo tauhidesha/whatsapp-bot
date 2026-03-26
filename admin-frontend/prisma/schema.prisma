@@ -1,0 +1,243 @@
+// prisma/schema.prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ============================================
+// CORE MODELS
+// ============================================
+
+model Customer {
+  id            String    @id @default(uuid())
+  phone         String    @unique
+  whatsappLid   String?   @unique
+  name          String?
+  totalSpending Float     @default(0)
+  lastService   DateTime?
+  status        String    @default("new")
+  notes         String?
+  aiPaused      Boolean   @default(false)
+  aiPausedUntil DateTime?
+  aiPauseReason String?
+  profilePicUrl String?
+  lastMessage   String?
+  lastMessageAt DateTime?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  messages          DirectMessage[]
+  bookings          Booking[]
+  transactions      Transaction[]
+  vehicles          Vehicle[]
+  customerContext   CustomerContext?
+}
+
+model Vehicle {
+  id            String    @id @default(uuid())
+  customerId    String
+  customer      Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  modelName     String
+  plateNumber   String?   @unique
+  color         String?
+  notes         String?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  bookings      Booking[]
+}
+
+model DirectMessage {
+  id          String   @id @default(uuid())
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  senderId    String
+  role        String
+  content     String
+  mediaUrl    String?
+  context     Json?
+
+  createdAt   DateTime @default(now())
+}
+
+model Booking {
+  id              String    @id @default(uuid())
+  customerId      String
+  customer        Customer  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  vehicleId       String?
+  vehicle         Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  bookingDate     DateTime
+  status          String    @default("PENDING")
+  serviceType     String
+  adminNotes      String?
+
+  // Denormalized fields for quick display
+  plateNumber     String?
+  vehicleModel    String?
+  customerName    String?
+  customerPhone   String?
+
+  // Extended fields
+  notes           String?
+  homeService     Boolean   @default(false)
+  pickupService   Boolean   @default(false)
+  subtotal        Float?
+  downPayment     Float?
+  paymentMethod   String?
+  category        String?
+  reminderSent    Boolean   @default(false)
+  reminderSentAt  DateTime?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  transaction          Transaction?
+  coatingMaintenance  CoatingMaintenance?
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  customerId  String?
+  customer    Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  bookingId   String?  @unique
+  booking     Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  amount      Float
+  type        String
+  category    String?
+  status      String   @default("UNPAID")
+  description String?
+  paymentMode String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ============================================
+// AI CONTEXT & CLASSIFICATION
+// ============================================
+
+model CustomerContext {
+  id                String   @id
+  phone             String   @unique
+
+  customer          Customer? @relation(fields: [phone], references: [phone])
+
+  // Motor info
+  motorModel        String?
+  motorPlate        String?
+  motorYear         String?
+  motorColor        String?
+  motorCondition    String?
+
+  // Service info
+  targetServices    String[]
+  serviceDetail     String?
+  budgetSignal      String?
+
+  // Conversation state
+  detectedIntents   String[]
+  isChangingTopic   Boolean  @default(false)
+  saidExpensive     Boolean?
+  askedPrice        Boolean?
+  askedAvailability Boolean?
+  sharedPhoto       Boolean?
+  preferredDay      String?
+  preferredTime     String?
+  locationHint      String?
+
+  // Quotes
+  quotedServices    Json?
+  quotedTotalNormal Float?
+  quotedTotalBundling Float?
+  quotedAt          DateTime?
+
+  // Stage
+  conversationStage String?
+  lastAiAction      String?
+  upsellOffered     Boolean?
+  upsellAccepted    Boolean?
+  butuhBantuanAdmin Boolean  @default(false)
+  conversationSummary String?
+
+  // Classification
+  customerLabel     String?
+  labelConfidence   Float?
+  labelReason      String?
+  labelScores      Json?
+  followUpStrategy String?
+  txCount          Int?
+  daysSinceLastChat Int?
+  daysSinceLastTx  Int?
+  ghostedTimes     Int?
+  lastGhostCountedAt DateTime?
+  followUpConverted Boolean @default(false)
+  lastFollowUpAt   DateTime?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// ============================================
+// SERVICE-SPECIFIC MODELS
+// ============================================
+
+model CoatingMaintenance {
+  id              String   @id @default(uuid())
+  bookingId       String?  @unique
+  booking         Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  customerName    String
+  customerPhone   String
+  vehicleInfo     String
+  maintenanceDate DateTime
+  coatingType     String?
+  status          String   @default("pending")
+  reminderSent    Boolean  @default(false)
+  reminderSentAt  DateTime?
+  createdAt       DateTime @default(now())
+}
+
+model HandoverSnooze {
+  id            String   @id
+  customerId    String
+  expiresAt     DateTime?
+  reason        String?
+  manual        Boolean  @default(false)
+  createdAt     DateTime @default(now())
+}
+
+model CustomerLocation {
+  id            String   @id @default(uuid())
+  customerId    String
+  latitude      Float
+  longitude     Float
+  address       String?
+  label         String?
+  source        String?
+  createdAt     DateTime @default(now())
+}
+
+// ============================================
+// KEY-VALUE STORE (Universal NoSQL adapter)
+// ============================================
+
+model KeyValueStore {
+  id          String   @id @default(uuid())
+  collection  String
+  key         String
+  value       Json
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([collection, key])
+}

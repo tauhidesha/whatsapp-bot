@@ -13,7 +13,7 @@ const http = require('http');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
-const admin = require('firebase-admin');
+const prisma = require('./src/lib/prisma');
 const qrcode = require('qrcode-terminal');
 const fetch = require('node-fetch');
 const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
@@ -81,33 +81,8 @@ app.use(express.json({ limit: '50mb' }));
 // --- Utility Functions ---
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-// --- Firebase Initialization ---
-if (!admin.apps.length) {
-    const serviceAccountBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
-    if (serviceAccountBase64) {
-        const serviceAccountJson = Buffer.from(serviceAccountBase64, 'base64').toString('utf-8');
-        const serviceAccount = JSON.parse(serviceAccountJson);
-        admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount)
-        });
-    } else {
-        const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
-        if (serviceAccountJson) {
-            const serviceAccount = JSON.parse(serviceAccountJson);
-            admin.initializeApp({
-                credential: admin.credential.cert(serviceAccount)
-            });
-        }
-    }
-
-    // Fallback: Jika tidak ada credential di env, coba gunakan Application Default Credentials (ADC)
-    if (admin.apps.length === 0) {
-        console.log('⚠️ [Firebase] Tidak ada credential spesifik di env. Mencoba Application Default Credentials...');
-        admin.initializeApp();
-    }
-}
-
-const db = admin.firestore();
+// Database already initialized in src/lib/prisma
+// const db = null; // Mark as null to find any remaining legacy usages
 
 // --- Tool Registry ---
 const availableTools = {
@@ -342,32 +317,18 @@ let currentSystemPrompt = SYSTEM_PROMPT;
 
 async function loadSystemPrompt() {
     try {
-        if (!db) return;
-
-        // Initial load
-        const doc = await db.collection('settings').doc('ai_config').get();
-        if (doc.exists && doc.data().systemPrompt) {
-            currentSystemPrompt = doc.data().systemPrompt;
-            console.log('✅ [CONFIG] Loaded custom System Prompt from Firestore.');
+        const row = await prisma.keyValueStore.findUnique({
+             where: { collection_key: { collection: 'settings', key: 'ai_config' } }
+        });
+        
+        if (row && row.value && row.value.systemPrompt) {
+            currentSystemPrompt = row.value.systemPrompt;
+            console.log('✅ [CONFIG] Loaded custom System Prompt from SQL (KeyValueStore).');
         } else {
             console.log('ℹ️ [CONFIG] Using default hardcoded System Prompt.');
         }
-
-        // Real-time listener
-        db.collection('settings').doc('ai_config').onSnapshot(docSnapshot => {
-            if (docSnapshot.exists && docSnapshot.data().systemPrompt) {
-                const newPrompt = docSnapshot.data().systemPrompt;
-                if (newPrompt !== currentSystemPrompt) {
-                    currentSystemPrompt = newPrompt;
-                    console.log('🔄 [CONFIG] System Prompt updated from Firestore listener.');
-                }
-            }
-        }, err => {
-            console.warn('⚠️ [CONFIG] System prompt listener error:', err.message);
-        });
-
     } catch (error) {
-        console.error('❌ [CONFIG] Failed to load system prompt:', error);
+        console.error('❌ [CONFIG] Failed to load system prompt from SQL:', error.message);
     }
 }
 
@@ -570,37 +531,30 @@ const MEMORY_CONFIG = {
 
 // --- Memory Functions ---
 async function getConversationHistory(senderNumber, limit = MEMORY_CONFIG.maxMessages) {
-    if (!db) return [];
-
     const { docId } = parseSenderIdentity(senderNumber);
-    if (!docId) {
-        return [];
-    }
+    if (!docId) return [];
 
     try {
-        const messagesRef = db.collection('directMessages').doc(docId).collection('messages');
-
-        console.log(`[Memory] Fetching history for ${docId} with constraint: max ${limit} messages.`);
-
-        const snapshot = await messagesRef
-            .orderBy('timestamp', 'desc')
-            .limit(limit)
-            .get();
-
-        const messages = [];
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            messages.push({
-                text: data.text,
-                sender: data.sender,
-                timestamp: data.timestamp
-            });
+        // Fetch from DirectMessage table
+        const messages = await prisma.directMessage.findMany({
+            where: {
+                customer: { phone: docId }
+            },
+            take: limit,
+            orderBy: { createdAt: 'desc' }
         });
 
+        // Map to expected internal AI format
+        const formatted = messages.map(m => ({
+            text: m.content,
+            sender: m.role === 'assistant' ? 'ai' : m.role,
+            timestamp: m.createdAt
+        }));
+
         // Return in chronological order (oldest first)
-        return messages.reverse();
+        return formatted.reverse();
     } catch (error) {
-        console.error('Error getting conversation history:', error);
+        console.error('[Memory] Error fetching SQL conversation history:', error.message);
         return [];
     }
 }
@@ -944,7 +898,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
         // --- 4. FULL CONVERSATION HISTORY ---
         let conversationHistoryMessages = [];
 
-        if (senderNumber && db) {
+        if (senderNumber && prisma) {
             console.log(`🧠 [AI_PROCESSING] Memuat histori percakapan lengkap...`);
             try {
                 // Ambil 6 pesan untuk Admin, 10 pesan untuk Customer
@@ -1647,7 +1601,7 @@ async function processBufferedMessages(senderNumber, client) {
     const { normalizedAddress } = parseSenderIdentity(senderNumber);
     if (await isSnoozeActive(normalizedAddress)) {
         console.log(`[DEBOUNCED] AI skipped for ${senderNumber} (handover active). Saving message only.`);
-        if (db) await saveMessageToFirestore(senderNumber, combinedMessage, 'user');
+        if (prisma) await saveMessageToPrisma(senderNumber, combinedMessage, 'user');
         return;
     }
 
@@ -1685,7 +1639,7 @@ async function processBufferedMessages(senderNumber, client) {
                 const auditResponse = await startAudit(normalizedAddress);
                 markBotMessage(targetNumber, auditResponse);
                 await client.sendText(targetNumber, auditResponse);
-                if (db) {
+                if (prisma) {
                     await saveMessageToFirestore(senderNumber, combinedMessage, 'user');
                     await saveMessageToFirestore(senderNumber, auditResponse, 'ai');
                 }
@@ -1699,7 +1653,7 @@ async function processBufferedMessages(senderNumber, client) {
                 const auditResponse = await handleResumeAudit(normalizedAddress);
                 markBotMessage(targetNumber, auditResponse);
                 await client.sendText(targetNumber, auditResponse);
-                if (db) {
+                if (prisma) {
                     await saveMessageToFirestore(senderNumber, combinedMessage, 'user');
                     await saveMessageToFirestore(senderNumber, auditResponse, 'ai');
                 }
@@ -1716,7 +1670,7 @@ async function processBufferedMessages(senderNumber, client) {
                     const targetNumber = toSenderNumberWithSuffix(senderNumber);
                     markBotMessage(targetNumber, auditResponse);
                     await client.sendText(targetNumber, auditResponse);
-                    if (db) {
+                    if (prisma) {
                         await saveMessageToFirestore(senderNumber, combinedMessage, 'user');
                         await saveMessageToFirestore(senderNumber, auditResponse, 'ai');
                     }
@@ -1751,7 +1705,7 @@ async function processBufferedMessages(senderNumber, client) {
                 markBotMessage(targetNumber, aiResponse.trim());
                 await client.sendText(targetNumber, aiResponse.trim());
 
-                if (db) {
+                if (prisma) {
                     // Simpan sebagai 'admin' di sender field agar riwayat di Firestore terbaca rapi
                     await saveMessageToFirestore(senderNumber, combinedMessage, 'admin');
                     await saveMessageToFirestore(senderNumber, aiResponse, 'ai');
@@ -1809,7 +1763,7 @@ async function processBufferedMessages(senderNumber, client) {
                     const targetNumber = toSenderNumberWithSuffix(senderNumber);
                     markBotMessage(targetNumber, reply);
                     await client.sendText(targetNumber, reply);
-                    if (db) {
+                    if (prisma) {
                         await saveMessageToFirestore(senderNumber, combinedMessage, 'user');
                         await saveMessageToFirestore(senderNumber, reply, 'ai');
                     }
@@ -1866,7 +1820,7 @@ async function processBufferedMessages(senderNumber, client) {
                                     const targetNumber = toSenderNumberWithSuffix(senderNumber);
                                     markBotMessage(targetNumber, aiResponse.trim());
                                     await client.sendText(targetNumber, aiResponse.trim());
-                                    if (db) {
+                                    if (prisma) {
                                         await saveMessageToFirestore(senderNumber, combinedMessage, 'user');
                                         await saveMessageToFirestore(senderNumber, aiResponse, 'ai');
                                     }
@@ -1904,10 +1858,10 @@ async function processBufferedMessages(senderNumber, client) {
         // Fire and forget — track follow-up signals
         updateSignalsOnIncomingMessage(senderNumber, combinedMessage).catch(err => console.warn('[SignalTracker] Failed:', err.message));
 
-        // Save to Firebase if available
-        if (db) {
-            await saveMessageToFirestore(senderNumber, combinedMessage, 'user');
-            await saveMessageToFirestore(senderNumber, aiResponse, 'ai');
+        // Save messages to Prisma
+        if (prisma) {
+            await saveMessageToPrisma(senderNumber, combinedMessage, 'user');
+            await saveMessageToPrisma(senderNumber, aiResponse, 'ai');
         }
 
         // Send response back to user
@@ -1953,29 +1907,44 @@ function start(client) {
         let originalLid = senderNumber.endsWith('@lid') ? senderNumber : null;
         let realPhoneFallback = '';
 
-        // Resolve @lid (Linked Devices / Meta Business) ke nomor asli
+        // Resolve @lid (Linked Identity) ke nomor telepon asli (@c.us)
         if (senderNumber.endsWith('@lid')) {
+            console.log(`[LID] Detected LID: ${senderNumber}, attempting to resolve...`);
             try {
-                const contact = await client.getContact(msg.from);
-                
-                if (contact && contact.id && contact.id._serialized && contact.id._serialized.includes('@c.us')) {
-                    senderNumber = contact.id._serialized;
-                } else if (msg.sender && msg.sender.pnJid) {
+                // LAYER 1: Cek dari objek message (Paling cepat, 0ms)
+                if (msg.sender && msg.sender.pnJid) {
                     senderNumber = msg.sender.pnJid;
-                } else {
-                    // Fallback WPPConnect
+                    console.log(`[LID] Resolved via pnJid: ${senderNumber}`);
+                } 
+                // LAYER 2: Gunakan fungsi resmi WPPConnect requestPhoneNumber (Paling akurat)
+                else if (typeof client.requestPhoneNumber === 'function') {
                     const realPhone = await client.requestPhoneNumber(msg.from);
                     if (realPhone) {
-                        senderNumber = realPhone;
+                        // realPhone biasanya dalam format "628123@c.us"
+                        senderNumber = realPhone.includes('@') ? realPhone : `${realPhone}@c.us`;
+                        console.log(`[LID] Resolved via requestPhoneNumber: ${senderNumber}`);
+                    }
+                } 
+                // LAYER 3: Cek contact internal
+                else {
+                    const contact = await client.getContact(msg.from);
+                    if (contact && contact.id && contact.id._serialized && contact.id._serialized.includes('@c.us')) {
+                        senderNumber = contact.id._serialized;
+                        console.log(`[LID] Resolved via getContact: ${senderNumber}`);
                     }
                 }
+
+                // Final Check: Jika masih @lid, biarkan saja (identifier fallback)
+                if (senderNumber.endsWith('@lid')) {
+                    console.log(`[LID] Resolution failed, keeping identifier: ${senderNumber}`);
+                }
             } catch (err) {
-                console.warn(`[WPP] Warning: Gagal resolve nomor asli dari LID ${msg.from}:`, err.message);
+                console.error(`[LID] Resolution error: ${err.message}`);
             }
         }
 
         // Standardize to 62...
-        const { normalizePhone } = require('./src/server/firestoreTriggers.js');
+        const { normalizePhone } = require('./src/ai/utils/mergeCustomerContext.js');
         const normalized = normalizePhone(senderNumber);
         
         if (normalized) {
@@ -2247,16 +2216,23 @@ async function saveMessageToPrisma(senderNumber, message, senderType) {
                 }
             });
 
+            // Update customer data
+            const updateData = {
+                lastMessage: message,
+                lastMessageAt: new Date(),
+                aiPaused: snoozeInfo.active || false,
+                aiPausedUntil: snoozeInfo.expiresAt ? new Date(snoozeInfo.expiresAt) : null,
+                aiPauseReason: snoozeInfo.reason,
+            };
+            
+            // If sender uses @lid format, save it to whatsappLid field
+            if (senderNumber.endsWith('@lid')) {
+                updateData.whatsappLid = senderNumber;
+            }
+            
             await prisma.customer.update({
                 where: { id: customer.id },
-                data: {
-                    lastMessage: message,
-                    lastMessageAt: new Date(),
-                    lastMessageSender: senderType,
-                    aiPaused: snoozeInfo.active || false,
-                    aiPausedUntil: snoozeInfo.expiresAt ? new Date(snoozeInfo.expiresAt) : null,
-                    aiPauseReason: snoozeInfo.reason,
-                }
+                data: updateData
             });
         }
     } catch (error) {
@@ -2280,7 +2256,13 @@ async function saveSenderMeta(senderNumber, displayName, client = null) {
     let profilePicUrl = null;
     if (client && channel === 'whatsapp' && !fetchedProfilePics.has(senderNumber)) {
         try {
-            profilePicUrl = await client.getProfilePicFromServer(senderNumber);
+            const picResult = await client.getProfilePicFromServer(senderNumber);
+            // Extract URL string from the object returned by WhatsApp
+            if (typeof picResult === 'string') {
+                profilePicUrl = picResult;
+            } else if (picResult && typeof picResult === 'object') {
+                profilePicUrl = picResult.eurl || picResult.imgFull || picResult.img || null;
+            }
             fetchedProfilePics.add(senderNumber);
         } catch (error) {
             console.warn(`[ProfilePic] Gagal mengambil foto profil untuk ${senderNumber}:`, error.message);
@@ -2290,19 +2272,27 @@ async function saveSenderMeta(senderNumber, displayName, client = null) {
     try {
         const snoozeInfo = await getSnoozeInfo(senderNumber);
 
+        const customerData = {
+            phone: docId,
+            name: displayName || docId,
+            profilePicUrl: profilePicUrl,
+            aiPaused: snoozeInfo.active || false,
+            aiPausedUntil: snoozeInfo.expiresAt ? new Date(snoozeInfo.expiresAt) : null,
+            aiPauseReason: snoozeInfo.reason,
+        };
+        
+        // If sender uses @lid format, save it to whatsappLid field
+        if (senderNumber.endsWith('@lid')) {
+            customerData.whatsappLid = senderNumber;
+        }
+
         const customer = await prisma.customer.upsert({
             where: { phone: docId },
-            create: {
-                phone: docId,
-                name: displayName || docId,
-                profilePicUrl: profilePicUrl,
-                aiPaused: snoozeInfo.active || false,
-                aiPausedUntil: snoozeInfo.expiresAt ? new Date(snoozeInfo.expiresAt) : null,
-                aiPauseReason: snoozeInfo.reason,
-            },
+            create: customerData,
             update: {
                 name: displayName,
                 profilePicUrl: profilePicUrl || undefined,
+                whatsappLid: senderNumber.endsWith('@lid') ? senderNumber : undefined,
                 aiPaused: snoozeInfo.active || false,
                 aiPausedUntil: snoozeInfo.expiresAt ? new Date(snoozeInfo.expiresAt) : null,
                 aiPauseReason: snoozeInfo.reason,
@@ -2327,40 +2317,55 @@ function serializeTimestamp(timestamp) {
 }
 
 async function listConversations(limit = 100) {
-    if (!db) return [];
-
     try {
-        const snapshot = await db.collection('directMessages').get();
-        const conversations = await Promise.all(snapshot.docs.map(async (doc) => {
-            const data = doc.data() || {};
-            const senderNumberFull = data.fullSenderId || toSenderNumberWithSuffix(doc.id);
-            const snoozeInfo = await getSnoozeInfo(senderNumberFull);
+        const customers = await prisma.customer.findMany({
+            take: limit,
+            orderBy: { updatedAt: 'desc' },
+            include: {
+                messages: {
+                    orderBy: { createdAt: 'desc' },
+                    take: 1
+                },
+                bookings: {
+                    orderBy: { bookingDate: 'desc' },
+                    take: 1,
+                    select: {
+                        id: true,
+                        bookingDate: true,
+                        serviceType: true,
+                        status: true
+                    }
+                },
+                customerContext: true,
+                _count: { select: { bookings: true, messages: true } }
+            }
+        });
 
-            const identity = parseSenderIdentity(senderNumberFull);
-            const storedChannel = typeof data.channel === 'string' ? data.channel.toLowerCase() : null;
-            const effectiveChannel = storedChannel && storedChannel !== 'unknown'
-                ? storedChannel
-                : identity.channel || 'whatsapp';
+        const conversations = await Promise.all(customers.map(async (c) => {
+            const lastMessage = c.messages[0];
+            const lastBooking = c.bookings[0];
+            const snoozeInfo = await getSnoozeInfo(c.phone);
+            const context = c.customerContext;
 
             return {
-                id: doc.id,
-                senderNumber: senderNumberFull,
-                name: data.name || null,
-                lastMessage: data.lastMessage || null,
-                lastMessageSender: data.lastMessageSender || null,
-                lastMessageAt: serializeTimestamp(data.lastMessageAt),
-                updatedAt: serializeTimestamp(data.updatedAt),
-                messageCount: typeof data.messageCount === 'number' ? data.messageCount : null,
-                channel: effectiveChannel,
-                platformId: data.platformId || identity.platformId || doc.id,
-                aiPaused: snoozeInfo.active,
-                aiPausedUntil: snoozeInfo.expiresAt,
+                id: c.id,
+                senderNumber: c.phone + '@c.us',
+                name: c.name || null,
+                lastMessage: lastMessage?.content || null,
+                lastMessageSender: lastMessage?.role || null,
+                lastMessageAt: lastMessage?.createdAt?.toISOString() || c.lastMessageAt?.toISOString() || c.updatedAt.toISOString(),
+                updatedAt: c.updatedAt.toISOString(),
+                messageCount: c._count.messages,
+                channel: 'whatsapp',
+                platformId: c.phone,
+                aiPaused: c.aiPaused || snoozeInfo.active,
+                aiPausedUntil: c.aiPausedUntil?.toISOString() || snoozeInfo.expiresAt,
                 aiPausedManual: snoozeInfo.manual,
                 aiPausedReason: snoozeInfo.reason,
-                label: data.customerLabel || null,
-                labelReason: data.labelReason || null,
-                labelUpdatedAt: serializeTimestamp(data.labelUpdatedAt),
-                profilePicUrl: data.profilePicUrl?.eurl || data.profilePicUrl || null,
+                label: context?.customerLabel || null,
+                labelReason: context?.labelReason || null,
+                labelUpdatedAt: context?.updatedAt?.toISOString() || null,
+                profilePicUrl: c.profilePicUrl || null,
             };
         }));
 
@@ -2369,10 +2374,6 @@ async function listConversations(limit = 100) {
             const timeB = b.updatedAt ? Date.parse(b.updatedAt) : 0;
             return timeB - timeA;
         });
-
-        if (limit && conversations.length > limit) {
-            return conversations.slice(0, limit);
-        }
 
         return conversations;
     } catch (error) {
@@ -2499,10 +2500,40 @@ app.post('/generate-invoice', async (req, res) => {
             return res.status(400).json({ error: 'customerName and customerPhone are required.' });
         }
 
-        // Normalize customer phone to WA format
-        let recipientNumber = customerPhone.replace(/\D/g, '');
-        if (!recipientNumber.endsWith('@c.us') && !recipientNumber.endsWith('@lid')) {
-            recipientNumber = `${recipientNumber}@c.us`;
+        // Normalize customer phone to WA format - preserve @lid suffix if present
+        let recipientNumber = customerPhone;
+        
+        // Check if customer has whatsappLid in database
+        const prisma = require('./src/lib/prisma');
+        const normalizedPhone = customerPhone.replace(/[^0-9]/g, '');
+        const customer = await prisma.customer.findFirst({
+            where: {
+                OR: [
+                    { phone: normalizedPhone },
+                    { whatsappLid: customerPhone },
+                    { whatsappLid: { endsWith: customerPhone } }
+                ]
+            },
+            select: { whatsappLid: true, phone: true }
+        });
+        
+        if (customer && customer.whatsappLid) {
+            // Use the stored LID format
+            recipientNumber = customer.whatsappLid;
+            console.log(`[API] Using stored whatsappLid: ${recipientNumber}`);
+        } else if (recipientNumber.endsWith('@lid')) {
+            // Keep LID format as-is
+            console.log(`[API] Using customer LID: ${recipientNumber}`);
+        } else if (recipientNumber.endsWith('@c.us')) {
+            // Keep c.us format
+            console.log(`[API] Using customer phone: ${recipientNumber}`);
+        } else {
+            // Extract digits and add @c.us
+            recipientNumber = recipientNumber.replace(/\D/g, '');
+            if (recipientNumber.length > 0) {
+                recipientNumber = `${recipientNumber}@c.us`;
+            }
+            console.log(`[API] Formatted customer phone: ${recipientNumber}`);
         }
 
         // Use admin number as senderNumber (for auth check)
@@ -2559,11 +2590,62 @@ app.post('/send-message', async (req, res) => {
                 throw new Error('WhatsApp client not initialized.');
             }
 
-            const targetNumber = identity.normalizedAddress || toSenderNumberWithSuffix(number);
+            let targetNumber = identity.normalizedAddress || toSenderNumberWithSuffix(number);
+            
+            // If it's LID format, try to resolve to real phone number (3-layer approach)
+            if (targetNumber && targetNumber.endsWith('@lid')) {
+                console.log(`[API] LID detected: ${targetNumber}, attempting to resolve...`);
+                try {
+                    // LAYER 1: Try requestPhoneNumber (most accurate)
+                    if (typeof global.whatsappClient.requestPhoneNumber === 'function') {
+                        const realPhone = await global.whatsappClient.requestPhoneNumber(targetNumber);
+                        if (realPhone) {
+                            targetNumber = realPhone.includes('@') ? realPhone : `${realPhone}@c.us`;
+                            console.log(`[API] LID resolved via requestPhoneNumber: ${targetNumber}`);
+                        }
+                    }
+                    // LAYER 2: Try getContact
+                    else if (targetNumber.endsWith('@lid')) {
+                        const contact = await global.whatsappClient.getContact(targetNumber);
+                        if (contact && contact.id && contact.id._serialized && contact.id._serialized.includes('@c.us')) {
+                            targetNumber = contact.id._serialized;
+                            console.log(`[API] LID resolved via getContact: ${targetNumber}`);
+                        }
+                    }
+                } catch (err) {
+                    console.log(`[API] LID resolution error: ${err.message}`);
+                }
+            }
+            
+            // Ensure proper suffix for non-LID numbers
+            if (targetNumber && !targetNumber.includes('@')) {
+                targetNumber = targetNumber + '@c.us';
+            }
+            
+            console.log(`[API] Sending to: ${targetNumber}`);
             markBotMessage(targetNumber, finalMessage);
-            await global.whatsappClient.sendText(targetNumber, finalMessage);
-            await saveMessageToFirestore(targetNumber, finalMessage, 'admin');
-            console.log(`[API] Successfully sent WhatsApp message to ${targetNumber}`);
+            
+            try {
+                await global.whatsappClient.sendText(targetNumber, finalMessage);
+                console.log(`[API] Successfully sent WhatsApp message to ${targetNumber}`);
+            } catch (sendError) {
+                // If error with resolved number, try with original LID format
+                if (sendError.message && sendError.message.includes('No LID')) {
+                    const originalLid = number.includes('@lid') ? number : `${number.replace(/[^0-9]/g, '')}@lid`;
+                    console.log(`[API] Send failed, trying original LID: ${originalLid}`);
+                    try {
+                        await global.whatsappClient.sendText(originalLid, finalMessage);
+                        targetNumber = originalLid;
+                        console.log(`[API] Success with original LID`);
+                    } catch (e2) {
+                        throw sendError;
+                    }
+                } else {
+                    throw sendError;
+                }
+            }
+            
+            await saveMessageToPrisma(targetNumber, finalMessage, 'admin');
             return res.status(200).json({ success: true, channel: 'whatsapp', rewritten });
         }
 
@@ -2634,10 +2716,10 @@ app.post('/test-ai', async (req, res) => {
         const runId = aiResult.id;
 
         // Save messages to history AFTER processing to avoid doubling in history
-        if (effectiveSenderNumber && db) {
-            await saveMessageToFirestore(effectiveSenderNumber, testMessage, 'user');
+        if (effectiveSenderNumber && prisma) {
+            await saveMessageToPrisma(effectiveSenderNumber, testMessage, 'user');
             if (response) {
-                await saveMessageToFirestore(effectiveSenderNumber, response, 'ai');
+                await saveMessageToPrisma(effectiveSenderNumber, response, 'ai');
             }
 
             // Fire and forget — extract context THEN classify (same as WhatsApp flow)
@@ -2754,23 +2836,28 @@ app.post('/conversation/:number/ai-state', async (req, res) => {
 app.get('/bookings', async (req, res) => {
     try {
         const { start, end } = req.query;
-        let query = db.collection('bookings');
 
-        // Filter sederhana berdasarkan tanggal jika disediakan
-        if (start) query = query.where('bookingDate', '>=', start);
-        if (end) query = query.where('bookingDate', '<=', end);
+        const where = {};
+        if (start) {
+            where.bookingDate = { ...where.bookingDate, gte: new Date(start) };
+        }
+        if (end) {
+            where.bookingDate = { ...where.bookingDate, lte: new Date(end) };
+        }
 
-        const snapshot = await query.orderBy('bookingDate', 'asc').get();
-        const bookings = [];
+        const bookings = await prisma.booking.findMany({
+            where,
+            orderBy: { bookingDate: 'asc' },
+            include: {
+                customer: { select: { name: true, phone: true } },
+                vehicle: { select: { modelName: true, plateNumber: true, color: true } }
+            }
+        });
 
-        snapshot.forEach(doc => {
-            const data = doc.data();
-
-            // Hitung Estimasi Durasi & Cek Kategori Repaint
+        const transformedBookings = bookings.map(b => {
             let maxDurationMinutes = 0;
             let isRepaint = false;
-
-            const serviceList = data.services || (data.serviceName ? [data.serviceName] : []);
+            const serviceList = [b.serviceType];
 
             serviceList.forEach(sName => {
                 const cleanName = sName.toLowerCase();
@@ -2778,7 +2865,6 @@ app.get('/bookings', async (req, res) => {
                     cleanName.includes(m.name.toLowerCase()) ||
                     m.name.toLowerCase().includes(cleanName)
                 );
-
                 if (svc) {
                     if (svc.category === 'repaint') isRepaint = true;
                     const dur = parseInt(svc.estimatedDuration || '0', 10);
@@ -2786,31 +2872,37 @@ app.get('/bookings', async (req, res) => {
                 }
             });
 
-            // Konversi menit ke hari kerja (asumsi 8 jam/hari = 480 menit)
             const durationDays = Math.ceil(maxDurationMinutes / 480) || 1;
+            const startDate = new Date(b.bookingDate);
+            const endDate = new Date(startDate);
+            endDate.setDate(startDate.getDate() + (durationDays - 1));
+            const estimatedEndDate = endDate.toISOString().split('T')[0];
 
-            // Hitung Tanggal Selesai
-            let estimatedEndDate = data.bookingDate;
-            if (data.bookingDate) {
-                const startDate = new Date(data.bookingDate);
-                const endDate = new Date(startDate);
-                endDate.setDate(startDate.getDate() + (durationDays - 1));
-                estimatedEndDate = endDate.toISOString().split('T')[0];
-            }
-
-            bookings.push({
-                id: doc.id,
-                ...data,
+            return {
+                id: b.id,
+                customerName: b.customerName || b.customer?.name,
+                customerPhone: b.customerPhone || b.customer?.phone,
+                vehicleInfo: b.vehicleModel ? `${b.vehicleModel}${b.plateNumber ? ' - ' + b.plateNumber : ''}` : b.vehicle?.modelName,
+                services: [b.serviceType],
+                serviceName: b.serviceType,
+                bookingDate: b.bookingDate.toISOString().split('T')[0],
+                bookingTime: b.bookingDate.toISOString().slice(11, 16),
+                bookingDateTime: b.bookingDate,
+                status: b.status.toLowerCase(),
+                subtotal: b.subtotal,
+                downPayment: b.downPayment,
+                paymentMethod: b.paymentMethod,
+                homeService: b.homeService,
+                notes: b.notes,
                 isRepaint,
                 estimatedDurationDays: durationDays,
                 estimatedEndDate,
-                // Pastikan timestamp diserialisasi
-                createdAt: serializeTimestamp(data.createdAt),
-                updatedAt: serializeTimestamp(data.updatedAt)
-            });
+                createdAt: b.createdAt.toISOString(),
+                updatedAt: b.updatedAt.toISOString()
+            };
         });
 
-        res.json({ bookings, status: 'success' });
+        res.json({ bookings: transformedBookings, status: 'success' });
     } catch (error) {
         console.error('[API] Error fetching bookings:', error);
         res.status(500).json({ error: error.message });
@@ -2843,18 +2935,31 @@ app.patch('/bookings/:id/status', async (req, res) => {
             return res.status(400).json({ error: 'Status is required' });
         }
 
-        const updateData = {
-            status,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        };
-
-        if (notes) {
-            updateData.adminNotes = notes;
+        const booking = await prisma.booking.findUnique({ where: { id } });
+        if (!booking) {
+            return res.status(404).json({ error: 'Booking not found' });
         }
 
-        await db.collection('bookings').doc(id).update(updateData);
+        const updateData = {
+            status: status.toUpperCase(),
+            adminNotes: notes || booking.adminNotes,
+        };
 
-        res.json({ success: true, id, status });
+        const updated = await prisma.booking.update({
+            where: { id },
+            data: updateData,
+            include: { customer: true }
+        });
+
+        // Update customer lastService if completed
+        if (status.toUpperCase() === 'COMPLETED' && booking.status !== 'COMPLETED') {
+            await prisma.customer.update({
+                where: { id: booking.customerId },
+                data: { lastService: booking.bookingDate }
+            });
+        }
+
+        res.json({ success: true, id, status: updated.status.toLowerCase() });
     } catch (error) {
         console.error('[API] Error updating booking status:', error);
         res.status(500).json({ error: error.message });
@@ -2865,13 +2970,7 @@ app.patch('/bookings/:id/status', async (req, res) => {
 server.listen(PORT, '0.0.0.0', async () => {
     console.log(`🚀 WhatsApp AI Chatbot listening on http://0.0.0.0:${PORT}`);
     
-    // Start real-time Firestore triggers for unified CRM
-    try {
-        const { startFirestoreTriggers } = require('./src/server/firestoreTriggers.js');
-        startFirestoreTriggers();
-    } catch (e) {
-        console.error('Failed to start Firestore Triggers:', e);
-    }
+    // SQL triggers handled in-app via customerSync utility.
 
     console.log(`🤖 AI Provider: Google Gemini`);
     console.log(`🤖 AI Model: ${process.env.AI_MODEL || 'gemini-flash-lite-latest'}`);

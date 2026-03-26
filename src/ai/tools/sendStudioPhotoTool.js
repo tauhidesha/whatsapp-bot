@@ -76,7 +76,10 @@ async function implementation(input = {}) {
       throw new Error('[sendStudioPhoto] WhatsApp client belum siap.');
     }
 
-    await client.sendImage(identity.recipientId, STUDIO_PHOTO_PATH, STUDIO_PHOTO_FILENAME, caption);
+    // Use recipient as-is (LID stays LID, @c.us stays @c.us)
+    const recipient = identity.recipientId;
+
+    await client.sendImage(recipient, STUDIO_PHOTO_PATH, STUDIO_PHOTO_FILENAME, caption);
 
     return {
       success: true,

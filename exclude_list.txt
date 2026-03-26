@@ -1,0 +1,10 @@
+node_modules
+admin-frontend/node_modules
+admin-frontend/.next
+admin-ui
+tokens
+.git
+.gemini
+*.tar.gz
+*.log
+.DS_Store

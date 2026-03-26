@@ -127,12 +127,18 @@ async function resolveSizeForService({ service, sizeArg, motorModel }) {
 
 async function getPromoInfo() {
   try {
-    const db = admin.firestore();
-    const doc = await db.collection('settings').doc('promo_config').get();
+    const prisma = require('../../lib/prisma');
+    const kv = await prisma.keyValueStore.findUnique({
+      where: {
+        collection_key: {
+          collection: 'settings',
+          key: 'promo_config'
+        }
+      }
+    });
 
-    if (doc.exists && doc.data().isActive) {
-      const data = doc.data();
-      return `💡 *PROMO BOOM BULAN INI:* \n\n${data.promoText}\n\n*Syarat & Ketentuan berlaku.*`;
+    if (kv && kv.value.isActive) {
+      return `💡 *PROMO BOOM BULAN INI:* \n\n${kv.value.promoText}\n\n*Syarat & Ketentuan berlaku.*`;
     }
   } catch (error) {
     console.warn('[getServiceDetailsTool] Failed to fetch promo:', error.message);

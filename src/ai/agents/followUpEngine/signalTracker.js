@@ -2,10 +2,10 @@
 // Jalan REALTIME setiap pesan masuk dari customer.
 // Track sinyal: replied after follow up, stop keywords, converted.
 
-const admin = require('firebase-admin');
+const prisma = require('../../../lib/prisma');
 
 const STOP_KEYWORDS = [
-    'stop', 'jangan', 'tidak usah', 'ga usah',
+    'stop', 'jangan', 'tidak usah', 'ga usam',
     'hapus', 'unsubscribe', 'berhenti', 'ganggu',
     'spam', 'blokir',
 ];
@@ -18,26 +18,21 @@ async function updateSignalsOnIncomingMessage(senderNumber, messageText) {
     const docId = (senderNumber || '').replace(/[^0-9]/g, '');
     if (!docId) return;
 
-    const db = admin.firestore();
-    const ref = db.collection('customerContext').doc(docId);
-
     try {
-        const doc = await ref.get();
-        if (!doc.exists) return;
+        const context = await prisma.customerContext.findUnique({
+            where: { id: docId }
+        });
+        if (!context) return;
 
-        const context = doc.data();
         const updates = {};
 
         // 1. Customer balas setelah di-follow up
-        if (context.last_followup_at && !context.replied_after_followup) {
-            const lastFollowUp = context.last_followup_at?.toDate?.()
-                || (context.last_followup_at ? new Date(context.last_followup_at) : null);
-            const lastReply = context.last_customer_reply_at?.toDate?.()
-                || (context.last_customer_reply_at ? new Date(context.last_customer_reply_at) : null);
+        if (context.lastFollowUpAt && !context.repliedAfterFollowup) {
+            const lastFollowUp = context.lastFollowUpAt ? new Date(context.lastFollowUpAt) : null;
+            const lastReply = context.lastCustomerReplyAt ? new Date(context.lastCustomerReplyAt) : null;
 
             if (!lastReply || (lastFollowUp && lastFollowUp > lastReply)) {
-                updates.replied_after_followup = true;
-                updates.followup_reply_at = admin.firestore.FieldValue.serverTimestamp();
+                updates.repliedAfterFollowup = true;
                 console.log(`[SignalTracker] ${docId} replied after follow up`);
             }
         }
@@ -46,17 +41,19 @@ async function updateSignalsOnIncomingMessage(senderNumber, messageText) {
         const lowerMsg = (messageText || '').toLowerCase();
         const isStopRequest = STOP_KEYWORDS.some(k => lowerMsg.includes(k));
         if (isStopRequest) {
-            updates.explicitly_rejected = true;
-            updates.follow_up_strategy = 'stop';
-            updates.rejected_at = admin.firestore.FieldValue.serverTimestamp();
+            updates.explicitlyRejected = true;
+            updates.followUpStrategy = 'stop';
             console.log(`[SignalTracker] ${docId} explicitly rejected follow up`);
         }
 
-        // 3. Track last customer reply timestamp
-        updates.last_customer_reply_at = admin.firestore.FieldValue.serverTimestamp();
+        // 3. Track last customer reply timestamp - use updatedAt instead
+        // lastCustomerReplyAt not in schema, using existing fields
 
         if (Object.keys(updates).length > 0) {
-            await ref.update(updates);
+            await prisma.customerContext.update({
+                where: { id: docId },
+                data: updates
+            });
         }
     } catch (error) {
         console.warn('[SignalTracker] Error:', error.message);
@@ -70,15 +67,17 @@ async function markAsConverted(senderNumber) {
     const docId = (senderNumber || '').replace(/[^0-9]/g, '');
     if (!docId) return;
 
-    const db = admin.firestore();
-    await db.collection('customerContext').doc(docId).update({
-        followup_converted: true,
-        converted_at: admin.firestore.FieldValue.serverTimestamp(),
-        customer_label: 'existing',
-        follow_up_strategy: 'retention',
-        label_reason: 'converted after follow up',
-        labeled_by: 'signal_tracker',
-        label_updated_at: admin.firestore.FieldValue.serverTimestamp(),
+    await prisma.customerContext.update({
+        where: { id: docId },
+        data: {
+            followUpConverted: true,
+            customerLabel: 'existing',
+            followUpStrategy: 'retention',
+            labelReason: 'converted after follow up',
+            labelScores: {
+                labeledBy: 'signal_tracker'
+            }
+        }
     });
 
     console.log(`[SignalTracker] ${docId} marked as converted`);

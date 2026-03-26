@@ -1,4 +1,4 @@
-const admin = require('firebase-admin');
+const prisma = require('../../lib/prisma');
 
 const getSystemPromptTool = {
     name: "getSystemPrompt",
@@ -30,15 +30,20 @@ async function getSystemPrompt(args) {
     }
 
     try {
-        const db = admin.firestore();
+        // 2. Baca dari Prisma KeyValueStore
+        const kv = await prisma.keyValueStore.findUnique({
+            where: {
+                collection_key: {
+                    collection: 'settings',
+                    key: 'ai_config'
+                }
+            }
+        });
 
-        // 2. Baca dari Firestore
-        const doc = await db.collection('settings').doc('ai_config').get();
-
-        if (doc.exists && doc.data().systemPrompt) {
+        if (kv && kv.value.systemPrompt) {
             return {
                 status: "success",
-                systemPrompt: doc.data().systemPrompt,
+                systemPrompt: kv.value.systemPrompt,
                 message: "Berikut adalah System Prompt yang sedang aktif (dari Database):"
             };
         } else {

@@ -1,11 +1,37 @@
 // File: src/ai/agents/followUpEngine/scheduler.js
 // Daily cron job: label downgrade, eligibility check, generate & send follow-up messages.
 
-const admin = require('firebase-admin');
+const prisma = require('../../../lib/prisma');
 const { generateFollowUpMessage, getDaysSince } = require('./messageGenerator.js');
 const { shouldStop, handleStopAction } = require('./stopCondition.js');
-const { saveMessageToFirestore } = require('../../utils/firestoreUtils.js');
 const { markBotMessage } = require('../../utils/adminMessageSync.js');
+
+// ─── Helper: Save message to Prisma ────────────────────────────────────────
+
+async function saveMessageToPrisma(senderNumber, message, senderType) {
+    const docId = (senderNumber || '').replace(/@c\.us$|@lid$/, '').replace(/\D/g, '');
+    if (!docId) return;
+
+    const customer = await prisma.customer.findUnique({ where: { phone: docId } });
+    if (!customer) return;
+
+    await prisma.directMessage.create({
+        data: {
+            customerId: customer.id,
+            senderId: senderNumber,
+            role: senderType === 'user' ? 'user' : (senderType === 'ai' ? 'assistant' : 'admin'),
+            content: message,
+        }
+    });
+
+    await prisma.customer.update({
+        where: { id: customer.id },
+        data: {
+            lastMessage: message,
+            lastMessageAt: new Date(),
+        }
+    });
+}
 
 // ─── Strategy Config ─────────────────────────────────────────────────────────
 
@@ -29,7 +55,7 @@ const STRATEGY_CONFIG = {
         waitDays: 7,
         intervalDays: 14,
         maxFollowUps: 1,
-        angle: 'promo', // Hanya kalau ada promo aktif
+        angle: 'promo',
     },
     existing: {
         action: 'follow_up',
@@ -62,50 +88,48 @@ const DOWNGRADE_RULES = [
         from: 'hot_lead',
         to: 'warm_lead',
         condition: (ctx, meta) =>
-            getDaysSince(meta.lastMessageAt) > 7 && (ctx.tx_count || 0) === 0,
+            getDaysSince(meta.lastMessageAt) > 7 && (ctx.txCount || 0) === 0,
         reason: 'hot_lead tidak reply > 7 hari',
     },
     {
         from: 'warm_lead',
         to: 'window_shopper',
         condition: (ctx, meta) =>
-            (ctx.ghosted_times || 0) >= 1 &&
+            (ctx.ghostedTimes || 0) >= 1 &&
             getDaysSince(meta.lastMessageAt) > 14,
         reason: 'warm_lead ghosted > 14 hari',
     },
     {
         from: 'existing',
         to: 'churned',
-        condition: (ctx) => getDaysSince(ctx.last_transaction_at) > 90,
+        condition: (ctx) => getDaysSince(ctx.lastTransactionAt) > 90,
         reason: 'existing tidak balik > 90 hari',
-    },
-    {
-        from: 'loyal',
-        to: 'churned',
-        condition: (ctx) => getDaysSince(ctx.last_transaction_at) > 180,
-        reason: 'loyal tidak balik > 180 hari',
     },
 ];
 
 // ─── Eligibility Check ──────────────────────────────────────────────────────
 
 function isEligible(context, metadata) {
-    const label = context.customer_label;
+    const label = context.customerLabel;
     const strategy = STRATEGY_CONFIG[label];
-
     if (!strategy || strategy.action === 'stop') return false;
-    if (context.explicitly_rejected) return false;
-    if (context.blocked) return false;
-    if (context.followup_converted) return false;
 
-    const followupCount = context.followup_count || 0;
-    if (followupCount >= strategy.maxFollowUps) return false;
+    const lastFollowUp = context.lastFollowUpAt ? new Date(context.lastFollowUpAt) : null;
+    const lastMessage = metadata?.lastMessageAt ? new Date(metadata.lastMessageAt) : null;
+    const now = new Date();
 
-    const daysSinceLastChat = getDaysSince(metadata.lastMessageAt);
-    const daysSinceLastFollowUp = getDaysSince(context.last_followup_at);
+    // Must have messaged before
+    if (!lastMessage) return false;
 
-    if (daysSinceLastChat === null || daysSinceLastChat < strategy.waitDays) return false;
-    if (daysSinceLastFollowUp !== null && daysSinceLastFollowUp < strategy.intervalDays) return false;
+    // Check wait days
+    if (lastFollowUp) {
+        const daysSinceLastFollowUp = Math.floor((now - lastFollowUp) / (1000 * 60 * 60 * 24));
+        if (daysSinceLastFollowUp < strategy.waitDays) return false;
+    }
+
+    // Check max follow-ups
+    const followUpCount = context.followUpCount || 0;
+    if (followUpCount >= strategy.maxFollowUps) return false;
 
     return true;
 }
@@ -119,37 +143,54 @@ function delay(ms) {
 // ─── Main Daily Run ──────────────────────────────────────────────────────────
 
 async function runDailyFollowUp() {
-    const db = admin.firestore();
     console.log('[Scheduler] Starting daily follow up run...');
 
-    // 1. Scan semua customerContext
-    const snapshot = await db.collection('customerContext').get();
+    // 1. Scan semua customerContext dari Prisma
+    const contexts = await prisma.customerContext.findMany({
+        where: {
+            customerLabel: { not: null }
+        },
+        include: {
+            customer: true
+        }
+    });
+
     const queue = [];
     let downgradeCount = 0;
 
-    for (const doc of snapshot.docs) {
-        const context = doc.data();
-        const docId = doc.id;
+    for (const context of contexts) {
+        const docId = context.id;
+        const customer = context.customer;
 
         // Skip yang belum punya label
-        if (!context.customer_label) continue;
+        if (!context.customerLabel) continue;
 
-        // Ambil metadata dari directMessages
-        const metaDoc = await db.collection('directMessages').doc(docId).get();
-        if (!metaDoc.exists) continue;
-        const metadata = metaDoc.data();
+        // Skip jika tidak ada customer
+        if (!customer) continue;
+
+        // Ambil metadata dari customer
+        const metadata = {
+            lastMessageAt: customer.lastMessageAt,
+            name: customer.name,
+            fullSenderId: customer.phone + '@c.us'
+        };
 
         // 2. Label downgrade check
         for (const rule of DOWNGRADE_RULES) {
-            if (context.customer_label === rule.from && rule.condition(context, metadata)) {
-                await doc.ref.update({
-                    customer_label: rule.to,
-                    previous_label: rule.from,
-                    label_reason: rule.reason,
-                    labeled_by: 'scheduler_downgrade',
-                    label_updated_at: admin.firestore.FieldValue.serverTimestamp(),
+            if (context.customerLabel === rule.from && rule.condition(context, metadata)) {
+                await prisma.customerContext.update({
+                    where: { id: docId },
+                    data: {
+                        customerLabel: rule.to,
+                        labelReason: rule.reason,
+                        labelScores: {
+                            ...(context.labelScores || {}),
+                            previousLabel: rule.from,
+                            labeledBy: 'scheduler_downgrade'
+                        }
+                    }
                 });
-                context.customer_label = rule.to; // Update local copy
+                context.customerLabel = rule.to;
                 downgradeCount++;
                 console.log(`[Scheduler] Downgrade ${docId}: ${rule.from} → ${rule.to}`);
                 break;
@@ -161,11 +202,11 @@ async function runDailyFollowUp() {
 
         queue.push({
             docId,
-            senderNumber: metadata.fullSenderId || `${docId}@c.us`,
-            name: metadata.name || 'Mas',
+            senderNumber: customer.phone + '@c.us',
+            name: customer.name || 'Mas',
             context,
             metadata,
-            strategy: STRATEGY_CONFIG[context.customer_label],
+            strategy: STRATEGY_CONFIG[context.customerLabel],
         });
     }
 
@@ -194,7 +235,7 @@ async function runDailyFollowUp() {
 
         // Stagger delay
         if (i < queue.length - 1) {
-            await delay(30000); // 30 detik antar customer
+            await delay(30000);
         }
     }
 
@@ -208,7 +249,7 @@ async function processFollowUp(customer) {
     // Check stop conditions
     const stopResult = shouldStop(context);
     if (stopResult.stop) {
-        await handleStopAction(docId, stopResult, context.customer_label);
+        await handleStopAction(docId, stopResult, context.customerLabel);
         console.log(`[Scheduler] Stopped ${docId}: ${stopResult.reason}`);
         return;
     }
@@ -233,16 +274,18 @@ async function processFollowUp(customer) {
     console.log(`[Scheduler] ✅ Sent to ${docId}: "${message.substring(0, 50)}..."`);
 
     // Update signals setelah kirim
-    const db = admin.firestore();
-    await db.collection('customerContext').doc(docId).update({
-        followup_count: admin.firestore.FieldValue.increment(1),
-        last_followup_at: admin.firestore.FieldValue.serverTimestamp(),
-        last_followup_strategy: strategy.angle,
-        replied_after_followup: false, // Reset, tunggu reply baru
+    await prisma.customerContext.update({
+        where: { id: docId },
+        data: {
+            followUpCount: (context.followUpCount || 0) + 1,
+            lastFollowUpAt: new Date(),
+            lastFollowUpStrategy: strategy.angle,
+            // repliedAfterFollowup: false // Reset, tunggu reply baru
+        }
     });
 
-    // Simpan ke directMessages
-    await saveMessageToFirestore(senderNumber, message, 'ai');
+    // Simpan ke Prisma
+    await saveMessageToPrisma(senderNumber, message, 'ai');
 }
 
 // ─── Cron Scheduler ──────────────────────────────────────────────────────────
@@ -257,45 +300,36 @@ function startFollowUpScheduler() {
 
     schedulerHandle = setInterval(async () => {
         const now = new Date();
-        // UTC+7: jam 09:00 WIB = 02:00 UTC
-        const utcHour = now.getUTCHours();
-        const utcMinute = now.getUTCMinutes();
+        const hour = now.getHours();
 
-        // Hanya jalankan antara 02:00-02:14 UTC (09:00-09:14 WIB)
-        if (utcHour !== 2 || utcMinute >= 15) return;
-
-        // Skip Minggu
-        const day = now.getDay();
-        if (day === 0) {
-            console.log('[Scheduler] Skip Sunday');
-            return;
-        }
-
-        try {
-            await runDailyFollowUp();
-        } catch (error) {
-            console.error('[Scheduler] Error in daily run:', error);
+        // Run daily hanya jam 9 pagi
+        if (hour === 9) {
+            try {
+                await runDailyFollowUp();
+            } catch (err) {
+                console.error('[Scheduler] Daily run failed:', err);
+            }
         }
     }, intervalMs);
 
-    console.log('✅ [FollowUp Scheduler] Started (daily 09:00 WIB, skip Sunday)');
+    console.log('[Scheduler] Follow-up scheduler started (15 min interval, 9am daily run)');
 }
 
 function stopFollowUpScheduler() {
     if (schedulerHandle) {
         clearInterval(schedulerHandle);
         schedulerHandle = null;
-        console.log('[Scheduler] Stopped');
+        console.log('[Scheduler] Follow-up scheduler stopped');
     }
 }
 
+function isSchedulerRunning() {
+    return schedulerHandle !== null;
+}
+
 module.exports = {
+    runDailyFollowUp,
     startFollowUpScheduler,
     stopFollowUpScheduler,
-    runDailyFollowUp,
-    // Exported for testing & stopCondition
-    STRATEGY_CONFIG,
-    DOWNGRADE_RULES,
-    isEligible,
-    getDaysSince,
+    isSchedulerRunning,
 };

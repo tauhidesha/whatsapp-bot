@@ -1,8 +1,8 @@
 // File: src/ai/utils/auditSession.js
 // State management untuk Customer Audit session.
-// Firestore collection: auditSession/{adminNumber}
+// Using Prisma KeyValueStore for session data.
 
-const admin = require('firebase-admin');
+const prisma = require('../../lib/prisma');
 
 const TIMEOUT_MS = 30 * 60 * 1000; // 30 menit
 
@@ -10,25 +10,19 @@ function getDocId(adminNumber) {
     return (adminNumber || '').replace(/[^0-9]/g, '');
 }
 
-function getRef(adminNumber) {
-    const db = admin.firestore();
-    return db.collection('auditSession').doc(getDocId(adminNumber));
+async function getSessionKey(adminNumber) {
+    return `audit_session_${getDocId(adminNumber)}`;
 }
 
 /**
  * Buat session audit baru.
- * @param {string} adminNumber
- * @param {number} autoLabeledCount - Jumlah customer yang auto-labeled
- * @param {Array} pendingQueue - Array of { docId, name, lastMessageAt, motorModel, targetService, lastMessageSender }
  */
 async function createSession(adminNumber, autoLabeledCount, pendingQueue) {
-    const ref = getRef(adminNumber);
-    const now = admin.firestore.FieldValue.serverTimestamp();
-
+    const key = await getSessionKey(adminNumber);
     const session = {
         status: 'in_progress',
-        startedAt: now,
-        lastActivityAt: now,
+        startedAt: new Date().toISOString(),
+        lastActivityAt: new Date().toISOString(),
         totalCustomers: autoLabeledCount + pendingQueue.length,
         autoLabeled: autoLabeledCount,
         pendingReview: pendingQueue,
@@ -38,39 +32,64 @@ async function createSession(adminNumber, autoLabeledCount, pendingQueue) {
         pausedAt: null,
     };
 
-    await ref.set(session);
+    await prisma.keyValueStore.upsert({
+        where: {
+            collection_key: {
+                collection: 'auditSessions',
+                key: getDocId(adminNumber)
+            }
+        },
+        create: {
+            collection: 'auditSessions',
+            key: getDocId(adminNumber),
+            value: session
+        },
+        update: {
+            value: session
+        }
+    });
+
     console.log(`[Audit] Session created for ${getDocId(adminNumber)}: ${pendingQueue.length} pending, ${autoLabeledCount} auto-labeled`);
     return session;
 }
 
 /**
  * Ambil session aktif. Jika lastActivityAt > 30 menit → auto-pause.
- * @param {string} adminNumber
- * @returns {Object|null} session data atau null jika tidak ada / sudah selesai
  */
 async function getSession(adminNumber) {
-    const ref = getRef(adminNumber);
-    const doc = await ref.get();
+    const kv = await prisma.keyValueStore.findUnique({
+        where: {
+            collection_key: {
+                collection: 'auditSessions',
+                key: getDocId(adminNumber)
+            }
+        }
+    });
 
-    if (!doc.exists) return null;
-
-    const data = doc.data();
+    if (!kv) return null;
+    const data = kv.value;
 
     if (data.status === 'completed') return null;
 
     // Lazy timeout check
     if (data.status === 'in_progress' && data.lastActivityAt) {
-        const lastActivity = data.lastActivityAt.toDate ? data.lastActivityAt.toDate() : new Date(data.lastActivityAt);
+        const lastActivity = new Date(data.lastActivityAt);
         const elapsed = Date.now() - lastActivity.getTime();
 
         if (elapsed > TIMEOUT_MS) {
             console.log(`[Audit] Session auto-paused for ${getDocId(adminNumber)} (idle ${Math.round(elapsed / 60000)} min)`);
-            await ref.update({
-                status: 'paused',
-                pausedAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
             data.status = 'paused';
-            data.pausedAt = new Date();
+            data.pausedAt = new Date().toISOString();
+            
+            await prisma.keyValueStore.update({
+                where: {
+                    collection_key: {
+                        collection: 'auditSessions',
+                        key: getDocId(adminNumber)
+                    }
+                },
+                data: { value: data }
+            });
         }
     }
 
@@ -87,15 +106,19 @@ async function hasActiveSession(adminNumber) {
 
 /**
  * Tandai current customer selesai, geser index ke berikutnya.
- * @param {string} adminNumber
- * @param {{ docId: string, label: string }} reviewResult
  */
 async function advanceSession(adminNumber, reviewResult) {
-    const ref = getRef(adminNumber);
-    const doc = await ref.get();
-    if (!doc.exists) return null;
+    const kv = await prisma.keyValueStore.findUnique({
+        where: {
+            collection_key: {
+                collection: 'auditSessions',
+                key: getDocId(adminNumber)
+            }
+        }
+    });
+    if (!kv) return null;
 
-    const data = doc.data();
+    const data = kv.value;
     const completedReview = [...(data.completedReview || []), reviewResult];
     const nextIndex = (data.currentIndex || 0) + 1;
     const isFinished = nextIndex >= (data.pendingReview || []).length;
@@ -105,74 +128,167 @@ async function advanceSession(adminNumber, reviewResult) {
         currentIndex: nextIndex,
         currentStep: isFinished ? 'completed' : 'awaiting_classification',
         status: isFinished ? 'completed' : 'in_progress',
-        lastActivityAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastActivityAt: new Date().toISOString(),
     };
 
     if (isFinished) {
-        update.completedAt = admin.firestore.FieldValue.serverTimestamp();
+        update.completedAt = new Date().toISOString();
     }
 
-    await ref.update(update);
+    await prisma.keyValueStore.update({
+        where: {
+            collection_key: {
+                collection: 'auditSessions',
+                key: getDocId(adminNumber)
+            }
+        },
+        data: { value: { ...data, ...update } }
+    });
 
     console.log(`[Audit] Advanced session for ${getDocId(adminNumber)}: index ${nextIndex}, finished: ${isFinished}`);
-    return { ...data, ...update, completedReview, currentIndex: nextIndex };
+    return { ...data, ...update };
 }
 
 /**
- * Update step session saat ini (e.g. awaiting_classification → awaiting_detail).
+ * Update step session saat ini
  */
 async function updateSessionStep(adminNumber, step) {
-    const ref = getRef(adminNumber);
-    await ref.update({
-        currentStep: step,
-        lastActivityAt: admin.firestore.FieldValue.serverTimestamp(),
+    const kv = await prisma.keyValueStore.findUnique({
+        where: {
+            collection_key: {
+                collection: 'auditSessions',
+                key: getDocId(adminNumber)
+            }
+        }
+    });
+    if (!kv) return;
+
+    kv.value.currentStep = step;
+    kv.value.lastActivityAt = new Date().toISOString();
+
+    await prisma.keyValueStore.update({
+        where: {
+            collection_key: {
+                collection: 'auditSessions',
+                key: getDocId(adminNumber)
+            }
+        },
+        data: { value: kv.value }
     });
 }
 
 /**
- * Pause session (admin ketik escape keyword atau timeout).
+ * Pause session
  */
 async function pauseSession(adminNumber) {
-    const ref = getRef(adminNumber);
-    await ref.update({
-        status: 'paused',
-        pausedAt: admin.firestore.FieldValue.serverTimestamp(),
+    const kv = await prisma.keyValueStore.findUnique({
+        where: {
+            collection_key: {
+                collection: 'auditSessions',
+                key: getDocId(adminNumber)
+            }
+        }
+    });
+    if (!kv) return;
+
+    kv.value.status = 'paused';
+    kv.value.pausedAt = new Date().toISOString();
+
+    await prisma.keyValueStore.update({
+        where: {
+            collection_key: {
+                collection: 'auditSessions',
+                key: getDocId(adminNumber)
+            }
+        },
+        data: { value: kv.value }
     });
     console.log(`[Audit] Session paused for ${getDocId(adminNumber)}`);
 }
 
 /**
- * Resume session yang di-pause.
+ * Resume session
  */
 async function resumeSession(adminNumber) {
-    const ref = getRef(adminNumber);
-    await ref.update({
-        status: 'in_progress',
-        pausedAt: null,
-        lastActivityAt: admin.firestore.FieldValue.serverTimestamp(),
+    const kv = await prisma.keyValueStore.findUnique({
+        where: {
+            collection_key: {
+                collection: 'auditSessions',
+                key: getDocId(adminNumber)
+            }
+        }
+    });
+    if (!kv) return;
+
+    kv.value.status = 'in_progress';
+    kv.value.pausedAt = null;
+    kv.value.lastActivityAt = new Date().toISOString();
+
+    await prisma.keyValueStore.update({
+        where: {
+            collection_key: {
+                collection: 'auditSessions',
+                key: getDocId(adminNumber)
+            }
+        },
+        data: { value: kv.value }
     });
     console.log(`[Audit] Session resumed for ${getDocId(adminNumber)}`);
 }
 
 /**
- * Tandai session selesai.
+ * Tandai session selesai
  */
 async function completeSession(adminNumber) {
-    const ref = getRef(adminNumber);
-    await ref.update({
-        status: 'completed',
-        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+    const kv = await prisma.keyValueStore.findUnique({
+        where: {
+            collection_key: {
+                collection: 'auditSessions',
+                key: getDocId(adminNumber)
+            }
+        }
+    });
+    if (!kv) return;
+
+    kv.value.status = 'completed';
+    kv.value.completedAt = new Date().toISOString();
+
+    await prisma.keyValueStore.update({
+        where: {
+            collection_key: {
+                collection: 'auditSessions',
+                key: getDocId(adminNumber)
+            }
+        },
+        data: { value: kv.value }
     });
     console.log(`[Audit] Session completed for ${getDocId(adminNumber)}`);
 }
 
 /**
- * Touch lastActivityAt — dipanggil setiap admin kirim pesan dalam konteks audit.
+ * Touch lastActivityAt
  */
 async function touchSession(adminNumber) {
-    const ref = getRef(adminNumber);
-    await ref.update({
-        lastActivityAt: admin.firestore.FieldValue.serverTimestamp(),
+    const kv = await prisma.keyValueStore.findUnique({
+        where: {
+            collection_key: {
+                collection: 'auditSessions',
+                key: getDocId(adminNumber)
+            }
+        }
+    });
+    if (!kv) return;
+
+    kv.value.lastActivityAt = new Date().toISOString();
+
+    await prisma.keyValueStore.update({
+        where: {
+            collection_key: {
+                collection: 'auditSessions',
+                key: getDocId(adminNumber)
+            }
+        },
+        data: { value: kv.value }
     });
 }
 

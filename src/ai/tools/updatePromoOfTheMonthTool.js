@@ -1,7 +1,7 @@
 // File: src/ai/tools/updatePromoOfTheMonthTool.js
-// Tool khusus Admin untuk mengupdate promo bulanan di Firestore
+// Tool khusus Admin untuk mengupdate promo bulanan di Prisma
 
-const admin = require('firebase-admin');
+const prisma = require('../../lib/prisma');
 const { isAdmin } = require('../utils/adminAuth');
 const { invalidatePromoCache } = require('../utils/promoConfig.js');
 
@@ -17,15 +17,33 @@ async function implementation(args) {
     }
 
     try {
-        const db = admin.firestore();
-
-        // 2. Simpan ke Firestore
-        await db.collection('settings').doc('promo_config').set({
-            promoText,
-            isActive: isActive !== undefined ? isActive : true,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            updatedBy: senderNumber
-        }, { merge: true });
+        // 2. Simpan ke Prisma KeyValueStore
+        await prisma.keyValueStore.upsert({
+            where: {
+                collection_key: {
+                    collection: 'settings',
+                    key: 'promo_config'
+                }
+            },
+            create: {
+                collection: 'settings',
+                key: 'promo_config',
+                value: {
+                    promoText,
+                    isActive: isActive !== undefined ? isActive : true,
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: senderNumber
+                }
+            },
+            update: {
+                value: {
+                    promoText,
+                    isActive: isActive !== undefined ? isActive : true,
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: senderNumber
+                }
+            }
+        });
 
         // Invalidate promo cache agar follow up engine langsung pakai promo baru
         invalidatePromoCache();

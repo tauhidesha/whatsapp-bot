@@ -269,6 +269,14 @@ const updateBookingTool = {
         data: updateData,
       });
 
+      // Sync customer statistics (important if status changed to COMPLETED or date changed)
+      try {
+        const { syncCustomer } = require('../utils/customerSync.js');
+        await syncCustomer(updated.customerId);
+      } catch (syncErr) {
+        console.warn('[updateBookingTool] Sync failed:', syncErr.message);
+      }
+
       let summaryParts = [`Booking ${bookingId} berhasil diperbarui.`];
       if (updateData.bookingDate) {
         const updatedDate = updated.bookingDate instanceof Date ? updated.bookingDate : new Date(updated.bookingDate);

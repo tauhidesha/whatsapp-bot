@@ -1,7 +1,7 @@
 // File: src/ai/utils/promoConfig.js
-// Promo config with 5-minute cache. Fetch dari Firestore settings/promo_config.
+// Promo config with 5-minute cache. Fetch dari Prisma KeyValueStore.
 
-const admin = require('firebase-admin');
+const prisma = require('../../lib/prisma');
 
 let promoCache = null;
 let promoCacheAt = 0;
@@ -16,12 +16,17 @@ async function getActivePromo() {
     }
 
     try {
-        const db = admin.firestore();
-        const doc = await db.collection('settings').doc('promo_config').get();
+        const kv = await prisma.keyValueStore.findUnique({
+            where: {
+                collection_key: {
+                    collection: 'settings',
+                    key: 'promo_config'
+                }
+            }
+        });
 
-        const data = doc.exists ? doc.data() : null;
-        promoCache = (data?.isActive && data?.promoText)
-            ? data.promoText
+        promoCache = (kv?.value?.isActive && kv?.value?.promoText)
+            ? kv.value.promoText
             : null;
         promoCacheAt = now;
 

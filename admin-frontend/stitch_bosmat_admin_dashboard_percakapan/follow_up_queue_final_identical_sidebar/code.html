@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Follow-up Queue - Bosmat Admin</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ec5b13",
+                        "background-light": "#f8f6f6",
+                        "background-dark": "#221610",
+                    },
+                    fontFamily: {
+                        "display": ["Public Sans"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 min-h-screen">
+<div class="flex h-screen overflow-hidden">
+<!-- Exact Dark Navy Sidebar from Reference -->
+<aside class="w-full md:w-64 flex-col bg-[#0f172a] p-6 hidden md:flex min-h-screen text-slate-300">
+<div class="flex items-center gap-3 px-4 mb-8">
+<div class="size-8 bg-white/10 rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-white">account_balance_wallet</span>
+</div>
+<h2 class="text-white text-lg font-bold leading-tight tracking-tight">Bosmat Admin</h2>
+</div>
+<nav class="flex flex-col gap-1">
+<div class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-white/5 hover:text-white transition-colors cursor-pointer group">
+<span class="material-symbols-outlined group-hover:text-primary transition-colors">dashboard</span>
+<span class="text-sm font-medium">Dashboard</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-white/5 hover:text-white transition-colors cursor-pointer group">
+<span class="material-symbols-outlined group-hover:text-primary transition-colors">event_available</span>
+<span class="text-sm font-medium">Bookings</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/10 text-primary border-l-4 border-primary shadow-sm">
+<span class="material-symbols-outlined">group</span>
+<span class="text-sm font-semibold">CRM</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-white/5 hover:text-white transition-colors cursor-pointer group">
+<span class="material-symbols-outlined group-hover:text-primary transition-colors">chat_bubble</span>
+<span class="text-sm font-medium">Messages</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-white/5 hover:text-white transition-colors cursor-pointer group">
+<span class="material-symbols-outlined group-hover:text-primary transition-colors">settings</span>
+<span class="text-sm font-medium">Settings</span>
+</div>
+</nav>
+<div class="mt-auto pt-4 border-t border-white/10">
+<button class="flex w-full items-center justify-center gap-2 rounded-xl h-11 px-4 bg-primary text-white text-sm font-bold tracking-tight hover:bg-primary/90 transition-all shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined text-[20px]">add</span>
+<span>Generate Invoice</span>
+</button>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col overflow-y-auto">
+<!-- Header -->
+<header class="p-8 pb-4">
+<div class="flex flex-col gap-2">
+<h2 class="text-3xl font-black tracking-tight text-slate-900 dark:text-slate-100">Follow-up Queue</h2>
+<p class="text-slate-500 dark:text-slate-400 max-w-2xl">Manage pending customer interactions, follow up on abandoned bookings, and nurture leads to improve conversion rates.</p>
+</div>
+</header>
+<!-- Summary Metrics -->
+<section class="px-8 py-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+<div class="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+<p class="text-slate-500 dark:text-slate-400 text-sm font-medium">Total Pending Follow-ups</p>
+<div class="flex items-end gap-2 mt-1">
+<p class="text-3xl font-bold text-slate-900 dark:text-slate-100">42</p>
+<span class="text-emerald-500 text-sm font-bold mb-1">+5%</span>
+</div>
+</div>
+<div class="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+<p class="text-slate-500 dark:text-slate-400 text-sm font-medium">High Priority Leads</p>
+<div class="flex items-end gap-2 mt-1">
+<p class="text-3xl font-bold text-slate-900 dark:text-slate-100">12</p>
+<span class="text-primary text-sm font-bold mb-1">Critical</span>
+</div>
+</div>
+<div class="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+<p class="text-slate-500 dark:text-slate-400 text-sm font-medium">Avg. Response Time</p>
+<div class="flex items-end gap-2 mt-1">
+<p class="text-3xl font-bold text-slate-900 dark:text-slate-100">4.5h</p>
+<span class="text-primary text-sm font-bold mb-1">-10% faster</span>
+</div>
+</div>
+</section>
+<!-- Filter Tabs -->
+<nav class="px-8 mt-4 border-b border-slate-200 dark:border-slate-700 flex gap-8">
+<a class="pb-4 border-b-2 border-primary text-primary font-bold text-sm" href="#">All Tasks</a>
+<a class="pb-4 border-b-2 border-transparent text-slate-500 dark:text-slate-400 font-medium text-sm hover:text-slate-700 dark:hover:text-slate-200" href="#">Abandoned Bookings</a>
+<a class="pb-4 border-b-2 border-transparent text-slate-500 dark:text-slate-400 font-medium text-sm hover:text-slate-700 dark:hover:text-slate-200" href="#">Post-Service Checks</a>
+<a class="pb-4 border-b-2 border-transparent text-slate-500 dark:text-slate-400 font-medium text-sm hover:text-slate-700 dark:hover:text-slate-200" href="#">Lead Nurturing</a>
+</nav>
+<!-- Data Table Section -->
+<section class="p-8">
+<div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-slate-50 dark:bg-slate-900/50">
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Customer</th>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Reason</th>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Last Interaction</th>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center">Priority</th>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-right">Action</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+<!-- Row 1 -->
+<tr class="hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition-colors">
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<div class="size-9 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center overflow-hidden">
+<img class="size-full object-cover" data-alt="Portrait of Sarah Jenkins, customer profile picture" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAFAoqe3LYOdEqWAzD3wgdc5Cwr_c06bPgVG4QLyNZ6XzD9CgwX4coxDSs0oJVyPMfskJuBCeZC23FZlRO2ABPYlbF7-z4Fx4XDgodT0VXiPUjT7JkGHf1JMltRNdjpD3xvAMKG1u_yeZQRPTtxkmuGVDbRA57tsLp9AJ-rytIu57b66yNZPF1fePY2f3d-mdFcCUK_HoScZmmNTqypaRE8v_9diBa8_PMGz4wvOCo4HLRx2ry_9bkrMarMIHXDt6nFFYKiPI6w-IU"/>
+</div>
+<div>
+<p class="font-semibold text-slate-900 dark:text-slate-100">Sarah Jenkins</p>
+<p class="text-xs text-slate-500">sarah.j@example.com</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                                        Abandoned Booking
+                                    </span>
+</td>
+<td class="px-6 py-5 text-sm text-slate-600 dark:text-slate-400">
+                                    2 hours ago
+                                </td>
+<td class="px-6 py-5 text-center">
+<span class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-primary/10 text-primary uppercase">
+                                        High
+                                    </span>
+</td>
+<td class="px-6 py-5 text-right space-x-3">
+<button class="text-sm font-bold text-primary hover:underline">Send Message</button>
+<button class="text-sm font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">Dismiss</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition-colors">
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<div class="size-9 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center overflow-hidden">
+<img class="size-full object-cover" data-alt="Portrait of Michael Chen, customer profile picture" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA0OjdJ0RR767Ykb9Ay1_3156jYUKXOGrhaHsXlxtLHhNRhMArcXroDbLPKuuwjMWHb4NJCJ1UyP2kJrynblAJeZoSSZkV54-eBzlfVTPDR1NaSNvQhPsp1Y2dmF2b9qAUmsCqYFDVcKD2sJ85ROLMqTlmF8lI9-aKgOuN6WK2fncOm4XEaN3r3-g-G7InC6nm-uZwBBCDreJHYvcsq0HXAQd-mLoD6byF-q6cu0ebyXAAkQ9pO-vjnbtkNReKSzegM6rrZ9wqlu2M"/>
+</div>
+<div>
+<p class="font-semibold text-slate-900 dark:text-slate-100">Michael Chen</p>
+<p class="text-xs text-slate-500">m.chen@example.com</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                                        Post-Service Check
+                                    </span>
+</td>
+<td class="px-6 py-5 text-sm text-slate-600 dark:text-slate-400">
+                                    1 day ago
+                                </td>
+<td class="px-6 py-5 text-center">
+<span class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 uppercase">
+                                        Medium
+                                    </span>
+</td>
+<td class="px-6 py-5 text-right space-x-3">
+<button class="text-sm font-bold text-primary hover:underline">Send Message</button>
+<button class="text-sm font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">Dismiss</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition-colors">
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<div class="size-9 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center overflow-hidden">
+<img class="size-full object-cover" data-alt="Portrait of Emma Rodriguez, customer profile picture" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDK40L_nDY4GKgT5zaSRx_b1nNUsPTO_fGKJe7tcZk55L6hKmTIv6fOd4SPkBsRzDwHT1a2f90AXwjTBAe2FlxMl_8RIIXaXFV8iyVhI32S3beScQst6Ymw2us0QNCyIZccB49vG2Hg_ed_dPV8YpwrFLN3RisPC2HqD5PSbCCjE3SldOXScnNFNuX3bh5Y2Bygb92t5gjOFf6Ubab7ESAaRL0GUPeJaZbya3-nI9sPiyznM1k2sSz2nuaRQIKN5r0k-LIJ7HHpKP4"/>
+</div>
+<div>
+<p class="font-semibold text-slate-900 dark:text-slate-100">Emma Rodriguez</p>
+<p class="text-xs text-slate-500">emma.rod@example.com</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-400">
+                                        Inquiry Follow-up
+                                    </span>
+</td>
+<td class="px-6 py-5 text-sm text-slate-600 dark:text-slate-400">
+                                    3 days ago
+                                </td>
+<td class="px-6 py-5 text-center">
+<span class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-500 uppercase">
+                                        Low
+                                    </span>
+</td>
+<td class="px-6 py-5 text-right space-x-3">
+<button class="text-sm font-bold text-primary hover:underline">Send Message</button>
+<button class="text-sm font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">Dismiss</button>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition-colors">
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<div class="size-9 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center overflow-hidden">
+<img class="size-full object-cover" data-alt="Portrait of David Smith, customer profile picture" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC9FABK3c6TePvPnk0sMoK0FW1dOGDl9L3lGGzqulVlK4eq1aSsEq9dVVE99Dc0IxiZ0wRim5hYvHjPEqlOn6TBqSWYruNZhPydpABtPTqOtvSvVPql6iPBwhjbvvAnJBvmjvvPKioEoqixBE4PpDy_SjGh2J1peXA_baMTAXwqmxejWggFSVHGV0Vh0_7ehlq3srUvm-5TnhoeEUxZpZyFgEprpo4rATkCGE82d3sMI0jlTuPlPR2DxgG95eQtPrf8JfKZU2rhg3M"/>
+</div>
+<div>
+<p class="font-semibold text-slate-900 dark:text-slate-100">David Smith</p>
+<p class="text-xs text-slate-500">d.smith@example.com</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                                        Abandoned Booking
+                                    </span>
+</td>
+<td class="px-6 py-5 text-sm text-slate-600 dark:text-slate-400">
+                                    5 hours ago
+                                </td>
+<td class="px-6 py-5 text-center">
+<span class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-primary/10 text-primary uppercase">
+                                        High
+                                    </span>
+</td>
+<td class="px-6 py-5 text-right space-x-3">
+<button class="text-sm font-bold text-primary hover:underline">Send Message</button>
+<button class="text-sm font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">Dismiss</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination footer -->
+<div class="mt-6 flex items-center justify-between">
+<p class="text-sm text-slate-500">Showing 1 to 4 of 42 results</p>
+<div class="flex gap-2">
+<button class="p-2 border border-slate-200 dark:border-slate-700 rounded hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50">
+<span class="material-symbols-outlined text-sm leading-none">chevron_left</span>
+</button>
+<button class="p-2 border border-slate-200 dark:border-slate-700 rounded bg-primary text-white font-bold px-4 text-sm leading-none">
+                            1
+                        </button>
+<button class="p-2 border border-slate-200 dark:border-slate-700 rounded hover:bg-slate-50 dark:hover:bg-slate-800">
+                            2
+                        </button>
+<button class="p-2 border border-slate-200 dark:border-slate-700 rounded hover:bg-slate-50 dark:hover:bg-slate-800">
+<span class="material-symbols-outlined text-sm leading-none">chevron_right</span>
+</button>
+</div>
+</div>
+</section>
+</main>
+</div>
+</body></html>
