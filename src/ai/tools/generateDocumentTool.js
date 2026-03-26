@@ -23,7 +23,7 @@ const generateDocumentTool = {
     type: 'function',
     function: {
       name: 'generateDocument',
-      description: 'Buat PDF (tanda_terima/invoice/bukti_bayar) dan kirim ke admin.',
+      description: 'Buat PDF (tanda_terima/invoice/bukti_bayar) dan kirim ke customer. WAJIB isi recipientNumber dengan nomor customer.',
       parameters: {
         type: 'object',
         properties: {
@@ -43,10 +43,10 @@ const generateDocumentTool = {
           paymentMethod: { type: 'string', description: 'Metode pembayaran (Transfer, Tunai, QRIS).' },
           notes: { type: 'string', description: 'Catatan tambahan (keluhan, kondisi fisik, dll).' },
           senderNumber: { type: 'string', description: 'Nomor pengirim (otomatis diisi sistem).' },
-          recipientNumber: { type: 'string', description: 'Nomor penerima dokumen (jika beda dari pengirim, misal kirim ke customer). Format: 628xxx@c.us' },
+          recipientNumber: { type: 'string', description: 'WAJIB: Nomor customer penerima dokumen. Format: 628xxx@c.us atau 176665158225970@lid' },
           bookingDate: { type: 'string', description: 'Tanggal booking (YYYY-MM-DD) untuk kalkulasi estimasi selesai.' }
         },
-        required: ['documentType', 'senderNumber']
+        required: ['documentType', 'senderNumber', 'recipientNumber']
       }
     }
   },
@@ -65,15 +65,42 @@ const generateDocumentTool = {
       bookingDate
     } = input;
 
-    const targetRecipient = recipientNumber || senderNumber;
-
-    // 1. Security Check: Pastikan yang request adalah Admin
-    if (!isAdmin(senderNumber)) {
-      return {
-        success: false,
-        message: "⛔ Akses Ditolak. Fitur pembuatan dokumen hanya dapat diakses oleh nomor Admin."
-      };
+    let targetRecipient = recipientNumber || senderNumber;
+    
+    // JANGAN gunakan senderNumber sebagai recipient - HARUS ada recipientNumber
+    if (!recipientNumber) {
+      console.log(`[generateDocument] WARNING: recipientNumber not provided!`);
+      // Coba cari customer dari database berdasarkan senderNumber (admin)
+      const prisma = require('../../lib/prisma');
+      try {
+        // Ambil customer terakhir yang di-chat admin
+        const lastCustomer = await prisma.customer.findFirst({
+          where: {
+            messages: {
+              some: {
+                createdAt: {
+                  gte: new Date(Date.now() - 24 * 60 * 60 * 1000) // Last 24 hours
+                }
+              }
+            }
+          },
+          orderBy: { updatedAt: 'desc' },
+          select: { phone: true, whatsappLid: true, name: true }
+        });
+        
+        if (lastCustomer && lastCustomer.whatsappLid) {
+          console.log(`[generateDocument] Auto-detected customer: ${lastCustomer.name} (${lastCustomer.whatsappLid})`);
+          targetRecipient = lastCustomer.whatsappLid;
+        } else if (lastCustomer && lastCustomer.phone) {
+          targetRecipient = lastCustomer.phone + '@c.us';
+          console.log(`[generateDocument] Auto-detected customer: ${lastCustomer.name} (${targetRecipient})`);
+        }
+      } catch (err) {
+        console.log(`[generateDocument] Failed to auto-detect customer: ${err.message}`);
+      }
     }
+    
+    console.log(`[generateDocument] targetRecipient: ${targetRecipient}, senderNumber: ${senderNumber}, recipientNumber: ${recipientNumber}`);
 
     // 1.5 Auto-Calculate Price if totalAmount is 0/missing
     let finalTotal = totalAmount;
@@ -187,10 +214,10 @@ const generateDocumentTool = {
       doc.text(`Kendaraan: ${motorDetails}`, 50, y + 18);
       doc.text(`Tanggal Berlaku: ${now.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, 50, y + 36);
 
-      // Right column
-      const rightColumnX = 360;
-      doc.text(`No. WA: ${senderNumber}`, rightColumnX, y);
-      doc.text(`Masa Berlaku: ${warrantyData.duration}`, rightColumnX, y + 18);
+       // Right column
+       const rightColumnX = 360;
+       doc.text(`No. WA: ${recipientNumber}`, rightColumnX, y);
+       doc.text(`Masa Berlaku: ${warrantyData.duration}`, rightColumnX, y + 18);
 
       generateHr(doc, y + 65);
       y += 85;
@@ -291,7 +318,7 @@ const generateDocumentTool = {
         .text(customerName, 50, 208)
         .font('Helvetica')
         .fontSize(10)
-        .text(senderNumber, 50, 222);
+        .text(recipientNumber, 50, 222);
 
       // Document Meta (Right side of bar)
       doc
@@ -506,8 +533,34 @@ const generateDocumentTool = {
 
     if (global.whatsappClient) {
       try {
+        // Resolve LID to phone number if needed (3-layer approach)
+        let recipient = targetRecipient;
+        if (recipient && recipient.endsWith('@lid')) {
+          console.log(`[generateDocument] LID detected: ${recipient}, attempting to resolve...`);
+          try {
+            // LAYER 1: Try requestPhoneNumber
+            if (typeof global.whatsappClient.requestPhoneNumber === 'function') {
+              const realPhone = await global.whatsappClient.requestPhoneNumber(recipient);
+              if (realPhone) {
+                recipient = realPhone.includes('@') ? realPhone : `${realPhone}@c.us`;
+                console.log(`[generateDocument] LID resolved via requestPhoneNumber: ${recipient}`);
+              }
+            }
+            // LAYER 2: Try getContact
+            else if (recipient.endsWith('@lid')) {
+              const contact = await global.whatsappClient.getContact(recipient);
+              if (contact && contact.id && contact.id._serialized && contact.id._serialized.includes('@c.us')) {
+                recipient = contact.id._serialized;
+                console.log(`[generateDocument] LID resolved via getContact: ${recipient}`);
+              }
+            }
+          } catch (err) {
+            console.log(`[generateDocument] LID resolution error: ${err.message}`);
+          }
+        }
+
         await global.whatsappClient.sendFile(
-          targetRecipient,
+          recipient,
           filePath,
           filename,
           `Berikut dokumen *${title}* untuk Anda.`
