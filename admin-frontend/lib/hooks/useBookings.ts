@@ -22,6 +22,12 @@ export interface Booking {
   services: string | string[];
   notes?: string;
   additionalService?: string;
+  totalAmount?: number;
+  amountPaid?: number;
+  paymentStatus?: string;
+  subtotal?: number;
+  downPayment?: number;
+  paymentMethod?: string;
 }
 
 export function useBookings() {

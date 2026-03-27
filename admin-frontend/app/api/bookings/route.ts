@@ -171,9 +171,9 @@ export async function POST(req: NextRequest) {
           bookingId: booking.id,
           amount: downPayment,
           type: 'income',
-          status: 'PAID',
+          status: 'SUCCESS',
           description: `Down Payment - ${serviceName}`,
-          paymentMode: paymentMethod || 'transfer',
+          paymentMethod: paymentMethod || 'transfer',
         }
       });
 

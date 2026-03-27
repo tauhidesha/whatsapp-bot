@@ -12,8 +12,8 @@ async function syncCustomer(customerId) {
     const aggregateSpending = await prisma.transaction.aggregate({
       where: {
         customerId,
-        type: 'income',
-        status: 'PAID'
+        type: { in: ['income', 'INCOME'] },
+        status: { in: ['PAID', 'SUCCESS'] }
       },
       _sum: {
         amount: true

@@ -90,6 +90,12 @@ model Booking {
   notes           String?
   homeService     Boolean   @default(false)
   pickupService   Boolean   @default(false)
+  
+  // Financial Tracking
+  totalAmount     Float?
+  amountPaid      Float     @default(0)
+  paymentStatus   String    @default("UNPAID") // UNPAID, PARTIAL, PAID
+  
   subtotal        Float?
   downPayment     Float?
   paymentMethod   String?
@@ -112,11 +118,12 @@ model Transaction {
   booking     Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
 
   amount      Float
-  type        String
   category    String?
-  status      String   @default("UNPAID")
+  type        String
+  status      String   @default("SUCCESS") // SUCCESS, PENDING, FAILED
   description String?
-  paymentMode String?
+  paymentMethod String? @map("paymentMode")
+  paymentDate DateTime @default(now())
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

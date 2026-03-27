@@ -65,8 +65,9 @@ function delay(ms) {
 function cleanFloat(val) {
     if (val === null || val === undefined || val === '') return null;
     if (typeof val === 'number') return val;
-    // Remove currency and commas if string
-    const cleaned = String(val).replace(/[^0-9.]/g, '');
+    // Handle ranges like "Rp380.000 - Rp470.000" -> take first one
+    const firstPart = String(val).split('-')[0].split('(')[0]; // Remove ranges and parentheticals
+    const cleaned = firstPart.replace(/[^0-9]/g, ''); // Remove everything except digits
     const num = parseFloat(cleaned);
     return isNaN(num) ? null : num;
 }
@@ -81,6 +82,23 @@ function parseExtractedJSON(text) {
         const parsed = JSON.parse(cleaned);
         // Sanitize numeric fields
         if (parsed) {
+            // Coerce string fields
+            ['motor_model', 'motor_plate', 'motor_year', 'motor_color', 'motor_condition', 
+             'service_detail', 'budget_signal', 'preferred_day', 'preferred_time', 'location_hint', 
+             'conversation_stage', 'last_ai_action', 'conversation_summary'].forEach(field => {
+                if (parsed[field] !== null && parsed[field] !== undefined && typeof parsed[field] !== 'string') {
+                    parsed[field] = String(parsed[field]);
+                }
+            });
+
+            // Coerce boolean fields
+            ['is_changing_topic', 'said_expensive', 'asked_price', 'asked_availability', 
+             'shared_photo', 'upsell_offered', 'upsell_accepted', 'butuh_bantuan_admin'].forEach(field => {
+                if (parsed[field] !== null && parsed[field] !== undefined) {
+                    parsed[field] = (parsed[field] === true || parsed[field] === 'true');
+                }
+            });
+
             parsed.quoted_total_normal = cleanFloat(parsed.quoted_total_normal);
             parsed.quoted_total_bundling = cleanFloat(parsed.quoted_total_bundling);
             // Ensure quoted_services price is also float if it's an array of objects

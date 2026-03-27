@@ -26,6 +26,7 @@ const UpdateBookingSchema = z.object({
   notes: z.string().optional(),
   estimatedDurationMinutes: z.number().int().positive().optional(),
   subtotal: z.number().optional(),
+  totalAmount: z.number().optional(),
   homeService: z
     .object({
       requested: z.boolean().optional(),
@@ -77,6 +78,7 @@ const updateBookingTool = {
           motorPlate: { type: 'string', description: 'Plat nomor motor (opsional).' },
           notes: { type: 'string', description: 'Catatan tambahan (opsional).' },
           estimatedDurationMinutes: { type: 'number', description: 'Durasi estimasi baru (menit).' },
+          totalAmount: { type: 'number', description: 'Total biaya jasa/deal harga (pilihan).' },
         },
         required: ['bookingId'],
       },
@@ -257,6 +259,8 @@ const updateBookingTool = {
         updateData.status = mappedStatus;
       }
 
+      if (parsed.totalAmount !== undefined) updateData.totalAmount = parsed.totalAmount;
+
       if (Object.keys(updateData).length === 0) {
         return {
           success: false,
@@ -269,9 +273,11 @@ const updateBookingTool = {
         data: updateData,
       });
 
-      // Sync customer statistics (important if status changed to COMPLETED or date changed)
+      // Sync financial and customer statistics
       try {
+        const { syncBookingFinance } = require('../utils/financeSync.js');
         const { syncCustomer } = require('../utils/customerSync.js');
+        await syncBookingFinance(bookingId);
         await syncCustomer(updated.customerId);
       } catch (syncErr) {
         console.warn('[updateBookingTool] Sync failed:', syncErr.message);

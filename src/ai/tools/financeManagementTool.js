@@ -6,7 +6,10 @@ const { traceable } = require('../utils/langsmith.js');
 const { parseSenderIdentity } = require('../../lib/utils.js');
 const { syncCustomer } = require('../utils/customerSync.js');
 
+const { syncBookingFinance } = require('../utils/financeSync.js');
+
 const TransactionTypeEnum = z.enum(['income', 'expense']);
+const TransactionStatusEnum = z.enum(['SUCCESS', 'PENDING', 'FAILED']);
 
 const addTransactionSchema = z.object({
   type: TransactionTypeEnum,
@@ -17,7 +20,23 @@ const addTransactionSchema = z.object({
   date: z.string().optional(),
   customerName: z.string().optional(),
   customerNumber: z.string().optional(),
-  customerId: z.string().optional(), // In SQL this will be the customer.id (phone)
+  customerId: z.string().optional(),
+  bookingId: z.string().optional(),
+  senderNumber: z.string(),
+});
+
+const updateTransactionSchema = z.object({
+  id: z.string().uuid(),
+  amount: z.number().positive().optional(),
+  status: TransactionStatusEnum.optional(),
+  category: z.string().optional(),
+  description: z.string().optional(),
+  paymentMethod: z.string().optional(),
+  senderNumber: z.string(),
+});
+
+const deleteTransactionSchema = z.object({
+  id: z.string().uuid(),
   senderNumber: z.string(),
 });
 
@@ -68,6 +87,7 @@ const addTransactionTool = {
           date: { type: 'string', description: 'ISO string (opsional).' },
           customerName: { type: 'string', description: 'Nama customer (pilihan).' },
           customerNumber: { type: 'string', description: 'Nomor WA (pilihan).' },
+          bookingId: { type: 'string', description: 'ID Booking jika terkait layanan (pilihan).' },
           senderNumber: { type: 'string', description: 'Otomatis.' },
         },
         required: ['type', 'amount', 'category', 'description', 'paymentMethod', 'senderNumber'],
@@ -101,20 +121,23 @@ const addTransactionTool = {
       const tx = await prisma.transaction.create({
         data: {
           type: parsed.type === 'income' ? 'INCOME' : 'EXPENSE',
-          status: 'PAID',
+          status: 'SUCCESS',
           amount: parsed.amount,
           category: parsed.category,
           description: parsed.description,
           paymentMethod: parsed.paymentMethod,
-          createdAt: txDate,
+          paymentDate: txDate,
           customerName: parsed.customerName,
           customerId: linkedPhone,
+          bookingId: parsed.bookingId || null,
           createdBy: parsed.senderNumber
         }
       });
 
-      // SYNC CUSTOMER statistics after income
-      if (linkedPhone && parsed.type === 'income') {
+      // SYNC statistics
+      if (parsed.bookingId) {
+        await syncBookingFinance(parsed.bookingId);
+      } else if (linkedPhone && parsed.type === 'income') {
         await syncCustomer(linkedPhone);
       }
 
@@ -129,6 +152,94 @@ const addTransactionTool = {
       return { success: false, message: `SQL Error: ${err.message}` };
     }
   }, { name: "addTransactionTool" }),
+};
+
+const updateTransactionTool = {
+  toolDefinition: {
+    type: 'function',
+    function: {
+      name: 'updateTransaction',
+      description: 'KHUSUS ADMIN. Mengubah data transaksi yang sudah dicatat.',
+      parameters: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: 'ID Transaksi (UUID).' },
+          amount: { type: 'number', description: 'Nominal baru.' },
+          status: { type: 'string', enum: ['SUCCESS', 'PENDING', 'FAILED'] },
+          category: { type: 'string' },
+          description: { type: 'string' },
+          paymentMethod: { type: 'string' },
+          senderNumber: { type: 'string' },
+        },
+        required: ['id', 'senderNumber'],
+      },
+    },
+  },
+  implementation: traceable(async (input = {}) => {
+    try {
+      const parsed = updateTransactionSchema.parse(input);
+      if (!isAdmin(parsed.senderNumber)) return { success: false, message: "⛔ Akses Ditolak." };
+
+      const oldTx = await prisma.transaction.findUnique({ where: { id: parsed.id } });
+      if (!oldTx) return { success: false, message: "Transaksi tidak ditemukan." };
+
+      const tx = await prisma.transaction.update({
+        where: { id: parsed.id },
+        data: {
+          amount: parsed.amount,
+          status: parsed.status,
+          category: parsed.category,
+          description: parsed.description,
+          paymentMethod: parsed.paymentMethod,
+        }
+      });
+
+      // SYNC after edit
+      if (tx.bookingId) await syncBookingFinance(tx.bookingId);
+      else if (tx.customerId && tx.type === 'INCOME') await syncCustomer(tx.customerId);
+
+      return { success: true, message: 'Transaksi berhasil diupdate.', data: tx };
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  }, { name: "updateTransactionTool" }),
+};
+
+const deleteTransactionTool = {
+  toolDefinition: {
+    type: 'function',
+    function: {
+      name: 'deleteTransaction',
+      description: 'KHUSUS ADMIN. Menghapus transaksi.',
+      parameters: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: 'ID Transaksi (UUID).' },
+          senderNumber: { type: 'string' },
+        },
+        required: ['id', 'senderNumber'],
+      },
+    },
+  },
+  implementation: traceable(async (input = {}) => {
+    try {
+      const parsed = deleteTransactionSchema.parse(input);
+      if (!isAdmin(parsed.senderNumber)) return { success: false, message: "⛔ Akses Ditolak." };
+
+      const tx = await prisma.transaction.findUnique({ where: { id: parsed.id } });
+      if (!tx) return { success: false, message: "Transaksi tidak ditemukan." };
+
+      await prisma.transaction.delete({ where: { id: parsed.id } });
+
+      // SYNC after delete
+      if (tx.bookingId) await syncBookingFinance(tx.bookingId);
+      else if (tx.customerId && tx.type === 'INCOME') await syncCustomer(tx.customerId);
+
+      return { success: true, message: 'Transaksi berhasil dihapus.' };
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  }, { name: "deleteTransactionTool" }),
 };
 
 const getTransactionHistoryTool = {
@@ -212,7 +323,10 @@ const calculateFinancesTool = {
 
       const stats = await prisma.transaction.groupBy({
         by: ['type'],
-        where: { createdAt: { gte: from } },
+        where: { 
+          createdAt: { gte: from },
+          status: 'SUCCESS'
+        },
         _sum: { amount: true },
         _count: { _all: true }
       });
@@ -238,6 +352,8 @@ const calculateFinancesTool = {
 
 module.exports = {
   addTransactionTool,
+  updateTransactionTool,
+  deleteTransactionTool,
   getTransactionHistoryTool,
   calculateFinancesTool,
 };

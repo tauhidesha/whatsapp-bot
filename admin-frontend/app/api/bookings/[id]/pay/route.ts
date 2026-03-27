@@ -117,7 +117,7 @@ export async function POST(
     const updatedBooking = await prisma.booking.update({
       where: { id: bookingId },
       data: {
-        status: 'PAID',
+        status: 'SUCCESS',
         paymentMethod,
       }
     });
@@ -132,8 +132,8 @@ export async function POST(
         where: { id: existingTransaction.id },
         data: {
           amount: finalAmount,
-          status: 'PAID',
-          paymentMode: paymentMethod.toLowerCase(),
+          status: 'SUCCESS',
+          paymentMethod: paymentMethod.toLowerCase(),
           description: `Pelunasan Service: ${booking.serviceType}${dp > 0 ? ` (DP Rp ${dp.toLocaleString()} sudah dibayar)` : ''}`,
         }
       });
@@ -144,9 +144,9 @@ export async function POST(
           bookingId,
           amount: finalAmount,
           type: 'income',
-          status: 'PAID',
+          status: 'SUCCESS',
           description: `Pelunasan Service: ${booking.serviceType}${dp > 0 ? ` (DP Rp ${dp.toLocaleString()} sudah dibayar)` : ''}`,
-          paymentMode: paymentMethod.toLowerCase(),
+          paymentMethod: paymentMethod.toLowerCase(),
         }
       });
     }

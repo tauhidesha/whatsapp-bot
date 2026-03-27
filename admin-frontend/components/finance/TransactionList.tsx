@@ -12,6 +12,8 @@ interface TransactionListProps {
   transactions: Transaction[];
   loading?: boolean;
   className?: string;
+  onEdit?: (t: Transaction) => void;
+  onRefresh?: () => void;
 }
 
 const formatIDR = (amount: number) => {
@@ -22,13 +24,34 @@ const formatIDR = (amount: number) => {
   }).format(amount);
 };
 
-export default function TransactionList({ transactions, loading, className }: TransactionListProps) {
+export default function TransactionList({ transactions, loading, className, onEdit, onRefresh }: TransactionListProps) {
   const [filter, setFilter] = useState<'all' | 'income' | 'expense'>('all');
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
   const filtered = transactions.filter(t => {
     if (filter === 'all') return true;
     return t.type === filter;
   });
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Hapus transaksi ini? Data booking terkait akan dihitung ulang.')) return;
+    
+    setIsDeleting(id);
+    try {
+      const res = await fetch(`/api/finance/${id}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (json.success) {
+        onRefresh?.();
+      } else {
+        alert(json.error || 'Gagal menghapus transaksi');
+      }
+    } catch (err) {
+      console.error('Delete error:', err);
+      alert('Gagal menghapus transaksi');
+    } finally {
+      setIsDeleting(null);
+    }
+  };
 
   return (
     <div className={cn("bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden", className)}>
@@ -64,18 +87,19 @@ export default function TransactionList({ transactions, loading, className }: Tr
               <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest">Kategori</th>
               <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest">Keterangan</th>
               <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-right">Nominal</th>
+              <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i} className="animate-pulse">
-                  <td colSpan={4} className="px-6 py-4"><div className="h-4 bg-slate-100 rounded w-full" /></td>
+                  <td colSpan={5} className="px-6 py-4"><div className="h-4 bg-slate-100 rounded w-full" /></td>
                 </tr>
               ))
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-6 py-12 text-center text-slate-400 font-medium italic">Belum ada transaksi</td>
+                <td colSpan={5} className="px-6 py-12 text-center text-slate-400 font-medium italic">Belum ada transaksi</td>
               </tr>
             ) : (
               filtered.map((t) => (
@@ -109,6 +133,28 @@ export default function TransactionList({ transactions, loading, className }: Tr
                     <p className={cn("text-[14px] font-black tracking-tight", t.type === 'income' ? "text-emerald-600" : "text-rose-600")}>
                       {t.type === 'income' ? '+' : '-'} {formatIDR(t.amount)}
                     </p>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center justify-center gap-2">
+                      <button 
+                        onClick={() => onEdit?.(t)}
+                        className="p-1.5 rounded-lg bg-slate-100 text-slate-500 hover:bg-teal-50 hover:text-teal-600 transition-all"
+                        title="Edit"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">edit</span>
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(t.id)}
+                        disabled={isDeleting === t.id}
+                        className={cn(
+                          "p-1.5 rounded-lg bg-slate-100 text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition-all",
+                          isDeleting === t.id && "animate-pulse opacity-50"
+                        )}
+                        title="Hapus"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">{isDeleting === t.id ? 'refresh' : 'delete'}</span>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))

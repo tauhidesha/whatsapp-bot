@@ -91,6 +91,7 @@ const BookingArgsSchema = z.object({
   clientId: z.string().optional(),
   notes: z.string().optional(),
   subtotal: z.number().optional(),
+  totalAmount: z.number().optional(),
   homeService: z.boolean().optional(),
   customerLocation: LocationSchema.optional(),
   pickup: z.union([PickupSchema, z.boolean()]).optional(),
@@ -116,6 +117,7 @@ const createBookingTool = {
           vehicleInfo: { type: 'string', description: "Info kendaraan (model & plat)." },
           motorModel: { type: 'string', description: "Model motor (optional, extracted from vehicleInfo)." },
           motorPlate: { type: 'string', description: "Plat nomor motor (optional, extracted from vehicleInfo)." },
+          totalAmount: { type: 'number', description: "Total biaya jasa/deal harga (pilihan)." },
         },
         required: ['serviceName', 'bookingDate', 'bookingTime'],
       },
@@ -360,6 +362,7 @@ const createBookingTool = {
           status: 'PENDING',
           notes,
           subtotal,
+          totalAmount: parsed.totalAmount,
           homeService: effectiveHomeService || false,
           pickupService: pickupDetails?.requested || false,
           category: getServiceCategory(primaryServices[0]),
@@ -368,9 +371,11 @@ const createBookingTool = {
 
       console.log(`[createBookingTool] Booking berhasil dibuat dengan ID: ${booking.id}`);
 
-      // Sync customer statistics
+      // Sync statistics
       try {
+        const { syncBookingFinance } = require('../utils/financeSync.js');
         const { syncCustomer } = require('../utils/customerSync.js');
+        await syncBookingFinance(booking.id);
         await syncCustomer(customer.id);
       } catch (syncErr) {
         console.warn('[createBookingTool] Sync failed:', syncErr.message);

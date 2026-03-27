@@ -116,7 +116,7 @@ async function handleCrmSummary(days) {
         prisma.booking.count({ where: { createdAt: { gte: cutoff } } }),
         prisma.transaction.aggregate({
             where: { 
-                status: 'PAID', 
+                status: { in: ['PAID', 'SUCCESS'] }, 
                 createdAt: { gte: cutoff } 
             },
             _sum: { amount: true }

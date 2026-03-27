@@ -13,11 +13,12 @@ export interface Transaction {
   amount: number;
   category: string;
   description: string;
-  paymentMode: string;
+  paymentMethod: string;
   createdAt: string | Date;
   customer?: { name: string; phone: string };
   customerName?: string;
   customerId?: string;
+  bookingId?: string;
 }
 
 export interface FinanceSummary {
@@ -83,5 +84,5 @@ export function useFinanceData(daysLimit = 30, customerId?: string) {
     }
   }, [daysLimit, customerId]);
 
-  return { transactions, summary, loading, error };
+  return { transactions, summary, loading, error, refresh: fetchFinanceData };
 }

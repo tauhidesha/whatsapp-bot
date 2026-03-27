@@ -1,4 +1,6 @@
+// @ts-ignore
 import prisma from '../../lib/prisma';
+// @ts-ignore
 import { normalizeWhatsappNumber } from './humanHandover';
 
 function toDocId(senderNumber?: string | null) {

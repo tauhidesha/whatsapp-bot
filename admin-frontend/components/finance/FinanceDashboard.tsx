@@ -7,11 +7,18 @@ import FinanceChart from './FinanceChart';
 import TransactionList from './TransactionList';
 import AddTransactionModal from './AddTransactionModal';
 import Button from '@/components/shared/Button';
+import { Transaction } from '@/lib/hooks/useFinanceData';
 
 export default function FinanceDashboard() {
   const [timeframe, setTimeframe] = useState(30);
-  const { transactions, summary, loading } = useFinanceData(timeframe);
+  const { transactions, summary, loading, refresh } = useFinanceData(timeframe);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+
+  const handleEdit = (t: Transaction) => {
+    setEditingTransaction(t);
+    setIsModalOpen(true);
+  };
 
   return (
     <div className="flex flex-col gap-8 p-4 md:p-8 animate-in fade-in duration-500">
@@ -52,7 +59,12 @@ export default function FinanceDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
-          <TransactionList transactions={transactions} loading={loading} />
+          <TransactionList 
+            transactions={transactions} 
+            loading={loading} 
+            onEdit={handleEdit}
+            onRefresh={refresh}
+          />
         </div>
         <div>
           <FinanceChart transactions={transactions} loading={loading} />
@@ -61,7 +73,12 @@ export default function FinanceDashboard() {
 
       <AddTransactionModal 
         isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingTransaction(null);
+          refresh();
+        }} 
+        editData={editingTransaction}
       />
     </div>
   );

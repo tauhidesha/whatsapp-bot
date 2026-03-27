@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { syncBookingFinance } from '@/lib/services/financeSync';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -33,12 +34,17 @@ export async function POST(req: NextRequest) {
         amount: Number(amount),
         category: category || serviceType || 'general',
         description: finalDescription,
-        paymentMode: paymentMethod || 'cash',
-        status: 'PAID',
+        paymentMethod: paymentMethod || 'cash',
+        status: 'SUCCESS',
         ...(customerId ? { customerId } : {}),
         ...(bookingId ? { bookingId } : {}),
       }
     });
+
+    // Handle data correlation: sync booking if bookingId is provided
+    if (bookingId) {
+      await syncBookingFinance(bookingId);
+    }
 
     return NextResponse.json({
       success: true,
