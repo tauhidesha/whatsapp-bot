@@ -97,7 +97,7 @@ const generateDocumentTool = {
       }
     }
     
-    // Auto-Calculate Price if totalAmount is 0/missing
+    // Auto-Calculate Price if totalAmount is 0/missing, or enrich items with descriptions
     let finalTotal = totalAmount;
     let finalItems = items;
     let detectedSize = null;
@@ -115,39 +115,57 @@ const generateDocumentTool = {
       }
     }
 
-    if ((!finalTotal || finalTotal === 0) && documentType !== 'tanda_terima') {
+    // Always try to enrich items with descriptions from masterLayanan
+    if (finalItems && finalItems !== '-') {
       try {
-        if (detectedSize) {
-          let runningTotal = 0;
-          const itemList = items.split(/,|\n/).map(i => i.trim()).filter(Boolean);
-          const detailedList = [];
+        const itemList = finalItems.split(/\n/).map(i => i.trim()).filter(Boolean);
+        const enrichedList = [];
+        let runningTotal = 0;
 
-          for (const itemStr of itemList) {
-            const service = masterLayanan.find(s =>
-              itemStr.toLowerCase().includes(s.name.toLowerCase()) ||
-              s.name.toLowerCase().includes(itemStr.toLowerCase())
-            );
-
-            if (service) {
-              let price = service.price;
-              if (service.variants && Array.isArray(service.variants)) {
-                const variant = service.variants.find(v => v.name === detectedSize);
-                if (variant) price = variant.price;
-              }
-              runningTotal += price;
-              detailedList.push(`${service.name} (${detectedSize}): ${formatCurrency(price)}`);
-            } else {
-              detailedList.push(itemStr);
-            }
+        for (const itemStr of itemList) {
+          // Parse "Name: Price" or just "Name"
+          const lastColon = itemStr.lastIndexOf(':');
+          let name = itemStr;
+          let price = 0;
+          
+          if (lastColon > -1) {
+            name = itemStr.substring(0, lastColon).trim();
+            price = parseInt(itemStr.substring(lastColon + 1).replace(/[^\d]/g, '')) || 0;
           }
 
-          if (runningTotal > 0) {
-            finalTotal = runningTotal;
-            finalItems = detailedList.join('\n');
+          const service = masterLayanan.find(s =>
+            name.toLowerCase().includes(s.name.toLowerCase()) ||
+            s.name.toLowerCase().includes(name.toLowerCase())
+          );
+
+          if (service) {
+            // Use existing price if available, otherwise get from master
+            let finalPrice = price;
+            if (finalPrice === 0 && (!finalTotal || finalTotal === 0)) {
+              finalPrice = service.price;
+              if (service.variants && Array.isArray(service.variants) && detectedSize) {
+                const variant = service.variants.find(v => v.name === detectedSize);
+                if (variant) finalPrice = variant.price;
+              }
+            }
+            runningTotal += finalPrice;
+            
+            const desc = service.summary || service.description || '';
+            const pricePart = finalPrice > 0 ? `: ${finalPrice}` : '';
+            enrichedList.push(`${service.name}${pricePart}\n_desc_${desc}`);
+          } else {
+            enrichedList.push(itemStr);
+            if (price > 0) runningTotal += price;
           }
         }
+
+        finalItems = enrichedList.join('\n');
+        // If we didn't have a total before, use the calculated one
+        if (!finalTotal || finalTotal === 0) {
+          finalTotal = runningTotal;
+        }
       } catch (err) {
-        console.warn('[generateDocument] Auto-price calculation failed:', err);
+        console.warn('[generateDocument] Items enrichment/calculation failed:', err);
       }
     }
 
@@ -225,11 +243,19 @@ const generateDocumentTool = {
     } else {
       // ─── INVOICE / RECEIPT PDF (PUPPETEER) ───
       title = documentType === 'tanda_terima' ? 'Receipt' : documentType === 'bukti_bayar' ? 'Payment' : 'Invoice';
+
+      // Load logo as base64 for Puppeteer stability
+      const logoPath = path.resolve(process.cwd(), 'data/boS Mat (1000 x 500 px) (1).png');
+      const logoBase64 = fs.existsSync(logoPath) 
+        ? `data:image/png;base64,${fs.readFileSync(logoPath).toString('base64')}`
+        : '';
+
       const html = generateInvoiceHTML({
         documentType, customerName, motorDetails,
         items: finalItems, finalTotal, amountPaid,
         paymentMethod, notes, recipientNumber,
-        bookingDate, docNumber: idSuffix, now, detectedSize
+        bookingDate, docNumber: idSuffix, now, detectedSize,
+        logoBase64
       });
 
       // Konfigurasi Chromium path

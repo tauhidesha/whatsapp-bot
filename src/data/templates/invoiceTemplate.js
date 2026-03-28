@@ -4,7 +4,8 @@ module.exports = function generateInvoiceHTML(data) {
   const {
     documentType, customerName, motorDetails, items,
     finalTotal, amountPaid, paymentMethod, notes,
-    recipientNumber, bookingDate, docNumber, now, detectedSize
+    recipientNumber, bookingDate, docNumber, now, detectedSize,
+    logoBase64
   } = data;
 
   // Hitung values
@@ -12,8 +13,27 @@ module.exports = function generateInvoiceHTML(data) {
   const balance = finalTotal - paid;
   const subtotal = finalTotal;
 
-  // Parse items jadi array
-  const itemsList = items.split(/\n|,\s*/).map(i => i.trim()).filter(Boolean);
+  // Clean recipient number
+  const displayPhone = (recipientNumber || '-')
+    .replace('@c.us', '')
+    .replace('@lid', '')
+    .replace(/^62/, '0');
+
+  // Parse items jadi array - Split by newline
+  const itemsList = items.split(/\n/).map(i => i.trim()).filter(Boolean);
+
+  // Filter redundant notes
+  let filteredNotes = notes || '-';
+  if (filteredNotes.startsWith('Layanan: ')) {
+    const noteContent = filteredNotes.replace('Layanan: ', '').trim();
+    // If the note content is exactly the same as items summary, hide it
+    const itemsSummary = itemsList.map(i => i.split(':')[0].trim()).join(', ');
+    if (noteContent === itemsSummary) filteredNotes = '';
+    else filteredNotes = noteContent;
+  }
+  const notesList = (filteredNotes && filteredNotes !== '-') 
+    ? filteredNotes.split('\n').map(n => n.trim()).filter(Boolean)
+    : [];
 
   return `<!DOCTYPE html>
 <html class="dark">
@@ -44,7 +64,7 @@ module.exports = function generateInvoiceHTML(data) {
   <!-- Header -->
   <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:60px">
     <div>
-      <h1 class="font-headline" style="font-size:72px; font-weight:900; line-height:0.85; text-transform:uppercase; margin-bottom:16px">
+      <h1 class="font-headline" style="font-size:96px; font-weight:900; line-height:0.8; text-transform:uppercase; margin-bottom:16px">
         ${documentType === 'tanda_terima' ? 'Receipt' : documentType === 'bukti_bayar' ? 'Payment' : 'Invoice'}<br/>
         <span class="text-yellow">Repaint &<br/>Detailing</span>
       </h1>
@@ -55,7 +75,7 @@ module.exports = function generateInvoiceHTML(data) {
       </div>
     </div>
     <div style="text-align:right">
-      <img src="file://${process.cwd()}/data/boS Mat (1000 x 500 px) (1).png" style="height:60px; margin-bottom:24px"/>
+      <img src="${logoBase64}" style="height:60px; margin-bottom:24px"/>
       <div>
         <p class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em">Nomor Dokumen</p>
         <p class="font-headline text-yellow" style="font-size:28px; font-weight:700">#BS-${docNumber}</p>
@@ -73,7 +93,7 @@ module.exports = function generateInvoiceHTML(data) {
       <p class="text-yellow" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.2em; margin-bottom:20px">Informasi Pelanggan</p>
       <p class="font-headline" style="font-size:24px; font-weight:700; text-transform:uppercase; margin-bottom:8px">${customerName}</p>
       <p class="text-muted" style="font-size:14px; line-height:1.8">
-        ${recipientNumber}<br/>
+        WhatsApp: ${displayPhone}<br/>
         Kendaraan: ${motorDetails}
       </p>
     </div>
@@ -98,20 +118,26 @@ module.exports = function generateInvoiceHTML(data) {
 
   <!-- Items -->
   ${itemsList.map(item => {
-    const lastColon = item.lastIndexOf(':');
-    let desc = item, price = 0;
+    // Handle description enrichment via _desc_ prefix
+    const parts = item.split('\n_desc_');
+    const mainItem = parts[0];
+    const itemDesc = parts[1] || '';
+
+    const lastColon = mainItem.lastIndexOf(':');
+    let title = mainItem, price = 0;
     if (lastColon > -1) {
-      price = parseInt(item.substring(lastColon+1).replace(/[^\d]/g,'')) || 0;
-      desc = item.substring(0, lastColon).trim();
+      price = parseInt(mainItem.substring(lastColon+1).replace(/[^\d]/g,'')) || 0;
+      title = mainItem.substring(0, lastColon).trim();
     }
     const priceStr = price > 0 ? `Rp${price.toLocaleString('id-ID')}` : '-';
-    // Clean desc for display
-    const cleanDesc = desc.replace(/^(\d+\.|[-*•])\s*/, '').trim();
+    // Clean title for display
+    const cleanTitle = title.replace(/^(\d+\.|[-*•])\s*/, '').trim();
 
     return `
     <div class="item-row">
       <div>
-        <p class="font-headline" style="font-size:18px; font-weight:700; text-transform:uppercase">${cleanDesc}</p>
+        <p class="font-headline" style="font-size:18px; font-weight:700; text-transform:uppercase">${cleanTitle}</p>
+        ${itemDesc ? `<p class="text-muted" style="font-size:12px; line-height:1.4; margin-top:4px">${itemDesc}</p>` : ''}
       </div>
       <p class="font-headline" style="font-size:18px; font-weight:700; text-align:center">01</p>
       <p class="text-muted" style="font-size:14px; text-align:right">${priceStr}</p>
@@ -123,10 +149,17 @@ module.exports = function generateInvoiceHTML(data) {
   <div style="display:grid; grid-template-columns:7fr 5fr; gap:48px; margin-top:60px">
     <!-- Notes & Payment Info -->
     <div>
-      ${notes && notes !== '-' ? `
+      ${notesList.length > 0 ? `
       <div class="bg-darker border-yellow" style="padding:32px; margin-bottom:24px">
-        <p class="font-headline" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.15em; margin-bottom:16px">Catatan</p>
-        <p class="text-muted" style="font-size:14px; line-height:1.7">${notes}</p>
+        <p class="font-headline" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.15em; margin-bottom:16px">Catatan Teknis Layanan</p>
+        <div style="display:flex; flex-direction:column; gap:8px">
+          ${notesList.map(n => `
+            <div style="display:flex; gap:10px; align-items:flex-start">
+              <span class="text-yellow" style="font-size:12px">●</span>
+              <p class="text-muted" style="font-size:14px; line-height:1.5">${n}</p>
+            </div>
+          `).join('')}
+        </div>
       </div>` : ''}
       <div style="padding:24px; border:1px solid #484831; background:#1c1b1b">
         <p class="text-yellow" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.15em; margin-bottom:12px">Informasi Pembayaran</p>
