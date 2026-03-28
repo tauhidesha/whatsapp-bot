@@ -42,10 +42,7 @@ module.exports = function generateInvoiceHTML(data) {
   <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@100..900&family=Manrope:wght@200..800&display=swap" rel="stylesheet"/>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    @page {
-      margin: 0;
-      size: A4;
-    }
+    @page { margin: 40px 0; size: A4; }
     body {
       background: #131313;
       color: #e5e2e1;
@@ -64,7 +61,8 @@ module.exports = function generateInvoiceHTML(data) {
     .item-row { 
       display:grid; 
       grid-template-columns:6fr 1fr 2fr 2fr; 
-      padding:16px; 
+      gap: 16px;
+      padding:28px 16px; 
       border-bottom:1px solid rgba(255,255,255,0.05); 
       align-items:center;
       page-break-inside: avoid;
@@ -128,7 +126,7 @@ module.exports = function generateInvoiceHTML(data) {
   </div>
 
   <!-- Items Table Header -->
-  <div style="display:grid; grid-template-columns:6fr 1fr 2fr 2fr; padding:0 16px 12px; border-bottom:1px solid #484831; margin-bottom:8px">
+  <div style="display:grid; grid-template-columns:6fr 1fr 2fr 2fr; gap:16px; padding:0 16px 12px; border-bottom:1px solid #484831; margin-bottom:8px">
     <span class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em">Deskripsi Layanan</span>
     <span class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em; text-align:center">Jml</span>
     <span class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em; text-align:right">Harga</span>
@@ -165,45 +163,62 @@ module.exports = function generateInvoiceHTML(data) {
       <div class="bg-darker border-yellow" style="padding:32px; margin-bottom:24px">
         <p class="font-headline" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.15em; margin-bottom:16px">Catatan Teknis Layanan</p>
         <div style="display:flex; flex-direction:column; gap:8px">
-          ${notesList.map(n => `
+          ${notesList.map(n => {
+            let icon = '●';
+            const lowerN = n.toLowerCase();
+            if (lowerN.includes('garansi')) icon = '✓';
+            else if (lowerN.includes('waktu') || lowerN.includes('jam') || lowerN.includes('hari')) icon = '⏱';
+            
+            return `
             <div style="display:flex; gap:10px; align-items:flex-start">
-              <span class="text-yellow" style="font-size:12px">●</span>
+              <span style="color:#FFFF00; font-size:14px; margin-top:2px">${icon}</span>
               <p class="text-muted" style="font-size:14px; line-height:1.5">${n}</p>
-            </div>
-          `).join('')}
+            </div>`;
+          }).join('')}
         </div>
       </div>` : ''}
       <div style="padding:24px; border:1px solid #484831; background:#1c1b1b">
-        <p class="text-yellow" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.15em; margin-bottom:12px">Informasi Pembayaran</p>
-        <p class="font-headline" style="font-size:18px; font-weight:700; text-transform:uppercase">Bank BCA: 1662515412</p>
-        <p class="text-muted" style="font-size:13px">A/N Muhammad Tauhid Haryadesa</p>
+        <p class="text-yellow" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.15em; margin-bottom:16px">Informasi Pembayaran</p>
+        <div style="display:flex; align-items:center; gap:16px">
+          <!-- Icon box -->
+          <div style="background:rgba(255,255,255,0.05); padding:12px; display:flex; align-items:center; justify-content:center">
+            <span style="font-size:20px">🏦</span>
+          </div>
+          <div>
+            <p class="font-headline" style="font-size:18px; font-weight:700; text-transform:uppercase">Bank BCA: 1662515412</p>
+            <p class="text-muted" style="font-size:13px; text-transform:uppercase">A/N Muhammad Tauhid Haryadesa</p>
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- Calculations -->
-    <div style="background:#2a2a2a; padding:40px; display:flex; flex-direction:column; justify-content:space-between">
-      <div style="display:flex; flex-direction:column; gap:20px">
-        <div style="display:flex; justify-content:space-between">
-          <span class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em">Subtotal</span>
-          <span style="font-size:16px">Rp${subtotal.toLocaleString('id-ID')}</span>
-        </div>
-        ${paid > 0 ? `
-        <div style="display:flex; justify-content:space-between">
-          <span class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em">DP / Uang Muka</span>
-          <span style="font-size:16px; color:#ffb4ab">- Rp${paid.toLocaleString('id-ID')}</span>
-        </div>` : ''}
-        <div style="display:flex; justify-content:space-between; padding-top:16px">
-          <div>
-            <span class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em; display:block; margin-bottom:8px">Total Keseluruhan</span>
-            <span class="font-headline" style="font-size:36px; font-weight:900">Rp${subtotal.toLocaleString('id-ID')}</span>
-          </div>
-        </div>
+    <div style="background:#2a2a2a; padding:40px; display:flex; flex-direction:column; gap:20px">
+      <div style="display:flex; justify-content:space-between">
+        <span class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em">Subtotal</span>
+        <span style="font-size:16px">Rp${subtotal.toLocaleString('id-ID')}</span>
       </div>
-      <div class="bg-yellow" style="padding:20px 24px; margin:0 -40px -40px; display:flex; justify-content:space-between; align-items:center">
+
+      ${paid > 0 ? `
+      <div style="display:flex; justify-content:space-between">
+        <span class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em">DP / Uang Muka</span>
+        <span style="font-size:16px; color:#ffb4ab">- Rp${paid.toLocaleString('id-ID')}</span>
+      </div>` : ''}
+
+      <!-- Border separator -->
+      <div style="border-top:1px solid #484831; padding-top:24px; margin-top:8px">
+        <span class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em; display:block; margin-bottom:8px">Total Keseluruhan</span>
+        <span class="font-headline" style="font-size:36px; font-weight:900">Rp${subtotal.toLocaleString('id-ID')}</span>
+      </div>
+
+      <!-- Sisa Tagihan kuning — full bleed -->
+      <div style="background:#FFFF00; padding:20px 24px; margin:0 -40px -40px; display:flex; justify-content:space-between; align-items:center">
         <div>
-          <span style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.2em; display:block; margin-bottom:4px">Sisa Tagihan</span>
-          <span class="font-headline" style="font-size:44px; font-weight:900">Rp${balance.toLocaleString('id-ID')}</span>
+          <span style="color:#1d1d00; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.2em; display:block; margin-bottom:4px">Sisa Tagihan</span>
+          <span class="font-headline" style="color:#1d1d00; font-size:44px; font-weight:900">Rp${balance.toLocaleString('id-ID')}</span>
         </div>
+        <!-- Wallet icon unicode -->
+        <span style="font-size:28px; color:#1d1d00">💳</span>
       </div>
     </div>
   </div>
