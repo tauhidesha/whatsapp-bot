@@ -42,7 +42,7 @@ module.exports = function generateInvoiceHTML(data) {
   <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@100..900&family=Manrope:wght@200..800&display=swap" rel="stylesheet"/>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    @page { margin: 40px 0; size: A4; }
+    @page { margin: 0; size: A4; }
     body {
       background: #131313;
       color: #e5e2e1;
