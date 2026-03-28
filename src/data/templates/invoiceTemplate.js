@@ -42,12 +42,16 @@ module.exports = function generateInvoiceHTML(data) {
   <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@100..900&family=Manrope:wght@200..800&display=swap" rel="stylesheet"/>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    @page {
+      margin: 0;
+      size: A4;
+    }
     body {
       background: #131313;
       color: #e5e2e1;
       font-family: 'Manrope', sans-serif;
       padding: 60px;
-      width: 900px;
+      width: 794px; /* A4 width in px at 96dpi */
       margin: 0 auto;
     }
     .font-headline { font-family: 'League Spartan', sans-serif; }
@@ -57,14 +61,29 @@ module.exports = function generateInvoiceHTML(data) {
     .bg-darker { background: #0e0e0e; }
     .text-muted { color: #cac8aa; }
     .border-yellow { border-left: 2px solid #FFFF00; }
-    .item-row { display:grid; grid-template-columns:6fr 1fr 2fr 2fr; padding:28px 16px; border-bottom:1px solid rgba(255,255,255,0.05); align-items:center; }
+    .item-row { 
+      display:grid; 
+      grid-template-columns:6fr 1fr 2fr 2fr; 
+      padding:16px; 
+      border-bottom:1px solid rgba(255,255,255,0.05); 
+      align-items:center;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .totals-section {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    @media print {
+      body { padding-top: 40px; }
+    }
   </style>
 </head>
 <body>
   <!-- Header -->
   <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:60px">
     <div>
-      <h1 class="font-headline" style="font-size:96px; font-weight:900; line-height:0.8; text-transform:uppercase; margin-bottom:16px">
+      <h1 class="font-headline" style="font-size:72px; font-weight:900; line-height:0.8; text-transform:uppercase; margin-bottom:16px">
         ${documentType === 'tanda_terima' ? 'Receipt' : documentType === 'bukti_bayar' ? 'Payment' : 'Invoice'}<br/>
         <span class="text-yellow">Repaint &<br/>Detailing</span>
       </h1>
@@ -89,7 +108,7 @@ module.exports = function generateInvoiceHTML(data) {
 
   <!-- Customer & Studio -->
   <div style="display:grid; grid-template-columns:1fr 1fr; gap:1px; background:#484831; margin-bottom:60px">
-    <div class="bg-dark" style="padding:40px">
+    <div class="bg-dark" style="padding:28px">
       <p class="text-yellow" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.2em; margin-bottom:20px">Informasi Pelanggan</p>
       <p class="font-headline" style="font-size:24px; font-weight:700; text-transform:uppercase; margin-bottom:8px">${customerName}</p>
       <p class="text-muted" style="font-size:14px; line-height:1.8">
@@ -97,7 +116,7 @@ module.exports = function generateInvoiceHTML(data) {
         Kendaraan: ${motorDetails}
       </p>
     </div>
-    <div class="bg-dark" style="padding:40px">
+    <div class="bg-dark" style="padding:28px">
       <p class="text-yellow" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.2em; margin-bottom:20px">Studio Layanan</p>
       <p class="font-headline" style="font-size:24px; font-weight:700; text-transform:uppercase; margin-bottom:8px">BOSMAT STUDIO</p>
       <p class="text-muted" style="font-size:14px; line-height:1.8">
@@ -118,20 +137,13 @@ module.exports = function generateInvoiceHTML(data) {
 
   <!-- Items -->
   ${itemsList.map(item => {
-    // Handle description enrichment via _desc_ prefix
-    const parts = item.split('\n_desc_');
-    const mainItem = parts[0];
-    const itemDesc = parts[1] || '';
+    // Parse per item pakai || separator
+    const parts = item.split('||');
+    const cleanTitle = (parts[0] || '').trim().replace(/^(\d+\.|[-*•])\s*/, '');
+    const price = parseInt(parts[1]) || 0;
+    const itemDesc = (parts[2] || '').trim();
 
-    const lastColon = mainItem.lastIndexOf(':');
-    let title = mainItem, price = 0;
-    if (lastColon > -1) {
-      price = parseInt(mainItem.substring(lastColon+1).replace(/[^\d]/g,'')) || 0;
-      title = mainItem.substring(0, lastColon).trim();
-    }
     const priceStr = price > 0 ? `Rp${price.toLocaleString('id-ID')}` : '-';
-    // Clean title for display
-    const cleanTitle = title.replace(/^(\d+\.|[-*•])\s*/, '').trim();
 
     return `
     <div class="item-row">
@@ -146,7 +158,7 @@ module.exports = function generateInvoiceHTML(data) {
   }).join('')}
 
   <!-- Totals + Notes -->
-  <div style="display:grid; grid-template-columns:7fr 5fr; gap:48px; margin-top:60px">
+  <div class="totals-section" style="display:grid; grid-template-columns:7fr 5fr; gap:32px; margin-top:40px">
     <!-- Notes & Payment Info -->
     <div>
       ${notesList.length > 0 ? `

@@ -151,10 +151,9 @@ const generateDocumentTool = {
             runningTotal += finalPrice;
             
             const desc = service.summary || service.description || '';
-            const pricePart = finalPrice > 0 ? `: ${finalPrice}` : '';
-            enrichedList.push(`${service.name}${pricePart}\n_desc_${desc}`);
+            enrichedList.push(`${service.name}||${finalPrice}||${desc}`);
           } else {
-            enrichedList.push(itemStr);
+            enrichedList.push(`${name}||${price}||`);
             if (price > 0) runningTotal += price;
           }
         }
@@ -274,6 +273,12 @@ const generateDocumentTool = {
         path: filePath,
         format: 'A4',
         printBackground: true,
+        margin: {
+          top: '40px',
+          bottom: '40px',
+          left: '0px',
+          right: '0px'
+        }
       });
       await browser.close();
     }
