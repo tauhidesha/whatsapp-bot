@@ -1,3 +1,6 @@
 [submodule "admin-ui"]
 	path = admin-ui
 	url = https://github.com/tauhidesha/admin-ui.git
+[submodule "admin-frontend"]
+	path = admin-frontend
+	url = https://github.com/tauhidesha/bosmatstudioadmin.git
