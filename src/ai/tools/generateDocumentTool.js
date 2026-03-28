@@ -1,5 +1,6 @@
 // File: src/ai/tools/generateDocumentTool.js
 const PDFDocument = require('pdfkit');
+const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
 const { formatCurrency } = require('../utils/distanceMatrix.js');
@@ -8,6 +9,7 @@ const { getServiceDetailsTool } = require('./getServiceDetailsTool.js');
 const masterLayanan = require('../../data/masterLayanan.js');
 const { isAdmin } = require('../utils/adminAuth.js');
 const { warrantyRepaint, warrantyCoating } = require('../../data/warrantyTerms.js');
+const generateInvoiceHTML = require('../../data/templates/invoiceTemplate.js');
 
 // Helper untuk membuat garis horizontal
 function generateHr(doc, y) {
@@ -67,19 +69,16 @@ const generateDocumentTool = {
 
     let targetRecipient = recipientNumber || senderNumber;
     
-    // JANGAN gunakan senderNumber sebagai recipient - HARUS ada recipientNumber
+    // Auto-detect customer if recipientNumber is missing
     if (!recipientNumber) {
-      console.log(`[generateDocument] WARNING: recipientNumber not provided!`);
-      // Coba cari customer dari database berdasarkan senderNumber (admin)
       const prisma = require('../../lib/prisma');
       try {
-        // Ambil customer terakhir yang di-chat admin
         const lastCustomer = await prisma.customer.findFirst({
           where: {
             messages: {
               some: {
                 createdAt: {
-                  gte: new Date(Date.now() - 24 * 60 * 60 * 1000) // Last 24 hours
+                  gte: new Date(Date.now() - 24 * 60 * 60 * 1000)
                 }
               }
             }
@@ -89,29 +88,24 @@ const generateDocumentTool = {
         });
         
         if (lastCustomer && lastCustomer.whatsappLid) {
-          console.log(`[generateDocument] Auto-detected customer: ${lastCustomer.name} (${lastCustomer.whatsappLid})`);
           targetRecipient = lastCustomer.whatsappLid;
         } else if (lastCustomer && lastCustomer.phone) {
           targetRecipient = lastCustomer.phone + '@c.us';
-          console.log(`[generateDocument] Auto-detected customer: ${lastCustomer.name} (${targetRecipient})`);
         }
       } catch (err) {
         console.log(`[generateDocument] Failed to auto-detect customer: ${err.message}`);
       }
     }
     
-    console.log(`[generateDocument] targetRecipient: ${targetRecipient}, senderNumber: ${senderNumber}, recipientNumber: ${recipientNumber}`);
-
-    // 1.5 Auto-Calculate Price if totalAmount is 0/missing
+    // Auto-Calculate Price if totalAmount is 0/missing
     let finalTotal = totalAmount;
     let finalItems = items;
     let detectedSize = null;
 
-    // Detect Motor Size (needed for auto-price or filling missing row prices)
     if (documentType !== 'tanda_terima') {
       try {
         const sizeRes = await getServiceDetailsTool.implementation({
-          service_name: 'Full Detailing', // Layanan dummy untuk infer ukuran
+          service_name: 'Full Detailing',
           motor_model: motorDetails,
           senderNumber
         });
@@ -129,7 +123,6 @@ const generateDocumentTool = {
           const detailedList = [];
 
           for (const itemStr of itemList) {
-            // Find service in masterLayanan
             const service = masterLayanan.find(s =>
               itemStr.toLowerCase().includes(s.name.toLowerCase()) ||
               s.name.toLowerCase().includes(itemStr.toLowerCase())
@@ -158,398 +151,122 @@ const generateDocumentTool = {
       }
     }
 
-    // 2. Setup Waktu, ID, & Info Studio
+    // Setup Waktu, ID, & Info Studio
     const now = new Date();
     const idSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-
-    // 3. Generate PDF
-    const doc = new PDFDocument({ margin: 50, size: 'A4' });
     const tempDir = path.resolve(__dirname, '../../../temp_docs');
-
+    
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });
     }
 
     const filename = `${documentType}_${now.getTime()}.pdf`;
     const filePath = path.join(tempDir, filename);
-    const writeStream = fs.createWriteStream(filePath);
-
-    doc.pipe(writeStream);
-
-    // --- STYLING CONSTANTS ---
-    const primaryColor = '#18181b'; // Zinc-950
-    const secondaryColor = '#52525b'; // Zinc-600
-    const mutedColor = '#71717a'; // Zinc-500
-    const lightBg = '#f4f4f5'; // Zinc-100
-
     let title = 'Dokumen';
 
     if (documentType.startsWith('garansi_')) {
-      // --- WARRANTY PDF ---
+      // ─── WARRANTY PDF (PDFKIT) ───
+      const doc = new PDFDocument({ margin: 50, size: 'A4' });
+      const writeStream = fs.createWriteStream(filePath);
+      doc.pipe(writeStream);
+
       const warrantyData = documentType === 'garansi_repaint' ? warrantyRepaint : warrantyCoating;
-
-      // --- HEADER: Logo centered on top ---
       const logoPath = path.join(__dirname, '../../../data/boS Mat (1000 x 500 px) (1).png');
-      if (fs.existsSync(logoPath)) {
-        doc.image(logoPath, 50, 25, { width: 120 });
-      }
+      if (fs.existsSync(logoPath)) doc.image(logoPath, 50, 25, { width: 120 });
 
-      // Title next to logo
-      doc.fillColor(primaryColor).fontSize(16).font('Helvetica-Bold')
-        .text(warrantyData.title, 250, 35, { width: 365 });
-      doc.fillColor(mutedColor).fontSize(10).font('Helvetica')
-        .text('Bosmat Detailing & Repainting Studio', 250, 55, { width: 365 });
-
+      doc.fillColor('#18181b').fontSize(16).font('Helvetica-Bold').text(warrantyData.title, 250, 35, { width: 365 });
+      doc.fillColor('#71717a').fontSize(10).font('Helvetica').text('Bosmat Detailing & Repainting Studio', 250, 55, { width: 365 });
       title = warrantyData.title;
       generateHr(doc, 85);
 
-      // --- CUSTOMER INFO ---
       let y = 105;
-      doc.fillColor(primaryColor).fontSize(11).font('Helvetica-Bold').text('Informasi Pelanggan & Kendaraan', 50, y);
+      doc.fillColor('#18181b').fontSize(11).font('Helvetica-Bold').text('Informasi Pelanggan & Kendaraan', 50, y);
       y += 22;
-      doc.font('Helvetica').fontSize(10).fillColor(secondaryColor);
-
-      // Left column
+      doc.font('Helvetica').fontSize(10).fillColor('#52525b');
       doc.text(`Nama: ${customerName}`, 50, y);
       doc.text(`Kendaraan: ${motorDetails}`, 50, y + 18);
       doc.text(`Tanggal Berlaku: ${now.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, 50, y + 36);
-
-       // Right column
-       const rightColumnX = 360;
-       doc.text(`No. WA: ${recipientNumber}`, rightColumnX, y);
-       doc.text(`Masa Berlaku: ${warrantyData.duration}`, rightColumnX, y + 18);
-
+      doc.text(`No. WA: ${recipientNumber}`, 360, y);
+      doc.text(`Masa Berlaku: ${warrantyData.duration}`, 360, y + 18);
       generateHr(doc, y + 65);
       y += 85;
 
       for (const section of warrantyData.sections) {
         if (y > 700) { doc.addPage(); y = 50; }
-
-        doc.fillColor(primaryColor).fontSize(11).font('Helvetica-Bold').text(section.heading, 50, y);
+        doc.fillColor('#18181b').fontSize(11).font('Helvetica-Bold').text(section.heading, 50, y);
         y += 15;
-
         if (section.body) {
           if (y > 750) { doc.addPage(); y = 50; }
-          doc.fillColor(secondaryColor).fontSize(9).font('Helvetica').text(section.body, 50, y, { width: 495, align: 'justify' });
+          doc.fillColor('#52525b').fontSize(9).font('Helvetica').text(section.body, 50, y, { width: 495, align: 'justify' });
           y += doc.heightOfString(section.body, { width: 495 }) + 10;
         }
-
         if (section.items && section.items.length > 0) {
           for (const item of section.items) {
-            const itemText = `• ${item}`;
-            const h = doc.heightOfString(itemText, { width: 480 });
-            if (y + h > 750) { doc.addPage(); doc.fillColor(secondaryColor).fontSize(9).font('Helvetica'); y = 50; }
-            doc.fillColor(secondaryColor).fontSize(9).text('•', 50, y);
+            const h = doc.heightOfString(`• ${item}`, { width: 480 });
+            if (y + h > 750) { doc.addPage(); y = 50; }
+            doc.fillColor('#52525b').fontSize(9).text('•', 50, y);
             doc.text(item, 60, y, { width: 480, align: 'justify' });
             y += h + 3;
           }
           y += 5;
         }
       }
-
-      if (y > 680) { doc.addPage(); y = 50; }
       y += 30;
-      doc.fillColor(primaryColor).fontSize(10).text('Hormat Kami,', 50, y, { align: 'right', width: 495 });
+      doc.fillColor('#18181b').fontSize(10).text('Hormat Kami,', 50, y, { align: 'right', width: 495 });
       y += 50;
       doc.font('Helvetica-Bold').text('Bosmat Detailing And Repainting', 50, y, { align: 'right', width: 495 });
-
       doc.end();
 
-    } else {
-      // --- INVOICE / RECEIPT PDF ---
-      // --- HEADER ---
-      // Logo: Top Left
-      const logoPath = path.join(__dirname, '../../../data/boS Mat (1000 x 500 px) (1).png');
-      if (fs.existsSync(logoPath)) {
-        doc.image(logoPath, 50, 30, { width: 140 });
-      }
-
-      // Document Title & Company Info: Top Right
-      title = 'Invoice';
-      let docCode = 'INV';
-      if (documentType === 'tanda_terima') { title = 'Surat Tanda Terima'; docCode = 'STT'; }
-      else if (documentType === 'bukti_bayar') { title = 'Kuitansi'; docCode = 'RCP'; }
-
-      const docNumber = `${idSuffix}`;
-
-      // Title at Top Right
-      doc
-        .fillColor(primaryColor)
-        .fontSize(22)
-        .font('Helvetica-Bold')
-        .text(title, 345, 30, { align: 'right', width: 200 });
-
-      // Company Info below Title
-      const headerX = 345;
-      const headerWidth = 200;
-      let headerY = 65;
-
-      doc
-        .fontSize(10)
-        .text('Bosmat Detailing And Repainting', headerX, headerY, { align: 'right', width: headerWidth })
-        .font('Helvetica')
-        .fillColor(secondaryColor);
-
-      headerY += 14;
-      doc.text('Garasi 54', headerX, headerY, { align: 'right', width: headerWidth });
-      headerY += 12;
-      doc.text('Jl. R. Sanim No. 99 , Beji, Tanah Baru', headerX, headerY, { align: 'right', width: headerWidth });
-      headerY += 12;
-      doc.text('Depok Jawa Barat 16456', headerX, headerY, { align: 'right', width: headerWidth });
-      headerY += 12;
-      doc.text('ID', headerX, headerY, { align: 'right', width: headerWidth });
-      headerY += 12;
-      doc.text('08179481010', headerX, headerY, { align: 'right', width: headerWidth });
-      headerY += 12;
-      doc.text('Bosmatdetailing.studio@gmail.com', headerX, headerY, { align: 'right', width: headerWidth });
-
-      // --- BILL TO / INFO BAR ---
-      doc.fillColor(lightBg).rect(30, 180, 535, 60).fill();
-
-      doc
-        .fillColor(secondaryColor)
-        .fontSize(9)
-        .font('Helvetica-Bold')
-        .text('DITAGIH KEPADA', 50, 195);
-
-      doc
-        .fillColor(primaryColor)
-        .fontSize(11)
-        .text(customerName, 50, 208)
-        .font('Helvetica')
-        .fontSize(10)
-        .text(recipientNumber, 50, 222);
-
-      // Document Meta (Right side of bar)
-      doc
-        .fillColor(primaryColor)
-        .fontSize(9)
-        .font('Helvetica-Bold')
-        .text('Invoice #', 350, 195, { width: 80, align: 'right' })
-        .text(docNumber, 440, 195, { width: 100, align: 'right' })
-        .text('Tanggal', 350, 208, { width: 80, align: 'right' })
-        .text(now.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }), 440, 208, { width: 100, align: 'right' })
-        .text('Jatuh tempo', 350, 221, { width: 80, align: 'right' })
-        .text(new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }), 440, 221, { width: 100, align: 'right' });
-
-      // --- TABLE ITEMS ---
-      const tableTop = 265;
-      doc
-        .fillColor(primaryColor)
-        .fontSize(10)
-        .font('Helvetica-Bold')
-        .text('Barang', 50, tableTop)
-        .text('Kuantitas', 300, tableTop, { width: 60, align: 'center' })
-        .text('Harga', 370, tableTop, { width: 80, align: 'right' })
-        .text('Jumlah', 460, tableTop, { width: 85, align: 'right' });
-
-      generateHr(doc, tableTop + 15);
-
-      let y = tableTop + 30;
-      const itemsList = finalItems.split(/\n|,\s*/).map(i => i.trim()).filter(Boolean);
-
-      itemsList.forEach((item, index) => {
-        let desc = item;
-        let priceVal = 0;
-
-        const isSubItem = /^([-*•])/.test(item);
-
-        const lastColonIndex = item.lastIndexOf(':');
-        if (lastColonIndex > -1) {
-          const potentialPrice = item.substring(lastColonIndex + 1).replace(/[^\d]/g, '');
-          priceVal = parseInt(potentialPrice) || 0;
-          desc = item.substring(0, lastColonIndex).trim();
-        }
-
-        // Cleanup desc for matching/display
-        const cleanDesc = desc.replace(/^(\d+\.|[-*•])\s*/, '').trim();
-
-        // Fallback price from masterLayanan if still 0 and NOT a sub-item
-        if (!isSubItem && priceVal === 0) {
-          const service = masterLayanan.find(s => cleanDesc.toLowerCase().includes(s.name.toLowerCase()));
-          if (service) {
-            priceVal = service.price;
-            if (service.variants && Array.isArray(service.variants) && detectedSize) {
-              const variant = service.variants.find(v => v.name === detectedSize);
-              if (variant) priceVal = variant.price;
-            }
-          }
-        }
-
-        // Secondary fallback: if it's the only item, use finalTotal
-        if (!isSubItem && priceVal === 0 && itemsList.length === 1) {
-          priceVal = finalTotal;
-        }
-
-        // Item Name
-        doc.font(isSubItem ? 'Helvetica' : 'Helvetica-Bold')
-          .fontSize(isSubItem ? 9 : 10)
-          .fillColor(isSubItem ? secondaryColor : primaryColor)
-          .text(isSubItem ? `  ${desc}` : cleanDesc, 50, y, { width: 240 });
-
-        if (!isSubItem) {
-          // Kuantitas, Harga, Jumlah
-          doc.font('Helvetica').fontSize(10).fillColor(primaryColor).text('1', 300, y, { width: 60, align: 'center' });
-
-          const priceText = priceVal > 0 ? formatCurrency(priceVal) : '-';
-          doc.text(priceText, 370, y, { width: 80, align: 'right' });
-          doc.text(priceText, 460, y, { width: 85, align: 'right' });
-        }
-
-        // Automatically add SOP/Description from masterLayanan if it matches and isn't already a sub-item list
-        const serviceData = !isSubItem ? masterLayanan.find(s => cleanDesc.toLowerCase().includes(s.name.toLowerCase())) : null;
-        if (serviceData && (serviceData.summary || serviceData.description)) {
-          const summary = serviceData.summary || serviceData.description;
-          const bulletPoints = summary.split('\n').filter(p => p.trim());
-
-          y += doc.heightOfString(isSubItem ? `  ${desc}` : cleanDesc, { width: 240 }) + 5;
-          doc.fontSize(8).fillColor(secondaryColor);
-
-          bulletPoints.forEach(point => {
-            const pointText = `• ${point.replace(/^•\s*/, '')}`;
-            const h = doc.heightOfString(pointText, { width: 240 });
-            if (y + h > 750) { doc.addPage(); y = 50; }
-            doc.text(pointText, 50, y, { width: 240 });
-            y += h + 2;
-          });
-          y += 10;
-          doc.fillColor(primaryColor);
-        } else {
-          y += Math.max(doc.heightOfString(isSubItem ? `  ${desc}` : cleanDesc, { width: 240 }) + 10, 20);
-        }
-
-        if (y > 750) { doc.addPage(); y = 50; }
+      await new Promise((resolve, reject) => {
+        writeStream.on('finish', resolve);
+        writeStream.on('error', reject);
       });
 
-      generateHr(doc, y);
-      y += 20;
+    } else {
+      // ─── INVOICE / RECEIPT PDF (PUPPETEER) ───
+      title = documentType === 'tanda_terima' ? 'Receipt' : documentType === 'bukti_bayar' ? 'Payment' : 'Invoice';
+      const html = generateInvoiceHTML({
+        documentType, customerName, motorDetails,
+        items: finalItems, finalTotal, amountPaid,
+        paymentMethod, notes, recipientNumber,
+        bookingDate, docNumber: idSuffix, now, detectedSize
+      });
 
-      // --- SUMMARY SECTION ---
-      const summaryX = 350;
+      // Konfigurasi Chromium path
+      const executablePath = process.env.CHROMIUM_PATH || 
+                             (fs.existsSync('/usr/bin/chromium-browser') ? '/usr/bin/chromium-browser' : 
+                             (fs.existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : undefined));
 
-      const subtotal = finalTotal;
-      const paid = amountPaid || 0;
-      const balance = subtotal - paid;
-
-      doc
-        .fontSize(10)
-        .fillColor(secondaryColor)
-        .text('Subtotal', summaryX, y, { width: 100, align: 'right' })
-        .fillColor(primaryColor)
-        .text(formatCurrency(subtotal), summaryX + 110, y, { width: 85, align: 'right' });
-      y += 20;
-
-      doc
-        .fillColor(secondaryColor)
-        .text('Total', summaryX, y, { width: 100, align: 'right' })
-        .fillColor(primaryColor)
-        .text(formatCurrency(subtotal), summaryX + 110, y, { width: 85, align: 'right' });
-      y += 20;
-
-      if (paid > 0) {
-        doc
-          .fillColor(secondaryColor)
-          .text(`Lunas pada ${now.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}`, summaryX - 20, y, { width: 120, align: 'right' })
-          .fillColor(primaryColor)
-          .text(formatCurrency(paid), summaryX + 110, y, { width: 85, align: 'right' });
-        y += 30;
-      }
-
-      // Amount Due Highlight box
-      doc.fillColor(lightBg).rect(345, y, 210, 45).fill();
-      doc
-        .fillColor(secondaryColor)
-        .fontSize(10)
-        .text('Jumlah yang Harus Dibayar', 355, y + 10);
-      doc
-        .fillColor(primaryColor)
-        .fontSize(18)
-        .font('Helvetica-Bold')
-        .text(formatCurrency(balance), 355, y + 20, { width: 190, align: 'right' });
-
-      y += 70;
-      doc
-        .fontSize(12)
-        .fillColor(primaryColor)
-        .font('Helvetica-Bold')
-        .text('Instruksi Pembayaran', 50, y);
-      y += 20;
-
-      doc
-        .fontSize(10)
-        .font('Helvetica')
-        .text('Bank BCA', 50, y)
-        .text('1662515412', 50, y + 14)
-        .text('A/N Nama Muhammad Tauhid Haryadesa', 50, y + 28);
-
-      // --- ESTIMATED COMPLETION DATE ---
-      y += 60;
-      if (bookingDate) {
-        const itemList = finalItems.split(/\n|,\s*/).map(i => i.trim()).filter(Boolean);
-        let maxDurationMinutes = 0;
-        for (const itemStr of itemList) {
-          const cleanItem = itemStr.replace(/^(\d+\.|[-*•])\s*/, '').replace(/:.*$/, '').trim();
-          const svc = masterLayanan.find(s => cleanItem.toLowerCase().includes(s.name.toLowerCase()));
-          if (svc && svc.estimatedDuration) {
-            const dur = parseInt(svc.estimatedDuration) || 0;
-            if (dur > maxDurationMinutes) maxDurationMinutes = dur;
-          }
-        }
-        const workingDays = Math.max(1, Math.ceil(maxDurationMinutes / 480));
-        const bDate = new Date(bookingDate);
-        let daysAdded = 0;
-        const estDate = new Date(bDate);
-        while (daysAdded < workingDays) {
-          estDate.setDate(estDate.getDate() + 1);
-          if (estDate.getDay() !== 0) daysAdded++;
-        }
-
-        doc
-          .fontSize(10)
-          .fillColor(primaryColor)
-          .font('Helvetica-Bold')
-          .text('Estimasi Selesai', 50, y);
-        doc
-          .font('Helvetica')
-          .fillColor(secondaryColor)
-          .text(`${estDate.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} (${workingDays} hari kerja)`, 50, y + 14);
-        y += 40;
-      } else {
-        doc
-          .fontSize(9)
-          .fillColor(secondaryColor)
-          .text('Penjadwalan pengerjaan menyusul sesuai ketersediaan slot (TBA).', 50, y);
-        y += 20;
-      }
-
-      doc.end();
+      const browser = await puppeteer.launch({ 
+        executablePath,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+        headless: 'new'
+      });
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'networkidle0' });
+      await page.pdf({
+        path: filePath,
+        format: 'A4',
+        printBackground: true,
+      });
+      await browser.close();
     }
 
-    // 4. Wait for file write & Send
-    await new Promise((resolve, reject) => {
-      writeStream.on('finish', resolve);
-      writeStream.on('error', reject);
-    });
-
+    // 4. Send via WhatsApp
     if (global.whatsappClient) {
       try {
-        // Use recipient as-is (LID stays LID, @c.us stays @c.us)
-        const recipient = targetRecipient;
-
         await global.whatsappClient.sendFile(
-          recipient,
+          targetRecipient,
           filePath,
           filename,
           `Berikut dokumen *${title}* untuk Anda.`
         );
 
-        // Cleanup: Hapus file temp setelah dikirim
         setTimeout(() => {
           fs.unlink(filePath, (err) => {
-            if (err) console.error(`[generateDocument] Gagal menghapus temp file ${filePath}:`, err);
-            else console.log(`[generateDocument] Temp file dihapus: ${filename}`);
+            if (err) console.error(`[generateDocument] Failed deletion: ${err.message}`);
           });
-        }, 5000);
+        }, 15000);
 
         return {
           success: true,
@@ -558,16 +275,10 @@ const generateDocumentTool = {
         };
       } catch (error) {
         console.error('[generateDocument] Error sending file:', error);
-        return {
-          success: false,
-          message: `Gagal mengirim file PDF: ${error.message}`
-        };
+        return { success: false, message: `Gagal mengirim file PDF: ${error.message}` };
       }
     } else {
-      return {
-        success: false,
-        message: "WhatsApp client tidak tersedia saat ini."
-      };
+      return { success: false, message: "WhatsApp client tidak tersedia saat ini." };
     }
   }
 };

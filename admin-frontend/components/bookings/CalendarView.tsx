@@ -1,139 +1,144 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { Calendar, dateFnsLocalizer, Event } from 'react-big-calendar';
-import { format, parse, startOfWeek, getDay } from 'date-fns';
+import { 
+  format, 
+  startOfMonth, 
+  endOfMonth, 
+  startOfWeek, 
+  endOfWeek, 
+  eachDayOfInterval, 
+  isSameMonth, 
+  isSameDay, 
+  addMonths, 
+  subMonths 
+} from 'date-fns';
 import { id } from 'date-fns/locale';
-import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { Booking } from '@/lib/hooks/useBookings';
-
-const locales = {
-  'id-ID': id,
-};
-
-const localizer = dateFnsLocalizer({
-  format,
-  parse,
-  startOfWeek,
-  getDay,
-  locales,
-});
+import { cn } from '@/lib/utils';
 
 interface CalendarViewProps {
   bookings: Booking[];
+  currentMonth: Date;
+  onMonthChange: (date: Date) => void;
+  onDateSelect: (date: Date) => void;
+  selectedDate: Date;
 }
 
-export function CalendarView({ bookings }: CalendarViewProps) {
-  // Pre-calculate daily detailing capacity for block coloring
-  const dailyDetailing = useMemo(() => {
-    const counts: Record<string, number> = {};
-    bookings.forEach(b => {
-      if (b.status === 'cancelled') return;
-      const servicesList = Array.isArray(b.services) ? b.services : [b.services].filter(Boolean);
-      const servicesStr = servicesList.join(' ').toLowerCase();
-      if (servicesStr.includes('detailing') || servicesStr.includes('coating') || servicesStr.includes('cuci') || servicesStr.includes('wash')) {
-        counts[b.bookingDate] = (counts[b.bookingDate] || 0) + 1;
-      }
-    });
-    return counts;
-  }, [bookings]);
+export function CalendarView({ 
+  bookings, 
+  currentMonth, 
+  onMonthChange,
+  onDateSelect,
+  selectedDate
+}: CalendarViewProps) {
+  
+  const days = useMemo(() => {
+    const start = startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 0 });
+    const end = endOfWeek(endOfMonth(currentMonth), { weekStartsOn: 0 });
+    return eachDayOfInterval({ start, end });
+  }, [currentMonth]);
 
-  const events: Event[] = useMemo(() => {
-    return bookings.map(booking => {
-      let startDateStr = `${booking.bookingDate}T${booking.bookingTime || '09:00'}:00`;
-      let startDate = new Date(startDateStr);
-      
-      if (isNaN(startDate.getTime())) {
-          startDate = new Date();
-      }
-      
-      // Estimate 2 hours for a typical service
-      const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
+  const dayLabels = ['MINGGU', 'SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU'];
 
-      const servicesList = Array.isArray(booking.services) ? booking.services : [booking.services].filter(Boolean);
-      const servicesStr = servicesList.join(' ').toLowerCase();
-      const isRepaint = servicesStr.includes('repaint') || servicesStr.includes('repair');
-      const isDetailing = servicesStr.includes('detailing') || servicesStr.includes('coating') || servicesStr.includes('cuci') || servicesStr.includes('wash');
-
-      // Determine color based on service type (matching Capacity Widget colors)
-      let bgColor = '#94a3b8'; // slate (General)
-      if (isRepaint) bgColor = '#3b82f6'; // blue (Repaint)
-      else if (isDetailing) bgColor = '#14b8a6'; // teal (Detailing)
-      
-      if (booking.status === 'cancelled') bgColor = '#f87171'; // red
-
-      return {
-        id: booking.id,
-        title: `${booking.vehicleInfo} - ${booking.customerName}`,
-        start: startDate,
-        end: endDate,
-        allDay: false,
-        resource: {
-           status: booking.status,
-           services: booking.services,
-           phone: booking.customerPhone,
-           color: bgColor,
-           isCancelled: booking.status === 'cancelled'
-        }
-      };
-    });
-  }, [bookings]);
-
-  const eventStyleGetter = (event: Event) => {
-    const r = event.resource as any;
-    return {
-      style: {
-        backgroundColor: r?.color || '#3b82f6',
-        borderRadius: '6px',
-        opacity: r?.isCancelled ? 0.6 : 0.9,
-        color: 'white',
-        border: '0px',
-        display: 'block',
-        textDecoration: r?.isCancelled ? 'line-through' : 'none'
-      }
-    };
-  };
-
-  const dayPropGetter = (date: Date) => {
-    // Format local date
-    const dateStr = format(date, 'yyyy-MM-dd');
-    const isFull = (dailyDetailing[dateStr] || 0) >= 2;
-    
-    if (isFull) {
-      return {
-        style: {
-          backgroundColor: '#fef2f2', // light red background for full day
-        }
-      };
-    }
-    return {};
+  const getBookingsForDay = (date: Date) => {
+    return bookings.filter(b => b.bookingDate === format(date, 'yyyy-MM-dd') && b.status !== 'cancelled');
   };
 
   return (
-    <div className="h-[500px] sm:h-[600px] w-full bg-white p-2 sm:p-4 rounded-xl shadow-sm border border-slate-100 overflow-x-auto">
-      <div className="min-w-[600px] sm:min-w-0">
-      <Calendar
-        localizer={localizer}
-        events={events}
-        startAccessor="start"
-        endAccessor="end"
-        style={{ height: '100%' }}
-        eventPropGetter={eventStyleGetter}
-        dayPropGetter={dayPropGetter}
-        culture="id-ID"
-        messages={{
-            next: "Maju",
-            previous: "Mundur",
-            today: "Hari Ini",
-            month: "Bulan",
-            week: "Minggu",
-            day: "Hari"
-        }}
-        views={['month', 'week', 'day']}
-        defaultView="week"
-        min={new Date(0, 0, 0, 8, 0, 0)} // Start at 8 AM
-        max={new Date(0, 0, 0, 20, 0, 0)} // End at 8 PM
-      />
+    <div className="flex-1 flex flex-col min-h-0 bg-[#131313]">
+      {/* Calendar Header Controls */}
+      <div className="flex justify-between items-end mb-10">
+        <div className="space-y-1">
+          <p className="text-xs font-bold text-[#FFFF00] tracking-widest space-grotesk uppercase">OPERASIONAL HARIAN</p>
+          <h3 className="text-4xl font-black league-spartan tracking-tighter uppercase text-white">
+            KALENDER {format(currentMonth, 'MMMM yyyy', { locale: id }).toUpperCase()}
+          </h3>
+        </div>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => onMonthChange(subMonths(currentMonth, 1))}
+            className="bg-[#2A2A2A] p-3 text-white hover:bg-[#FFFF00] hover:text-[#131313] transition-colors rounded-sm"
+          >
+            <span className="material-symbols-outlined block">chevron_left</span>
+          </button>
+          <button 
+            onClick={() => onMonthChange(addMonths(currentMonth, 1))}
+            className="bg-[#2A2A2A] p-3 text-white hover:bg-[#FFFF00] hover:text-[#131313] transition-colors rounded-sm"
+          >
+            <span className="material-symbols-outlined block">chevron_right</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Calendar Grid Container */}
+      <div className="flex-1 overflow-auto no-scrollbar border-t border-l border-white/5">
+        <div className="grid grid-cols-7 w-full h-full min-w-[800px]">
+          {/* Day Labels */}
+          {dayLabels.map(label => (
+            <div key={label} className="p-4 border-r border-b border-white/5 text-center text-[10px] font-black tracking-widest text-white/30 space-grotesk bg-[#0E0E0E]/30">
+              {label}
+            </div>
+          ))}
+
+          {/* Calendar Cells */}
+          {days.map((day, i) => {
+            const isCurrentMonth = isSameMonth(day, currentMonth);
+            const isToday = isSameDay(day, new Date());
+            const isSelected = isSameDay(day, selectedDate);
+            const dayBookings = getBookingsForDay(day);
+            const bookingCount = dayBookings.length;
+
+            return (
+              <div 
+                key={day.toString()}
+                onClick={() => onDateSelect(day)}
+                className={cn(
+                  "min-h-[140px] p-4 border-r border-b border-white/5 transition-colors cursor-pointer relative group",
+                  !isCurrentMonth ? "opacity-20 bg-[#0E0E0E]" : "hover:bg-white/5",
+                  isSelected && "bg-[#FFFF00]/5 border-b-[#FFFF00]/30 border-r-[#FFFF00]/30",
+                  isToday && !isSelected && "bg-white/[0.02]"
+                )}
+              >
+                <span className={cn(
+                  "text-sm font-bold space-grotesk",
+                  isToday ? "text-[#FFFF00]" : "text-white/80",
+                  !isCurrentMonth && "text-white/40"
+                )}>
+                  {format(day, 'd')}
+                </span>
+
+                {isToday && (
+                  <div className="absolute top-2 right-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#FFFF00] animate-pulse" />
+                  </div>
+                )}
+
+                {/* Booking Indicators */}
+                <div className="mt-4 space-y-1.5">
+                  {bookingCount > 0 ? (
+                    <>
+                      <div className={cn(
+                        "px-2 py-1 rounded-sm",
+                        isSelected || isToday ? "bg-[#FFFF00]" : "bg-white/10"
+                      )}>
+                        <p className={cn(
+                          "text-[9px] font-black truncate uppercase",
+                          isSelected || isToday ? "text-[#131313]" : "text-white/60"
+                        )}>
+                          {bookingCount} BOOKING{bookingCount > 1 ? 'S' : ''}
+                        </p>
+                      </div>
+                      <p className="text-[8px] text-white/40 pl-1 font-bold space-grotesk truncate uppercase">
+                        {dayBookings[0].vehicleInfo}
+                      </p>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

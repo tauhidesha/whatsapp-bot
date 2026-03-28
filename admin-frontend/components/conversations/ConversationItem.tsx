@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Conversation } from '@/lib/hooks/useRealtimeConversations';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -28,7 +28,7 @@ export default function ConversationItem({
   const [imageError, setImageError] = useState(false);
   const channelBadge = channelBadges[conversation.channel as keyof typeof channelBadges] || { 
     label: 'UN', 
-    className: 'bg-slate-50 text-slate-600 border-slate-100' 
+    className: 'bg-[#262626] text-slate-400 border-white/5' 
   };
   
   const getTimeAgo = () => {
@@ -43,88 +43,65 @@ export default function ConversationItem({
   };
 
   const timeAgo = getTimeAgo();
-  const aiPaused = conversation.aiState && !conversation.aiState.enabled;
+  const aiActive = conversation.aiState && conversation.aiState.enabled;
 
   return (
-    <div
+    <button
       onClick={onClick}
       className={cn(
-        "group grid grid-cols-[48px_1fr] gap-4 p-4 cursor-pointer transition-all duration-200 rounded-2xl relative mb-1 mx-1 border overflow-hidden",
-        isActive
-          ? "bg-white border-zinc-900 shadow-lg ring-1 ring-zinc-900 z-10"
-          : "bg-transparent border-transparent hover:bg-slate-50"
+        "w-full text-left p-4 border-b border-white/5 transition-all relative group overflow-hidden",
+        isActive 
+          ? "bg-[#1C1B1B]" 
+          : "bg-[#131313] hover:bg-[#1C1B1B]/50"
       )}
     >
-      {/* Avatar Section */}
-      <div className="flex-shrink-0">
-        <div className={cn(
-          "w-12 h-12 rounded-[16px] flex items-center justify-center font-bold text-sm bg-slate-100 text-slate-400 group-hover:bg-slate-200 transition-all overflow-hidden"
+      <div className="flex justify-between items-start gap-2 mb-1 w-full overflow-hidden">
+        <h3 className={cn(
+          "font-headline font-black text-[14px] truncate transition-colors leading-none tracking-widest uppercase",
+          isActive ? "text-[#FFFF00]" : "text-white"
         )}>
-          {conversation.profilePicUrl && !imageError ? (
-            <Image 
-              src={conversation.profilePicUrl} 
-              alt={conversation.customerName} 
-              width={48}
-              height={48}
-              className="w-full h-full object-cover"
-              unoptimized
-              onError={() => setImageError(true)}
-            />
-          ) : (
-            (conversation.customerName || 'U').charAt(0).toUpperCase()
-          )}
-        </div>
+          {conversation.customerName || 'Pelanggan'}
+        </h3>
+        <span className="text-[10px] font-medium shrink-0 text-slate-500 font-sans">
+          {timeAgo === 'Baru' ? 'Baru' : format(new Date(conversation.lastMessageTime || Date.now()), 'HH:mm', { locale: idLocale })}
+        </span>
       </div>
 
-      {/* Info Section - Use min-w-0 to ensure grid content respects parent width */}
-      <div className="min-w-0 py-0.5">
-        <div className="flex justify-between items-center gap-2 mb-1.5 w-full overflow-hidden">
-          <h3 className={cn(
-            "font-black text-[15.5px] truncate transition-colors leading-none tracking-tight",
-            isActive ? "text-zinc-950" : "text-zinc-800"
-          )}>
-            {conversation.customerName || 'Pelanggan'}
-          </h3>
-          <span className="text-[10px] uppercase font-bold shrink-0 tracking-wider text-slate-400">
-            {timeAgo}
-          </span>
-        </div>
+      {/* Last message preview */}
+      <p className={cn(
+        "text-[12px] truncate mb-3 leading-tight font-sans tracking-wide",
+        isActive ? "text-white/90" : "text-slate-500"
+      )}>
+        {conversation.lastMessage || 'Menunggu pesan pertama...'}
+      </p>
 
-        {/* Last message preview - Grid handles this much better with truncate */}
-        <p className={cn(
-          "text-[13.5px] truncate mb-2.5 leading-tight text-slate-500",
-          isActive ? "text-zinc-500 font-medium" : "font-normal"
-        )}>
-          {conversation.lastMessage || 'Menunggu pesan pertama...'}
-        </p>
+      {/* Badges Container */}
+      <div className="flex items-center gap-2 overflow-hidden w-full">
+        {aiActive ? (
+          <div className="px-1.5 py-0.5 text-[8px] font-black uppercase bg-[#FFFF00] text-[#131313] tracking-widest leading-none">
+            AI AKTIF
+          </div>
+        ) : (
+          <div className="px-1.5 py-0.5 text-[8px] font-black uppercase bg-[#262626] text-slate-500 border border-white/5 tracking-widest leading-none">
+            AI OFF
+          </div>
+        )}
 
-        {/* Badges Container */}
-        <div className="flex items-center gap-2 overflow-hidden w-full">
-          <Badge variant="outline" className={cn(
-            "px-2 py-0 h-4 text-[8px] font-black uppercase border-none flex-shrink-0", 
-            channelBadge.className
-          )}>
-            {channelBadge.label}
-          </Badge>
+        {conversation.label && (
+          <div className="px-1.5 py-0.5 text-[8px] font-black uppercase text-slate-300 bg-[#262626] border border-white/5 tracking-widest leading-none">
+            {conversation.label.replace('_', ' ')}
+          </div>
+        )}
 
-          {aiPaused && (
-            <Badge variant="outline" className="px-2 py-0 h-4 text-[8px] font-black uppercase bg-amber-50 text-amber-600 border-none flex-shrink-0">
-              AI OFF
-            </Badge>
-          )}
-
-          {conversation.label && (
-            <div className="px-2 py-0 h-4 text-[8px] font-black uppercase text-slate-400 bg-slate-50 rounded flex items-center truncate min-w-0 flex-1">
-              {conversation.label.replace('_', ' ')}
-            </div>
-          )}
-        </div>
+        {conversation.unreadCount > 0 && !isActive && (
+          <div className="px-1.5 py-0.5 text-[8px] font-black uppercase bg-[#FFFF00] text-[#131313] tracking-widest leading-none">
+            NEW
+          </div>
+        )}
       </div>
-
-      {/* Unread indicator */}
-      {conversation.unreadCount > 0 && (
-        <div className="absolute right-4 top-1/2 -translate-y-1/2 size-2.5 bg-zinc-900 rounded-full shadow-lg" />
+      {isActive && (
+        <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-[#FFFF00]" />
       )}
-    </div>
+    </button>
   );
 }

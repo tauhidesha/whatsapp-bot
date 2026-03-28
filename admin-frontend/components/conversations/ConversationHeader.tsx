@@ -4,35 +4,20 @@ import { useState } from 'react';
 import { Conversation } from '@/lib/hooks/useRealtimeConversations';
 import Button from '@/components/shared/Button';
 import Modal from '@/components/shared/Modal';
-import { formatDistanceToNow } from 'date-fns';
-import { id as idLocale } from 'date-fns/locale';
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import Image from 'next/image';
-import CustomerFinanceSummary from './CustomerFinanceSummary';
 import ManualBookingForm from '@/components/bookings/ManualBookingForm';
 import { ApiClient } from '@/lib/api/client';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 interface ConversationHeaderProps {
   conversation: Conversation;
   apiClient: ApiClient;
+  allConversations: Conversation[];
   onAiStateChange: (enabled: boolean, reason?: string) => Promise<void>;
   onLabelChange: (label: string, reason?: string) => Promise<void>;
   onBack?: () => void;
   loading?: boolean;
 }
-
-const channelBadges = {
-  whatsapp: { label: 'WA', className: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
-  instagram: { label: 'IG', className: 'bg-pink-50 text-pink-600 border-pink-100' },
-  messenger: { label: 'FB', className: 'bg-blue-50 text-blue-600 border-blue-100' },
-};
 
 const CONVERSATION_LABELS = [
   { value: 'hot_lead', label: 'Hot Lead', className: 'bg-red-50 text-red-600 border-red-100' },
@@ -48,13 +33,13 @@ const CONVERSATION_LABELS = [
 export default function ConversationHeader({
   conversation,
   apiClient,
+  allConversations,
   onAiStateChange,
   onLabelChange,
   onBack,
   loading = false,
 }: ConversationHeaderProps) {
   const [isTogglingAi, setIsTogglingAi] = useState(false);
-  const [showAiPauseInfo, setShowAiPauseInfo] = useState(false);
   const [showLabelModal, setShowLabelModal] = useState(false);
   const [selectedLabel, setSelectedLabel] = useState(conversation.label || '');
   const [labelReason, setLabelReason] = useState('');
@@ -62,16 +47,7 @@ export default function ConversationHeader({
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [imageError, setImageError] = useState(false);
 
-  const channelBadge = channelBadges[conversation.channel as keyof typeof channelBadges] || { 
-    label: 'UN', 
-    className: 'bg-slate-50 text-slate-600 border-slate-100' 
-  };
-  
   const aiEnabled = conversation.aiState?.enabled ?? true;
-  const aiPausedUntil = conversation.aiState?.pausedUntil;
-  const aiPauseReason = conversation.aiState?.reason;
-  
-  const currentLabel = CONVERSATION_LABELS.find(l => l.value === conversation.label);
 
   const handleAiToggle = async () => {
     setIsTogglingAi(true);
@@ -88,7 +64,6 @@ export default function ConversationHeader({
 
   const handleLabelUpdate = async () => {
     if (!selectedLabel) return;
-    
     setIsUpdatingLabel(true);
     try {
       await onLabelChange(selectedLabel, labelReason || undefined);
@@ -101,159 +76,179 @@ export default function ConversationHeader({
     }
   };
 
-  const openLabelModal = () => {
-    setSelectedLabel(conversation.label || '');
-    setLabelReason('');
-    setShowLabelModal(true);
-  };
-
-  const getAiStatusText = () => {
-    if (aiEnabled) return 'AI Aktif';
-    if (aiPausedUntil) {
-      const timeRemaining = formatDistanceToNow(new Date(aiPausedUntil), { addSuffix: true, locale: idLocale });
-      return `Paused ${timeRemaining}`;
-    }
-    return 'AI Paused';
-  };
-
   return (
     <>
-      <div className="h-20 border-b flex items-center justify-between px-4 md:px-8 shrink-0 bg-white/80 backdrop-blur-md sticky top-0 z-20">
-        {/* Left side - Customer info */}
-        <div className="flex items-center gap-1.5 md:gap-4 min-w-0">
-          {onBack && (
-            <button 
-              onClick={onBack}
-              className="md:hidden size-10 flex items-center justify-center rounded-xl bg-slate-50 text-slate-500 hover:bg-slate-100 active:scale-95 transition-all mr-1"
-            >
-              <span className="material-symbols-outlined text-[22px]">arrow_back</span>
-            </button>
-          )}
-          <div className="relative group">
-            <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center font-black text-slate-400 shadow-sm transition-transform group-hover:rotate-3 overflow-hidden">
-              {conversation.profilePicUrl && !imageError ? (
-                <Image 
-                  src={conversation.profilePicUrl} 
-                  alt={conversation.customerName} 
-                  width={48}
-                  height={48}
-                  className="w-full h-full object-cover"
-                  unoptimized
-                  onError={() => setImageError(true)}
-                />
-              ) : (
-                (conversation.customerName || 'U').charAt(0).toUpperCase()
-              )}
-            </div>
-            <div className="absolute -bottom-1 -right-1 size-5 bg-white rounded-lg shadow-md border border-slate-50 flex items-center justify-center">
-               <Badge variant="outline" className={cn("p-0 size-4 flex items-center justify-center text-[7px] font-black border-none", channelBadge.className)}>
-                  {channelBadge.label}
-               </Badge>
+      <div className="shrink-0 w-full z-20 bg-[#131313] border-b border-[#FFFF00]/10">
+
+        {/* ── MOBILE HEADER (< md) ── */}
+        <div className="flex md:hidden items-center justify-between px-4 h-16">
+          {/* Back + Name */}
+          <div className="flex items-center gap-3">
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="text-[#FFFF00] hover:opacity-80 transition-opacity active:scale-95"
+              >
+                <span className="material-symbols-outlined">arrow_back</span>
+              </button>
+            )}
+            <div className="flex flex-col">
+              <span className="font-headline font-bold text-sm uppercase tracking-wider text-white leading-tight">
+                {conversation.customerName || 'Unknown User'}
+              </span>
+              <span className="font-body text-[10px] text-zinc-500 tracking-tight">
+                {conversation.customerPhone || ''}
+              </span>
             </div>
           </div>
 
-          <div className="flex flex-col min-w-0">
-            <div className="flex items-center gap-3">
-              <h3 className="font-black text-[15px] md:text-[18px] text-zinc-900 leading-none tracking-tight truncate max-w-[65px] sm:max-w-[120px] md:max-w-none">
-                {conversation.customerName || 'Unknown User'}
-              </h3>
-              {currentLabel && (
-                <button
-                  onClick={openLabelModal}
-                  className={cn(
-                    "px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all hover:brightness-95 active:scale-95 shadow-sm",
-                    currentLabel.className
-                  )}
-                >
-                  {currentLabel.label}
-                </button>
+          {/* Zoya AI badge (Button) */}
+          <button
+            onClick={handleAiToggle}
+            disabled={isTogglingAi || loading}
+            className={cn(
+              'flex items-center gap-2 px-3 py-1 rounded-full border transition-all active:scale-95',
+              aiEnabled
+                ? 'bg-[#FFFF00]/10 border-[#FFFF00]/20'
+                : 'bg-zinc-800 border-zinc-700'
+            )}
+          >
+            <span
+              className={cn(
+                'w-2 h-2 rounded-full',
+                aiEnabled ? 'bg-[#FFFF00] animate-pulse' : 'bg-zinc-500'
               )}
-            </div>
-            <div className="flex items-center gap-3 mt-1 md:mt-2">
-              <p className="text-[10px] md:text-[11px] font-bold text-slate-400 uppercase tracking-[0.1em] truncate max-w-[90px] md:max-w-none font-mono">
-                {conversation.customerPhone || 'NO PHONE ATTACHED'}
-              </p>
-              <CustomerFinanceSummary customerId={conversation.id} />
-            </div>
-          </div>
+            />
+            <span
+              className={cn(
+                'font-headline font-bold text-xs tracking-widest uppercase',
+                aiEnabled ? 'text-[#FFFF00]' : 'text-zinc-500'
+              )}
+            >
+              ZOYA AI {isTogglingAi ? '...' : ''}
+            </span>
+          </button>
         </div>
 
-        {/* Right side - Controls */}
-        <div className="flex items-center gap-1.5 md:gap-4 shrink-0">
-          {/* Label selector button */}
-          <button
-            onClick={openLabelModal}
-            className="flex items-center gap-1.5 px-2.5 md:px-4 py-2.5 rounded-xl text-[12px] font-black bg-slate-50 text-slate-600 hover:bg-slate-100/80 hover:text-zinc-900 transition-all active:scale-95 border border-slate-100 shadow-sm shrink-0"
-          >
-            <span className="material-symbols-outlined text-[18px]">settings_ethernet</span>
-            <span className="hidden md:inline">LABEL DATA</span>
-          </button>
+        {/* ── DESKTOP HEADER (≥ md) ── */}
+        <div className="hidden md:flex items-center justify-between px-8 h-20">
 
-          {/* Booking Button */}
-          <button
-            onClick={() => setShowBookingModal(true)}
-            className="flex items-center gap-1.5 px-2.5 md:px-4 py-2.5 rounded-xl text-[12px] font-black bg-primary text-zinc-900 hover:scale-[1.02] transition-all active:scale-95 shadow-lg shadow-primary/20 shrink-0"
-          >
-            <span className="material-symbols-outlined text-[18px]">calendar_add_on</span>
-            <span className="hidden md:inline">BUAT BOOKING</span>
-          </button>
+          {/* Left: Avatar + Info */}
+          <div className="flex items-center gap-4">
+            {/* Back button (optional on desktop) */}
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="mr-1 text-zinc-500 hover:text-white transition-colors"
+              >
+                <span className="material-symbols-outlined">arrow_back</span>
+              </button>
+            )}
 
-          {/* AI Control Center */}
-          <div className="flex items-center bg-slate-50/80 p-1.5 rounded-2xl gap-2 shadow-sm border border-slate-100">
-            <button
-              onClick={() => setShowAiPauseInfo(!showAiPauseInfo)}
-              className={cn(
-                "flex items-center gap-1 md:gap-2 px-2.5 md:px-4 py-2 rounded-xl text-[12px] font-bold transition-all shrink-0",
-                aiEnabled
-                  ? "bg-teal-500 text-white shadow-md shadow-teal-500/20"
-                  : "bg-amber-500 text-white shadow-md shadow-amber-500/20"
-              )}
-            >
-              <span className="material-symbols-outlined text-[18px]">
-                {aiEnabled ? 'smart_toy' : 'pause_presentation'}
-              </span>
-              <span className="hidden md:inline">{getAiStatusText().toUpperCase()}</span>
-            </button>
+            {/* Avatar */}
+            <div className="relative">
+              <div className="w-12 h-12 rounded-sm bg-[#2a2a2a] border border-white/5 flex items-center justify-center font-headline text-zinc-500 overflow-hidden">
+                {conversation.profilePicUrl && !imageError ? (
+                  <Image
+                    src={conversation.profilePicUrl}
+                    alt={conversation.customerName || 'Profile'}
+                    width={48}
+                    height={48}
+                    className="w-full h-full object-cover"
+                    unoptimized
+                    onError={() => setImageError(true)}
+                  />
+                ) : (
+                  <span className="font-headline font-bold text-lg text-zinc-400">
+                    {(conversation.customerName || 'U').charAt(0).toUpperCase()}
+                  </span>
+                )}
+              </div>
+              {/* Online dot */}
+              <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-[#FFFF00] rounded-full border-2 border-[#131313]" />
+            </div>
 
-            <button
-              onClick={handleAiToggle}
-              disabled={isTogglingAi || loading}
-              className={cn(
-                "h-9 w-9 bg-white rounded-xl flex items-center justify-center transition-all shadow-sm border border-slate-100 hover:scale-105 active:scale-95 disabled:opacity-50 shrink-0",
-                aiEnabled ? "text-slate-400 hover:text-red-500" : "text-teal-500"
-              )}
-            >
-              {isTogglingAi ? (
-                <div className="size-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <span className="material-symbols-outlined text-[20px]">
-                  {aiEnabled ? 'emergency_home' : 'bolt'}
-                </span>
-              )}
-            </button>
+            {/* Name + ID */}
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-headline font-bold text-lg text-white uppercase tracking-wide truncate max-w-[200px]">
+                  {conversation.customerName || 'Unknown User'}
+                </h3>
+                {aiEnabled && (
+                  <span
+                    onClick={() => setShowLabelModal(true)}
+                    className="px-2 py-0.5 bg-[#FFFF00] text-black text-[9px] font-headline font-black rounded-sm uppercase tracking-widest cursor-pointer hover:bg-[#eaea00] transition-colors"
+                  >
+                    AI ZOYA AKTIF
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-zinc-500 font-body uppercase tracking-widest mt-0.5">
+                Customer ID: #{conversation.id.slice(-4).toUpperCase()}
+              </p>
+            </div>
           </div>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="h-10 w-10 flex items-center justify-center rounded-xl text-slate-300 hover:text-zinc-900 hover:bg-slate-50 transition-all outline-none">
-                <span className="material-symbols-outlined text-[24px]">more_horiz</span>
+          {/* Right: Total Spend + Actions */}
+          <div className="flex items-center gap-6">
+
+            {/* Total Spend */}
+            <div className="text-right">
+              <p className="text-[10px] text-zinc-500 font-body uppercase tracking-widest">Total Spend</p>
+              <p className="text-lg font-headline font-bold text-[#FFFF00] leading-tight">
+                Rp 12.450.000
+              </p>
+            </div>
+
+            {/* Zoya AI Toggle */}
+            <div className="flex items-center gap-3 bg-[#1c1b1b] px-3 py-1.5 rounded-sm border border-white/5">
+              <span className="text-[10px] font-headline font-bold text-zinc-400 uppercase tracking-tighter">
+                Zoya AI
+              </span>
+              <button
+                onClick={handleAiToggle}
+                disabled={isTogglingAi || loading}
+                className={cn(
+                  'relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none',
+                  aiEnabled ? 'bg-[#FFFF00]' : 'bg-zinc-600'
+                )}
+              >
+                <span className="sr-only">Toggle AI</span>
+                <span
+                  className={cn(
+                    'inline-block h-3 w-3 transform rounded-full transition-transform shadow-sm',
+                    aiEnabled ? 'translate-x-5 bg-black' : 'translate-x-1 bg-white'
+                  )}
+                />
               </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 p-2 rounded-2xl shadow-2xl border-slate-100 animate-in zoom-in-95 duration-200">
-              <DropdownMenuItem className="p-3 rounded-xl cursor-not-allowed opacity-50 text-[12px] font-bold">
-                <span className="material-symbols-outlined text-[18px] mr-3">archive</span>
-                ARKIP CHAT
-              </DropdownMenuItem>
-              <DropdownMenuItem className="p-3 rounded-xl text-red-500 hover:bg-red-50 focus:bg-red-50 text-[12px] font-bold cursor-pointer">
-                <span className="material-symbols-outlined text-[18px] mr-3">delete_sweep</span>
-                HAPUS PERMANEN
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              <span
+                className={cn(
+                  'text-[10px] font-headline font-bold',
+                  aiEnabled ? 'text-[#FFFF00]' : 'text-zinc-500'
+                )}
+              >
+                {aiEnabled ? 'ON' : 'OFF'}
+              </span>
+            </div>
+
+            {/* Buat Booking */}
+            <button
+              onClick={() => setShowBookingModal(true)}
+              className="px-4 h-10 flex items-center gap-2 rounded-sm text-[10px] font-headline font-bold bg-[#FFFF00] text-black hover:bg-[#eaea00] active:scale-95 transition-all uppercase tracking-widest"
+            >
+              <span className="material-symbols-outlined text-[16px]">calendar_add_on</span>
+              Buat Booking
+            </button>
+
+            {/* More */}
+            <button className="w-10 h-10 border border-white/10 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-[#2a2a2a] transition-colors rounded-sm">
+              <span className="material-symbols-outlined">more_vert</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Label Update Modal */}
+      {/* ── MODALS ── */}
       <Modal
         isOpen={showLabelModal}
         onClose={() => setShowLabelModal(false)}
@@ -264,11 +259,13 @@ export default function ConversationHeader({
             <button
               onClick={() => setSelectedLabel('')}
               className={cn(
-                "p-4 rounded-2xl border-2 text-[13px] font-black transition-all flex items-center gap-3",
-                selectedLabel === '' ? "bg-zinc-900 border-zinc-900 text-white shadow-xl shadow-zinc-900/20" : "bg-slate-50 border-transparent text-slate-500 hover:bg-slate-100"
+                'p-4 rounded-sm border border-white/5 text-[11px] font-headline font-black uppercase transition-all flex items-center gap-3',
+                selectedLabel === ''
+                  ? 'bg-[#FFFF00] text-black'
+                  : 'bg-[#2a2a2a] text-zinc-400 hover:bg-zinc-800'
               )}
             >
-              <span className="material-symbols-outlined text-[20px]">block</span>
+              <span className="material-symbols-outlined text-[18px]">block</span>
               No Label
             </button>
             {CONVERSATION_LABELS.map((label) => (
@@ -276,25 +273,27 @@ export default function ConversationHeader({
                 key={label.value}
                 onClick={() => setSelectedLabel(label.value)}
                 className={cn(
-                  "p-4 rounded-2xl border-2 text-[13px] font-black transition-all flex items-center gap-3",
-                  selectedLabel === label.value ? "bg-primary border-primary text-zinc-900 shadow-xl shadow-primary/20" : "bg-slate-50 border-transparent text-slate-500 hover:bg-slate-100"
+                  'p-4 rounded-sm border border-white/5 text-[11px] font-headline font-black uppercase transition-all flex items-center gap-3',
+                  selectedLabel === label.value
+                    ? 'bg-[#FFFF00] text-black'
+                    : 'bg-[#2a2a2a] text-zinc-400 hover:bg-zinc-800'
                 )}
               >
-                <div className={cn("size-2 rounded-full", label.className.split(' ')[0].replace('bg-', 'bg-'))} />
+                <div className={cn('size-2 rounded-full', label.className.split(' ')[0])} />
                 {label.label}
               </button>
             ))}
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 px-1">
+            <label className="text-[10px] font-headline font-black uppercase tracking-widest text-zinc-500 px-1">
               Catatan Internal
             </label>
             <textarea
               value={labelReason}
               onChange={(e) => setLabelReason(e.target.value)}
               placeholder="Berikan alasan perubahan status..."
-              className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-[13px] font-medium focus:ring-4 focus:ring-primary/10 outline-none resize-none transition-all placeholder:text-slate-300"
+              className="w-full px-4 py-3 bg-[#0e0e0e] border border-white/10 rounded-sm text-sm font-body focus:ring-1 focus:ring-[#FFFF00]/30 outline-none resize-none transition-all placeholder:text-zinc-600 text-white"
               rows={3}
             />
           </div>
@@ -304,7 +303,7 @@ export default function ConversationHeader({
               onClick={() => setShowLabelModal(false)}
               variant="secondary"
               disabled={isUpdatingLabel}
-              className="flex-1 font-black h-14 rounded-2xl bg-slate-50 border-none text-slate-400 hover:text-slate-600"
+              className="flex-1 font-headline font-black h-12 rounded-sm bg-zinc-800 border-none text-zinc-400 hover:text-white"
             >
               BATAL
             </Button>
@@ -313,7 +312,7 @@ export default function ConversationHeader({
               variant="primary"
               isLoading={isUpdatingLabel}
               disabled={selectedLabel === conversation.label && !labelReason}
-              className="flex-[2] font-black h-14 rounded-2xl shadow-2xl shadow-primary/30"
+              className="flex-[2] font-headline font-black h-12 rounded-sm bg-[#FFFF00] text-black hover:bg-[#eaea00] border-none"
             >
               SIMPAN STATUS
             </Button>
@@ -333,56 +332,14 @@ export default function ConversationHeader({
             customerName: conversation.customerName,
             customerPhone: conversation.customerPhone,
           }}
+          allConversations={allConversations}
           apiClient={apiClient}
           onSuccess={() => {
             setShowBookingModal(false);
-            alert('Booking berhasil dibuat!');
           }}
           onCancel={() => setShowBookingModal(false)}
         />
       </Modal>
-
-      {/* AI Pause Info Overlay */}
-      {showAiPauseInfo && !aiEnabled && (
-        <div 
-          className="fixed inset-0 z-[100] bg-zinc-900/5 backdrop-blur-[2px]" 
-          onClick={() => setShowAiPauseInfo(false)}
-        >
-          <div className="absolute right-12 top-24 bg-white border border-slate-100 rounded-[24px] shadow-2xl p-6 w-80 z-[101] animate-in zoom-in-95 duration-300 border-none">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="size-10 bg-amber-500 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/20">
-                <span className="material-symbols-outlined text-[22px] text-white">timer_pause</span>
-              </div>
-              <div>
-                <p className="text-xs font-black text-zinc-950 uppercase tracking-wider">AI Insight</p>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Kondisi Jeda Saat Ini</p>
-              </div>
-            </div>
-            
-            <div className="space-y-4">
-              {aiPausedUntil && (
-                <div className="bg-slate-50/50 p-4 rounded-[18px] border border-slate-100/50">
-                  <p className="text-[9px] text-slate-400 font-black uppercase mb-1.5 tracking-tighter">ESTIMASI KEMBALI AKTIF</p>
-                  <p className="text-sm text-zinc-900 font-black">{new Date(aiPausedUntil).toLocaleString('id-ID', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}</p>
-                </div>
-              )}
-              {aiPauseReason && (
-                <div className="bg-slate-50/50 p-4 rounded-[18px] border border-slate-100/50">
-                  <p className="text-[9px] text-slate-400 font-black uppercase mb-1.5 tracking-tighter">ALASAN PENANGGUHAN</p>
-                  <p className="text-xs text-slate-600 font-bold leading-relaxed">&quot;{aiPauseReason}&quot;</p>
-                </div>
-              )}
-              {!aiPausedUntil && !aiPauseReason && (
-                <p className="text-xs text-slate-500 italic text-center py-4 font-medium">Monitoring AI berjalan secara manual.</p>
-              )}
-            </div>
-            
-            <button className="w-full mt-6 py-3 rounded-xl bg-zinc-900 text-white text-[10px] font-black uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all">
-               TUTUP INFO
-            </button>
-          </div>
-        </div>
-      )}
     </>
   );
 }

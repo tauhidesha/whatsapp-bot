@@ -7,16 +7,19 @@ import { ApiClient } from '@/lib/api/client';
 import ConversationHeader from './ConversationHeader';
 import MessageList from './MessageList';
 import MessageComposer from './MessageComposer';
+import FloatingBookingButton from './FloatingBookingButton';
 
 interface ConversationWindowProps {
   conversation: Conversation;
   apiClient: ApiClient;
+  allConversations: Conversation[];
   onBack?: () => void;
 }
 
 export default function ConversationWindow({
   conversation,
   apiClient,
+  allConversations,
   onBack,
 }: ConversationWindowProps) {
   const [sendingMessage, setSendingMessage] = useState(false);
@@ -80,12 +83,13 @@ export default function ConversationWindow({
   };
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 h-full bg-white overflow-hidden">
+    <div className="flex-1 flex flex-col min-w-0 h-full bg-[#131313] relative overflow-hidden">
       {/* Header */}
-      <div className="shrink-0 border-b border-slate-50">
+      <div className="shrink-0">
         <ConversationHeader
           conversation={conversation}
           apiClient={apiClient}
+          allConversations={allConversations}
           onAiStateChange={handleAiStateChange}
           onLabelChange={handleLabelChange}
           onBack={onBack}
@@ -94,11 +98,21 @@ export default function ConversationWindow({
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 min-h-0 relative overflow-hidden">
-        <div className="absolute inset-0 overflow-hidden">
-          <MessageList messages={messages} loading={messagesLoading} />
-        </div>
+      <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden bg-[#131313]">
+        <MessageList
+          messages={messages}
+          loading={messagesLoading}
+          customerName={conversation.customerName}
+          profilePic={conversation.profilePicUrl}
+        />
       </div>
+
+      {/* Floating Action Button (Mobile Only) */}
+      <FloatingBookingButton 
+        conversation={conversation} 
+        apiClient={apiClient} 
+        allConversations={allConversations}
+      />
 
       {/* Composer */}
       <div className="shrink-0">

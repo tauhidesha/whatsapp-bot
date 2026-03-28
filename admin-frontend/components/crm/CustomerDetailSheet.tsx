@@ -56,9 +56,9 @@ export interface CustomerDetail {
   lastService: string | null;
   totalSpending: number;
   vehicles: VehicleDetail[];
-  bookings: BookingHistory[];
+  bookings?: BookingHistory[];
   status: 'active' | 'churned' | 'new';
-  warranties: Array<{
+  warranties?: Array<{
     id: string;
     type: string;
     vehicle: string;
@@ -245,7 +245,7 @@ export function CustomerDetailSheet({ customer, open, onOpenChange }: Props) {
                       <span className="text-slate-500">Servis Terakhir</span>
                       <span className="font-bold text-slate-700">{formatDate(displayCustomer.lastService)}</span>
                     </div>
-                    {displayCustomer.warranties && displayCustomer.warranties.some(w => w.status === 'ACTIVE') && (
+                    {(displayCustomer as any).warranties && (displayCustomer as any).warranties.some((w: any) => w.status === 'ACTIVE') && (
                       <div className="flex justify-between items-center py-2">
                         <span className="text-slate-500">Garansi Aktif</span>
                         <Badge className="bg-emerald-500">YA</Badge>

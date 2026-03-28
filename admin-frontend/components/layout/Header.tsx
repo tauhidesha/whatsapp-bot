@@ -21,7 +21,7 @@ interface HeaderProps {
 export default function Header({ onMobileMenuToggle }: HeaderProps) {
   const { user, logout } = useAuth();
   const router = useRouter();
-  const { isHeaderVisible } = useLayout();
+  const { isHeaderVisible, headerTitle, headerExtra } = useLayout();
 
   const handleLogout = async () => {
     try {
@@ -34,60 +34,112 @@ export default function Header({ onMobileMenuToggle }: HeaderProps) {
 
   return (
     <header className={cn(
-      "h-16 border-b bg-white flex items-center justify-between px-6 shrink-0 transition-transform duration-300 ease-in-out",
-      "md:translate-y-0",
+      "fixed top-0 right-0 left-0 md:left-64 z-40 bg-[#131313] md:bg-[#131313]/60 md:backdrop-blur-xl border-b border-[#1C1B1B] h-16 flex justify-between items-center transition-all duration-300 ease-in-out px-6",
+      "translate-y-0",
       !isHeaderVisible && "-translate-y-full"
     )}>
-      {/* Left side - Mobile menu toggle */}
-      <div className="flex items-center gap-4 md:hidden">
-        <button
-          onClick={onMobileMenuToggle}
-          className="p-2 hover:bg-slate-50 rounded-lg transition-colors"
-        >
-          <span className="material-symbols-outlined">menu</span>
-        </button>
+      
+      {/* =========================================
+          MOBILE VIEW HEADER (Khusus Layar HP)
+          ========================================= */}
+      <div className="flex w-full justify-between items-center md:hidden">
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={onMobileMenuToggle} 
+            className="text-[#FFFF00] outline-none active:scale-95 transition-transform flex items-center justify-center"
+          >
+            <span className="material-symbols-outlined">menu</span>
+          </button>
+          <h1 className="text-2xl font-headline font-black tracking-tighter lowercase text-white mt-1">bosmat studio</h1>
+        </div>
+        <div className="flex items-center gap-4">
+          <button className="text-[#FFFF00] outline-none active:scale-95 transition-transform flex items-center justify-center">
+            <span className="material-symbols-outlined">settings_input_component</span>
+          </button>
+        </div>
       </div>
 
-      {/* Right side - User menu with Dropdown */}
-      <div className="flex items-center gap-4 ml-auto">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-3 hover:bg-slate-50 p-1.5 rounded-xl transition-colors outline-none">
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-semibold text-slate-900 leading-none mb-1">
-                  {user?.email?.split('@')[0] || 'Admin'}
-                </p>
-                <p className="text-[10px] text-slate-500">{user?.email}</p>
-              </div>
-              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 shadow-sm">
-                <span className="material-symbols-outlined text-primary text-[22px]">account_circle</span>
-              </div>
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56 mt-1 p-1.5 rounded-xl shadow-xl">
-            <DropdownMenuLabel className="font-normal px-2 py-1.5">
-              <div className="flex flex-col space-y-1">
-                <p className="text-sm font-semibold leading-none">Akun Saya</p>
-                <p className="text-xs leading-none text-muted-foreground">
-                  {user?.email}
-                </p>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator className="my-1" />
-            <DropdownMenuItem className="p-2 rounded-lg cursor-pointer focus:bg-slate-50" onClick={() => router.push('/settings')}>
-              <span className="material-symbols-outlined text-[18px] mr-2">settings</span>
-              <span>Settings</span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator className="my-1" />
-            <DropdownMenuItem
-              className="p-2 rounded-lg cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive"
-              onClick={handleLogout}
-            >
-              <span className="material-symbols-outlined text-[18px] mr-2">logout</span>
-              <span>Logout</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+      {/* =========================================
+          DESKTOP VIEW HEADER (Khusus Layar Besar)
+          ========================================= */}
+      {/* Left side - Title and Subtitle */}
+      <div className="hidden md:flex flex-col justify-center shrink-0">
+        <h1 className={cn(
+          "text-xl font-headline font-black tracking-widest leading-none drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] uppercase",
+          headerTitle === 'INBOX CONTROL' ? "text-[#FFFF00]" : "text-white"
+        )}>
+          {headerTitle}
+        </h1>
+        <p className="text-[9px] text-slate-500 font-label tracking-wide uppercase mt-1">
+          {headerTitle === 'INBOX CONTROL' 
+            ? 'Monitoring pesan masuk dan kontrol AI assistant Zoya.' 
+            : 'Ringkasan aktivitas bengkel dan performa AI Zoya hari ini.'}
+        </p>
+      </div>
+
+      {/* Middle - Extra content (e.g. Search Bar) */}
+      <div className="hidden md:flex flex-1 justify-center max-w-xl px-12">
+        {headerExtra}
+      </div>
+
+      {/* Right side - Actions and Profile */}
+      <div className="hidden md:flex items-center space-x-6">
+        <div className="flex items-center space-x-4">
+          <button className="text-[#CDCDCD] hover:text-[#FFFF00] transition-colors active:scale-95">
+            <span className="material-symbols-outlined">notifications</span>
+          </button>
+          <button className="text-[#CDCDCD] hover:text-[#FFFF00] transition-colors active:scale-95" onClick={() => router.push('/settings')}>
+            <span className="material-symbols-outlined">settings</span>
+          </button>
+        </div>
+
+        <div className="flex items-center space-x-3 border-l border-[#1C1B1B] pl-6">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-3 outline-none group text-right">
+                <div>
+                  <p className="text-xs font-bold text-white uppercase tracking-wider">
+                    {user?.displayName || user?.email?.split('@')[0] || 'Tauhidesha'}
+                  </p>
+                  <p className="text-[9px] text-[#FFFF00] uppercase font-black tracking-widest">Administrator</p>
+                </div>
+                <div className="w-10 h-10 rounded-sm border border-white/10 overflow-hidden group-hover:border-[#FFFF00] transition-all bg-[#1C1B1B] flex items-center justify-center shrink-0">
+                  {user?.photoURL ? (
+                    <img 
+                      src={user.photoURL} 
+                      alt="Google Profile" 
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover transition-all duration-300"
+                    />
+                  ) : (
+                    <span className="material-symbols-outlined text-slate-500">account_circle</span>
+                  )}
+                </div>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 mt-2 glass-panel border-[#1C1B1B] text-[#e5e2e1]">
+              <DropdownMenuLabel className="font-normal px-2 py-1.5">
+                <div className="flex flex-col space-y-1">
+                  <p className="font-headline text-sm font-bold uppercase tracking-wider">Profile</p>
+                  <p className="text-[10px] text-slate-500">{user?.email}</p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator className="bg-[#1C1B1B]" />
+              <DropdownMenuItem className="p-2 rounded-sm cursor-pointer hover:bg-[#1C1B1B] hover:text-[#FFFF00]" onClick={() => router.push('/settings')}>
+                <span className="material-symbols-outlined text-sm mr-3">settings</span>
+                <span className="text-[10px] uppercase font-bold tracking-widest">Settings</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-[#1C1B1B]" />
+              <DropdownMenuItem
+                className="p-2 rounded-sm cursor-pointer text-red-400 hover:bg-red-900/20 group"
+                onClick={handleLogout}
+              >
+                <span className="material-symbols-outlined text-sm mr-3">logout</span>
+                <span className="text-[10px] uppercase font-bold tracking-widest">Logout</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </header>
   );

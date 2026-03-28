@@ -1,22 +1,24 @@
 import type { Metadata } from 'next';
-import { Inter_Tight, Lora, IBM_Plex_Mono } from 'next/font/google';
+import { Inter, League_Spartan, Space_Grotesk } from 'next/font/google';
 import './globals.css';
 import { cn } from "@/lib/utils";
 
-const fontSans = Inter_Tight({
+const fontSans = Inter({
   subsets: ["latin"],
   variable: "--font-sans",
+  weight: ["300", "400", "500", "600", "700"],
 });
 
-const fontSerif = Lora({
+const fontHeadline = League_Spartan({
   subsets: ["latin"],
-  variable: "--font-serif",
+  variable: "--font-headline",
+  weight: ["700", "800", "900"],
 });
 
-const fontMono = IBM_Plex_Mono({
+const fontTechnical = Space_Grotesk({
   subsets: ["latin"],
-  variable: "--font-mono",
-  weight: ["400", "500", "700"],
+  variable: "--font-technical",
+  weight: ["300", "400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -30,12 +32,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="id">
+    <html lang="id" className="dark">
       <body className={cn(
-        "min-h-screen bg-background font-sans antialiased",
+        "min-h-screen bg-background font-body antialiased",
         fontSans.variable,
-        fontSerif.variable,
-        fontMono.variable
+        fontHeadline.variable,
+        fontTechnical.variable
       )}>
         {children}
       </body>

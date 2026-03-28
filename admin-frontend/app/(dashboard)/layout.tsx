@@ -56,7 +56,7 @@ function DashboardLayoutContent({
   const { isHeaderVisible } = useLayout();
 
   return (
-    <div className="flex h-screen w-full flex-col md:flex-row bg-slate-50 overflow-hidden relative">
+    <div className="flex h-screen w-full flex-col md:flex-row bg-[#131313] relative overflow-hidden">
       {/* Sidebar */}
       <Sidebar />
 
@@ -64,24 +64,21 @@ function DashboardLayoutContent({
       <MobileNav isOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden relative">
+      <main className="flex-1 ml-0 md:ml-64 flex flex-col h-full overflow-hidden">
         {/* Header - Fixed on mobile with auto-hide, static on desktop */}
         <div className={cn(
           "fixed top-0 left-0 right-0 z-30 transition-transform duration-300 ease-in-out",
-          "md:static md:translate-y-0 md:z-auto",
           isHeaderVisible ? "translate-y-0" : "-translate-y-full"
         )}>
           <Header onMobileMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)} />
         </div>
 
-        {/* Spacer untuk fixed header di mobile - animate bersama header */}
-        <div className={cn(
-          "shrink-0 md:hidden transition-all duration-300 ease-in-out",
-          isHeaderVisible ? "h-16" : "h-0"
-        )} />
-
         {/* Page Content */}
-        <section className="flex-1 overflow-y-auto relative">
+        <section className="flex-1 overflow-y-auto mt-16 bg-background relative">
+          {/* Subtle background branding */}
+          <div className="absolute -right-20 bottom-0 opacity-[0.03] select-none pointer-events-none">
+            <span className="font-headline text-[30rem] leading-none text-white italic">B</span>
+          </div>
           {children}
         </section>
       </main>

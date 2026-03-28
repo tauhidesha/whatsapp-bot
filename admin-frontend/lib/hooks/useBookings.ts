@@ -89,5 +89,45 @@ export function useBookings() {
     }
   };
 
-  return { bookings, loading, error, updateBookingStatus };
+  const deleteBooking = async (id: string) => {
+    try {
+      const res = await fetch(`/api/bookings?id=${id}`, {
+        method: 'DELETE',
+      });
+
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+
+      // Local update
+      setBookings(prev => prev.filter(b => b.id !== id));
+      return true;
+    } catch (err) {
+      console.error('Error deleting booking:', err);
+      throw err;
+    }
+  };
+
+  const updateBooking = async (id: string, updates: Partial<Booking>) => {
+    try {
+      const res = await fetch('/api/bookings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id, ...updates }),
+      });
+
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+
+      // Local update
+      setBookings(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
+      return true;
+    } catch (err) {
+      console.error('Error updating booking:', err);
+      throw err;
+    }
+  };
+
+  return { bookings, loading, error, updateBookingStatus, deleteBooking, updateBooking };
 }

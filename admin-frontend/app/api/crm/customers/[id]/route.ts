@@ -28,7 +28,7 @@ export async function GET(
                 status: true,
                 plateNumber: true,
                 vehicleModel: true,
-              }
+              } as any
             }
           },
           orderBy: { createdAt: 'desc' }
@@ -48,7 +48,7 @@ export async function GET(
           take: 20
         },
         customerContext: true
-      }
+      } as any
     });
 
     if (!customer) {

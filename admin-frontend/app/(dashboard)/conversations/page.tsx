@@ -10,6 +10,7 @@ import ConversationList from '@/components/conversations/ConversationList';
 import ConversationWindow from '@/components/conversations/ConversationWindow';
 import NotificationPanel from '@/components/shared/NotificationPanel';
 import { cn } from '@/lib/utils';
+import { useLayout } from '@/context/LayoutContext';
 
 // Error Boundary Component for graceful error handling
 function ConversationErrorBoundary({ children }: { children: React.ReactNode }) {
@@ -34,8 +35,36 @@ function ConversationErrorBoundary({ children }: { children: React.ReactNode }) 
 function ConversationsContent() {
   const { user, getIdToken } = useAuth();
   const searchParams = useSearchParams();
+  const { setHeaderTitle, setHeaderExtra } = useLayout();
   const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>();
   const [showPermissionPrompt, setShowPermissionPrompt] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Update header on mount
+  useEffect(() => {
+    setHeaderTitle('INBOX CONTROL');
+    
+    // Inject search bar into header
+    setHeaderExtra(
+      <div className="relative w-full group">
+        <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-[20px] group-focus-within:text-[#FFFF00] transition-colors">
+          search
+        </span>
+        <input 
+          type="text"
+          placeholder="Cari chat atau pesan..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full h-11 bg-[#1C1B1B] border border-white/5 rounded-sm pl-12 pr-4 text-[13px] text-white placeholder:text-slate-600 focus:outline-none focus:border-[#FFFF00]/30 transition-all font-sans"
+        />
+      </div>
+    );
+
+    return () => {
+      setHeaderTitle('SYSTEM OVERVIEW');
+      setHeaderExtra(null);
+    };
+  }, [setHeaderTitle, setHeaderExtra, searchQuery]);
 
   // Handle incoming 'id' from query parameters
   useEffect(() => {
@@ -89,12 +118,12 @@ function ConversationsContent() {
   if (error) {
     return (
       <ConversationErrorBoundary>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <h2 className="text-red-900 font-semibold mb-2">Connection Error</h2>
-          <p className="text-red-700 text-sm">{error.message}</p>
+        <div className="bg-red-900/20 border border-red-500/50 rounded-sm p-4">
+          <h2 className="text-red-400 font-headline font-black mb-2 uppercase tracking-wider">Connection Error</h2>
+          <p className="text-red-300/70 text-[11px] font-sans">{error.message}</p>
           <button
             onClick={() => window.location.reload()}
-            className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition-colors"
+            className="mt-4 px-6 py-2 bg-red-600 text-white rounded-sm text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-colors"
           >
             Retry
           </button>
@@ -105,7 +134,7 @@ function ConversationsContent() {
 
   return (
     <>
-      <div className="flex-1 flex bg-white border-l overflow-hidden h-full relative">
+      <div className="flex bg-[#131313] overflow-hidden h-[calc(100vh-64px)] relative">
         {/* Conversation List */}
         <div className={cn(
           "h-full shrink-0 transition-all duration-300 min-w-0",
@@ -127,23 +156,29 @@ function ConversationsContent() {
           {selectedConversation ? (
             <ConversationWindow
               conversation={selectedConversation}
+              allConversations={conversations}
               apiClient={apiClient}
               onBack={() => setSelectedConversationId(undefined)}
             />
           ) : (
-            <div className="hidden md:flex flex-1 flex-col items-center justify-center bg-slate-50">
-              <div className="text-center">
-                <span className="material-symbols-outlined text-6xl text-slate-300 mb-4 block">
-                  chat_bubble_outline
-                </span>
-                <p className="text-slate-500 font-medium">
-                  Pilih percakapan untuk memulai
-                </p>
-                <p className="text-slate-400 text-sm mt-2">
-                  {conversations.length} percakapan tersedia
+            <div className="hidden md:flex flex-1 flex-col items-center justify-center bg-[#131313] relative overflow-hidden">
+              {/* Subtle background branding */}
+              <div className="absolute -right-20 -bottom-20 opacity-[0.02] select-none pointer-events-none">
+                <span className="font-headline text-[40rem] leading-none text-white italic">B</span>
+              </div>
+              
+              <div className="text-center relative z-10">
+                <div className="size-24 bg-[#1C1B1B] border border-white/5 rounded-[40px] flex items-center justify-center mx-auto mb-8 shadow-2xl">
+                  <span className="material-symbols-outlined text-5xl text-slate-700">
+                    forum
+                  </span>
+                </div>
+                <h3 className="text-white font-headline font-black text-xl uppercase tracking-widest mb-2">Pilih Percakapan</h3>
+                <p className="text-slate-500 font-sans text-xs uppercase tracking-widest font-bold">
+                  {conversations.length} total percakapan tersedia
                 </p>
                 {notificationCount > 0 && (
-                  <p className="text-primary text-sm mt-1 font-semibold">
+                  <p className="text-[#FFFF00] text-[10px] mt-4 font-black uppercase tracking-widest animate-pulse">
                     {notificationCount} notifikasi baru
                   </p>
                 )}

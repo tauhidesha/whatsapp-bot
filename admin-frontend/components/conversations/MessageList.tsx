@@ -2,83 +2,64 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Message } from '@/lib/hooks/useConversationMessages';
-import { formatDistanceToNow } from 'date-fns';
+import { format } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useLayout } from '@/context/LayoutContext';
-import { useScrollDirection } from '@/lib/hooks/useScrollDirection';
 
 interface MessageListProps {
   messages: Message[];
   loading?: boolean;
+  customerName?: string;
+  profilePic?: string | null;
 }
 
-function formatMessageText(text: string) {
-  if (!text) return '';
-  text = text.replace(/\*([^*]+)\*/g, '<strong>$1</strong>');
-  text = text.replace(/_([^_]+)_/g, '<em>$1</em>');
-  text = text.replace(/~([^~]+)~/g, '<del>$1</del>');
-  return text;
-}
-
-export default function MessageList({ messages, loading = false }: MessageListProps) {
+export default function MessageList({
+  messages,
+  loading = false,
+  customerName,
+}: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollEl, setScrollEl] = useState<HTMLElement | null>(null);
   const { setIsHeaderVisible } = useLayout();
-  const { isAtTop } = useScrollDirection(scrollEl);
 
-  // Callback ref - dipanggil tepat saat DOM element ter-attach/detach
   const setScrollRef = useCallback((node: HTMLDivElement | null) => {
     (scrollRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
-    if (node) {
-      setScrollEl(node);
-      setIsHeaderVisible(false); // default hide saat conversation dibuka
-    } else {
-      setScrollEl(null);
-      setIsHeaderVisible(true); // reset saat keluar
-    }
+    setScrollEl(node || null);
+  }, []);
+
+  useEffect(() => {
+    setIsHeaderVisible(true);
   }, [setIsHeaderVisible]);
 
-  // Show header hanya saat di posisi paling atas, hide saat scroll down
-  useEffect(() => {
-    if (isAtTop) {
-      setIsHeaderVisible(true);
-    } else {
-      setIsHeaderVisible(false);
-    }
-  }, [setIsHeaderVisible, isAtTop]);
-
-  // Auto-scroll to latest message (tanpa trigger hide)
   useEffect(() => {
     if (!scrollEl) return;
     const timeout = setTimeout(() => {
       scrollEl.scrollTo({ top: scrollEl.scrollHeight, behavior: 'smooth' });
     }, 150);
     return () => clearTimeout(timeout);
-  }, [scrollEl]); // hanya saat pertama attach, bukan setiap messages update
+  }, [scrollEl, messages]);
 
   if (loading) {
     return (
-      <div className="h-full w-full flex items-center justify-center bg-slate-50/30">
-        <div className="text-center">
-          <div className="size-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sm font-medium text-slate-500">Memuat riwayat pesan...</p>
-        </div>
+      <div className="flex items-center justify-center flex-1 w-full bg-[#131313]">
+        <div className="size-10 border-4 border-[#FFFF00]/20 border-t-[#FFFF00] rounded-full animate-spin" />
       </div>
     );
   }
 
   if (messages.length === 0) {
     return (
-      <div className="h-full w-full flex items-center justify-center bg-slate-50/50">
-        <div className="text-center p-8 max-w-xs">
-          <div className="size-24 bg-white rounded-full flex items-center justify-center mx-auto shadow-2xl shadow-slate-200/50 mb-8 border border-slate-50">
-            <span className="material-symbols-outlined text-6xl text-slate-100">forum</span>
+      <div className="flex items-center justify-center flex-1 w-full bg-[#131313]">
+        <div className="text-center p-8 max-w-xs relative z-10">
+          <div className="size-24 bg-[#1C1B1B] border border-white/5 rounded-[40px] flex items-center justify-center mx-auto shadow-2xl mb-8">
+            <span className="material-symbols-outlined text-6xl text-slate-700">forum</span>
           </div>
-          <h4 className="text-slate-900 font-black text-lg mb-2">Pintu Terbuka!</h4>
-          <p className="text-xs text-slate-400 leading-relaxed font-medium">
-            Belum ada pesan di sini. Jadilah yang pertama menyapa pelanggan Anda.
+          <h4 className="text-white font-headline font-black text-lg mb-2 uppercase tracking-widest">
+            Sistem Ready
+          </h4>
+          <p className="text-[10px] text-slate-500 leading-relaxed font-black uppercase tracking-widest font-sans">
+            Menunggu transmisi data pertama dari pelanggan.
           </p>
         </div>
       </div>
@@ -88,107 +69,100 @@ export default function MessageList({ messages, loading = false }: MessageListPr
   return (
     <div
       ref={setScrollRef}
-      className="h-full w-full bg-[#fbfbfb]"
-      style={{ overflowY: 'auto', overflowX: 'hidden' }}
+      className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 flex flex-col gap-6 no-scrollbar bg-[#131313] relative custom-scrollbar"
     >
-      {/* Subtle Background Overlay */}
-      <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:20px_20px]" />
+      {/* Date Divider */}
+      <div className="flex justify-center">
+        <span className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-bold font-sans">
+          TODAY • {format(new Date(), 'hh:mm a', { locale: idLocale }).toUpperCase()}
+        </span>
+      </div>
 
-      <div
-        className="py-4 md:py-8 flex flex-col gap-3 min-h-full"
-        style={{ padding: '1rem 0.75rem', width: '100%', boxSizing: 'border-box' }}
-      >
-        {/* Spacer to push content down if not full */}
-        <div className="flex-1" />
+      {messages.map((message) => {
+        const isSelf = message.sender === 'admin';
+        const isAI = message.sender === 'ai';
+        const isOutgoing = isSelf || isAI;
+        const formattedTime = format(
+          new Date(message.timestamp),
+          'hh:mm a',
+          { locale: idLocale }
+        ).toUpperCase();
 
-        {messages.map((message, idx) => {
-          const isOutgoing = message.sender === 'admin' || message.sender === 'ai';
-          const senderLabel =
-            message.sender === 'customer'
-              ? 'Customer'
-              : message.sender === 'ai'
-                ? 'AI Assistant'
-                : 'Admin';
+        const isImage =
+          message.content.includes('http') &&
+          (message.content.includes('.jpg') || message.content.includes('.png'));
 
-          const timeAgo = (() => {
-            try {
-              if (!message.timestamp) return 'Baru saja';
-              const date = new Date(message.timestamp);
-              if (isNaN(date.getTime())) return 'Baru saja';
-              return formatDistanceToNow(date, { addSuffix: false, locale: idLocale });
-            } catch {
-              return 'Baru saja';
-            }
-          })();
-
-          const showAvatar = !isOutgoing && (idx === 0 || messages[idx - 1].sender !== message.sender);
-
-          return (
+        return (
+          <div
+            key={message.id}
+            className={cn(
+              'flex flex-col max-w-[85%] group',
+              isOutgoing ? 'items-end self-end' : 'items-start self-start'
+            )}
+          >
+            {/* Sender label + timestamp */}
             <div
-              key={message.id}
               className={cn(
-                "flex group animate-in fade-in slide-in-from-bottom-4 duration-500",
-                isOutgoing ? "justify-end" : "justify-start"
+                'flex items-center gap-2 mb-1',
+                isOutgoing ? 'mr-1 flex-row' : 'ml-1 flex-row'
               )}
-              style={{ width: '100%', minWidth: 0, boxSizing: 'border-box' }}
             >
-              {!isOutgoing && (
-                <div className="w-10 mr-3 shrink-0 flex flex-col justify-end">
-                  {showAvatar ? (
-                    <div className="w-9 h-9 rounded-full bg-white border-2 border-slate-100 flex items-center justify-center shadow-md font-black text-slate-300 text-[10px]">
-                      {senderLabel.charAt(0)}
-                    </div>
-                  ) : <div className="w-9" />}
-                </div>
+              {isOutgoing ? (
+                <>
+                  <span className="text-[10px] text-zinc-500 font-sans">{formattedTime}</span>
+                  <span
+                    className={cn(
+                      'w-1 h-1 rounded-full',
+                      isAI ? 'bg-[#FFFF00]' : 'bg-zinc-500'
+                    )}
+                  />
+                  <span
+                    className={cn(
+                      'text-[10px] font-bold uppercase tracking-wider font-sans',
+                      isAI ? 'text-[#FFFF00]' : 'text-zinc-400'
+                    )}
+                  >
+                    {isAI ? 'ZOYA AI' : 'ADMIN OPS'}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="text-[10px] font-bold text-zinc-300 uppercase tracking-wider font-sans">
+                    {customerName || 'Customer'}
+                  </span>
+                  <span className="w-1 h-1 bg-zinc-600 rounded-full" />
+                  <span className="text-[10px] text-zinc-500 font-sans">{formattedTime}</span>
+                </>
               )}
+            </div>
 
+            {/* Bubble */}
+            {isImage ? (
+              <div className="bg-[#1c1b1b] p-1 rounded-xl border border-white/5 overflow-hidden">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={message.content}
+                  alt="Attachment"
+                  className="w-full aspect-square object-cover rounded-lg grayscale hover:grayscale-0 transition-all duration-500"
+                />
+              </div>
+            ) : (
               <div
                 className={cn(
-                  "flex flex-col",
-                  isOutgoing ? "items-end" : "items-start"
+                  'p-4 text-sm font-sans leading-relaxed whitespace-pre-wrap',
+                  isOutgoing
+                    ? isAI
+                      ? 'bg-[#FFFF00] text-[#1d1d00] rounded-tl-xl rounded-bl-xl rounded-br-xl font-semibold shadow-[0_8px_24px_rgba(234,234,0,0.15)]'
+                      : 'bg-[#2a2a2a] text-[#e5e2e1] rounded-tl-xl rounded-bl-xl rounded-br-xl border border-white/5'
+                    : 'bg-[#2a2a2a] text-[#e5e2e1] rounded-tr-xl rounded-br-xl rounded-bl-xl border-l-2 border-zinc-600/30'
                 )}
-                style={{
-                  minWidth: 0,
-                  maxWidth: isOutgoing ? '75%' : 'calc(75% - 52px)',
-                }}
               >
-                <div
-                  className={cn(
-                    "px-4 py-3 rounded-2xl leading-relaxed text-[15px] relative transition-all duration-300",
-                    isOutgoing
-                      ? "bg-slate-800 text-slate-50 font-medium rounded-tr-sm shadow-sm"
-                      : "bg-white text-slate-700 rounded-tl-sm border border-slate-200 shadow-sm"
-                  )}
-                  style={{ wordBreak: 'break-word', overflowWrap: 'break-word', minWidth: 0, maxWidth: '100%' }}
-                >
-                  <div
-                    dangerouslySetInnerHTML={{ __html: formatMessageText(message.content) }}
-                    style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'break-word' }}
-                  />
-                </div>
-
-                <div className={cn(
-                  "mt-2.5 flex items-center gap-2.5 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300",
-                  isOutgoing ? "flex-row-reverse" : ""
-                )}>
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    {senderLabel}
-                  </span>
-                  <span className="size-1 bg-slate-200 rounded-full" />
-                  <span className="text-[10px] font-bold text-slate-300 uppercase">
-                    {timeAgo}
-                  </span>
-                  {isOutgoing && message.sender === 'ai' && (
-                    <Badge variant="outline" className="h-3.5 ml-1 px-1.5 py-0 text-[9px] border-primary/30 text-primary-foreground bg-primary/10 uppercase font-black tracking-tighter shadow-none">
-                      AUTO-RESPONSE
-                    </Badge>
-                  )}
-                </div>
+                {message.content}
               </div>
-            </div>
-          );
-        })}
-      </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

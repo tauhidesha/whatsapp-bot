@@ -322,3 +322,86 @@ export async function PATCH(req: NextRequest) {
     );
   }
 }
+
+// DELETE /api/bookings?id=xxx
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: 'Booking ID is required' },
+        { status: 400 }
+      );
+    }
+
+    await prisma.transaction.deleteMany({ where: { bookingId: id } });
+    await prisma.booking.delete({ where: { id } });
+
+    return NextResponse.json({
+      success: true,
+      message: 'Booking berhasil dihapus',
+    });
+  } catch (error: any) {
+    console.error('Error deleting booking:', error);
+    return NextResponse.json(
+      { success: false, error: 'Gagal menghapus booking', details: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT /api/bookings
+export async function PUT(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { id, ...data } = body;
+
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: 'Booking ID is required' },
+        { status: 400 }
+      );
+    }
+
+    // Transfom frontend payload to DB field names if necessary
+    const updateData: any = {};
+    if (data.customerName) updateData.customerName = data.customerName;
+    if (data.customerPhone) updateData.customerPhone = data.customerPhone.replace(/\D/g, '');
+    if (data.serviceName) {
+      updateData.serviceType = data.serviceName;
+      updateData.category = getServiceCategory(data.serviceName);
+    }
+    if (data.bookingDate && data.bookingTime) {
+      updateData.bookingDate = new Date(`${data.bookingDate}T${data.bookingTime}:00`);
+    }
+    if (data.vehicleInfo) {
+      const parts = data.vehicleInfo.split(' (');
+      updateData.vehicleModel = parts[0];
+      if (parts[1]) updateData.plateNumber = parts[1].replace(')', '');
+    }
+    if (data.subtotal !== undefined) updateData.subtotal = data.subtotal;
+    if (data.dpAmount !== undefined) updateData.downPayment = data.dpAmount;
+    if (data.homeService !== undefined) updateData.homeService = data.homeService;
+    if (data.notes !== undefined) updateData.notes = data.notes;
+    if (data.paymentMethod) updateData.paymentMethod = data.paymentMethod;
+
+    const booking = await prisma.booking.update({
+      where: { id },
+      data: updateData,
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: booking,
+      message: 'Booking berhasil diperbarui sepenuhnya',
+    });
+  } catch (error: any) {
+    console.error('Error in PUT booking:', error);
+    return NextResponse.json(
+      { success: false, error: 'Gagal memperbarui booking', details: error.message },
+      { status: 500 }
+    );
+  }
+}
