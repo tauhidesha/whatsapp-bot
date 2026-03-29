@@ -16,6 +16,7 @@ generator client {
 model Customer {
   id            String    @id @default(uuid())
   phone         String    @unique
+  phoneReal     String?
   whatsappLid   String?   @unique
   name          String?
   totalSpending Float     @default(0)
@@ -37,6 +38,8 @@ model Customer {
   transactions      Transaction[]
   vehicles          Vehicle[]
   customerContext   CustomerContext?
+
+  @@index([phoneReal])
 }
 
 model Vehicle {
@@ -44,7 +47,7 @@ model Vehicle {
   customerId    String
   customer      Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
   modelName     String
-  plateNumber   String?   @unique
+  plateNumber   String?
   color         String?
   notes         String?
 
@@ -52,6 +55,8 @@ model Vehicle {
   updatedAt     DateTime  @updatedAt
 
   bookings      Booking[]
+
+  @@unique([customerId, plateNumber])
 }
 
 model DirectMessage {

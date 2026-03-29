@@ -62,6 +62,21 @@ const daftarUkuranMotor = require('./src/data/daftarUkuranMotor.js');
 const { repaintBodiHalus } = require('./src/data/repaintPrices.js');
 const { getActivePromo } = require('./src/ai/utils/promoConfig.js');
 const { getSpecificPriceContext } = require('./src/ai/utils/priceCalculator.js');
+const browserUtils = require('./src/ai/utils/browser.js');
+
+// --- Global Constants ---
+const ACTIVE_AI_MODEL = process.env.AI_MODEL || 'gemini-flash-lite-latest';
+const DEBOUNCE_DELAY_MS = 10000;
+const ACTIVE_VISION_MODEL = process.env.VISION_MODEL || 'gemini-1.5-flash';
+const MEMORY_CONFIG = {
+    maxMessages: parseInt(process.env.MEMORY_MAX_MESSAGES) || 20,
+    maxAgeHours: parseInt(process.env.MEMORY_MAX_AGE_HOURS) || 24,
+};
+
+// Centralized Browser Config
+const CHROMIUM_PATH = browserUtils.getChromiumPath();
+const PUPPETEER_CHROME_ARGS = browserUtils.DEFAULT_CHROME_ARGS;
+const PUPPETEER_VIEWPORT = { width: 1280, height: 800 };
 
 const app = express();
 const server = http.createServer(app);
@@ -195,9 +210,7 @@ if (API_KEYS.length > 1) {
     console.log(`🔄 [STARTUP] Fallback API key configured - will auto-retry on failures`);
 }
 
-const ACTIVE_AI_MODEL = process.env.AI_MODEL || 'gemini-flash-lite-latest';
-// Vision default: gemini-2.5-flash (multimodal). Bisa override via VISION_MODEL/IMAGE_MODEL.
-const ACTIVE_VISION_MODEL = process.env.VISION_MODEL || process.env.IMAGE_MODEL || 'gemini-2.5-flash';
+// ACTIVE_VISION_MODEL is defined at the top as a global constant
 const FALLBACK_VISION_MODEL = process.env.VISION_FALLBACK_MODEL || 'gemini-2.0-flash';
 
 const baseModel = new ChatGoogleGenerativeAI({
@@ -415,71 +428,11 @@ function getTracingConfig(label, options = {}) {
 const { DebounceQueue } = require('./src/ai/utils/debounceQueue.js');
 
 const pendingMessages = new Map();
-const DEBOUNCE_DELAY_MS = parseInt(process.env.DEBOUNCE_DELAY_MS || '10000', 10);
+const { getChromiumPath, DEFAULT_CHROME_ARGS } = require('./src/ai/utils/browser');
 
-const DEFAULT_CHROME_ARGS = [
-    '--no-sandbox',
-    '--disable-setuid-sandbox',
-    '--disable-dev-shm-usage',
-    '--disable-gpu',
-    '--disable-background-networking',
-    '--disable-background-timer-throttling',
-    '--disable-client-side-phishing-detection',
-    '--disable-component-update',
-    '--disable-default-apps',
-    '--disable-domain-reliability',
-    '--disable-extensions',
-    '--disable-popup-blocking',
-    '--disable-renderer-backgrounding',
-    '--disable-sync',
-    '--disable-accelerated-2d-canvas',
-    '--disable-print-preview',
-    '--disable-prompt-on-repost',
-    '--metrics-recording-only',
-    '--mute-audio',
-    '--no-default-browser-check',
-    '--no-first-run',
-    '--password-store=basic',
-    '--use-mock-keychain',
-    '--hide-scrollbars',
-    '--remote-debugging-port=0',
-    '--disable-software-rasterizer',
-    '--disable-features=IsolateOrigins,site-per-process',
-    '--disable-web-security',
-    // ⬇️ EKSTRIM RAM SAVING UNTUK SERVER 1-2GB ⬇️
-    '--disable-site-isolation-trials', // MEMBUNUH BANYAK CHILD PROCESS 
-    '--disable-webgl',
-    '--js-flags="--max-old-space-size=512"', // BATASI RAM V8 ENGINE CHROME
-    '--disk-cache-size=20000000', // BATASI CACHE CHROME
-    // Additional stability flags for EC2
-    '--disable-breakpad',
-    '--disable-hang-monitor',
-    '--disable-ipc-flooding-protection',
-    '--no-zygote',
-    '--enable-features=NetworkService,NetworkServiceInProcess',
-    // Stealth mode - Anti-detection flags
-    '--disable-blink-features=AutomationControlled',
-    '--exclude-switches=enable-automation',
-    '--disable-infobars',
-    '--window-size=1920,1080',
-    '--start-maximized',
-    '--lang=en-US,en',
-];
+// PUPPETEER_VIEWPORT is handled by the browser utility at the top of the file.
 
-const ADDITIONAL_CHROME_ARGS = (process.env.CHROMIUM_ADDITIONAL_ARGS || '')
-    .split(/[\s,]+/)
-    .map((flag) => flag.trim())
-    .filter(Boolean);
-
-const PUPPETEER_CHROME_ARGS = Array.from(new Set([...DEFAULT_CHROME_ARGS, ...ADDITIONAL_CHROME_ARGS]));
-
-const DEFAULT_VIEWPORT_WIDTH = parseInt(process.env.PUPPETEER_VIEWPORT_WIDTH || '800', 10);
-const DEFAULT_VIEWPORT_HEIGHT = parseInt(process.env.PUPPETEER_VIEWPORT_HEIGHT || '600', 10);
-
-const PUPPETEER_VIEWPORT = {
-    width: Number.isFinite(DEFAULT_VIEWPORT_WIDTH) ? DEFAULT_VIEWPORT_WIDTH : 800,
-    height: Number.isFinite(DEFAULT_VIEWPORT_HEIGHT) ? DEFAULT_VIEWPORT_HEIGHT : 600,
-};
+// CHROMIUM_PATH and getChromiumPath are now handled by the browser utility at the top of the file.
 
 async function cleanupChromiumProfileLocks(sessionName, sessionDataPath = './tokens') {
     try {
@@ -523,11 +476,7 @@ async function cleanupChromiumProfileLocks(sessionName, sessionDataPath = './tok
     }
 }
 
-// --- Memory Configuration ---
-const MEMORY_CONFIG = {
-    maxMessages: parseInt(process.env.MEMORY_MAX_MESSAGES) || 3,
-    includeSystemMessages: process.env.MEMORY_INCLUDE_SYSTEM === 'true'
-};
+// MEMORY_CONFIG is defined at the top as a global constant
 
 // --- Memory Functions ---
 async function getConversationHistory(senderNumber, limit = MEMORY_CONFIG.maxMessages) {
@@ -3055,12 +3004,13 @@ server.listen(PORT, '0.0.0.0', async () => {
             }
         },
         puppeteerOptions: {
-            userDataDir: sessionDataPath, // Pastikan path session konsisten
-            args: [
-                ...PUPPETEER_CHROME_ARGS,
-                '--disable-gpu', // Pastikan GPU mati untuk hemat memori
-                '--disable-web-security', // Membantu meloloskan beberapa resource WA Web
-            ]
+            userDataDir: sessionDataPath,
+            executablePath: CHROMIUM_PATH,
+            args: PUPPETEER_CHROME_ARGS,
+            ignoreHTTPSErrors: true,
+            defaultViewport: PUPPETEER_VIEWPORT,
+            timeout: 180000,
+            protocolTimeout: 360000,
         },
         headless: whatsappHeadless,
         logQR: false,
@@ -3223,7 +3173,7 @@ async function reconnectWhatsApp() {
                 defaultViewport: PUPPETEER_VIEWPORT,
                 ignoreHTTPSErrors: true,
                 headless: whatsappHeadless,
-                executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
+                executablePath: CHROMIUM_PATH,
             },
             onLoadingScreen: async (page) => {
                 try {

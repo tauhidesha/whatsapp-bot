@@ -188,7 +188,7 @@ const updateBookingTool = {
       if (parsed.serviceName) {
         const servicesArray = parsed.serviceName.split(',').map(s => s.trim()).filter(Boolean);
         if (servicesArray.length > 0) {
-          updateData.serviceType = servicesArray.join(', ');
+          updateData.serviceType = servicesArray.join('\n');
           updateData.category = getServiceCategory(servicesArray[0]);
         }
       }

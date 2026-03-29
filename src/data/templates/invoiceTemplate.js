@@ -19,15 +19,15 @@ module.exports = function generateInvoiceHTML(data) {
     .replace('@lid', '')
     .replace(/^62/, '0');
 
-  // Parse items jadi array - Split by newline
-  const itemsList = items.split(/\n/).map(i => i.trim()).filter(Boolean);
+  // Parse items jadi array - Split by newline ONLY
+  const itemsList = items.split('\n').map(i => i.trim()).filter(Boolean);
 
   // Filter redundant notes
   let filteredNotes = notes || '-';
   if (filteredNotes.startsWith('Layanan: ')) {
     const noteContent = filteredNotes.replace('Layanan: ', '').trim();
     // If the note content is exactly the same as items summary, hide it
-    const itemsSummary = itemsList.map(i => i.split(':')[0].trim()).join(', ');
+    const itemsSummary = itemsList.map(i => i.split('||')[0].trim()).join(', ');
     if (noteContent === itemsSummary) filteredNotes = '';
     else filteredNotes = noteContent;
   }
@@ -43,14 +43,19 @@ module.exports = function generateInvoiceHTML(data) {
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     @page { margin: 0; size: A4; }
+    html { background: #131313; -webkit-print-color-adjust: exact; }
     body {
       background: #131313;
       color: #e5e2e1;
       font-family: 'Manrope', sans-serif;
-      padding: 60px;
+      padding: 0;
       width: 794px; /* A4 width in px at 96dpi */
       margin: 0 auto;
+      -webkit-print-color-adjust: exact;
     }
+    
+    .content-padding { padding: 60px; }
+    
     .font-headline { font-family: 'League Spartan', sans-serif; }
     .text-yellow { color: #FFFF00; }
     .bg-yellow { background: #FFFF00; color: #1d1d00; }
@@ -58,102 +63,125 @@ module.exports = function generateInvoiceHTML(data) {
     .bg-darker { background: #0e0e0e; }
     .text-muted { color: #cac8aa; }
     .border-yellow { border-left: 2px solid #FFFF00; }
-    .item-row { 
-      display:grid; 
-      grid-template-columns:6fr 1fr 2fr 2fr; 
-      gap: 16px;
-      padding:28px 16px; 
-      border-bottom:1px solid rgba(255,255,255,0.05); 
-      align-items:center;
-      page-break-inside: avoid;
-      break-inside: avoid;
+    
+    /* Table styling for better page breaks and margins */
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .items-table thead { display: table-header-group; }
+    .items-table thead .spacer { height: 60px; }
+    
+    .item-row td {
+      padding: 28px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      vertical-align: middle;
     }
+    .item-row:last-child td { border-bottom: none; }
+    
     .totals-section {
       page-break-inside: avoid;
       break-inside: avoid;
     }
+    
     @media print {
-      body { padding-top: 40px; }
+      body { background: #131313; }
     }
   </style>
 </head>
 <body>
-  <!-- Header -->
-  <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:60px">
-    <div>
-      <h1 class="font-headline" style="font-size:72px; font-weight:900; line-height:0.8; text-transform:uppercase; margin-bottom:16px">
-        ${documentType === 'tanda_terima' ? 'Receipt' : documentType === 'bukti_bayar' ? 'Payment' : 'Invoice'}<br/>
-        <span class="text-yellow">Repaint &<br/>Detailing</span>
-      </h1>
-      <div style="display:flex; gap:12px; margin-top:16px">
-        <span style="background:#676700; color:#e6e67a; padding:4px 12px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em">
-          Status: ${paid >= finalTotal ? 'Lunas' : paid > 0 ? 'DP' : 'Belum Bayar'}
-        </span>
-      </div>
-    </div>
-    <div style="text-align:right">
-      <img src="${logoBase64}" style="height:60px; margin-bottom:24px"/>
+  <div class="content-padding">
+    <!-- Header -->
+    <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:60px">
       <div>
-        <p class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em">Nomor Dokumen</p>
-        <p class="font-headline text-yellow" style="font-size:28px; font-weight:700">#BS-${docNumber}</p>
+        <h1 class="font-headline" style="font-size:72px; font-weight:900; line-height:0.8; text-transform:uppercase; margin-bottom:16px">
+          ${documentType === 'tanda_terima' ? 'Receipt' : documentType === 'bukti_bayar' ? 'Payment' : 'Invoice'}<br/>
+          <span class="text-yellow">Repaint &<br/>Detailing</span>
+        </h1>
+        <div style="display:flex; gap:12px; margin-top:16px">
+          <span style="background:#676700; color:#e6e67a; padding:4px 12px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em">
+            Status: ${paid >= finalTotal ? 'Lunas' : paid > 0 ? 'DP' : 'Belum Bayar'}
+          </span>
+        </div>
       </div>
-      <div style="margin-top:16px">
-        <p class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em">Tanggal Terbit</p>
-        <p style="font-size:16px; font-weight:500">${now.toLocaleDateString('id-ID', { day:'numeric', month:'long', year:'numeric' })}</p>
+      <div style="text-align:right">
+        <img src="${logoBase64}" style="height:60px; margin-bottom:24px"/>
+        <div>
+          <p class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em">Nomor Dokumen</p>
+          <p class="font-headline text-yellow" style="font-size:28px; font-weight:700">#BS-${docNumber}</p>
+        </div>
+        <div style="margin-top:16px">
+          <p class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em">Tanggal Terbit</p>
+          <p style="font-size:16px; font-weight:500">${now.toLocaleDateString('id-ID', { day:'numeric', month:'long', year:'numeric' })}</p>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- Customer & Studio -->
-  <div style="display:grid; grid-template-columns:1fr 1fr; gap:1px; background:#484831; margin-bottom:60px">
-    <div class="bg-dark" style="padding:28px">
-      <p class="text-yellow" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.2em; margin-bottom:20px">Informasi Pelanggan</p>
-      <p class="font-headline" style="font-size:24px; font-weight:700; text-transform:uppercase; margin-bottom:8px">${customerName}</p>
-      <p class="text-muted" style="font-size:14px; line-height:1.8">
-        WhatsApp: ${displayPhone}<br/>
-        Kendaraan: ${motorDetails}
-      </p>
-    </div>
-    <div class="bg-dark" style="padding:28px">
-      <p class="text-yellow" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.2em; margin-bottom:20px">Studio Layanan</p>
-      <p class="font-headline" style="font-size:24px; font-weight:700; text-transform:uppercase; margin-bottom:8px">BOSMAT STUDIO</p>
-      <p class="text-muted" style="font-size:14px; line-height:1.8">
-        Garasi 54, Jl. R. Sanim No. 99<br/>
-        Beji, Depok, Jawa Barat 16456<br/>
-        08179481010
-      </p>
-    </div>
-  </div>
-
-  <!-- Items Table Header -->
-  <div style="display:grid; grid-template-columns:6fr 1fr 2fr 2fr; gap:16px; padding:0 16px 12px; border-bottom:1px solid #484831; margin-bottom:8px">
-    <span class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em">Deskripsi Layanan</span>
-    <span class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em; text-align:center">Jml</span>
-    <span class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em; text-align:right">Harga</span>
-    <span class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em; text-align:right">Total</span>
-  </div>
-
-  <!-- Items -->
-  ${itemsList.map(item => {
-    // Parse per item pakai || separator
-    const parts = item.split('||');
-    const cleanTitle = (parts[0] || '').trim().replace(/^(\d+\.|[-*•])\s*/, '');
-    const price = parseInt(parts[1]) || 0;
-    const itemDesc = (parts[2] || '').trim();
-
-    const priceStr = price > 0 ? `Rp${price.toLocaleString('id-ID')}` : '-';
-
-    return `
-    <div class="item-row">
-      <div>
-        <p class="font-headline" style="font-size:18px; font-weight:700; text-transform:uppercase">${cleanTitle}</p>
-        ${itemDesc ? `<p class="text-muted" style="font-size:12px; line-height:1.4; margin-top:4px">${itemDesc}</p>` : ''}
+    <!-- Customer & Studio -->
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1px; background:#484831; margin-bottom:60px">
+      <div class="bg-dark" style="padding:28px">
+        <p class="text-yellow" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.2em; margin-bottom:20px">Informasi Pelanggan</p>
+        <p class="font-headline" style="font-size:24px; font-weight:700; text-transform:uppercase; margin-bottom:8px">${customerName}</p>
+        <p class="text-muted" style="font-size:14px; line-height:1.8">
+          WhatsApp: ${displayPhone}<br/>
+          Kendaraan: ${motorDetails}
+        </p>
       </div>
-      <p class="font-headline" style="font-size:18px; font-weight:700; text-align:center">01</p>
-      <p class="text-muted" style="font-size:14px; text-align:right">${priceStr}</p>
-      <p class="font-headline text-yellow" style="font-size:18px; font-weight:700; text-align:right">${priceStr}</p>
-    </div>`;
-  }).join('')}
+      <div class="bg-dark" style="padding:28px">
+        <p class="text-yellow" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.2em; margin-bottom:20px">Studio Layanan</p>
+        <p class="font-headline" style="font-size:24px; font-weight:700; text-transform:uppercase; margin-bottom:8px">BOSMAT STUDIO</p>
+        <p class="text-muted" style="font-size:14px; line-height:1.8">
+          Garasi 54, Jl. R. Sanim No. 99<br/>
+          Beji, Depok, Jawa Barat 16456<br/>
+          08179481010
+        </p>
+      </div>
+    </div>
+
+    <!-- Items Table -->
+    <table class="items-table">
+      <thead>
+        <!-- Spacer header that repeats on page breaks -->
+        <tr class="spacer-only-print"><th colspan="4" style="height:40px"></th></tr>
+        <tr style="border-bottom:1px solid #484831;">
+          <th style="width:50%; text-align:left; padding-bottom:12px">
+            <span class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em">Deskripsi Layanan</span>
+          </th>
+          <th style="width:10%; text-align:center; padding-bottom:12px">
+            <span class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em">Jml</span>
+          </th>
+          <th style="width:20%; text-align:right; padding-bottom:12px">
+            <span class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em">Harga</span>
+          </th>
+          <th style="width:20%; text-align:right; padding-bottom:12px">
+            <span class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em">Total</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemsList.map(item => {
+          const parts = item.split('||');
+          const cleanTitle = (parts[0] || '').trim().replace(/^(\d+\.|[-*•])\s*/, '');
+          const price = parseInt(parts[1]) || 0;
+          const itemDesc = (parts[2] || '').trim();
+          const priceStr = price > 0 ? `Rp${price.toLocaleString('id-ID')}` : '-';
+
+          return `
+          <tr class="item-row" style="page-break-inside: avoid; break-inside: avoid;">
+            <td>
+              <p class="font-headline" style="font-size:18px; font-weight:700; text-transform:uppercase">${cleanTitle}</p>
+              ${itemDesc ? `<p class="text-muted" style="font-size:12px; line-height:1.4; margin-top:4px">${itemDesc}</p>` : ''}
+            </td>
+            <td style="text-align:center">
+              <p class="font-headline" style="font-size:18px; font-weight:700">01</p>
+            </td>
+            <td style="text-align:right">
+              <p class="text-muted" style="font-size:14px">${priceStr}</p>
+            </td>
+            <td style="text-align:right">
+              <p class="font-headline text-yellow" style="font-size:18px; font-weight:700">${priceStr}</p>
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
 
   <!-- Totals + Notes -->
   <div class="totals-section" style="display:grid; grid-template-columns:7fr 5fr; gap:32px; margin-top:40px">
@@ -220,6 +248,7 @@ module.exports = function generateInvoiceHTML(data) {
         <!-- Wallet icon unicode -->
         <span style="font-size:28px; color:#1d1d00">💳</span>
       </div>
+    </div>
     </div>
   </div>
 </body>

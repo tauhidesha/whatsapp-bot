@@ -118,47 +118,80 @@ const generateDocumentTool = {
     // Always try to enrich items with descriptions from masterLayanan
     if (finalItems && finalItems !== '-') {
       try {
-        const itemList = finalItems.split(/\n/).map(i => i.trim()).filter(Boolean);
-        const enrichedList = [];
+        // Step 1: Split and Parse
+        const itemList = finalItems.split('\n').map(i => i.trim()).filter(Boolean);
+        let parsedItems = [];
         let runningTotal = 0;
 
         for (const itemStr of itemList) {
-          // Parse "Name: Price" or just "Name"
-          const lastColon = itemStr.lastIndexOf(':');
-          let name = itemStr;
+          let name = '';
           let price = 0;
+          let desc = '';
           
-          if (lastColon > -1) {
-            name = itemStr.substring(0, lastColon).trim();
-            price = parseInt(itemStr.substring(lastColon + 1).replace(/[^\d]/g, '')) || 0;
+          if (itemStr.includes('||')) {
+            const parts = itemStr.split('||');
+            name = (parts[0] || '').trim();
+            price = parseInt(parts[1]) || 0;
+            desc = (parts[2] || '').trim();
+          } else {
+            const lastColon = itemStr.lastIndexOf(':');
+            if (lastColon > -1) {
+              name = itemStr.substring(0, lastColon).trim();
+              price = parseInt(itemStr.substring(lastColon + 1).replace(/[^\d]/g, '')) || 0;
+            } else {
+              name = itemStr;
+            }
           }
 
-          const service = masterLayanan.find(s =>
-            name.toLowerCase().includes(s.name.toLowerCase()) ||
-            s.name.toLowerCase().includes(name.toLowerCase())
-          );
+          if (!name) continue;
+
+          // Precise Matching: Try exact match first
+          let service = masterLayanan.find(s => s.name.toLowerCase() === name.toLowerCase());
+          
+          // Fallback to fuzzy match only if name is long enough to be significant
+          if (!service && name.length > 5) {
+            service = masterLayanan.find(s => 
+              name.toLowerCase().includes(s.name.toLowerCase()) || 
+              s.name.toLowerCase().includes(name.toLowerCase())
+            );
+          }
 
           if (service) {
-            // Use existing price if available, otherwise get from master
             let finalPrice = price;
-            if (finalPrice === 0 && (!finalTotal || finalTotal === 0)) {
+            if (finalPrice <= 0 && (!finalTotal || finalTotal === 0)) {
               finalPrice = service.price;
-              if (service.variants && Array.isArray(service.variants) && detectedSize) {
+              if (service.variants && detectedSize) {
                 const variant = service.variants.find(v => v.name === detectedSize);
                 if (variant) finalPrice = variant.price;
               }
             }
-            runningTotal += finalPrice;
             
-            const desc = service.summary || service.description || '';
-            enrichedList.push(`${service.name}||${finalPrice}||${desc}`);
+            parsedItems.push({
+              name: service.name,
+              price: finalPrice,
+              desc: desc || service.summary || service.description || ''
+            });
+            runningTotal += finalPrice;
           } else {
-            enrichedList.push(`${name}||${price}||`);
-            if (price > 0) runningTotal += price;
+            parsedItems.push({ name, price, desc });
+            runningTotal += price;
           }
         }
 
-        finalItems = enrichedList.join('\n');
+        // Step 2: Deduplicate while preserving order
+        // We only deduplicate if the prices are the same (likely redundant lookup)
+        const uniqueItems = [];
+        const seen = new Set();
+
+        for (const item of parsedItems) {
+          const key = `${item.name.toLowerCase()}|${item.price}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            uniqueItems.push(`${item.name}||${item.price}||${item.desc}`);
+          }
+        }
+
+        finalItems = uniqueItems.join('\n');
         // If we didn't have a total before, use the calculated one
         if (!finalTotal || finalTotal === 0) {
           finalTotal = runningTotal;
@@ -257,14 +290,12 @@ const generateDocumentTool = {
         logoBase64
       });
 
-      // Konfigurasi Chromium path
-      const executablePath = process.env.CHROMIUM_PATH || 
-                             (fs.existsSync('/usr/bin/chromium-browser') ? '/usr/bin/chromium-browser' : 
-                             (fs.existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : undefined));
+      const { getChromiumPath, DEFAULT_CHROME_ARGS } = require('../utils/browser');
+      const executablePath = getChromiumPath();
 
       const browser = await puppeteer.launch({ 
         executablePath,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+        args: DEFAULT_CHROME_ARGS,
         headless: 'new'
       });
       const page = await browser.newPage();
@@ -286,11 +317,14 @@ const generateDocumentTool = {
     // 4. Send via WhatsApp
     if (global.whatsappClient) {
       try {
+        // Small delay to ensure browser stability after generation
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
         await global.whatsappClient.sendFile(
           targetRecipient,
           filePath,
-          filename,
-          `Berikut dokumen *${title}* untuk Anda.`
+          `${title}_${customerName}.pdf`,
+          `Berikut adalah ${title} untuk pesanan Anda.`
         );
 
         setTimeout(() => {

@@ -218,17 +218,29 @@ const createBookingTool = {
         };
       }
 
-      // Get or create customer
-      const customer = await prisma.customer.upsert({
-        where: { phone: normalizedPhone },
-        create: {
-          phone: normalizedPhone,
-          name: customerName,
-        },
-        update: {
-          name: customerName,
+      // Get or create customer (consistent with admin dashboard)
+      const existingCustomer = await prisma.customer.findFirst({
+        where: {
+          OR: [
+            { phone: normalizedPhone },
+            { phoneReal: normalizedPhone }
+          ]
         }
       });
+
+      const customer = existingCustomer
+        ? await prisma.customer.update({
+            where: { id: existingCustomer.id },
+            data: { phoneReal: normalizedPhone }
+          })
+        : await prisma.customer.create({
+            data: {
+              phone: normalizedPhone,
+              phoneReal: normalizedPhone,
+              name: customerName,
+              status: 'new'
+            }
+          });
 
       // Extract vehicle info
       let vehicleModel = motorModel || null;
@@ -242,19 +254,43 @@ const createBookingTool = {
         vehiclePlate = extractPlateFromText(vehicleInfo);
       }
 
-      // Create or update vehicle
-      if (vehicleModel) {
+      // Create or update vehicle (atomic upsert)
+      if (vehiclePlate) {
         try {
-          const vehicle = await createOrUpdateVehicle({
-            phone: normalizedPhone,
-            modelName: vehicleModel,
-            plateNumber: vehiclePlate,
+          const vehicle = await prisma.vehicle.upsert({
+            where: {
+              customerId_plateNumber: {
+                customerId: customer.id,
+                plateNumber: vehiclePlate.toUpperCase().trim()
+              }
+            },
+            update: {
+              modelName: vehicleModel || 'Motor'
+            },
+            create: {
+              customerId: customer.id,
+              modelName: vehicleModel || 'Motor',
+              plateNumber: vehiclePlate.toUpperCase().trim()
+            }
           });
           vehicleId = vehicle.id;
           vehiclePlate = vehicle.plateNumber;
           vehicleModel = vehicle.modelName;
         } catch (err) {
-          console.warn('[createBookingTool] Vehicle creation failed:', err.message);
+          console.warn('[createBookingTool] Vehicle upsert failed:', err.message);
+        }
+      } else if (vehicleModel) {
+        // Fallback for model without plate
+        try {
+          const vehicle = await createOrUpdateVehicle({
+            phone: normalizedPhone,
+            modelName: vehicleModel,
+            plateNumber: null,
+          });
+          vehicleId = vehicle.id;
+          vehicleModel = vehicle.modelName;
+        } catch (err) {
+          console.warn('[createBookingTool] Fallback vehicle creation failed:', err.message);
         }
       }
 
@@ -358,7 +394,7 @@ const createBookingTool = {
           plateNumber: vehiclePlate,
           vehicleModel,
           bookingDate: bookingDateTime,
-          serviceType: primaryServices.join(', '),
+          serviceType: primaryServices.join('\n'),
           status: 'PENDING',
           notes,
           subtotal,
