@@ -1834,6 +1834,27 @@ async function processBufferedMessages(senderNumber, client) {
 
 // --- WhatsApp Event Handlers ---
 function start(client) {
+    // 🛡️ SAFEGUARD FOR @LID CRASHES
+    // Override UI state methods to silently ignore @lid identifiers,
+    // which crash WPPConnect internal Webpack state when called.
+    const origSendSeen = client.sendSeen.bind(client);
+    client.sendSeen = async (to) => {
+        if (to && to.toString().endsWith('@lid')) return;
+        try { return await origSendSeen(to); } catch (e) { /* ignore */ }
+    };
+
+    const origStartTyping = client.startTyping.bind(client);
+    client.startTyping = async (to, ...args) => {
+        if (to && to.toString().endsWith('@lid')) return;
+        try { return await origStartTyping(to, ...args); } catch (e) { /* ignore */ }
+    };
+
+    const origStopTyping = client.stopTyping.bind(client);
+    client.stopTyping = async (to) => {
+        if (to && to.toString().endsWith('@lid')) return;
+        try { return await origStopTyping(to); } catch (e) { /* ignore */ }
+    };
+
     // Initialize Coating Maintenance Reminders
     const { initCoatingRemindersSchedule } = require('./src/ai/utils/coatingReminders');
     initCoatingRemindersSchedule(client);
@@ -1856,39 +1877,16 @@ function start(client) {
         let originalLid = senderNumber.endsWith('@lid') ? senderNumber : null;
         let realPhoneFallback = '';
 
-        // Resolve @lid (Linked Identity) ke nomor telepon asli (@c.us)
+        // Handle @lid (Linked Identity)
         if (senderNumber.endsWith('@lid')) {
-            console.log(`[LID] Detected LID: ${senderNumber}, attempting to resolve...`);
-            try {
-                // LAYER 1: Cek dari objek message (Paling cepat, 0ms)
-                if (msg.sender && msg.sender.pnJid) {
-                    senderNumber = msg.sender.pnJid;
-                    console.log(`[LID] Resolved via pnJid: ${senderNumber}`);
-                } 
-                // LAYER 2: Gunakan fungsi resmi WPPConnect requestPhoneNumber (Paling akurat)
-                else if (typeof client.requestPhoneNumber === 'function') {
-                    const realPhone = await client.requestPhoneNumber(msg.from);
-                    if (realPhone) {
-                        // realPhone biasanya dalam format "628123@c.us"
-                        senderNumber = realPhone.includes('@') ? realPhone : `${realPhone}@c.us`;
-                        console.log(`[LID] Resolved via requestPhoneNumber: ${senderNumber}`);
-                    }
-                } 
-                // LAYER 3: Cek contact internal
-                else {
-                    const contact = await client.getContact(msg.from);
-                    if (contact && contact.id && contact.id._serialized && contact.id._serialized.includes('@c.us')) {
-                        senderNumber = contact.id._serialized;
-                        console.log(`[LID] Resolved via getContact: ${senderNumber}`);
-                    }
-                }
-
-                // Final Check: Jika masih @lid, biarkan saja (identifier fallback)
-                if (senderNumber.endsWith('@lid')) {
-                    console.log(`[LID] Resolution failed, keeping identifier: ${senderNumber}`);
-                }
-            } catch (err) {
-                console.error(`[LID] Resolution error: ${err.message}`);
+            // LAYER 1 ONLY: Check from message object (passive, harmless)
+            if (msg.sender && msg.sender.pnJid) {
+                senderNumber = msg.sender.pnJid;
+                console.log(`[LID] Resolved via pnJid: ${senderNumber}`);
+            } else {
+                console.log(`[LID] Unresolved LID accepted: ${senderNumber}. Proceeding with masked identity for Privacy API.`);
+                // We DO NOT drop the message here because WhatsApp Business masks incoming messages as @lid.
+                // Our safeguarded client methods above will protect us from Webpack crashes!
             }
         }
 
@@ -2203,7 +2201,7 @@ async function saveSenderMeta(senderNumber, displayName, client = null) {
     if (!docId) return;
 
     let profilePicUrl = null;
-    if (client && channel === 'whatsapp' && !fetchedProfilePics.has(senderNumber)) {
+    if (client && channel === 'whatsapp' && !senderNumber.endsWith('@lid') && !fetchedProfilePics.has(senderNumber)) {
         try {
             const picResult = await client.getProfilePicFromServer(senderNumber);
             // Extract URL string from the object returned by WhatsApp
@@ -2541,29 +2539,9 @@ app.post('/send-message', async (req, res) => {
 
             let targetNumber = identity.normalizedAddress || toSenderNumberWithSuffix(number);
             
-            // If it's LID format, try to resolve to real phone number (3-layer approach)
+            // Active LID resolution has been disabled here to prevent mobile unpairing.
             if (targetNumber && targetNumber.endsWith('@lid')) {
-                console.log(`[API] LID detected: ${targetNumber}, attempting to resolve...`);
-                try {
-                    // LAYER 1: Try requestPhoneNumber (most accurate)
-                    if (typeof global.whatsappClient.requestPhoneNumber === 'function') {
-                        const realPhone = await global.whatsappClient.requestPhoneNumber(targetNumber);
-                        if (realPhone) {
-                            targetNumber = realPhone.includes('@') ? realPhone : `${realPhone}@c.us`;
-                            console.log(`[API] LID resolved via requestPhoneNumber: ${targetNumber}`);
-                        }
-                    }
-                    // LAYER 2: Try getContact
-                    else if (targetNumber.endsWith('@lid')) {
-                        const contact = await global.whatsappClient.getContact(targetNumber);
-                        if (contact && contact.id && contact.id._serialized && contact.id._serialized.includes('@c.us')) {
-                            targetNumber = contact.id._serialized;
-                            console.log(`[API] LID resolved via getContact: ${targetNumber}`);
-                        }
-                    }
-                } catch (err) {
-                    console.log(`[API] LID resolution error: ${err.message}`);
-                }
+                console.log(`[API] LID targeted for sending: ${targetNumber} (Resolution disabled)`);
             }
             
             // Ensure proper suffix for non-LID numbers

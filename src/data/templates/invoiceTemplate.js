@@ -42,20 +42,17 @@ module.exports = function generateInvoiceHTML(data) {
   <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@100..900&family=Manrope:wght@200..800&display=swap" rel="stylesheet"/>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    @page :first { margin: 0; size: A4; }
-    @page { margin: 60px 0; size: A4; }
+    @page { margin: 0; size: A4; }
     html { background: #131313; -webkit-print-color-adjust: exact; }
     body {
       background: #131313;
       color: #e5e2e1;
       font-family: 'Manrope', sans-serif;
-      padding: 0;
+      padding: 60px;
       width: 794px; /* A4 width in px at 96dpi */
       margin: 0 auto;
       -webkit-print-color-adjust: exact;
     }
-    
-    .content-padding { padding: 60px; }
     
     .font-headline { font-family: 'League Spartan', sans-serif; }
     .text-yellow { color: #FFFF00; }
@@ -66,7 +63,7 @@ module.exports = function generateInvoiceHTML(data) {
     .border-yellow { border-left: 2px solid #FFFF00; }
     
     /* Table styling for better page breaks and margins */
-    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .items-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
     .items-table thead { display: table-header-group; }
     
     .item-row td {
@@ -87,7 +84,12 @@ module.exports = function generateInvoiceHTML(data) {
   </style>
 </head>
 <body>
-  <div class="content-padding">
+  <!-- Table Wrapper Hack for Black Margins on All Pages -->
+  <table style="width: 100%; border-collapse: collapse;">
+    <thead><tr><td style="height: 60px; padding: 0; border: none;"></td></tr></thead>
+    <tbody>
+      <tr><td style="padding: 0; border: none; vertical-align: top;">
+
     <!-- Header -->
     <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:60px">
       <div>
@@ -128,9 +130,9 @@ module.exports = function generateInvoiceHTML(data) {
         <p class="text-yellow" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.2em; margin-bottom:20px">Studio Layanan</p>
         <p class="font-headline" style="font-size:24px; font-weight:700; text-transform:uppercase; margin-bottom:8px">BOSMAT STUDIO</p>
         <p class="text-muted" style="font-size:14px; line-height:1.8">
-          Garasi 54, Jl. R. Sanim No. 99<br/>
-          Beji, Depok, Jawa Barat 16456<br/>
-          08179481010
+          Bukit Cengkeh 1, Jl. Medan No.B3/2<br/>
+          Kota Depok, Jawa Barat 16451<br/>
+          0895401527556
         </p>
       </div>
     </div>
@@ -208,7 +210,9 @@ module.exports = function generateInvoiceHTML(data) {
         <div style="display:flex; align-items:center; gap:16px">
           <!-- Icon box -->
           <div style="background:rgba(255,255,255,0.05); padding:12px; display:flex; align-items:center; justify-content:center">
-            <span style="font-size:20px">🏦</span>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 21H21M3 10H21M5 6L12 3L19 6M4 10V21M8 10V21M12 10V21M16 10V21M20 10V21" stroke="#FFFF00" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
           </div>
           <div>
             <p class="font-headline" style="font-size:18px; font-weight:700; text-transform:uppercase">Bank BCA: 1662515412</p>
@@ -244,11 +248,18 @@ module.exports = function generateInvoiceHTML(data) {
           <span class="font-headline" style="color:#1d1d00; font-size:44px; font-weight:900">Rp${balance.toLocaleString('id-ID')}</span>
         </div>
         <!-- Wallet icon unicode -->
-        <span style="font-size:28px; color:#1d1d00">💳</span>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="5" width="20" height="14" rx="2" stroke="#1d1d00" stroke-width="2"/>
+          <path d="M2 10H22" stroke="#1d1d00" stroke-width="2"/>
+          <path d="M6 15H10" stroke="#1d1d00" stroke-width="2" stroke-linecap="round"/>
+        </svg>
       </div>
     </div>
     </div>
-  </div>
+      </td></tr>
+    </tbody>
+    <tfoot><tr><td style="height: 60px; padding: 0; border: none;"></td></tr></tfoot>
+  </table>
 </body>
 </html>`;
 };

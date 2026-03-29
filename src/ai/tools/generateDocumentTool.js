@@ -10,6 +10,7 @@ const masterLayanan = require('../../data/masterLayanan.js');
 const { isAdmin } = require('../utils/adminAuth.js');
 const { warrantyRepaint, warrantyCoating } = require('../../data/warrantyTerms.js');
 const generateInvoiceHTML = require('../../data/templates/invoiceTemplate.js');
+const { generateWarrantyHTML } = require('../../data/templates/warrantyTemplate.js');
 
 // Helper untuk membuat garis horizontal
 function generateHr(doc, y) {
@@ -46,7 +47,8 @@ const generateDocumentTool = {
           notes: { type: 'string', description: 'Catatan tambahan (keluhan, kondisi fisik, dll).' },
           senderNumber: { type: 'string', description: 'Nomor pengirim (otomatis diisi sistem).' },
           recipientNumber: { type: 'string', description: 'WAJIB: Nomor customer penerima dokumen. Format: 628xxx@c.us atau 176665158225970@lid' },
-          bookingDate: { type: 'string', description: 'Tanggal booking (YYYY-MM-DD) untuk kalkulasi estimasi selesai.' }
+          bookingDate: { type: 'string', description: 'Tanggal booking (YYYY-MM-DD) untuk kalkulasi estimasi selesai.' },
+          serviceType: { type: 'string', description: 'Layanan yang digaransikan. Pisahkan dengan § jika lebih dari satu. Contoh: "Full Body Repaint § Nano Ceramic Coating".' }
         },
         required: ['documentType', 'senderNumber', 'recipientNumber']
       }
@@ -64,7 +66,8 @@ const generateDocumentTool = {
       notes = '-',
       senderNumber,
       recipientNumber,
-      bookingDate
+      bookingDate,
+      serviceType = '-'
     } = input;
 
     let targetRecipient = recipientNumber || senderNumber;
@@ -218,62 +221,86 @@ const generateDocumentTool = {
     let title = 'Dokumen';
 
     if (documentType.startsWith('garansi_')) {
-      // ─── WARRANTY PDF (PDFKIT) ───
-      const doc = new PDFDocument({ margin: 50, size: 'A4' });
-      const writeStream = fs.createWriteStream(filePath);
-      doc.pipe(writeStream);
+      // ─── WARRANTY PDF (PUPPETEER) ───
+      title = documentType === 'garansi_repaint' ? 'Garansi Repaint' : 'Garansi Coating';
 
-      const warrantyData = documentType === 'garansi_repaint' ? warrantyRepaint : warrantyCoating;
-      const logoPath = path.join(__dirname, '../../../data/boS Mat (1000 x 500 px) (1).png');
-      if (fs.existsSync(logoPath)) doc.image(logoPath, 50, 25, { width: 120 });
+      // Auto-fill dari booking terakhir jika data kosong
+      let warrantyCustomerName = customerName;
+      let warrantyMotorDetails = motorDetails;
+      let warrantyServiceType = serviceType;
+      let warrantyBookingDate = bookingDate;
+      let warrantyRecipient = targetRecipient;
 
-      doc.fillColor('#18181b').fontSize(16).font('Helvetica-Bold').text(warrantyData.title, 250, 35, { width: 365 });
-      doc.fillColor('#71717a').fontSize(10).font('Helvetica').text('Bosmat Detailing & Repainting Studio', 250, 55, { width: 365 });
-      title = warrantyData.title;
-      generateHr(doc, 85);
+      if (!warrantyCustomerName || warrantyCustomerName === 'Pelanggan' || warrantyMotorDetails === '-' || warrantyServiceType === '-') {
+        try {
+          const prisma = require('../../lib/prisma');
+          const booking = await prisma.booking.findFirst({
+            where: {
+              OR: [
+                { customerPhone: targetRecipient?.replace('@c.us', '').replace('@lid', '') },
+                { customer: { phoneReal: targetRecipient?.replace('@c.us', '') } },
+                { customer: { whatsappLid: targetRecipient } },
+              ],
+              status: { in: ['DONE', 'PAID'] }
+            },
+            include: { customer: true, vehicle: true },
+            orderBy: { bookingDate: 'desc' }
+          });
 
-      let y = 105;
-      doc.fillColor('#18181b').fontSize(11).font('Helvetica-Bold').text('Informasi Pelanggan & Kendaraan', 50, y);
-      y += 22;
-      doc.font('Helvetica').fontSize(10).fillColor('#52525b');
-      doc.text(`Nama: ${customerName}`, 50, y);
-      doc.text(`Kendaraan: ${motorDetails}`, 50, y + 18);
-      doc.text(`Tanggal Berlaku: ${now.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, 50, y + 36);
-      doc.text(`No. WA: ${recipientNumber}`, 360, y);
-      doc.text(`Masa Berlaku: ${warrantyData.duration}`, 360, y + 18);
-      generateHr(doc, y + 65);
-      y += 85;
-
-      for (const section of warrantyData.sections) {
-        if (y > 700) { doc.addPage(); y = 50; }
-        doc.fillColor('#18181b').fontSize(11).font('Helvetica-Bold').text(section.heading, 50, y);
-        y += 15;
-        if (section.body) {
-          if (y > 750) { doc.addPage(); y = 50; }
-          doc.fillColor('#52525b').fontSize(9).font('Helvetica').text(section.body, 50, y, { width: 495, align: 'justify' });
-          y += doc.heightOfString(section.body, { width: 495 }) + 10;
-        }
-        if (section.items && section.items.length > 0) {
-          for (const item of section.items) {
-            const h = doc.heightOfString(`• ${item}`, { width: 480 });
-            if (y + h > 750) { doc.addPage(); y = 50; }
-            doc.fillColor('#52525b').fontSize(9).text('•', 50, y);
-            doc.text(item, 60, y, { width: 480, align: 'justify' });
-            y += h + 3;
+          if (booking) {
+            if (!warrantyCustomerName || warrantyCustomerName === 'Pelanggan') warrantyCustomerName = booking.customerName;
+            if (warrantyMotorDetails === '-') warrantyMotorDetails = `${booking.vehicleModel || ''} (${booking.plateNumber || ''})`;
+            if (warrantyServiceType === '-') warrantyServiceType = booking.serviceType || '-';
+            if (!warrantyBookingDate) warrantyBookingDate = booking.bookingDate?.toISOString().split('T')[0];
+            if (booking.customer?.phoneReal) {
+              warrantyRecipient = booking.customer.phoneReal + '@c.us';
+            }
           }
-          y += 5;
+        } catch (err) {
+          console.warn('[generateDocument] Auto-fill warranty data failed:', err.message);
         }
       }
-      y += 30;
-      doc.fillColor('#18181b').fontSize(10).text('Hormat Kami,', 50, y, { align: 'right', width: 495 });
-      y += 50;
-      doc.font('Helvetica-Bold').text('Bosmat Detailing And Repainting', 50, y, { align: 'right', width: 495 });
-      doc.end();
 
-      await new Promise((resolve, reject) => {
-        writeStream.on('finish', resolve);
-        writeStream.on('error', reject);
+      // Parse plateNumber dari motorDetails — format: "NMax (B1234ETV)"
+      const plateMatch = warrantyMotorDetails.match(/\(([^)]+)\)/);
+      const plateNumber = plateMatch ? plateMatch[1].trim() : '-';
+      const motorName = warrantyMotorDetails.replace(/\([^)]*\)/, '').trim();
+
+      // Load logo as base64
+      const logoPath = path.resolve(process.cwd(), 'data/boS Mat (1000 x 500 px) (1).png');
+      const logoBase64 = fs.existsSync(logoPath)
+        ? fs.readFileSync(logoPath).toString('base64')
+        : '';
+
+      const html = generateWarrantyHTML({
+        type: documentType === 'garansi_repaint' ? 'repaint' : 'coating',
+        customerName: warrantyCustomerName,
+        customerPhone: warrantyRecipient?.replace('@c.us', '').replace('@lid', '').replace(/^62/, '0') || '-',
+        motorDetails: motorName,
+        plateNumber,
+        serviceType: warrantyServiceType,
+        bookingDate: warrantyBookingDate,
+        docNumber: idSuffix,
+        logoBase64,
       });
+
+      const { getChromiumPath, DEFAULT_CHROME_ARGS } = require('../utils/browser');
+      const executablePath = getChromiumPath();
+
+      const browser = await puppeteer.launch({
+        executablePath,
+        args: DEFAULT_CHROME_ARGS,
+        headless: 'new'
+      });
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'networkidle0' });
+      await page.pdf({
+        path: filePath,
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '0px', bottom: '0px', left: '0px', right: '0px' }
+      });
+      await browser.close();
 
     } else {
       // ─── INVOICE / RECEIPT PDF (PUPPETEER) ───

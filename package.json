@@ -20,7 +20,7 @@
   "dependencies": {
     "@langchain/core": "^1.1.24",
     "@langchain/google-genai": "^2.1.20",
-    "@prisma/client": "^5.21.1",
+    "@prisma/client": "^5.22.0",
     "@wppconnect-team/wppconnect": "^1.41.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
@@ -37,7 +37,7 @@
     "node-fetch": "^2.7.0",
     "open": "^11.0.0",
     "pdfkit": "^0.15.0",
-    "prisma": "^5.21.1",
+    "prisma": "^5.22.0",
     "puppeteer": "^24.40.0",
     "qrcode-terminal": "^0.12.0",
     "server-destroy": "^1.0.1",
