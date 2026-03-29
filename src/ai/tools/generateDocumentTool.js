@@ -119,7 +119,8 @@ const generateDocumentTool = {
     if (finalItems && finalItems !== '-') {
       try {
         // Step 1: Split and Parse
-        const itemList = finalItems.split('\n').map(i => i.trim()).filter(Boolean);
+        // Support §, \n, and comma + space (legacy)
+        const itemList = finalItems.split(/§|\n/).map(i => i.trim()).filter(Boolean);
         let parsedItems = [];
         let runningTotal = 0;
 
@@ -148,12 +149,14 @@ const generateDocumentTool = {
           // Precise Matching: Try exact match first
           let service = masterLayanan.find(s => s.name.toLowerCase() === name.toLowerCase());
           
-          // Fallback to fuzzy match only if name is long enough to be significant
-          if (!service && name.length > 5) {
-            service = masterLayanan.find(s => 
-              name.toLowerCase().includes(s.name.toLowerCase()) || 
-              s.name.toLowerCase().includes(name.toLowerCase())
-            );
+          // Fallback to fuzzy match: strict overlap ratio > 0.7
+          if (!service && name.length > 8) {
+            service = masterLayanan.find(s => {
+              const sName = s.name.toLowerCase();
+              const iName = name.toLowerCase();
+              // Only match if exact or substring with > 70% length overlap
+              return iName.includes(sName) && (sName.length / iName.length > 0.7);
+            });
           }
 
           if (service) {
