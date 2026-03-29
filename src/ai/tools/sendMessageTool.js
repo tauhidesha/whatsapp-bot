@@ -55,6 +55,20 @@ const sendMessageTool = {
 
       let target = destination.trim();
 
+      // Auto-fix: jika @c.us tapi nomor sebenarnya adalah LID di DB, ganti ke @lid
+      if (target.endsWith('@c.us')) {
+        const phoneDigits = target.replace('@c.us', '');
+        try {
+          const customer = await prisma.customer.findFirst({
+            where: { whatsappLid: { endsWith: phoneDigits } },
+            select: { whatsappLid: true }
+          });
+          if (customer?.whatsappLid) {
+            target = customer.whatsappLid;
+          }
+        } catch (e) {}
+      }
+
       if (target.endsWith('@lid')) {
         // Sudah format LID, biarkan
       } else {
