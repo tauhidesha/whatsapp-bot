@@ -48,10 +48,18 @@ module.exports = function generateInvoiceHTML(data) {
       background: #131313;
       color: #e5e2e1;
       font-family: 'Manrope', sans-serif;
-      padding: 60px;
+      padding: 0;
       width: 794px; /* A4 width in px at 96dpi */
       margin: 0 auto;
       -webkit-print-color-adjust: exact;
+    }
+    .page-wrap {
+      padding: 40px;
+      background: #131313;
+    }
+    .margin-top, .margin-bottom {
+      height: 40px;
+      background: #131313;
     }
     
     .font-headline { font-family: 'League Spartan', sans-serif; }
@@ -84,11 +92,9 @@ module.exports = function generateInvoiceHTML(data) {
   </style>
 </head>
 <body>
-  <!-- Table Wrapper Hack for Black Margins on All Pages -->
-  <table style="width: 100%; border-collapse: collapse;">
-    <thead><tr><td style="height: 60px; padding: 0; border: none;"></td></tr></thead>
-    <tbody>
-      <tr><td style="padding: 0; border: none; vertical-align: top;">
+  <table style="width:100%; border-collapse:collapse; background:#131313;">
+    <thead><tr><td class="margin-top"></td></tr></thead>
+    <tbody><tr><td style="padding: 0 40px; background:#131313;">
 
     <!-- Header -->
     <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:60px">
@@ -256,9 +262,8 @@ module.exports = function generateInvoiceHTML(data) {
       </div>
     </div>
     </div>
-      </td></tr>
-    </tbody>
-    <tfoot><tr><td style="height: 60px; padding: 0; border: none;"></td></tr></tfoot>
+      </td></tr></tbody>
+    <tfoot><tr><td class="margin-bottom"></td></tr></tfoot>
   </table>
 </body>
 </html>`;

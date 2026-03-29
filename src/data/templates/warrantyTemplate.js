@@ -104,7 +104,7 @@ function generateWarrantyHTML({
   .page {
     width: 210mm;
     min-height: 297mm;
-    padding: 12mm 14mm;
+    padding: 12mm 14mm 16mm;
     position: relative;
     background: var(--bg);
     overflow: hidden;
@@ -147,11 +147,16 @@ function generateWarrantyHTML({
 
   .header-left { display: flex; flex-direction: column; gap: 6px; }
 
+  .header { margin-top: 36px; }
+
   .logo {
     height: 36px;
     width: auto;
     object-fit: contain;
     filter: brightness(1.1);
+    position: absolute;
+    top: 12mm;
+    left: 14mm;
   }
 
   .doc-title {
@@ -383,7 +388,10 @@ function generateWarrantyHTML({
   /* ── FOOTER ── */
   .footer {
     background: var(--accent);
-    margin: 0 -14mm -12mm;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
     padding: 4mm 14mm;
     display: flex;
     justify-content: space-between;
@@ -459,9 +467,9 @@ function generateWarrantyHTML({
   <div class="watermark">BOSMAT</div>
 
   <!-- HEADER -->
+  ${logoSrc ? `<img src="${logoSrc}" class="logo" alt="Bosmat Studio"/>` : ''}
   <div class="header">
     <div class="header-left">
-      ${logoSrc ? `<img src="${logoSrc}" class="logo" alt="Bosmat Studio"/>` : '<div style="height:36px;font-family:League Spartan;font-size:20px;font-weight:900;color:#FFFF00;letter-spacing:-1px;">BOSMAT</div>'}
       <div class="doc-title">${isCoating ? 'GARANSI COATING' : 'GARANSI REPAINT'}</div>
       <div class="doc-subtitle">Premium Automotive Finish · Bosmat Studio</div>
     </div>
@@ -550,14 +558,6 @@ function generateWarrantyHTML({
       <h4>${t.title}</h4>
       <ul>${t.items.map(i => `<li>${i}</li>`).join('')}</ul>
     </div>`).join('')}
-  </div>
-
-  <!-- SIGNATURE -->
-  <div class="signature-row">
-    <div class="signature-box">
-      <div class="signature-line"></div>
-      <div class="signature-name">Bosmat Studio</div>
-    </div>
   </div>
 
   <!-- FOOTER -->

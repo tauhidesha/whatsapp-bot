@@ -25,7 +25,7 @@ function stringSimilarity(a, b) {
 function getServiceCategory(serviceName) {
   const name = (serviceName || '').toLowerCase();
   if (name.includes('detailing') || name.includes('poles')) return 'detailing';
-  if (name.includes('coating')) return 'coating';
+  if (name.includes('coating') || name.includes('glossy') || name.includes('doff') || name.includes('complete service') || name.includes('nano ceramic')) return 'coating';
   if (name.includes('repaint')) return 'repaint';
   return 'other';
 }
