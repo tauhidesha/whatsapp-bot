@@ -42,7 +42,8 @@ module.exports = function generateInvoiceHTML(data) {
   <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@100..900&family=Manrope:wght@200..800&display=swap" rel="stylesheet"/>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    @page { margin: 0; size: A4; }
+    @page :first { margin: 0; size: A4; }
+    @page { margin: 60px 0; size: A4; }
     html { background: #131313; -webkit-print-color-adjust: exact; }
     body {
       background: #131313;
@@ -67,7 +68,6 @@ module.exports = function generateInvoiceHTML(data) {
     /* Table styling for better page breaks and margins */
     table { width: 100%; border-collapse: collapse; table-layout: fixed; }
     .items-table thead { display: table-header-group; }
-    .items-table thead .spacer { height: 60px; }
     
     .item-row td {
       padding: 28px 16px;
@@ -138,8 +138,6 @@ module.exports = function generateInvoiceHTML(data) {
     <!-- Items Table -->
     <table class="items-table">
       <thead>
-        <!-- Spacer header that repeats on page breaks -->
-        <tr class="spacer-only-print"><th colspan="4" style="height:40px"></th></tr>
         <tr style="border-bottom:1px solid #484831;">
           <th style="width:50%; text-align:left; padding-bottom:12px">
             <span class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em">Deskripsi Layanan</span>
