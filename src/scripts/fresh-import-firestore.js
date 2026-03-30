@@ -529,6 +529,66 @@ async function importDirectMessages() {
 }
 
 // ============================================
+// PHASE D: IMPORT TRANSACTIONS
+// ============================================
+
+async function importTransactions() {
+    console.log('\n📥 Phase D: Importing Transactions from Firestore...\n');
+
+    const txSnapshot = await db.collection('transactions').get();
+    console.log(`   Firestore 'transactions' collection: ${txSnapshot.docs.length} docs`);
+
+    let imported = 0;
+    let skipped = 0;
+
+    for (const doc of txSnapshot.docs) {
+        try {
+            const data = doc.data();
+            const rawPhone = data.customerNumber || data.customerId;
+            if (!rawPhone) { skipped++; continue; }
+
+            const detected = detectAndSuffix(rawPhone);
+            if (!detected) { skipped++; continue; }
+
+            // Find customer in Prisma
+            const customer = await prisma.customer.findUnique({
+                where: { phone: detected.phone.replace(/[^0-9]/g, '') }
+            });
+
+            if (!customer) { skipped++; continue; }
+
+            // Create Transaction
+            await prisma.transaction.create({
+                data: {
+                    customerId: customer.id,
+                    amount: Number(data.amount) || 0,
+                    type: (data.type || 'income').toLowerCase(),
+                    status: (data.status || 'SUCCESS').toUpperCase(),
+                    description: data.description || data.serviceType || 'Historical Import',
+                    paymentMethod: data.paymentMode || data.paymentMethod || 'CASH',
+                    category: data.category || data.serviceType || 'GENERAL',
+                    createdAt: data.createdAt?.toDate?.() || new Date(),
+                    paymentDate: data.paymentDate?.toDate?.() || data.createdAt?.toDate?.() || new Date()
+                }
+            });
+
+            imported++;
+            if (imported % 100 === 0) {
+                process.stdout.write(`   📦 ${imported} transactions imported...\n`);
+            }
+        } catch (e) {
+            if (!e.message.includes('Unique constraint')) {
+                console.error(`   ❌ Transaction error for doc ${doc.id}: ${e.message}`);
+            }
+            skipped++;
+        }
+    }
+
+    console.log(`\n   ✅ Phase D complete: ${imported} transactions imported, ${skipped} skipped`);
+    return { imported, skipped };
+}
+
+// ============================================
 // MAIN
 // ============================================
 
@@ -549,6 +609,9 @@ async function main() {
         // Phase C: DirectMessages
         const phaseC = await importDirectMessages();
 
+        // Phase D: Transactions
+        const phaseD = await importTransactions();
+
         // Summary
         const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 
@@ -568,6 +631,9 @@ async function main() {
         console.log(`   Threads: ${phaseC.threadsProcessed}`);
         console.log(`   Messages: ${phaseC.totalMessages}`);
         console.log(`   New customers created: ${phaseC.threadsCreated}`);
+        console.log(`\nPhase D - Transactions:`);
+        console.log(`   Imported: ${phaseD.imported}`);
+        console.log(`   Skipped: ${phaseD.skipped}`);
 
         console.log('\n✅ FIRESTORE IMPORT COMPLETE!');
 
