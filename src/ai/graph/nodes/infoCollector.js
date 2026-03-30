@@ -56,8 +56,8 @@ DATA YANG HARUS DIEKSTRAK:
 3. paint_type: 'glossy' atau 'doff'.
 4. is_bongkar_total: boolean (apakah user mau layanan bongkar total/hampir seluruh bagian?).
 5. detailing_focus: 'baret' (poles bodi), 'mesin' (detailing mesin), 'kerangka' (cuci komplit).
-6. color_choice: warna yang diinginkan user untuk Repaint BODI (Halus/Kasar). Ini KHUSUS warna bodi.
-7. velg_color_choice: warna yang diinginkan user untuk Repaint VELG. Ini KHUSUS warna velg, TERPISAH dari warna bodi.
+6. color_choice: warna yang diinginkan user untuk Repaint BODI (Halus/Kasar). Ini KHUSUS warna bodi. "Standar" atau "Original" adalah nilai yang valid jika user ingin kembali ke warna asli pabrikan.
+7. velg_color_choice: warna yang diinginkan user untuk Repaint VELG. Ini KHUSUS warna velg, TERPISAH dari warna bodi. "Standar" atau "Original" juga valid di sini.
 8. is_previously_painted: boolean (khusus velg, apakah sudah pernah cat ulang/bukan ori?).
 
 PANDUAN:
@@ -67,6 +67,7 @@ PANDUAN:
 - Jika ada informasi yang bertentangan, ambil yang paling baru.
 - Jika user menerima tawaran combo/tambah layanan, TAMBAHKAN ke service_types (jangan replace).
 - Jika user menyebutkan warna dalam konteks velg, isi ke velg_color_choice. Jika dalam konteks bodi, isi ke color_choice.
+- Jika user bilang "balik standar", "warna aslinya", atau "original", isi color_choice atau velg_color_choice dengan "standar".
 
 FORMAT JAWABAN (JSON ONLY):
 {
