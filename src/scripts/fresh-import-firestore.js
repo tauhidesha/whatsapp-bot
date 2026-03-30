@@ -435,9 +435,12 @@ async function importDirectMessages() {
         const msgSnap = await doc.ref.collection('messages').get();
         if (msgSnap.empty) continue;
 
-        const messagesToInsert = [];
-        let latestMsgContent = '';
-        let latestMsgAt = null;
+        // Fetch existing messages timestamps for dedup
+        const existingMsgTimestamps = await prisma.directMessage.findMany({
+            where: { customerId: customerId },
+            select: { createdAt: true }
+        });
+        const existingTsSet = new Set(existingMsgTimestamps.map(m => m.createdAt.getTime()));
 
         msgSnap.forEach(msgDoc => {
             const m = msgDoc.data();
@@ -462,6 +465,11 @@ async function importDirectMessages() {
             }
 
             const timestamp = m.timestamp?.toDate?.() || m.createdAt?.toDate?.() || new Date();
+
+            // DEDUP: Skip if timestamp already exists for this customer
+            if (existingTsSet.has(timestamp.getTime())) {
+                return;
+            }
 
             messagesToInsert.push({
                 customerId,
