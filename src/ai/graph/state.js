@@ -38,12 +38,14 @@ const ZoyaState = Annotation.Root({
         reducer: (old, updated) => ({ ...old, ...updated }),
         default: () => ({
             vehicleType: null,
-            serviceType: null,
+            serviceTypes: [], // Array of service names (e.g. ["Repaint Bodi Halus", "Detailing Mesin"])
             paintType: null, // 'glossy' | 'doff'
             isBongkarTotal: null, // boolean
             detailingFocus: null, // 'baret' | 'mesin' | 'kerangka'
-            colorChoice: null, // string
+            colorChoice: null, // string (warna untuk Repaint Bodi)
+            velgColorChoice: null, // string (warna untuk Repaint Velg)
             isPreviouslyPainted: null, // boolean (for Velg)
+            comboOffered: false, // Track apakah promo combo sudah ditawarkan
             missingQuestions: [], // Daftar pertanyaan yang harus diajukan Zoya
             isReadyForTools: false
         })

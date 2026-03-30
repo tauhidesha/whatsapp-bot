@@ -442,6 +442,10 @@ async function importDirectMessages() {
         });
         const existingTsSet = new Set(existingMsgTimestamps.map(m => m.createdAt.getTime()));
 
+        const messagesToInsert = [];
+        let latestMsgAt = null;
+        let latestMsgContent = '';
+
         msgSnap.forEach(msgDoc => {
             const m = msgDoc.data();
 
@@ -552,7 +556,7 @@ async function importTransactions() {
 
             // Find customer in Prisma
             const customer = await prisma.customer.findUnique({
-                where: { phone: detected.phone.replace(/[^0-9]/g, '') }
+                where: { phone: detected.phone }
             });
 
             if (!customer) { skipped++; continue; }

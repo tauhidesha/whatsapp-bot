@@ -244,15 +244,21 @@ async function setSnoozeMode(senderNumber, durationMinutes = 60, options = {}) {
   
   // 2. Sync to Customer table
   try {
-    await prisma.customer.update({
-      where: { phone },
-      data: {
-        aiPaused: true,
-        aiPausedUntil: expiresAtDate,
-        aiPauseReason: reason || (manual ? 'manual-toggle' : 'timed-toggle'),
-        updatedAt: new Date(),
-      }
-    });
+    let customer = await prisma.customer.findUnique({ where: { phone } });
+    if (!customer && normalizedNumber.endsWith('@lid')) {
+      customer = await prisma.customer.findFirst({ where: { whatsappLid: normalizedNumber } });
+    }
+    if (customer) {
+      await prisma.customer.update({
+        where: { id: customer.id },
+        data: {
+          aiPaused: true,
+          aiPausedUntil: expiresAtDate,
+          aiPauseReason: reason || (manual ? 'manual-toggle' : 'timed-toggle'),
+          updatedAt: new Date(),
+        }
+      });
+    }
   } catch (err) {
     console.warn('[humanHandover] Gagal sinkronisasi snooze ke Customer:', err.message);
   }
@@ -269,15 +275,21 @@ async function clearSnoozeMode(senderNumber) {
     
     // Sync to Customer table
     try {
-      await prisma.customer.update({
-        where: { phone },
-        data: {
-          aiPaused: false,
-          aiPausedUntil: null,
-          aiPauseReason: null,
-          updatedAt: new Date(),
-        }
-      });
+      let customer = await prisma.customer.findUnique({ where: { phone } });
+      if (!customer && normalizedNumber.endsWith('@lid')) {
+        customer = await prisma.customer.findFirst({ where: { whatsappLid: normalizedNumber } });
+      }
+      if (customer) {
+        await prisma.customer.update({
+          where: { id: customer.id },
+          data: {
+            aiPaused: false,
+            aiPausedUntil: null,
+            aiPauseReason: null,
+            updatedAt: new Date(),
+          }
+        });
+      }
     } catch (err) {
       // Ignored
     }

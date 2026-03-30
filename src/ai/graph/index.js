@@ -32,11 +32,28 @@ workflow.addEdge('classifier', 'infoCollector');
 workflow.addConditionalEdges(
     'infoCollector',
     (state) => {
-        if (state.intent === 'HUMAN_HANDOVER') {
+        const { intent, context } = state;
+
+        if (intent === 'HUMAN_HANDOVER') {
             return 'END';
         }
-        // Jika sudah lengkap motor & layanannya, eksekusi tool (misal cek harga)
-        if (state.context.isReadyForTools) {
+
+        // Tentukan mode balasan (replyMode)
+        let replyMode = 'inform';
+        if (intent === 'GREETING') {
+            replyMode = 'greet';
+        } else if (context.missingQuestions.length > 0) {
+            replyMode = 'ask';
+        }
+
+        // Simpan replyMode ke metadata (state update)
+        // Catatan: Di real LangGraph, kita mengembalikan node selanjutnya.
+        // Untuk menyimpan data, kita butuh node perantara atau merubah state di dalam router (tidak direkomendasikan tapi praktis di sini).
+        // Sebagai alternatif, kita kirimkan data ini via metadata di return value node infoCollector (sudah dilakukan sebagian).
+        // Namun di sini kita akan biarkan formatter menentukannya sendiri berdasarkan state yang ada jika metadata tidak bisa diupdate di router.
+        
+        // Agar konsisten dengan rekomendasi user:
+        if (context.isReadyForTools) {
             return 'executor';
         }
         return 'formatter';

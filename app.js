@@ -2089,7 +2089,7 @@ function start(client) {
 async function saveMessageToPrisma(senderNumber, message, senderType) {
     const prisma = require('./src/lib/prisma');
     
-    const { docId, channel, platformId } = parseSenderIdentity(senderNumber);
+    const { docId, channel, platformId, isLid } = parseSenderIdentity(senderNumber);
     if (!docId) return;
 
     try {
@@ -2101,9 +2101,16 @@ async function saveMessageToPrisma(senderNumber, message, senderType) {
             'admin': 'admin',
         };
 
-        const customer = await prisma.customer.findUnique({
+        // Try by phone first, then fallback to whatsappLid for @lid senders
+        let customer = await prisma.customer.findUnique({
             where: { phone: docId }
         });
+
+        if (!customer && isLid) {
+            customer = await prisma.customer.findFirst({
+                where: { whatsappLid: senderNumber }
+            });
+        }
 
         if (customer) {
             await prisma.directMessage.create({
@@ -2133,6 +2140,8 @@ async function saveMessageToPrisma(senderNumber, message, senderType) {
                 where: { id: customer.id },
                 data: updateData
             });
+        } else {
+            console.warn(`[saveMessageToPrisma] ⚠️ Customer not found for ${docId}${isLid ? ` (LID: ${senderNumber})` : ''}. Message NOT saved.`);
         }
     } catch (error) {
         console.error('Error saving message to Prisma:', error);

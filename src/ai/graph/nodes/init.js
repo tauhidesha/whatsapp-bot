@@ -8,10 +8,12 @@ const prisma = new PrismaClient();
  * @returns {Object} State update (customer data)
  */
 async function initNode(state) {
+    console.log('--- [INIT_NODE] Starting ---');
     const { messages, metadata } = state;
     const phoneReal = metadata?.phoneReal;
 
     if (!phoneReal) {
+        console.log('[INIT_NODE] No phoneReal, using default Stranger.');
         return { customer: { name: 'Stranger' } };
     }
 

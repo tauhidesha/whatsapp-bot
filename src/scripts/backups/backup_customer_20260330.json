@@ -1,0 +1,2342 @@
+[
+  {
+    "id": "4d94e898-5e4f-47fa-b0e3-c341f9d4580d",
+    "phone": "1161184242617329",
+    "whatsappLid": "1161184242617329@lid",
+    "name": "qlabmotodetailing",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:06.120Z"
+  },
+  {
+    "id": "084e02b2-05d5-4334-9715-fefc4ce20709",
+    "phone": "2",
+    "whatsappLid": null,
+    "name": null,
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:06.386Z"
+  },
+  {
+    "id": "1c3f56cc-84ad-4b12-9807-645647f36137",
+    "phone": "3",
+    "whatsappLid": null,
+    "name": null,
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:06.563Z"
+  },
+  {
+    "id": "ecb53428-f786-426d-b206-e565c2905eab",
+    "phone": "694934326421458",
+    "whatsappLid": "694934326421458@lid",
+    "name": "tanamanteraskita",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:06.824Z"
+  },
+  {
+    "id": "37103259-7045-4e21-8b11-dfb7ac9be9fc",
+    "phone": "811798884738635",
+    "whatsappLid": "811798884738635@lid",
+    "name": "babanyayasa",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:06.952Z"
+  },
+  {
+    "id": "68449cc8-f779-46a0-801b-19c5c9bcfcff",
+    "phone": "5094536843991257",
+    "whatsappLid": "5094536843991257@lid",
+    "name": "Muhammad Tauhid Haryadesa",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:07.062Z"
+  },
+  {
+    "id": "6a87c91d-fb33-40e7-81b0-92204a3d5b87",
+    "phone": "620",
+    "whatsappLid": null,
+    "name": null,
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:07.171Z"
+  },
+  {
+    "id": "471c25f8-2fe1-4730-8e56-60d53755d598",
+    "phone": "6200",
+    "whatsappLid": null,
+    "name": null,
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:07.280Z"
+  },
+  {
+    "id": "3bfc18b6-6c3c-4f57-9b30-7523196f698e",
+    "phone": "62000",
+    "whatsappLid": null,
+    "name": null,
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:07.388Z"
+  },
+  {
+    "id": "dccc56a1-68ca-462a-9425-60fd349ecb73",
+    "phone": "620000",
+    "whatsappLid": null,
+    "name": null,
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:07.498Z"
+  },
+  {
+    "id": "fdc39734-5476-4843-bf09-7ac170cf1926",
+    "phone": "6200000",
+    "whatsappLid": null,
+    "name": null,
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:07.607Z"
+  },
+  {
+    "id": "fd9a7bc5-ca01-407b-9ae2-05faaca92740",
+    "phone": "62000000",
+    "whatsappLid": null,
+    "name": null,
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:07.720Z"
+  },
+  {
+    "id": "cc984d19-e77a-4f12-a077-5bca55f68516",
+    "phone": "6200000000",
+    "whatsappLid": null,
+    "name": null,
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:07.830Z"
+  },
+  {
+    "id": "57c25c02-a2e5-411a-b0b9-a53962acb95a",
+    "phone": "26281234567890",
+    "whatsappLid": "26281234567890@lid",
+    "name": null,
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:07.937Z"
+  },
+  {
+    "id": "8045c056-51a5-4c18-9eb4-f44f46c224e4",
+    "phone": "62812324567890",
+    "whatsappLid": null,
+    "name": null,
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:08.047Z"
+  },
+  {
+    "id": "20294a11-e4b5-4a6c-82f2-c7a518882078",
+    "phone": "62812334567890",
+    "whatsappLid": null,
+    "name": null,
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:08.156Z"
+  },
+  {
+    "id": "0ebb60b1-761b-4de7-bcad-cdfa41c483a3",
+    "phone": "628123435678490",
+    "whatsappLid": "628123435678490@lid",
+    "name": null,
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:08.277Z"
+  },
+  {
+    "id": "d8ede7aa-991f-4b13-ab70-4b2fa4dc4b95",
+    "phone": "62812343567890",
+    "whatsappLid": null,
+    "name": null,
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:08.386Z"
+  },
+  {
+    "id": "c89b5780-f092-467e-9431-edf88802e7ee",
+    "phone": "62812345667890",
+    "whatsappLid": null,
+    "name": null,
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:08.496Z"
+  },
+  {
+    "id": "15a3a0e3-5135-4649-9970-d159759eccc2",
+    "phone": "103096965460022",
+    "whatsappLid": "103096965460022@lid",
+    "name": "D",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:39.691Z"
+  },
+  {
+    "id": "cef4e666-c7ec-457f-989b-905a077af19f",
+    "phone": "103419205439707",
+    "whatsappLid": "103419205439707@lid",
+    "name": "paylater",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:40.059Z"
+  },
+  {
+    "id": "bf487e8c-f376-4399-b4ef-4eab3a70a591",
+    "phone": "105690991431703",
+    "whatsappLid": "105690991431703@lid",
+    "name": ".",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:40.400Z"
+  },
+  {
+    "id": "8eac8ef8-cc73-44ec-a195-53924ecc768a",
+    "phone": "106253313433822",
+    "whatsappLid": "106253313433822@lid",
+    "name": "🄷🄴🅁🅈",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:40.757Z"
+  },
+  {
+    "id": "f9cd8e17-a855-4c8b-8a49-6756eb6bbd15",
+    "phone": "115663687430233",
+    "whatsappLid": "115663687430233@lid",
+    "name": "O",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:41.132Z"
+  },
+  {
+    "id": "9122ca7b-ed09-48aa-95de-189a5848dbb8",
+    "phone": "120065944977495",
+    "whatsappLid": "120065944977495@lid",
+    "name": "Santiko Restuadhi",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:41.563Z"
+  },
+  {
+    "id": "a7693b33-9b90-404c-8660-df0c552ff7ea",
+    "phone": "120126678540292",
+    "whatsappLid": "120126678540292@lid",
+    "name": "Customer 0292",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:42.117Z"
+  },
+  {
+    "id": "20b2750f-0fe9-4c28-afe7-61374218e99c",
+    "phone": "120220563828991",
+    "whatsappLid": "120220563828991@lid",
+    "name": "RIZAL",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:42.545Z"
+  },
+  {
+    "id": "1a4b80c3-a198-4d79-b68f-5d4d353c2d40",
+    "phone": "12489899147309",
+    "whatsappLid": "12489899147309@lid",
+    "name": "Customer 7309",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:42.883Z"
+  },
+  {
+    "id": "6d5a8ffd-2c15-4d46-b6c3-c3db7f2f2de8",
+    "phone": "128355684892720",
+    "whatsappLid": "128355684892720@lid",
+    "name": "Apudin",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:43.234Z"
+  },
+  {
+    "id": "f3885f5b-1796-4ca6-b084-19e28b5371d7",
+    "phone": "132564685721773",
+    "whatsappLid": "132564685721773@lid",
+    "name": "Dirno",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:43.604Z"
+  },
+  {
+    "id": "f6068c8f-f438-4b70-8feb-4a2fe5d180ae",
+    "phone": "133599420514559",
+    "whatsappLid": "133599420514559@lid",
+    "name": "Galih B Prasetyo",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:43.938Z"
+  },
+  {
+    "id": "0276e373-ed30-4742-96d8-34113fa69b6c",
+    "phone": "134943711723630",
+    "whatsappLid": "134943711723630@lid",
+    "name": "Sigit Purwanto",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:44.267Z"
+  },
+  {
+    "id": "f7240ac5-272e-4582-bd79-1e5e00d23b27",
+    "phone": "136413144203433",
+    "whatsappLid": "136413144203433@lid",
+    "name": "Zaki Akmal",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:44.594Z"
+  },
+  {
+    "id": "7881c063-c375-4a67-90ab-7a4a5bf026d0",
+    "phone": "143297389543656",
+    "whatsappLid": "143297389543656@lid",
+    "name": "Ahmad Hafiz",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:44.931Z"
+  },
+  {
+    "id": "49fe9bdd-7af9-4ef7-965e-83ad1a7addcc",
+    "phone": "149409144799455",
+    "whatsappLid": "149409144799455@lid",
+    "name": "Varbull",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:45.259Z"
+  },
+  {
+    "id": "0539625d-0968-4d5a-86da-c20ecce84657",
+    "phone": "149460634063025",
+    "whatsappLid": "149460634063025@lid",
+    "name": "Rizaldi Halim",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:45.685Z"
+  },
+  {
+    "id": "c64954c2-87c4-44ec-a8e6-8b68631c84ee",
+    "phone": "154537436422163",
+    "whatsappLid": "154537436422163@lid",
+    "name": "Bang E'el",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:46.014Z"
+  },
+  {
+    "id": "b36c129b-5ed9-47f3-ab94-2901bee59a61",
+    "phone": "158273890181374",
+    "whatsappLid": "158273890181374@lid",
+    "name": "Anggito Aufa",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:46.440Z"
+  },
+  {
+    "id": "d690ded9-eefe-43ce-9353-4fb50f9723cd",
+    "phone": "15930067296309",
+    "whatsappLid": "15930067296309@lid",
+    "name": "Tuwi",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:46.966Z"
+  },
+  {
+    "id": "bc7bec9e-32bc-4420-8e7a-6acafc92503e",
+    "phone": "164025405038666",
+    "whatsappLid": "164025405038666@lid",
+    "name": "Riki",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:47.454Z"
+  },
+  {
+    "id": "954b7538-3ff8-4bf0-b488-d47a5e4f51c7",
+    "phone": "164574573637879",
+    "whatsappLid": "164574573637879@lid",
+    "name": "adityazulfikar",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:47.812Z"
+  },
+  {
+    "id": "4a678208-1cab-42d1-8bdf-c999c6f43038",
+    "phone": "16467558932577",
+    "whatsappLid": "16467558932577@lid",
+    "name": "sendiprasetiyoprasetiyo",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:48.143Z"
+  },
+  {
+    "id": "dc12bfc1-0ebd-4c73-95e9-9365a31c8bab",
+    "phone": "168139849523233",
+    "whatsappLid": "168139849523233@lid",
+    "name": "H 3 RU",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:48.476Z"
+  },
+  {
+    "id": "15e86b6d-a94b-4c87-939a-536fae5b03e5",
+    "phone": "172933267906603",
+    "whatsappLid": "172933267906603@lid",
+    "name": "abimana",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:48.844Z"
+  },
+  {
+    "id": "06729846-4744-4c3b-93ef-6f923c79677c",
+    "phone": "177515360481313",
+    "whatsappLid": "177515360481313@lid",
+    "name": "KROTO FISHING KPK",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:49.177Z"
+  },
+  {
+    "id": "f0da7a16-f229-4f20-8bf5-5479f0da7423",
+    "phone": "17876408893444",
+    "whatsappLid": "17876408893444@lid",
+    "name": "Nadira 32a",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:49.601Z"
+  },
+  {
+    "id": "e120dda4-db40-429c-af36-b7338d4bee15",
+    "phone": "182077186134200",
+    "whatsappLid": "182077186134200@lid",
+    "name": "Dicky",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:50.159Z"
+  },
+  {
+    "id": "a45babd7-1918-46b1-b106-4941e94ee86e",
+    "phone": "18631685578986",
+    "whatsappLid": "18631685578986@lid",
+    "name": "YoghA",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:50.604Z"
+  },
+  {
+    "id": "50940ecd-60fb-48fc-8901-d064736c7120",
+    "phone": "190838349029524",
+    "whatsappLid": "190838349029524@lid",
+    "name": "𝕪𝕠𝕟𝕕𝕙𝕒 𝕒𝕣𝕦𝕟𝕕𝕒",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:51.094Z"
+  },
+  {
+    "id": "5b80455a-7249-4365-8c8b-ff3b5395fee7",
+    "phone": "19323192082681",
+    "whatsappLid": "19323192082681@lid",
+    "name": "Anjar",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:51.506Z"
+  },
+  {
+    "id": "1109bdae-f7cc-4dad-88bb-5014efdedc18",
+    "phone": "200609366065346",
+    "whatsappLid": "200609366065346@lid",
+    "name": "Sulistiono",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:51.983Z"
+  },
+  {
+    "id": "697139c7-0c05-44f3-ae04-781196bcf751",
+    "phone": "205209410257132",
+    "whatsappLid": "205209410257132@lid",
+    "name": "Customer 7132",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:52.314Z"
+  },
+  {
+    "id": "906453ad-5cb6-4885-8d13-51ce3b36b4f8",
+    "phone": "207499080769749",
+    "whatsappLid": "207499080769749@lid",
+    "name": "Taufik Nugraha",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:52.717Z"
+  },
+  {
+    "id": "0de711b3-5865-48c8-ada5-cce880531f96",
+    "phone": "21118371029157",
+    "whatsappLid": "21118371029157@lid",
+    "name": "Arbi",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:53.054Z"
+  },
+  {
+    "id": "400c0869-8d2f-4f60-b292-df01d3435c7e",
+    "phone": "21282217287858",
+    "whatsappLid": "21282217287858@lid",
+    "name": "P",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:53.385Z"
+  },
+  {
+    "id": "79f13a57-c3b8-4fd3-aebc-ce603ce55cae",
+    "phone": "216664020881616",
+    "whatsappLid": "216664020881616@lid",
+    "name": "Abdul",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:53.711Z"
+  },
+  {
+    "id": "2d717539-6fbf-4f31-bb13-8a04a7349ad4",
+    "phone": "21698627825784",
+    "whatsappLid": "21698627825784@lid",
+    "name": "DENJAKA",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:54.040Z"
+  },
+  {
+    "id": "7a73ca34-c317-48ef-b3d9-22e00b7f59c9",
+    "phone": "220688371728540",
+    "whatsappLid": "220688371728540@lid",
+    "name": "Leo",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:54.371Z"
+  },
+  {
+    "id": "19197acd-aaa4-49a0-8185-b0e00c1da059",
+    "phone": "223561704804470",
+    "whatsappLid": "223561704804470@lid",
+    "name": "Carlo",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:54.700Z"
+  },
+  {
+    "id": "fd107038-3825-4cd2-80f9-7f3a25dd0e53",
+    "phone": "225112506802183",
+    "whatsappLid": "225112506802183@lid",
+    "name": "Bismillah",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:55.043Z"
+  },
+  {
+    "id": "bbb3205d-042d-4fa2-a69f-e37b3c431ebf",
+    "phone": "226705637662802",
+    "whatsappLid": "226705637662802@lid",
+    "name": "Angger Putra",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:55.410Z"
+  },
+  {
+    "id": "e7793e98-fa1b-49ad-b695-da79dfb5c5d3",
+    "phone": "227414357581852",
+    "whatsappLid": "227414357581852@lid",
+    "name": "Ahmad Hifdhullah P.",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:55.782Z"
+  },
+  {
+    "id": "dc006c5d-ba28-40ec-bb57-eaf9357f9f5a",
+    "phone": "230167364509934",
+    "whatsappLid": "230167364509934@lid",
+    "name": "RestuMuliyaSejati",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:56.207Z"
+  },
+  {
+    "id": "6eb3489d-150c-4997-8d8a-bb28b78b527e",
+    "phone": "232916261027984",
+    "whatsappLid": "232916261027984@lid",
+    "name": "Firza Dimas A.P",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:56.731Z"
+  },
+  {
+    "id": "95784660-0ea4-4a66-b178-7e2736f9a1c4",
+    "phone": "234398377054376",
+    "whatsappLid": "234398377054376@lid",
+    "name": "'",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:57.182Z"
+  },
+  {
+    "id": "5af118c5-ff78-486e-8ab4-f5772cc58ab1",
+    "phone": "23699679903908",
+    "whatsappLid": "23699679903908@lid",
+    "name": "Fadil",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:57.541Z"
+  },
+  {
+    "id": "a0e0572b-80bf-4e3e-865b-657544bf2210",
+    "phone": "241141073105079",
+    "whatsappLid": "241141073105079@lid",
+    "name": ".",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:57.869Z"
+  },
+  {
+    "id": "35c653ae-445d-4f00-82a3-1ae88c198f26",
+    "phone": "250280679633121",
+    "whatsappLid": "250280679633121@lid",
+    "name": "Muhammad ali akbar",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:58.192Z"
+  },
+  {
+    "id": "55c1e417-2ac0-4e73-8326-4242c4ac4285",
+    "phone": "25198942245100",
+    "whatsappLid": "25198942245100@lid",
+    "name": "R_r",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:58.523Z"
+  },
+  {
+    "id": "611fbff7-bfab-4020-8d4e-28bf046d6094",
+    "phone": "252196268552222",
+    "whatsappLid": "252196268552222@lid",
+    "name": "Rafli Rismawan",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:58.860Z"
+  },
+  {
+    "id": "7cce3beb-c23a-48ff-877e-e00153db10f5",
+    "phone": "252952233115739",
+    "whatsappLid": "252952233115739@lid",
+    "name": "Muhammad Bintang Alfatif",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:59.272Z"
+  },
+  {
+    "id": "44357f11-5617-4c02-81af-be77dadfa28b",
+    "phone": "258853451092133",
+    "whatsappLid": "258853451092133@lid",
+    "name": "NdokjavA'99",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:29:59.604Z"
+  },
+  {
+    "id": "1c14da38-5cbb-4dc0-9831-d9ceab3ff27f",
+    "phone": "259433288450235",
+    "whatsappLid": "259433288450235@lid",
+    "name": "BOWOW",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:00.024Z"
+  },
+  {
+    "id": "d109be97-8ff7-4c95-977f-5b8a01241d34",
+    "phone": "26070602498203",
+    "whatsappLid": "26070602498203@lid",
+    "name": "Kurdi",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:00.509Z"
+  },
+  {
+    "id": "1ec155df-09b0-49e3-a04b-7576c522bbb6",
+    "phone": "261417529819193",
+    "whatsappLid": "261417529819193@lid",
+    "name": "Mulyadi",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:00.979Z"
+  },
+  {
+    "id": "a885ae06-70e5-4d26-9fde-ed840615903a",
+    "phone": "264681721708608",
+    "whatsappLid": "264681721708608@lid",
+    "name": "~R~",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:01.492Z"
+  },
+  {
+    "id": "ca6451ec-3abe-4219-9853-54e853c7cedb",
+    "phone": "265102628520029",
+    "whatsappLid": "265102628520029@lid",
+    "name": "Syahrul Ramadhan",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:01.973Z"
+  },
+  {
+    "id": "3bb3ba0f-0f0b-4935-8fd8-7964c016a276",
+    "phone": "267447747797082",
+    "whatsappLid": "267447747797082@lid",
+    "name": "Yokotama",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:02.310Z"
+  },
+  {
+    "id": "92787b08-8431-4502-8262-27ca6b2f727f",
+    "phone": "273039862280362",
+    "whatsappLid": "273039862280362@lid",
+    "name": "Customer 0362",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:02.639Z"
+  },
+  {
+    "id": "bb531bdc-3fc1-49a6-8440-987b89dfe6d3",
+    "phone": "274311071953010",
+    "whatsappLid": "274311071953010@lid",
+    "name": ".",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:03.036Z"
+  },
+  {
+    "id": "2338ed50-c8b0-468f-b8d8-26e158efccf1",
+    "phone": "275754180972589",
+    "whatsappLid": "275754180972589@lid",
+    "name": "Ydhst",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:03.367Z"
+  },
+  {
+    "id": "787b9601-0d61-444c-a84b-9d89ef279e74",
+    "phone": "276755260641534",
+    "whatsappLid": "276755260641534@lid",
+    "name": "CANDRA",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:03.698Z"
+  },
+  {
+    "id": "637d09f1-88db-4efe-9f80-32c4d7305d37",
+    "phone": "279830104920292",
+    "whatsappLid": "279830104920292@lid",
+    "name": "Rezzha Fatullah",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:04.033Z"
+  },
+  {
+    "id": "ef5da736-3dde-404e-969f-59755190ba52",
+    "phone": "280285908348945",
+    "whatsappLid": "280285908348945@lid",
+    "name": "Adi",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:04.356Z"
+  },
+  {
+    "id": "258727ec-9c56-4edc-aa21-07cd6744a65e",
+    "phone": "28454242246818",
+    "whatsappLid": "28454242246818@lid",
+    "name": "+62",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:04.680Z"
+  },
+  {
+    "id": "bc78f8a7-f555-4089-a1a5-15b15ed861dd",
+    "phone": "29098470600743",
+    "whatsappLid": "29098470600743@lid",
+    "name": "A JAMALUL M 49",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:05.033Z"
+  },
+  {
+    "id": "ec864f10-2f0f-4f09-be7e-e9efdb591a29",
+    "phone": "29313252495614",
+    "whatsappLid": "29313252495614@lid",
+    "name": "zPice",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:05.361Z"
+  },
+  {
+    "id": "2bbf626a-ec4b-435c-b6dd-d4b90dd1f9bb",
+    "phone": "29545684045969",
+    "whatsappLid": "29545684045969@lid",
+    "name": "SPX Express",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:05.705Z"
+  },
+  {
+    "id": "89f52f01-322b-4b90-9afe-3c96e04c8e79",
+    "phone": "32208110772478",
+    "whatsappLid": "32208110772478@lid",
+    "name": "Arul",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:06.160Z"
+  },
+  {
+    "id": "594ef566-e635-490c-b73e-fc40011bcff7",
+    "phone": "34149889007770",
+    "whatsappLid": "34149889007770@lid",
+    "name": "Customer 7770",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:06.504Z"
+  },
+  {
+    "id": "0343ce29-b953-4916-88f8-26f431c35e19",
+    "phone": "36597852565756",
+    "whatsappLid": "36597852565756@lid",
+    "name": "Afrzl Krsd",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:06.865Z"
+  },
+  {
+    "id": "3ee38d4d-3833-405d-aacc-4873b69b5a02",
+    "phone": "36932457378005",
+    "whatsappLid": "36932457378005@lid",
+    "name": ".",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:07.190Z"
+  },
+  {
+    "id": "e15b4ce0-6e47-4bb6-b2d2-1625d7ea5754",
+    "phone": "39432111534194",
+    "whatsappLid": "39432111534194@lid",
+    "name": "Dwi Yudo Lelono",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:07.516Z"
+  },
+  {
+    "id": "a1d6fd51-ac9f-4ae7-a86b-2eb10027886a",
+    "phone": "42860099461341",
+    "whatsappLid": "42860099461341@lid",
+    "name": "Customer 1341",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:07.958Z"
+  },
+  {
+    "id": "787ffa54-67b3-4f09-8e4d-823d0d14f351",
+    "phone": "43817390592158",
+    "whatsappLid": "43817390592158@lid",
+    "name": "Prayoga",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:08.308Z"
+  },
+  {
+    "id": "7d3941de-86b7-4af0-a5a5-ccc08156ec24",
+    "phone": "44041181868133",
+    "whatsappLid": "44041181868133@lid",
+    "name": "Ahmad Hafidz",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:08.636Z"
+  },
+  {
+    "id": "81c96a71-112f-422c-b664-3b0e436606ba",
+    "phone": "48851041943666",
+    "whatsappLid": "48851041943666@lid",
+    "name": "RND🍂",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:09.029Z"
+  },
+  {
+    "id": "4172a221-a337-4daf-a622-ad0d8ee7010f",
+    "phone": "50964350414848",
+    "whatsappLid": "50964350414848@lid",
+    "name": "Anto lebong",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:09.493Z"
+  },
+  {
+    "id": "ccc70cf5-1ee7-45aa-9b3d-50ed7e19555b",
+    "phone": "58390181089482",
+    "whatsappLid": "58390181089482@lid",
+    "name": "Customer 9482",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:09.972Z"
+  },
+  {
+    "id": "9d248f60-f2c2-4a30-8ecf-8f371ba04d3b",
+    "phone": "58634927132801",
+    "whatsappLid": "58634927132801@lid",
+    "name": "Chandra Rismawan",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:10.296Z"
+  },
+  {
+    "id": "c6b18dc3-de9c-4e1e-8015-7db4304f18ba",
+    "phone": "62811116157",
+    "whatsappLid": null,
+    "name": "Yogi",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:10.627Z"
+  },
+  {
+    "id": "6acd8995-4520-413a-b068-00c8a750c034",
+    "phone": "6281111823512",
+    "whatsappLid": null,
+    "name": "6281111823512",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:10.980Z"
+  },
+  {
+    "id": "41b0a756-2ea9-4f59-8acd-ed95af3fecdd",
+    "phone": "628118512710",
+    "whatsappLid": null,
+    "name": "cs indah expres kodam",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:11.309Z"
+  },
+  {
+    "id": "3eb58c65-f8e9-4a0a-bbbe-5bcab0f1bfd2",
+    "phone": "6281196112757",
+    "whatsappLid": null,
+    "name": "Dadang QI",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:11.631Z"
+  },
+  {
+    "id": "26ba74f3-9b9b-4b74-9ec7-5189816f4396",
+    "phone": "6281210088766",
+    "whatsappLid": null,
+    "name": "Ngegayeum Dimsum",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:11.964Z"
+  },
+  {
+    "id": "178231c4-40e3-4c71-ae2e-0ebc045cbf21",
+    "phone": "6281210192220",
+    "whatsappLid": null,
+    "name": "Hardiyanto E.Nasri",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:12.314Z"
+  },
+  {
+    "id": "9882b8c5-7dd1-4296-9be4-cc27ef773bcc",
+    "phone": "6281218130364",
+    "whatsappLid": null,
+    "name": "Doni Afrizal",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:12.866Z"
+  },
+  {
+    "id": "38b494e5-4bb6-45a9-9af9-2d511156fe30",
+    "phone": "6281218939500",
+    "whatsappLid": null,
+    "name": "Afif Ash Shiddiq",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:13.400Z"
+  },
+  {
+    "id": "ef96d023-f39f-4d38-9926-2b687f989ad6",
+    "phone": "6281219472928",
+    "whatsappLid": null,
+    "name": "Imamcobain",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:13.771Z"
+  },
+  {
+    "id": "480e6a9e-aa7d-47ad-85ad-b11237db9038",
+    "phone": "6281219496427",
+    "whatsappLid": null,
+    "name": "PercetakanMerchandise 📲",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:14.117Z"
+  },
+  {
+    "id": "0a2acb9f-c2bf-44f8-90ff-dffeadb7c075",
+    "phone": "6281232449017",
+    "whatsappLid": null,
+    "name": "~Ulil Aidiy",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:14.439Z"
+  },
+  {
+    "id": "75b7a021-a390-4e35-9114-0501e727d295",
+    "phone": "6281281515641",
+    "whatsappLid": null,
+    "name": "Catur",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:14.778Z"
+  },
+  {
+    "id": "ec92f646-3490-4833-a0e1-324cc9e68fa2",
+    "phone": "6281285456004",
+    "whatsappLid": null,
+    "name": "setiawansurya07",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:15.099Z"
+  },
+  {
+    "id": "302fae1f-f959-4c93-ab98-92a7a865de64",
+    "phone": "6281287424443",
+    "whatsappLid": null,
+    "name": "Kikanaya",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:15.426Z"
+  },
+  {
+    "id": "07058675-f0aa-47fa-9fdd-d292839bd542",
+    "phone": "6281288171976",
+    "whatsappLid": null,
+    "name": "Lutfi Rizki Hardianto",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:15.831Z"
+  },
+  {
+    "id": "e2871ef6-792d-4c9b-91f0-0f25e293007d",
+    "phone": "6281290219422",
+    "whatsappLid": null,
+    "name": "mardibaker",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:16.219Z"
+  },
+  {
+    "id": "9a1ecb67-ff92-4fba-8afd-69700ceb5867",
+    "phone": "6281291862689",
+    "whatsappLid": null,
+    "name": "Radith Cruise",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:16.746Z"
+  },
+  {
+    "id": "03e793c0-2211-4dcb-b5de-cd12c83ca8e7",
+    "phone": "6281292867988",
+    "whatsappLid": null,
+    "name": "Ovi",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:17.274Z"
+  },
+  {
+    "id": "175aa496-3761-4e41-b10a-18121e4f593f",
+    "phone": "6281296605333",
+    "whatsappLid": null,
+    "name": "rezamc23",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:17.675Z"
+  },
+  {
+    "id": "af7c4a6b-a608-4a39-8880-7ac61a86896a",
+    "phone": "6281296761915",
+    "whatsappLid": null,
+    "name": "Dhany",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:18.004Z"
+  },
+  {
+    "id": "4663d0c5-2984-47a9-8f8b-35e7b3252088",
+    "phone": "6281297224396",
+    "whatsappLid": null,
+    "name": "Yusup",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:18.330Z"
+  },
+  {
+    "id": "3e3a18b1-0249-42e7-90c7-bd3a96200d4a",
+    "phone": "6281298652646",
+    "whatsappLid": null,
+    "name": "Firda Kusnata",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:18.666Z"
+  },
+  {
+    "id": "a87f79b3-ca24-4aba-89e5-680ee2e8f2ce",
+    "phone": "6281310761940",
+    "whatsappLid": null,
+    "name": "indrawijaya1ya",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:18.991Z"
+  },
+  {
+    "id": "ba74f663-b75c-4186-98a8-4c3882845b3f",
+    "phone": "6281312810828",
+    "whatsappLid": null,
+    "name": "Benny Carles",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:19.314Z"
+  },
+  {
+    "id": "70a20eb7-58df-4eaf-9a70-3d0bc9d68c65",
+    "phone": "6281314831433",
+    "whatsappLid": null,
+    "name": "Customer 1433",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:19.639Z"
+  },
+  {
+    "id": "391d5750-a913-4667-9acb-83092c9a5536",
+    "phone": "6281317333303",
+    "whatsappLid": null,
+    "name": "COSA NOSTRA",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:19.994Z"
+  },
+  {
+    "id": "4c8f315b-205b-43df-8ad4-4270acc9c94d",
+    "phone": "6281320263281",
+    "whatsappLid": null,
+    "name": "FahmyF",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:20.333Z"
+  },
+  {
+    "id": "de3f61c5-3bdb-4567-9127-5a068170cbb0",
+    "phone": "6281348888997",
+    "whatsappLid": null,
+    "name": "Ivan",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:20.882Z"
+  },
+  {
+    "id": "074d561b-8341-434e-a18b-a6c0803f03e7",
+    "phone": "6281351735906",
+    "whatsappLid": null,
+    "name": "IRFANTRI",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:21.395Z"
+  },
+  {
+    "id": "036599cc-7e18-4bb9-bbfb-c4bd63aec6c0",
+    "phone": "6281386409060",
+    "whatsappLid": null,
+    "name": "Jonny Ringo",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:21.895Z"
+  },
+  {
+    "id": "0d3a9bdb-5692-4458-af6f-cf71b98966c3",
+    "phone": "6281386781464",
+    "whatsappLid": null,
+    "name": "G E N N A R O",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:22.226Z"
+  },
+  {
+    "id": "e6ff65f5-04cb-481b-b9a2-f8f617a7b34a",
+    "phone": "6281388248249",
+    "whatsappLid": null,
+    "name": "Faisal Bie Lah",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:22.556Z"
+  },
+  {
+    "id": "91b3c4fa-280b-49a7-aec7-98a9a517a951",
+    "phone": "6281392000162",
+    "whatsappLid": null,
+    "name": "Fatha Alsidqi",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:22.892Z"
+  },
+  {
+    "id": "376140ad-a15f-4652-ada2-7bede73a9b7a",
+    "phone": "6281392974464",
+    "whatsappLid": null,
+    "name": "Riska Kurniawan",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:23.222Z"
+  },
+  {
+    "id": "3cddc2a1-77c1-48d3-aa6d-ecdbacc4f8ab",
+    "phone": "6281510021762",
+    "whatsappLid": null,
+    "name": "Aries Yudhatama",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:23.588Z"
+  },
+  {
+    "id": "786c9d9c-c87d-4bc2-a3ee-a520f46113ec",
+    "phone": "6281510226372",
+    "whatsappLid": null,
+    "name": "Wiwied Harry",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:23.943Z"
+  },
+  {
+    "id": "71998263-38c1-4b56-b400-88814ff63e7d",
+    "phone": "62816950460",
+    "whatsappLid": null,
+    "name": "Achmad Afif S.Kom.I M.M",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:24.269Z"
+  },
+  {
+    "id": "6e17a63a-38f0-4559-bcb0-02aaad3e6053",
+    "phone": "628170866809",
+    "whatsappLid": null,
+    "name": "JP",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:24.591Z"
+  },
+  {
+    "id": "9407ae7e-48de-4ff9-a4bf-3775d51ff596",
+    "phone": "628179481010",
+    "whatsappLid": null,
+    "name": "Tauhid",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:24.929Z"
+  },
+  {
+    "id": "cfae0682-7c80-4ca6-b60d-5d1ff291d589",
+    "phone": "6281932000052",
+    "whatsappLid": null,
+    "name": "oKHA",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:25.762Z"
+  },
+  {
+    "id": "1dad5a02-d3e8-47f4-b6c8-0c5b107d5e10",
+    "phone": "6281943673636",
+    "whatsappLid": null,
+    "name": "Ibenk",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:26.086Z"
+  },
+  {
+    "id": "90ef75e3-e9f0-4cac-8145-6e4c4e1300f3",
+    "phone": "6282110093554",
+    "whatsappLid": null,
+    "name": "Sasti Dwi Ardhyanti",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:26.417Z"
+  },
+  {
+    "id": "7167bc7e-7f09-436d-a669-52ac92f9e406",
+    "phone": "6282110764614",
+    "whatsappLid": null,
+    "name": "Anugrah",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:26.750Z"
+  },
+  {
+    "id": "d9b6bb3f-c6d8-4a06-9381-bbcf7a57414a",
+    "phone": "6282118199926",
+    "whatsappLid": null,
+    "name": "©®™",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:27.075Z"
+  },
+  {
+    "id": "edad8c6e-069e-4e92-9abc-12d651e52d40",
+    "phone": "6282123167017",
+    "whatsappLid": null,
+    "name": "Arsil \" Achil \" Majid",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:27.408Z"
+  },
+  {
+    "id": "869fa3a0-0551-4b26-83f1-2f6853edd65f",
+    "phone": "6282130222212",
+    "whatsappLid": null,
+    "name": "Daris Hazim",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:27.777Z"
+  },
+  {
+    "id": "2cc75d70-c8fa-4f64-84bc-774ec9cb526f",
+    "phone": "6282137828049",
+    "whatsappLid": null,
+    "name": "Firman",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:28.266Z"
+  },
+  {
+    "id": "a1464b8c-dfa4-47b5-b2d5-10124a584fd0",
+    "phone": "6282170208746",
+    "whatsappLid": null,
+    "name": "Hari Wibowo",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:28.810Z"
+  },
+  {
+    "id": "7026d66a-197e-46cb-87de-5788a71dba8d",
+    "phone": "6282177973945",
+    "whatsappLid": null,
+    "name": "Syarif Hidayatullah(Ayep)",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:29.291Z"
+  },
+  {
+    "id": "aa637320-0b43-47eb-bd7a-156c794e7623",
+    "phone": "6282246002858",
+    "whatsappLid": null,
+    "name": "✓",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:29.754Z"
+  },
+  {
+    "id": "f53595e5-06b7-4d43-8e12-b51425b0aacf",
+    "phone": "6282246619463",
+    "whatsappLid": null,
+    "name": "taqi",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:30.103Z"
+  },
+  {
+    "id": "5bf0e433-7234-436c-9d3a-d989d7e246ac",
+    "phone": "6282375929222",
+    "whatsappLid": null,
+    "name": "Customer 9222",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:30.502Z"
+  },
+  {
+    "id": "64a32d19-d1ec-44e4-a737-03b2cb3a9644",
+    "phone": "6285143546013",
+    "whatsappLid": null,
+    "name": "Ed",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:30.828Z"
+  },
+  {
+    "id": "4cebbfb6-2942-455f-8fad-af751076e450",
+    "phone": "6285159133369",
+    "whatsappLid": null,
+    "name": "majoo teknologi Indonesia",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:31.163Z"
+  },
+  {
+    "id": "a589ff6f-56c7-494e-9cca-0d0da2d62906",
+    "phone": "6285161121380",
+    "whatsappLid": null,
+    "name": "Adam",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:31.494Z"
+  },
+  {
+    "id": "c2bcf962-7bb6-447f-ab2c-37a4e454b23c",
+    "phone": "6285169630092",
+    "whatsappLid": null,
+    "name": "Donnie",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:31.815Z"
+  },
+  {
+    "id": "d157ea53-409d-473d-8f4f-417a349d3a12",
+    "phone": "6285282219183",
+    "whatsappLid": null,
+    "name": "Rai Oliveira",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:32.147Z"
+  },
+  {
+    "id": "ca8ff784-3371-4a46-a443-6dffd44e3aef",
+    "phone": "6285352074150",
+    "whatsappLid": null,
+    "name": "Perhotelan",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:32.473Z"
+  },
+  {
+    "id": "2037f79f-bb55-46b4-a357-5d53351f268b",
+    "phone": "628558040243",
+    "whatsappLid": null,
+    "name": "Ery",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:32.804Z"
+  },
+  {
+    "id": "a585e86c-1db9-4b7a-afa3-f6a271a1f309",
+    "phone": "6285691822685",
+    "whatsappLid": null,
+    "name": "Thomas Gatot Pambudi",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:33.127Z"
+  },
+  {
+    "id": "ea362afb-49d4-4798-a54a-1ea94533c89c",
+    "phone": "6285692512578",
+    "whatsappLid": null,
+    "name": "Halawa",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:33.463Z"
+  },
+  {
+    "id": "9a58cc96-d6f2-4bb2-8f8c-a7a706d6aca1",
+    "phone": "6285716557124",
+    "whatsappLid": null,
+    "name": "ALAMMM",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:33.797Z"
+  },
+  {
+    "id": "f1eaf993-7f9b-4f37-aa4c-4c37aae6baef",
+    "phone": "6285716843701",
+    "whatsappLid": null,
+    "name": "Rudi",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:34.148Z"
+  },
+  {
+    "id": "042de239-1cdc-4a74-826a-cce448662009",
+    "phone": "6285717117137",
+    "whatsappLid": null,
+    "name": "Bagus Putra",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:34.476Z"
+  },
+  {
+    "id": "73d7e5f5-88d8-461f-88be-3aae2d44c638",
+    "phone": "6285717744277",
+    "whatsappLid": null,
+    "name": "Cyra klunx",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:34.798Z"
+  },
+  {
+    "id": "eeb9631f-6f42-4a94-94ee-8da7fbdc4b85",
+    "phone": "6285718707314",
+    "whatsappLid": null,
+    "name": "Nur Aeni Solikhah",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:35.121Z"
+  },
+  {
+    "id": "409e2185-6060-4112-85b7-f0f71ded18fb",
+    "phone": "6285770315697",
+    "whatsappLid": null,
+    "name": "Ika Muflikhah",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:35.614Z"
+  },
+  {
+    "id": "637e0b1d-93da-4e58-8fb0-5d6df33f33ed",
+    "phone": "6285771474872",
+    "whatsappLid": null,
+    "name": "🥰",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:36.082Z"
+  },
+  {
+    "id": "e84dc077-3c6d-4f70-b88a-945a74ad4446",
+    "phone": "6285773198506",
+    "whatsappLid": null,
+    "name": "Fafafaa",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:36.560Z"
+  },
+  {
+    "id": "7b41371a-bce5-43e4-b027-46798f73ba6f",
+    "phone": "6285775029980",
+    "whatsappLid": null,
+    "name": "Irfan MKI",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:37.105Z"
+  },
+  {
+    "id": "623666f0-1ede-4bc9-9065-1ebae89d9d9c",
+    "phone": "6285775848208",
+    "whatsappLid": null,
+    "name": "Goffar Nur Hidayatulloh",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:37.427Z"
+  },
+  {
+    "id": "82975183-e3d1-4ed6-b524-00a2f07a8aaa",
+    "phone": "6285777186358",
+    "whatsappLid": null,
+    "name": "Zakia(putra Dan Chacha)",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:37.753Z"
+  },
+  {
+    "id": "00aa3b12-8f1b-4bfa-b7a1-413a64e5041e",
+    "phone": "6285777519033",
+    "whatsappLid": null,
+    "name": "🪅",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:38.078Z"
+  },
+  {
+    "id": "dd528c84-a546-4472-a955-7e74acf45bfa",
+    "phone": "6285777655411",
+    "whatsappLid": null,
+    "name": "Andry😎",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:38.410Z"
+  },
+  {
+    "id": "f354026b-297a-4649-9ac5-d159dbc2e914",
+    "phone": "6285777772111",
+    "whatsappLid": null,
+    "name": "IRfan || Bentosuke",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:38.735Z"
+  },
+  {
+    "id": "16c73f20-96e7-4a78-9e14-bb9f7746a247",
+    "phone": "6285778276217",
+    "whatsappLid": null,
+    "name": "HANDSOME",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:39.069Z"
+  },
+  {
+    "id": "a5b7c592-0c2a-4cc5-bf69-1e1d5204cb0f",
+    "phone": "6285779931306",
+    "whatsappLid": null,
+    "name": "Andika",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:39.401Z"
+  },
+  {
+    "id": "7483c0d2-d6fb-431e-8073-1e7dc3c1dfae",
+    "phone": "6285781172829",
+    "whatsappLid": null,
+    "name": "Rieswan Haedi",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:39.727Z"
+  },
+  {
+    "id": "5192d75f-54dd-40f7-9b15-bdc36bb63f02",
+    "phone": "6285817691377",
+    "whatsappLid": null,
+    "name": "AchongDL",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:40.066Z"
+  },
+  {
+    "id": "3ad263f0-0f1f-40c7-aff4-c83b0c811684",
+    "phone": "6285819260956",
+    "whatsappLid": null,
+    "name": "Will~",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:40.399Z"
+  },
+  {
+    "id": "eb56566e-c30e-4580-ae0c-42b5b362e3cd",
+    "phone": "6285880292171",
+    "whatsappLid": null,
+    "name": "hendra jaya per",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:40.725Z"
+  },
+  {
+    "id": "6ea72697-bcfc-430e-8f87-60e19a8578c3",
+    "phone": "6285881631801",
+    "whatsappLid": null,
+    "name": "RH Yaw",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:41.047Z"
+  },
+  {
+    "id": "ebe6c91e-6cbf-406b-b3e4-9ac306a90fee",
+    "phone": "6285882283859",
+    "whatsappLid": null,
+    "name": "Emilio. H",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:41.377Z"
+  },
+  {
+    "id": "e8cb9263-86b3-4a0f-828d-2d1b772b9582",
+    "phone": "6285888602463",
+    "whatsappLid": null,
+    "name": "🤲",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:41.708Z"
+  },
+  {
+    "id": "ffb156a1-100d-47b2-a603-f7ecc8fed244",
+    "phone": "6285891414342",
+    "whatsappLid": null,
+    "name": "kenzie",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:42.034Z"
+  },
+  {
+    "id": "31cedf12-00ed-42c0-adc8-69a64addbcf3",
+    "phone": "6285966311474",
+    "whatsappLid": null,
+    "name": "Den",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:42.359Z"
+  },
+  {
+    "id": "1f8ca0f0-3d35-452f-9f6c-6698ccf2b1cc",
+    "phone": "6287764757737",
+    "whatsappLid": null,
+    "name": "Fathul",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:42.704Z"
+  },
+  {
+    "id": "bd2ab564-33db-4fe7-b19b-1fd4f1337f97",
+    "phone": "6287771891866",
+    "whatsappLid": null,
+    "name": "K",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:43.029Z"
+  },
+  {
+    "id": "2233fe29-3684-46ce-bee2-1b7bcf961b3b",
+    "phone": "6287781795055",
+    "whatsappLid": null,
+    "name": "𝘽𝙪𝙣𝙜 𝙀𝙠𝙤",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:43.359Z"
+  },
+  {
+    "id": "e27dd70b-dc27-4e9f-a0cc-ef014f033fcb",
+    "phone": "6287808559101",
+    "whatsappLid": null,
+    "name": "Yofitra",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:43.736Z"
+  },
+  {
+    "id": "46c53e84-f99d-46df-b2a3-350ee7e2cfa8",
+    "phone": "6287878626916",
+    "whatsappLid": null,
+    "name": "Rifqi Ryan",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:44.379Z"
+  },
+  {
+    "id": "a1263d7b-6ddd-4e3b-ae51-2290c9e79ae6",
+    "phone": "6287878761734",
+    "whatsappLid": null,
+    "name": "agungyanto45",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:44.796Z"
+  },
+  {
+    "id": "e70b35d5-2e68-41cf-8880-f3fcd7d43ff3",
+    "phone": "6287886265959",
+    "whatsappLid": null,
+    "name": "🇮🇩🇮🇩",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:45.153Z"
+  },
+  {
+    "id": "0bee2131-5109-45a1-b3b6-22b4f141b854",
+    "phone": "6287889554140",
+    "whatsappLid": null,
+    "name": "Rahmat Mxhijau",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:45.501Z"
+  },
+  {
+    "id": "4bf58804-8e2c-4d05-8c51-c278962ae003",
+    "phone": "6287896980543",
+    "whatsappLid": null,
+    "name": "black id",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:45.836Z"
+  },
+  {
+    "id": "d6602d20-cb46-4cc0-83f3-ce0129411bab",
+    "phone": "6288212190094",
+    "whatsappLid": null,
+    "name": "Herman bedud",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:46.162Z"
+  },
+  {
+    "id": "6cb84fce-00b4-455a-a46a-297679d02369",
+    "phone": "6288213421063",
+    "whatsappLid": null,
+    "name": "Niel~",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:46.494Z"
+  },
+  {
+    "id": "e1d159de-77a5-493f-82b2-279e93469a60",
+    "phone": "6288214296224",
+    "whatsappLid": null,
+    "name": ".",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:46.823Z"
+  },
+  {
+    "id": "40d8d72e-5bd7-4098-9a7e-82451cd0ac73",
+    "phone": "6288293882386",
+    "whatsappLid": null,
+    "name": "Shouma",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:47.155Z"
+  },
+  {
+    "id": "23258036-2e47-480c-b878-173967a32b39",
+    "phone": "6288294623474",
+    "whatsappLid": null,
+    "name": "Aiz",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:47.476Z"
+  },
+  {
+    "id": "63f230cc-cfa2-4981-83a9-e5ee32d8742d",
+    "phone": "6289503530371",
+    "whatsappLid": null,
+    "name": "ANDRIALVAREZA",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:47.805Z"
+  },
+  {
+    "id": "db573e61-1c0a-4def-8a83-c90946cd30d1",
+    "phone": "6289524019794",
+    "whatsappLid": null,
+    "name": "Andin",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:48.130Z"
+  },
+  {
+    "id": "9782efa5-c61b-4f44-954c-82299a49422b",
+    "phone": "62895323756317",
+    "whatsappLid": null,
+    "name": "Riziq Fahlevi",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:48.462Z"
+  },
+  {
+    "id": "c8bd149f-4a66-435f-af0f-d71f22387c92",
+    "phone": "62895332107479",
+    "whatsappLid": null,
+    "name": "DS03",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:48.788Z"
+  },
+  {
+    "id": "7f011d6b-dafb-4c94-8abb-266a99fcf845",
+    "phone": "62895362109977",
+    "whatsappLid": null,
+    "name": "Arya",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:49.109Z"
+  },
+  {
+    "id": "43b9335d-00d5-42ff-bffd-8e2d2797efdd",
+    "phone": "62895393996576",
+    "whatsappLid": null,
+    "name": "Customer 6576",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:49.443Z"
+  },
+  {
+    "id": "174bc9fd-cb11-43e3-a0b3-6f2afd510393",
+    "phone": "62895428311859",
+    "whatsappLid": null,
+    "name": "Encep Suryana",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:49.770Z"
+  },
+  {
+    "id": "8064056b-e7aa-4838-913e-2550cad504ef",
+    "phone": "62895611932288",
+    "whatsappLid": null,
+    "name": "etiwahyuni🐻‍❄️✨️",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:50.102Z"
+  },
+  {
+    "id": "c572af18-464f-4e45-a094-53513f848da9",
+    "phone": "6289635666672",
+    "whatsappLid": null,
+    "name": "Abdulgoding",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:50.436Z"
+  },
+  {
+    "id": "8323e4e6-787c-40e6-b9a3-a8209beed0e9",
+    "phone": "6289639523677",
+    "whatsappLid": null,
+    "name": "Tabroni",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:50.759Z"
+  },
+  {
+    "id": "a793514a-c453-4552-80a1-86469fa7cf2b",
+    "phone": "6289650547041",
+    "whatsappLid": null,
+    "name": "Putut",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:51.081Z"
+  },
+  {
+    "id": "2b3c7fdc-31dc-41e9-8bb7-09efa9fdf084",
+    "phone": "6289652502585",
+    "whatsappLid": null,
+    "name": "Hisham abdul aziz",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:51.406Z"
+  },
+  {
+    "id": "5c4acb8f-dd2a-4e9c-955a-633f648057a3",
+    "phone": "6289658130521",
+    "whatsappLid": null,
+    "name": "NS",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:51.752Z"
+  },
+  {
+    "id": "a7d2417a-3e18-4403-8722-6972df435bc7",
+    "phone": "6289665304080",
+    "whatsappLid": null,
+    "name": "Samsul Udinss",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:52.097Z"
+  },
+  {
+    "id": "04672c2e-2e3e-40bd-a6e9-823c14483fee",
+    "phone": "6289666543482",
+    "whatsappLid": null,
+    "name": "ibrahimalgadry11",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:52.455Z"
+  },
+  {
+    "id": "20aefb9e-a64b-4dc9-b9ff-f621ce09d503",
+    "phone": "6289672799606",
+    "whatsappLid": null,
+    "name": "Priyand",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:53.046Z"
+  },
+  {
+    "id": "7da096ab-9cdd-49a3-ae5e-dee9c283f4a9",
+    "phone": "628971562270",
+    "whatsappLid": null,
+    "name": "🙂",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:53.370Z"
+  },
+  {
+    "id": "cf0bfd15-b196-48ca-a22b-eee224dc69c6",
+    "phone": "628981734985",
+    "whatsappLid": null,
+    "name": "hhaerudin",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:53.686Z"
+  },
+  {
+    "id": "d22a39b6-b9fb-4693-a830-ffabff18ab23",
+    "phone": "628986435137",
+    "whatsappLid": null,
+    "name": "bastlody",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:54.035Z"
+  },
+  {
+    "id": "20a337cc-a40d-4d5e-89d3-f635f948f07e",
+    "phone": "628997753745",
+    "whatsappLid": null,
+    "name": "KKaInun",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:54.368Z"
+  },
+  {
+    "id": "e0b59934-8b8d-4e5d-a974-263603b82d3e",
+    "phone": "63041798430951",
+    "whatsappLid": "63041798430951@lid",
+    "name": "Farhan Konsultan Property",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:54.708Z"
+  },
+  {
+    "id": "6b44a5c9-258c-46e1-935c-d5c68cd703f9",
+    "phone": "63698777423985",
+    "whatsappLid": "63698777423985@lid",
+    "name": "Customer 3985",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:55.037Z"
+  },
+  {
+    "id": "663f13fc-5af8-4bfa-b020-fbf30b9b4b47",
+    "phone": "64652545368146",
+    "whatsappLid": "64652545368146@lid",
+    "name": "JOE ZOE",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:55.386Z"
+  },
+  {
+    "id": "4d3f2992-840c-4ca2-9f5f-866b2b6edf69",
+    "phone": "65176246161433",
+    "whatsappLid": "65176246161433@lid",
+    "name": "Mam Aksa🦋",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:55.714Z"
+  },
+  {
+    "id": "a685d69a-f774-4822-a6a3-46f17400325e",
+    "phone": "71631934369837",
+    "whatsappLid": "71631934369837@lid",
+    "name": "🆚",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:56.053Z"
+  },
+  {
+    "id": "2f14898c-90c2-4e57-b252-67ad8dda8707",
+    "phone": "71640692051971",
+    "whatsappLid": "71640692051971@lid",
+    "name": "RENDY MARKETING XL SATU",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:56.381Z"
+  },
+  {
+    "id": "a7723cf9-01de-4454-95bf-f5cc662a6d76",
+    "phone": "72597899337811",
+    "whatsappLid": "72597899337811@lid",
+    "name": "🇮🇩FATKUR🇮🇩",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:56.708Z"
+  },
+  {
+    "id": "b9d6e53d-3967-48bd-9782-c038235f8cc3",
+    "phone": "76785475653826",
+    "whatsappLid": "76785475653826@lid",
+    "name": "Angga",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:57.033Z"
+  },
+  {
+    "id": "843c7461-9651-4e6b-bbbd-84b91868579e",
+    "phone": "80672806953156",
+    "whatsappLid": "80672806953156@lid",
+    "name": "R.T.H ||",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:57.370Z"
+  },
+  {
+    "id": "78d2c0d2-ab06-4ca2-a7af-3c3fc6340548",
+    "phone": "81287205363766",
+    "whatsappLid": "81287205363766@lid",
+    "name": "*****",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:57.726Z"
+  },
+  {
+    "id": "5ceb0092-5817-48b6-8bc1-e80331e39d22",
+    "phone": "81385821855975",
+    "whatsappLid": "81385821855975@lid",
+    "name": ".",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:58.053Z"
+  },
+  {
+    "id": "fa82b7b5-e948-4691-8e4f-4257d5710e50",
+    "phone": "83365365604399",
+    "whatsappLid": "83365365604399@lid",
+    "name": "Hardi Nay",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:58.378Z"
+  },
+  {
+    "id": "0bfb49af-9e15-4b22-9456-6e2a457a84c9",
+    "phone": "97354023731370",
+    "whatsappLid": "97354023731370@lid",
+    "name": "Fatur",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:58.915Z"
+  },
+  {
+    "id": "7c26fc8a-9439-4030-80f1-d721bfb029a1",
+    "phone": "97491613687912",
+    "whatsappLid": "97491613687912@lid",
+    "name": "anasaemun",
+    "phoneReal": null,
+    "status": "new",
+    "totalSpending": 0,
+    "createdAt": "2026-03-30T09:30:59.458Z"
+  }
+]

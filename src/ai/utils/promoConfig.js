@@ -1,5 +1,6 @@
 // File: src/ai/utils/promoConfig.js
 // Promo config with 5-minute cache. Fetch dari Prisma KeyValueStore.
+// Returns structured object with combo discount info.
 
 const prisma = require('../../lib/prisma');
 
@@ -7,11 +8,14 @@ let promoCache = null;
 let promoCacheAt = 0;
 const PROMO_CACHE_TTL = 5 * 60 * 1000; // 5 menit
 
+/**
+ * Returns structured promo object or null.
+ * Shape: { promoText, comboDiscount, comboMinServices }
+ */
 async function getActivePromo() {
     const now = Date.now();
 
-    // Return cache kalau masih fresh
-    if (promoCache !== null && (now - promoCacheAt) < PROMO_CACHE_TTL) {
+    if (promoCache !== undefined && promoCache !== null && (now - promoCacheAt) < PROMO_CACHE_TTL) {
         return promoCache;
     }
 
@@ -25,9 +29,15 @@ async function getActivePromo() {
             }
         });
 
-        promoCache = (kv?.value?.isActive && kv?.value?.promoText)
-            ? kv.value.promoText
-            : null;
+        if (kv?.value?.isActive) {
+            promoCache = {
+                promoText: kv.value.promoText || null,
+                comboDiscount: kv.value.comboDiscount || 0, // 0.15 = 15%
+                comboMinServices: kv.value.comboMinServices || 2,
+            };
+        } else {
+            promoCache = null;
+        }
         promoCacheAt = now;
 
         return promoCache;
