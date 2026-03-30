@@ -2,9 +2,10 @@ const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
 const { SystemMessage, HumanMessage } = require('@langchain/core/messages');
 
 const model = new ChatGoogleGenerativeAI({
-    model: process.env.AI_MODEL || 'gemini-1.5-flash',
-    maxOutputTokens: 1024,
+    model: process.env.AI_MODEL || 'gemini-2.5-flash-lite',
+    maxOutputTokens: 2048,
     temperature: 0,
+    responseMimeType: "application/json",
 });
 
 /**
@@ -42,38 +43,34 @@ async function infoCollectorNode(state) {
         return { context: { ...context, missingQuestions: [] } };
     }
 
-    const systemPrompt = `Kamu adalah Entity Extractor handal untuk Bengkel BosMat Studio.
-Tugas: Analisis SELURUH riwayat chat untuk mengekstrak informasi entitas berikut. Meskipun user tidak menyebutkannya di pesan terakhir, periksa pesan-pesan sebelumnya.
+    const systemPrompt = `[ROLE]
+Kamu adalah Senior Entity Extractor spesialis Otomotif untuk Bengkel BosMat Studio. 
+Keahlianmu adalah membedah percakapan WhatsApp yang berantakan menjadi data terstruktur JSON dengan akurasi 100%.
 
-DATA YANG HARUS DIEKSTRAK:
-1. motor_model: Nama model motor (contoh: NMAX, Nmax Old, Vario 160, Vespa, Scoopy, dll).
-2. service_types: ARRAY dari jenis layanan yang diminta user. User bisa minta lebih dari 1 layanan. Contoh: ["Repaint Bodi Halus", "Detailing Mesin"].
+[OBJECTIVE]
+Ekstrak informasi entitas dari riwayat chat. Prioritaskan kejujuran data (jangan menebak jika tidak ada) dan deteksi KOREKSI oleh user. 
+Kamu harus membedakan antara "Pertanyaan umum/harga" vs "Niat booking".
+
+[DETAILS: DATA YANG HARUS DIEKSTRAK]
+1. motor_model: Nama model motor (contoh: NMAX, Nmax Old, Vario 160). Deteksi jika user ganti motor di pesan terakhir.
+2. service_types: ARRAY dari jenis layanan resmi. User bisa minta lebih dari 1 layanan. 
    Layanan resmi:
-   - 'Repaint Bodi Halus', 'Repaint Bodi Kasar', 'Repaint Velg', 'Repaint Cover CVT', 'Spot Repair',
-   - 'Detailing Mesin', 'Cuci Komplit', 'Poles Bodi Glossy', 'Full Detailing Glossy',
-   - 'Coating Doff', 'Coating Glossy', 'Complete Service Doff', 'Complete Service Glossy'.
-   PENTING: Jika user bilang "repaint" tanpa spesifik, isi "Repaint". Jika "detailing" tanpa spesifik, isi "Detailing".
-3. paint_type: 'glossy' atau 'doff'.
-4. is_bongkar_total: boolean (apakah user mau layanan bongkar total/hampir seluruh bagian?).
+   - 'Repaint Bodi Halus', 'Repaint Bodi Kasar', 'Repaint Velg', 'Repaint Cover CVT', 'Spot Repair'
+   - 'Detailing Mesin', 'Cuci Komplit', 'Poles Bodi Glossy', 'Full Detailing Glossy'
+   - 'Coating Doff', 'Coating Glossy', 'Complete Service Doff', 'Complete Service Glossy'
+   PENTING: Jika hanya minta "repaint", isi "Repaint". Jika "detailing", isi "Detailing".
+3. paint_type: 'glossy' | 'doff'.
+4. is_bongkar_total: boolean (mau bongkar sampai rangka?).
 5. detailing_focus: 'baret' (poles bodi), 'mesin' (detailing mesin), 'kerangka' (cuci komplit).
-6. color_choice: warna yang diinginkan user untuk Repaint BODI (Halus/Kasar). Ini KHUSUS warna bodi. "Standar" atau "Original" adalah nilai yang valid jika user ingin kembali ke warna asli pabrikan.
-7. velg_color_choice: warna yang diinginkan user untuk Repaint VELG. Ini KHUSUS warna velg, TERPISAH dari warna bodi. "Standar" atau "Original" juga valid di sini.
-8. is_previously_painted: boolean (khusus velg, apakah sudah pernah cat ulang/bukan ori?).
-9. booking_date: Tanggal user ingin booking (contoh: "2026-03-31", "besok", "hari ini", "senin depan").
-10. booking_time: Jam user ingin booking (contoh: "10:00", "jam 2 siang", "pagi", "sore").
+6. color_choice: warna khusus bodi halus/kasar (misal: "Hitam Lembayung Ungu", "Standar").
+7. velg_color_choice: warna khusus velg (misal: "Gold Marchesini").
+8. is_previously_painted: boolean (khusus velg, sudah pernah cat ulang?).
+9. booking_date: Tanggal (misal: "2026-03-31", "besok", "sabtu").
+10. booking_time: Jam (misal: "10:00", "pagi", "jam 2 siang").
 
-PANDUAN:
-- Jika user bilang "NMAX", itu adalah motor_model.
-- Jika user bilang "Coating", itu adalah service_types: ["Coating"] (tapi butuh spesifik glossy/doff nanti).
-- Jika user bilang "repaint sama detailing", itu adalah service_types: ["Repaint", "Detailing"].
-- Jika ada informasi yang bertentangan, ambil yang paling baru.
-- Jika user menerima tawaran combo/tambah layanan, TAMBAHKAN ke service_types (jangan replace).
-- Jika user menyebutkan warna dalam konteks velg, isi ke velg_color_choice. Jika dalam konteks bodi, isi ke color_choice.
-- Jika user bilang "balik standar", "warna aslinya", atau "original", isi color_choice atau velg_color_choice dengan "standar".
-- Jika user bertanya ketersediaan hari ini/besok, isi booking_date sesuai konteksnya.
-
-FORMAT JAWABAN (JSON ONLY):
+[EXPECTED OUTPUT (JSON ONLY)]
 {
+  "internal_thought": "Analisis singkat: Apakah user melakukan koreksi? Apakah ini niat booking atau tanya harga? Kenapa nilai X dipilih?",
   "motor_model": string | null,
   "service_types": string[],
   "paint_type": "glossy" | "doff" | null,
@@ -84,17 +81,33 @@ FORMAT JAWABAN (JSON ONLY):
   "is_previously_painted": boolean | null,
   "booking_date": string | null,
   "booking_time": string | null
-}`;
+}
+
+[EXAMPLES]
+- User: "Cat velg nmax berapa?" AI: "Untuk velg Nmax 400rb mas." User: "Oke bsk jam 10 ya." 
+  -> motor_model: "Nmax", service_types: ["Repaint Velg"], booking_date: "besok", booking_time: "10:00".
+- User: "Vario 160 repaint halus hitam. Eh ganti deh, Vario 125 aja."
+  -> motor_model: "Vario 125" (Koreksi terdeteksi).
+
+[SENSE CHECK]
+- Jika user tanya "Cat Nmax berapa?", service_types adalah ["Repaint"] tapi JANGAN paksa isi booking_date jika user belum setuju booking.
+- Periksa spek warna: Jangan campur warna velg ke color_choice (bodi).`;
 
     try {
+        // Process chat history with speaker labels
+        const chatTranscript = messages.map(m => {
+            const role = m._getType() === 'human' ? '[USER]' : '[AI]';
+            return `${role}: ${m.content}`;
+        }).join('\n');
+
         const response = await model.invoke([
             new SystemMessage(systemPrompt),
-            new HumanMessage(messages.map(m => m.content).join('\n'))
+            new HumanMessage(chatTranscript)
         ]);
 
         console.log(`[INFO_COLLECTOR_NODE] Raw extraction: ${response.content}`);
-        const rawResult = response.content.replace(/```json|```/g, '').trim();
-        const extracted = JSON.parse(rawResult);
+        const extracted = JSON.parse(response.content);
+        console.log(`[INFO_COLLECTOR_NODE] Thread Analysis: ${extracted.internal_thought}`);
 
         // Update vehicleType (overwrite with latest if provided)
         if (extracted.motor_model) ctx.vehicleType = extracted.motor_model;
