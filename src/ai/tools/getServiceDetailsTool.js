@@ -110,9 +110,9 @@ async function resolveSizeForService({ service, sizeArg, motorModel }) {
 
   // 1. Prefer size from motorModel data if provided
   if (!finalSize && motorModel) {
-    const motorData = lookupMotorSizeFromData(motorModel);
+    const motorData = await lookupMotorSizeFromData(motorModel);
     if (motorData) {
-      finalSize = category === 'repaint' ? motorData.repaint_size : motorData.service_size;
+      finalSize = category === 'repaint' ? motorData.repaintSize : motorData.serviceSize;
       console.log(`[resolveSizeForService] Inferred ${finalSize} from model ${motorModel}`);
     }
   }
@@ -122,7 +122,6 @@ async function resolveSizeForService({ service, sizeArg, motorModel }) {
 
 async function getPromoInfo() {
   try {
-    const prisma = require('../../lib/prisma');
     const kv = await prisma.keyValueStore.findUnique({
       where: {
         collection_key: {
@@ -141,15 +140,6 @@ async function getPromoInfo() {
   return null;
 }
 
-// --- Repaint Model-Based Price Lookup ---
-// Map motor size (S/M/L/XL) to bodi_kasar category names
-const BODI_KASAR_SIZE_MAP = {
-  S: 'Small Matic / Bebek',
-  M: 'Medium Matic',
-  L: 'Big Matic',
-  XL: 'Extra Big Matic',
-};
-
 async function getSyaratKetentuan() {
   const kv = await prisma.keyValueStore.findUnique({
     where: { collection_key: { collection: 'settings', key: 'syarat_ketentuan_repaint' } }
@@ -167,12 +157,11 @@ async function getSyaratKetentuan() {
 
 async function lookupRepaintPrice(motorModel, subcategory, motorSize) {
   if (!motorModel) return null;
-  const query = motorModel.trim().toLowerCase();
 
   const motorData = await lookupMotorSizeFromData(motorModel);
   if (!motorData) return null;
 
-  // 1. Bodi Halus
+  // 1. Bodi Halus (usesModelPricing = true)
   if (!subcategory || subcategory === 'bodi_halus') {
     const service = await prisma.service.findFirst({ where: { subcategory: 'bodi_halus' } });
     if (service) {
@@ -192,7 +181,7 @@ async function lookupRepaintPrice(motorModel, subcategory, motorSize) {
     }
   }
 
-  // 2. Bodi Kasar
+  // 2. Bodi Kasar (usesModelPricing = false, based on size)
   if (subcategory === 'bodi_kasar') {
     const service = await prisma.service.findFirst({ where: { subcategory: 'bodi_kasar' } });
     const size = motorSize || motorData.repaintSize;
@@ -212,7 +201,7 @@ async function lookupRepaintPrice(motorModel, subcategory, motorSize) {
     }
   }
 
-  // 3. Velg
+  // 3. Velg (Hybrid)
   if (subcategory === 'velg') {
     const service = await prisma.service.findFirst({ where: { subcategory: 'velg' } });
     if (service) {
@@ -256,28 +245,6 @@ function formatRepaintPriceResult(lookup) {
     };
   }
 
-  if (lookup.min != null && lookup.max != null) {
-    return {
-      price: null,
-      price_min: lookup.min,
-      price_max: lookup.max,
-      price_formatted: `Rp${lookup.min.toLocaleString('id-ID')} - Rp${lookup.max.toLocaleString('id-ID')}`,
-      price_type: 'range',
-      motor_model: lookup.model,
-      note: lookup.note,
-    };
-  }
-
-  if (lookup.ranges) {
-    return {
-      price: null,
-      price_type: 'category_ranges',
-      ranges: lookup.ranges,
-      motor_model: lookup.model,
-      note: lookup.note,
-    };
-  }
-
   return null;
 }
 
@@ -291,120 +258,76 @@ async function processSingleService(parsedServiceName, input, promoText) {
     input.motor_model_name ||
     '').toString().trim() || null;
 
-  // Final fallback: Extract motor model from parsedServiceName if still null
-  if (!motorModel && parsedServiceName) {
-    const motorData = await lookupMotorSizeFromData(parsedServiceName);
-    if (motorData) {
-      motorModel = motorData.modelName;
-      console.log(`[getServiceDetailsTool] Extracted motor model "${motorModel}" from service name "${parsedServiceName}"`);
-    }
-  }
-
-  // Detect if the providing motorModel is actually just a category (halusination check)
-  const CATEGORY_KEYWORDS = ['matic', 'bebek', 'sport', 'besar', 'kecil', 'big', 'small', 'medium'];
-  const isCategoryOnly = motorModel && CATEGORY_KEYWORDS.some(k => motorModel.toLowerCase().includes(k) && motorModel.split(' ').length <= 2);
-
-  if (isCategoryOnly) {
-    console.log(`[getServiceDetailsTool] Detected category-only motor model: "${motorModel}". Flagging for clarification.`);
-    motorModel = null; // Treat as missing to trigger clarification
-  }
-
   const colorNameInput = (input.color_name || input.colorName || '').toString().trim() || null;
   const sizeFromArgs = normalizeSizeInput(input.size || input.motorSize || input.motor_size || input.vehicle_size || input.vehicleSize);
 
   const queryLower = parsedServiceName.trim().toLowerCase();
 
-  // Special case for "coating" generic query
-  if (queryLower === 'coating') {
-    const services = await prisma.service.findMany({
-      where: { category: 'coating' },
-      include: { prices: true }
-    });
-
-    const results = await Promise.all(services.map(async (service) => {
-      const { finalSize } = await resolveSizeForService({ service, sizeArg: sizeFromArgs, motorModel });
-      const priceEntry = service.prices.find(p => p.size === finalSize);
-      const basePrice = priceEntry?.price ?? 0;
-
-      return {
-        name: service.name,
-        summary: service.summary,
-        price: basePrice || 'Tergantung ukuran',
-        price_formatted: basePrice ? `Rp${basePrice.toLocaleString('id-ID')}` : 'Tergantung ukuran',
-        size: finalSize || 'Belum diketahui'
-      };
-    }));
-
-    return {
-      success: true,
-      multiple_candidates: true,
-      category: 'coating',
-      motor_model: motorModel || 'Belum diketahui',
-      candidates: results,
-      promo_active: !!promoText,
-      message: 'Ditemukan beberapa paket coating & complete service. Silakan pilih sesuai kebutuhan.'
-    };
-  }
-
-  // Special case for "detailing" generic query
-  if (queryLower === 'detailing' || queryLower === 'poles') {
-    const services = await prisma.service.findMany({
-      where: { category: 'detailing' },
-      include: { prices: true }
-    });
-
-    const results = await Promise.all(services.map(async (service) => {
-      const { finalSize } = await resolveSizeForService({ service, sizeArg: sizeFromArgs, motorModel });
-      const priceEntry = service.prices.find(p => p.size === finalSize);
-      const basePrice = priceEntry?.price ?? 0;
-
-      return {
-        name: service.name,
-        summary: service.summary,
-        price: basePrice || 'Tergantung ukuran',
-        price_formatted: basePrice ? `Rp${basePrice.toLocaleString('id-ID')}` : 'Tergantung ukuran',
-        size: finalSize || 'Belum diketahui'
-      };
-    }));
-
-    return {
-      success: true,
-      multiple_candidates: true,
-      category: 'detailing',
-      motor_model: motorModel || 'Belum diketahui',
-      candidates: results,
-      promo_active: !!promoText,
-      message: 'Berikut adalah daftar harga paket detailing kami.'
-    };
-  }
-
-  // Special case for "repaint" generic query
-  if (queryLower === 'repaint') {
+  // 1. Check for generic category queries - MANDATORY MOTOR MODEL
+  if (queryLower === 'coating' || queryLower === 'detailing' || queryLower === 'poles' || queryLower === 'repaint') {
     if (!motorModel) {
       return {
         success: true,
         needs_clarification: true,
-        message: 'Untuk memberikan estimasi harga repaint, mohon infokan tipe motornya (misal: Vario, NMAX, Scoopy, Beat).',
+        message: `Untuk memberikan estimasi harga ${queryLower}, mohon infokan tipe motornya (misal: Vario, NMAX, Scoopy, Beat) agar aku bisa berikan harga yang pas kak.`,
         action: 'ASK_USER'
       };
     }
+  }
 
+  // Handle generic category results if motor model IS provided
+  if (queryLower === 'coating' || queryLower === 'detailing' || queryLower === 'poles') {
+    const cat = queryLower === 'poles' ? 'detailing' : queryLower;
+    const services = await prisma.service.findMany({
+      where: { category: cat },
+      include: { prices: true }
+    });
+
+    const results = await Promise.all(services.map(async (service) => {
+      const { finalSize } = await resolveSizeForService({ service, sizeArg: sizeFromArgs, motorModel });
+      const priceEntry = service.prices.find(p => p.size === finalSize) || service.prices.find(p => !p.size && !p.vehicleModelId);
+      const basePrice = priceEntry?.price ?? 0;
+
+      return {
+        name: service.name,
+        summary: service.summary,
+        price: basePrice || 'Hubungi Admin',
+        price_formatted: basePrice ? `Rp${basePrice.toLocaleString('id-ID')}` : 'Hubungi Admin',
+        size: finalSize || 'Belum diketahui'
+      };
+    }));
+
+    return {
+      success: true,
+      multiple_candidates: true,
+      category: cat,
+      motor_model: motorModel,
+      candidates: results,
+      promo_active: !!promoText,
+      message: `Berikut estimasi harga ${cat} untuk motor ${motorModel}.`
+    };
+  }
+
+  if (queryLower === 'repaint') {
     const results = [];
     const { finalSize } = await resolveSizeForService({ service: { category: 'repaint' }, sizeArg: sizeFromArgs, motorModel });
 
-    // Gather specific repaint prices
     const subs = ['bodi_halus', 'bodi_kasar', 'velg'];
     for (const sub of subs) {
       const lookup = await lookupRepaintPrice(motorModel, sub, finalSize);
       const info = formatRepaintPriceResult(lookup);
       if (info && info.price) {
-        results.push({ name: info.subcategory === 'bodi_halus' ? 'Repaint Bodi Halus' : (info.subcategory === 'bodi_kasar' ? 'Repaint Bodi Kasar' : 'Repaint Velg'), price: info.price, price_formatted: info.price_formatted, note: info.note });
+        results.push({ 
+            name: sub === 'bodi_halus' ? 'Repaint Bodi Halus' : (sub === 'bodi_kasar' ? 'Repaint Bodi Kasar' : 'Repaint Velg'), 
+            price: info.price, 
+            price_formatted: info.price_formatted, 
+            note: info.note 
+        });
       }
     }
 
-    // Fixed price repaint services
     const fixedRepaints = await prisma.service.findMany({
-        where: { category: 'repaint', usesModelPricing: false },
+        where: { category: 'repaint', usesModelPricing: false, subcategory: null },
         include: { prices: true }
     });
     for (const s of fixedRepaints) {
@@ -424,7 +347,7 @@ async function processSingleService(parsedServiceName, input, promoText) {
     };
   }
 
-  // Fuzzy matching against all services
+  // 2. Specific Service Query
   const allServices = await prisma.service.findMany({ include: { prices: true } });
   const candidates = allServices
     .map(s => ({ ...s, similarity: stringSimilarity(parsedServiceName, s.name) }))
@@ -436,26 +359,24 @@ async function processSingleService(parsedServiceName, input, promoText) {
   }
 
   const service = candidates[0];
-  const { finalSize, category } = await resolveSizeForService({
-    service,
-    sizeArg: sizeFromArgs,
-    motorModel,
-  });
+  const { finalSize } = await resolveSizeForService({ service, sizeArg: sizeFromArgs, motorModel });
+
+  // CHECK IF MOTOR MODEL IS NEEDED (Size-based or Model-based)
+  const isSizeBased = service.prices.some(p => p.size);
+  if ((service.usesModelPricing || isSizeBased) && !motorModel) {
+      return {
+          success: true,
+          needs_clarification: true,
+          message: `Layanan "${service.name}" harganya tergantung pada tipe motor. Boleh tahu motor kakak tipe apa (misal: NMax, Vario, Beat)?`,
+          action: "ASK_USER"
+      };
+  }
 
   const durationFormatted = formatDuration(service.estimatedDuration);
   const surchargeMatch = colorNameInput ? await lookupColorSurcharge(colorNameInput) : null;
   const colorSurcharge = surchargeMatch ? surchargeMatch.surcharge : 0;
 
   if (service.usesModelPricing) {
-    if (!motorModel) {
-      return {
-        success: true,
-        needs_clarification: true,
-        message: `Layanan "${service.name}" memerlukan model motor spesifik untuk menentukan harga. Sebutkan model motornya (contoh: NMAX, Scoopy, Vario).`,
-        action: "ASK_USER"
-      };
-    }
-
     const lookup = await lookupRepaintPrice(motorModel, service.subcategory, finalSize);
     const priceInfo = formatRepaintPriceResult(lookup);
 
@@ -486,11 +407,11 @@ async function processSingleService(parsedServiceName, input, promoText) {
     }
   }
 
-  // Fallback: variant-based or flat price
+  // Variant-based or Flat price
   const priceEntry = service.prices.find(p => p.size === finalSize) || service.prices.find(p => !p.size && !p.vehicleModelId);
   const basePrice = priceEntry?.price || 0;
 
-  const result = {
+  return {
     success: true,
     service_name: service.name,
     category: service.category,
@@ -507,23 +428,14 @@ async function processSingleService(parsedServiceName, input, promoText) {
     final_price_formatted: basePrice ? `Rp${(basePrice + colorSurcharge).toLocaleString('id-ID')}` : null,
     promo_active: !!promoText,
   };
-
-  if (service.usesModelPricing && !motorModel) {
-    result.hint = 'Untuk harga yang lebih akurat, sertakan model motor (contoh: Scoopy, NMax, Beat).';
-  }
-
-  return result;
 }
 
 async function implementation(input) {
   try {
-    console.log('[getServiceDetailsTool] Input:', input);
-
     if (!input || typeof input !== 'object') {
       return { success: false, error: 'generic_error', message: 'Input tidak valid' };
     }
 
-    // Ensure service_name is treated as an array and handle camelCase variation
     let serviceNames = input.service_name || input.serviceName;
     const promo = await getPromoInfo();
 
@@ -531,17 +443,10 @@ async function implementation(input) {
       return { success: false, error: 'generic_error', message: 'service_name tidak valid atau kosong' };
     }
 
-    // Convert string to array gracefully
     if (typeof serviceNames === 'string') {
-      // If the string contains a comma, the LLM likely concatenated multiple services
-      if (serviceNames.includes(',')) {
-        serviceNames = serviceNames.split(',').map(s => s.trim()).filter(Boolean);
-      } else {
-        serviceNames = [serviceNames];
-      }
+      serviceNames = serviceNames.includes(',') ? serviceNames.split(',').map(s => s.trim()).filter(Boolean) : [serviceNames];
     }
 
-    // Initialize return object structure matching standard response
     if (Array.isArray(serviceNames)) {
       const results = await Promise.all(
         serviceNames.map(name => {
