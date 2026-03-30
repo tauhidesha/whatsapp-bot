@@ -63,43 +63,51 @@ FORMAT JAWABAN (JSON ONLY):
         if (extracted.color_choice) ctx.colorChoice = extracted.color_choice;
         if (extracted.is_previously_painted !== null) ctx.isPreviouslyPainted = extracted.is_previously_painted;
 
-        // --- LOGIKA DECISION TREE (MISSING QUESTIONS) ---
-        const missing = [];
+        // --- LOGIKA DECISION TREE (MISSING QUESTIONS - PING PONG STYLE) ---
+        let missingQuestion = null;
         const svc = (ctx.serviceType || '').toLowerCase();
 
-        // 1. Coating & Complete Service
-        if (svc.includes('coating') || svc.includes('complete service')) {
-            if (!ctx.paintType) missing.push("Cat motor Kakak jenisnya Glossy atau Doff?");
-            if (ctx.isBongkarTotal === null) missing.push("Mau proteksi bodi luar aja, atau bongkar total sampai rangka (Complete Service)?");
-        }
-
-        // 2. Detailing
-        if (svc.includes('detailing') || svc.includes('poles') || svc.includes('cuci')) {
-            if (!ctx.detailingFocus) missing.push("Masalah utamanya di mana Kak? Mau ngilangin baret bodi, mesin kotor, atau cuci bongkar total?");
-            if (!ctx.paintType && (svc.includes('poles') || svc.includes('full detailing'))) {
-                missing.push("Cat motornya Doff atau Glossy?");
-            }
-        }
-
-        // 3. Repaint
-        if (svc.includes('repaint')) {
-            if (!ctx.serviceType || svc === 'repaint') {
-                missing.push("Mau cat bagian mana Kak? Bodi Halus, Bodi Kasar, Velg, atau CVT/Arm?");
-            }
-            if (svc.includes('halus') || svc.includes('velg')) {
-                if (!ctx.colorChoice) missing.push("Rencana mau warna apa Kak?");
-            }
-            if (svc.includes('velg') && ctx.isPreviouslyPainted === null) {
-                missing.push("Khusus velg, apakah catnya masih ori pabrik atau sudah pernah dicat ulang?");
-            }
-        }
-
-        // Motor Model is mandatory for all
+        // Priority 1: Vehicle Type (Mandatory for everything)
         if (!ctx.vehicleType) {
-            missing.push("Boleh sebutin tipe motornya Kak? (misal: Scoopy 2021, NMax old, PCX 160)");
+            missingQuestion = "Boleh sebutin tipe motornya Kak? (misal: Scoopy 2021, NMax old, PCX 160)";
+        } 
+        // Priority 2: Service Type
+        else if (!ctx.serviceType || svc === 'repaint') {
+            if (svc.includes('repaint')) {
+                missingQuestion = "Mau cat bagian mana Kak? Bodi Halus, Bodi Kasar, Velg, atau CVT/Arm?";
+            } else {
+                missingQuestion = "Rencananya mau pakai layanan apa nih? (Misalnya: Repaint full bodi, Coating, atau Detailing aja?)";
+            }
+        }
+        // Priority 3: Service Specifics (Only reached if Vehicle & Service are known)
+        else {
+            // Coating & Complete Service specifics
+            if (svc.includes('coating') || svc.includes('complete service')) {
+                if (!ctx.paintType) {
+                    missingQuestion = "Cat motor Kakak sekarang jenisnya Glossy (mengkilap) atau Doff/Matte?";
+                } else if (ctx.isBongkarTotal === null) {
+                    missingQuestion = "Kakak mau proteksi bodi luarnya aja, atau mau dibongkar total dibersihin sampai ke rangka dan mesin (Complete Service)?";
+                }
+            }
+            // Detailing specifics
+            else if (svc.includes('detailing') || svc.includes('poles') || svc.includes('cuci')) {
+                if (!ctx.detailingFocus) {
+                    missingQuestion = "Masalah utamanya di mana Kak? Mau ngilangin baret bodi, mesin kotor, atau cuci bongkar total?";
+                } else if (!ctx.paintType && (svc.includes('poles') || svc.includes('full detailing'))) {
+                    missingQuestion = "Cat motor Kakak sekarang jenisnya Glossy atau Doff?";
+                }
+            }
+            // Repaint specifics
+            else if (svc.includes('repaint')) {
+                if ((svc.includes('halus') || svc.includes('velg')) && !ctx.colorChoice) {
+                    missingQuestion = "Rencana mau warna apa Kak?";
+                } else if (svc.includes('velg') && ctx.isPreviouslyPainted === null) {
+                    missingQuestion = "Khusus velg, apakah catnya masih ori pabrik atau sudah pernah dicat ulang?";
+                }
+            }
         }
 
-        ctx.missingQuestions = missing;
+        ctx.missingQuestions = missingQuestion ? [missingQuestion] : [];
 
         // Tentukan Shifting ke Executor
         // Siap eksekusi jika tidak ada pertanyaan kritis yang tersisa
