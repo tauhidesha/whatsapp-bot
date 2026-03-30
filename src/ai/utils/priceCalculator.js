@@ -104,7 +104,7 @@ async function findService(targetService) {
 /**
  * Main function: Hitung harga spesifik untuk motor + layanan.
  */
-async function getSpecificPriceContext(motorModel, targetServicesStr) {
+async function getSpecificPriceContext(motorModel, targetServicesStr, extraContext = {}) {
     if (!motorModel || !targetServicesStr) return { prompt: null, isAmbiguous: false };
 
     const motor = await findMotorSize(motorModel);
@@ -114,6 +114,9 @@ async function getSpecificPriceContext(motorModel, targetServicesStr) {
     const calculatedNames = new Set();
     let totalCalculated = 0;
     let anyAmbiguity = false;
+
+    // Load Surcharges for color mapping
+    const surcharges = await prisma.surcharge.findMany();
 
     for (const part of parts) {
         const { service, isAmbiguous } = await findService(part);
@@ -125,15 +128,15 @@ async function getSpecificPriceContext(motorModel, targetServicesStr) {
 
         let price = null;
         let pricingNote = service.summary || '';
+        let serviceSurcharge = 0;
+        let serviceBreakdown = "";
 
         // 1. Model-based (Repaint Bodi Halus / Velg specific)
         if (service.usesModelPricing && motor) {
             const priceEntry = await prisma.servicePrice.findFirst({
                 where: { serviceId: service.id, vehicleModelId: motor.id }
             });
-            if (priceEntry) {
-                price = priceEntry.price;
-            }
+            if (priceEntry) price = priceEntry.price;
         }
         
         // 2. Size-based (Detailing / Coating / Repaint Kasar)
@@ -142,9 +145,7 @@ async function getSpecificPriceContext(motorModel, targetServicesStr) {
             const priceEntry = await prisma.servicePrice.findFirst({
                 where: { serviceId: service.id, size: size }
             });
-            if (priceEntry) {
-                price = priceEntry.price;
-            }
+            if (priceEntry) price = priceEntry.price;
         }
 
         // 3. Fixed price
@@ -152,14 +153,36 @@ async function getSpecificPriceContext(motorModel, targetServicesStr) {
             const priceEntry = await prisma.servicePrice.findFirst({
                 where: { serviceId: service.id, size: null, vehicleModelId: null }
             });
-            if (priceEntry) {
-                price = priceEntry.price;
-            }
+            if (priceEntry) price = priceEntry.price;
         }
 
         if (price !== null) {
-            combinedResult += `- ${service.name} (${motorModel.toUpperCase()}): *Rp${price.toLocaleString('id-ID')}*\n`;
-            totalCalculated += price;
+            serviceBreakdown = `*Rp${price.toLocaleString('id-ID')}*`;
+
+            // --- ULTRA DETAIL SURCHARGES ---
+            
+            // A. Color Surcharge (Repaint only)
+            if (service.category === 'repaint' && extraContext.colorChoice) {
+                const normColor = extraContext.colorChoice.toLowerCase();
+                const match = surcharges.find(s => 
+                    normColor.includes(s.name.toLowerCase()) || 
+                    s.aliases.some(a => normColor.includes(a.toLowerCase()))
+                );
+                if (match) {
+                    serviceSurcharge += match.amount;
+                    serviceBreakdown += ` + Rp${match.amount.toLocaleString('id-ID')} (Warna ${match.name})`;
+                }
+            }
+
+            // B. Remover Fee (Repaint Velg only)
+            if (service.subcategory === 'velg' && extraContext.isPreviouslyPainted === true) {
+                const removerFee = 75000; // Standar remover fee
+                serviceSurcharge += removerFee;
+                serviceBreakdown += ` + Rp${removerFee.toLocaleString('id-ID')} (Jasa Remover)`;
+            }
+
+            combinedResult += `- ${service.name} (${motorModel.toUpperCase()}): ${serviceBreakdown}\n`;
+            totalCalculated += (price + serviceSurcharge);
         }
     }
 
@@ -167,10 +190,10 @@ async function getSpecificPriceContext(motorModel, targetServicesStr) {
 
     let finalPrompt = `\n\n[HARGA SPESIFIK - SUDAH DIHITUNG OTOMATIS]\n`;
     finalPrompt += combinedResult.trim() + `\n`;
-    if (calculatedNames.size > 1) {
-        finalPrompt += `Total Sementara: *Rp${totalCalculated.toLocaleString('id-ID')}*\n`;
+    if (calculatedNames.size > 1 || totalCalculated > 0) {
+        finalPrompt += `Total Estimasi: *Rp${totalCalculated.toLocaleString('id-ID')}*\n`;
     }
-    finalPrompt += `\n⚠️ INSTRUKSI: Langsung sebutkan harga otomatis di atas ke pelanggan. JANGAN panggil tool getServiceDetails lagi!`;
+    finalPrompt += `\n⚠️ INSTRUKSI: Langsung sebutkan rincian harga di atas.`;
 
     return { prompt: finalPrompt, isAmbiguous: anyAmbiguity };
 }

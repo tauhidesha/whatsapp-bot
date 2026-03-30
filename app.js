@@ -64,6 +64,9 @@ const { getActivePromo } = require('./src/ai/utils/promoConfig.js');
 const { getSpecificPriceContext } = require('./src/ai/utils/priceCalculator.js');
 const browserUtils = require('./src/ai/utils/browser.js');
 
+// --- LangGraph Integration ---
+const { zoyaAgent } = require('./src/ai/graph/index.js');
+
 // --- Global Constants ---
 const ACTIVE_AI_MODEL = process.env.AI_MODEL || 'gemini-flash-lite-latest';
 const DEBOUNCE_DELAY_MS = 10000;
@@ -1699,178 +1702,82 @@ async function processBufferedMessages(senderNumber, client) {
             return; // STOP DI SINI UNTUK ADMIN. Jangan lanjut ke JS Orchestrator Gate 1-3.
         }
 
-        // --- FLOW UNTUK CUSTOMER BIASA (Tetap Jalan) ---
+        // --- FLOW UNTUK CUSTOMER BIASA (Migrasi LangGraph) ---
         try {
-            console.log(`[Pipeline] Menjalankan Context Extractor sebelum AI membalas...`);
-            const history = await getConversationHistory(senderNumber, 3);
-            const lastAiMsgObj = [...history].reverse().find(m => m.sender === 'ai' || m.sender === 'bot');
-            const lastAiMsg = lastAiMsgObj ? lastAiMsgObj.text : "";
-
-            await extractAndSaveContext(combinedMessage, lastAiMsg, senderNumber);
-            console.log(`[Pipeline] Context Extractor selesai. Melanjutkan ke JS Orchestrator...`);
-
-            // --- JS ORCHESTRATOR (3-GATE HIERARCHY) ---
-            const customerCtx = await getCustomerContext(senderNumber);
-
-            if (customerCtx) {
-                // ═══════════════════════════════════════════════════════
-                // GATE 1: Interruption / User Labil (Topic Change)
-                // ═══════════════════════════════════════════════════════
-                if (customerCtx.is_changing_topic === true) {
-                    console.log(`🔄 [ORCHESTRATOR] Gate 1: Topic change detected for ${senderNumber}. Resetting booking state.`);
-                    // Reset booking-related fields in memory
-                    const resetFields = {
-                        preferred_day: null,
-                        preferred_time: null,
-                        conversation_stage: 'consulting',
-                        is_changing_topic: false, // consume the flag
-                    };
-                    await mergeAndSaveContext(senderNumber, resetFields);
-                    // Don't return — let normal AI flow handle the new topic
+            console.log(`[LangGraph] Invoking ZoyaAgent for ${senderNumber}...`);
+            
+            const { HumanMessage } = require('@langchain/core/messages');
+            
+            // Format input untuk Graph
+            const input = {
+                messages: [new HumanMessage(combinedMessage)],
+                metadata: {
+                    phoneReal: senderNumber,
+                    senderName: senderName,
+                    mediaItems: mediaItems
                 }
+            };
 
-                // ═══════════════════════════════════════════════════════
-                // GATE 2: Multi-Intent Hierarchy & Escalation
-                // ═══════════════════════════════════════════════════════
-                const intents = customerCtx.detected_intents || [];
+            // Jalankan Graph dengan thread_id (senderNumber) untuk manajemen state persisten
+            const result = await zoyaAgent.invoke(input, {
+                configurable: { thread_id: senderNumber }
+            });
 
-                if (intents.includes('tanya_teknis') || customerCtx.butuh_bantuan_admin) {
-                    console.log(`🚨 [ORCHESTRATOR] Gate 2: Escalation triggered for ${senderNumber}. Intents: ${intents.join(', ')}`);
-                    await setSnoozeMode(senderNumber, 60, { reason: 'eskalasi_otomatis' });
-                    await triggerBosMatTool.implementation({
-                        senderNumber: senderNumber,
-                        reason: 'User bertanya hal teknis/komplain di luar AI scope',
-                        customerQuestion: combinedMessage
-                    });
+            const lastMessage = result.messages[result.messages.length - 1];
+            const aiResponse = lastMessage ? lastMessage.content : null;
 
-                    const reply = "Wah, pertanyaan Mas/Kak cukup teknis nih. Zoya hold dulu ya, Zoya tanyain langsung ke tim teknisi/owner biar infonya akurat. Ditunggu sebentar ya! 🙏";
-                    const targetNumber = toSenderNumberWithSuffix(senderNumber);
-                    markBotMessage(targetNumber, reply);
-                    await client.sendText(targetNumber, reply);
-                    if (prisma) {
-                        await saveMessageToFirestore(senderNumber, combinedMessage, 'user');
-                        await saveMessageToFirestore(senderNumber, reply, 'ai');
-                    }
-                    await client.stopTyping(senderNumber);
-                    return; // STOP — escalated to human
+            // Handle HUMAN_HANDOVER intent
+            if (result.intent === 'HUMAN_HANDOVER') {
+                console.log(`🚨 [LangGraph] Escalation detected for ${senderNumber}. Triggering Human Handover.`);
+                await setSnoozeMode(senderNumber, 60, { reason: 'eskalasi_otomatis' });
+                await triggerBosMatTool.implementation({
+                    senderNumber: senderNumber,
+                    reason: 'User meminta bantuan admin atau terdeteksi emosi tinggi.',
+                    customerQuestion: combinedMessage
+                });
+                
+                const finalReply = aiResponse || "Wah, pertanyaan Mas/Kak cukup teknis nih. Zoya panggilin Admin dulu ya biar dibantu langsung! 🙏";
+                const targetNumber = toSenderNumberWithSuffix(senderNumber);
+                markBotMessage(targetNumber, finalReply);
+                await client.sendText(targetNumber, finalReply);
+                
+                if (prisma) {
+                    await saveMessageToPrisma(senderNumber, combinedMessage, 'user');
+                    await saveMessageToPrisma(senderNumber, finalReply, 'ai');
                 }
-
-                // ═══════════════════════════════════════════════════════
-                // ═══════════════════════════════════════════════════════
-                // GATE 3: Strict Booking Validation & Auto-Recommendation
-                // ═══════════════════════════════════════════════════════
-                const wantsBooking = intents.includes('mulai_booking') || customerCtx.conversation_stage === 'closing';
-
-                if (wantsBooking) {
-                    const day = customerCtx.preferred_day;
-                    const time = customerCtx.preferred_time;
-
-                    // 3a. Missing Date
-                    if (!day) {
-                        systemInstruction = `[SYSTEM_INSTRUCTION]: User ingin booking tapi hari/tanggal belum ditentukan. Tanyakan kapan Mas/Kak mau ke studio? (Jam buka: 09:00 - 18:00). JANGAN panggil tool booking.`;
-                        console.log(`📋 [ORCHESTRATOR] Gate 3a: Missing booking date. Injecting NLG instruction.`);
-                    } else {
-                        // 3b. Check Availability / Find Recommendations
-                        try {
-                            console.log(`📅 [ORCHESTRATOR] Gate 3b: Checking availability for ${day} ${time || '(Auto-Search)'}...`);
-                            const availResult = await checkBookingAvailabilityTool.implementation({ 
-                                bookingDate: day, 
-                                bookingTime: time,
-                                serviceName: customerCtx.target_services?.[0] || customerCtx.target_service
-                            });
-
-                            if (availResult.available) {
-                                if (time) {
-                                    // 3c. ALL CLEAR — Slot matches user request — Execute Booking!
-                                    console.log(`✅ [ORCHESTRATOR] Gate 3c: Slot available & confirmed! Executing booking...`);
-                                    const bookingResult = await createBookingTool.implementation({
-                                        senderNumber: senderNumber,
-                                        senderName: senderName,
-                                        motorModel: customerCtx.motor_model,
-                                        serviceName: (customerCtx.target_services && customerCtx.target_services.length > 0 ? customerCtx.target_services : [customerCtx.target_service]).join(', '),
-                                        bookingDate: day,
-                                        bookingTime: time,
-                                    });
-
-                                    console.log(`📅 [ORCHESTRATOR] Booking Success:`, JSON.stringify(bookingResult));
-
-                                    const nlgPrompt = `[SYSTEM_INSTRUCTION]: Booking BERHASIL dibuat! Data: ${JSON.stringify(bookingResult)}. Sampaikan ke user dengan sangat ramah, konfirmasi jadwalnya, dan ingatkan jam operasional kita. JANGAN panggil tool lagi.`;
-                                    const aiResponseResult = await getAIResponse(nlgPrompt, senderName, senderNumber, '', mediaItems, 'gemini-2.0-flash');
-                                    const aiResponse = aiResponseResult.content;
-
-                                    if (aiResponse) {
-                                        const targetNumber = toSenderNumberWithSuffix(senderNumber);
-                                        markBotMessage(targetNumber, aiResponse.trim());
-                                        await client.sendText(targetNumber, aiResponse.trim());
-                                        if (prisma) {
-                                            await saveMessageToFirestore(senderNumber, combinedMessage, 'user');
-                                            await saveMessageToFirestore(senderNumber, aiResponse, 'ai');
-                                        }
-                                    }
-                                    await client.stopTyping(senderNumber);
-                                    return; // DONE
-                                } else if (availResult.recommendedTime) {
-                                    // Found a slot! Zoya recommends it.
-                                    systemInstruction = `[SYSTEM_INSTRUCTION]: User belum menentukan jam, tapi Zoya cek hari ${day} ada slot kosong jam ${availResult.recommendedTime}. TAWARKAN jam ini ke user secara ramah untuk konfirmasi. JANGAN panggil tool booking dulu.`;
-                                    console.log(`💡 [ORCHESTRATOR] Gate 3b: Recommended slot found at ${availResult.recommendedTime}.`);
-                                } else {
-                                    // Available but no specific time yet
-                                    systemInstruction = `[SYSTEM_INSTRUCTION]: Hari ${day} masih ada slot kosong. Tanyakan jam berapa user mau datang? (Jam buka: 09:00 - 18:00).`;
-                                }
-                            } else {
-                                // Slot penuh / tutup / Error
-                                systemInstruction = `[SYSTEM_INSTRUCTION]: Jadwal ${day} ${time ? 'jam ' + time : ''} tidak tersedia. ${availResult.summary || 'Mohon tawarkan hari lain.'} JANGAN panggil tool booking.`;
-                                console.log(`❌ [ORCHESTRATOR] Gate 3b: Unavailable (${availResult.summary}).`);
-                            }
-                        } catch (bookErr) {
-                            console.error('❌ [ORCHESTRATOR] Booking Failed:', bookErr.message);
-                            systemInstruction = `[SYSTEM_INSTRUCTION]: Terjadi error teknis saat booking (${bookErr.message}). Minta maaf ke user dan bilang Zoya sedang melapor ke Admin untuk dibantu manual agar jadwalnya aman.`;
-                            await triggerBosMatTool.implementation({
-                                senderNumber: senderNumber,
-                                reason: `Gagal booking otomatis: ${bookErr.message}`,
-                                customerQuestion: combinedMessage
-                            });
-                        }
-                    }
-                }
+                await client.stopTyping(senderNumber);
+                return;
             }
+
+            // Normal Flow: Kirim balasan AI
+            if (aiResponse) {
+                const targetNumber = toSenderNumberWithSuffix(senderNumber);
+                
+                // Simpan Riwayat
+                if (prisma) {
+                    await saveMessageToPrisma(senderNumber, combinedMessage, 'user');
+                    await saveMessageToPrisma(senderNumber, aiResponse, 'ai');
+                }
+
+                // Kirim ke WhatsApp dengan delay dinamis
+                const dynamicDelay = Math.min(Math.max(aiResponse.length * 10, 1000), 4000);
+                await delay(dynamicDelay);
+                
+                markBotMessage(targetNumber, aiResponse.trim());
+                await client.sendText(targetNumber, aiResponse.trim());
+
+                // Update metadata async (Fire & Forget)
+                classifyAndSaveCustomer(senderNumber).catch(err => console.warn('[Classifier] Failed:', err.message));
+                updateSignalsOnIncomingMessage(senderNumber, combinedMessage).catch(err => console.warn('[SignalTracker] Failed:', err.message));
+            }
+
+            await client.stopTyping(senderNumber);
+
         } catch (err) {
-            console.warn('[Pipeline] Early Context extraction or Orchestrator failed:', err.message);
+            console.error('[LangGraph] Error during agent execution:', err);
+            await client.sendText(senderNumber, "Aduh Kak, Zoya lagi agak pusing dengerinnya. Bisa diulang pelan-pelan? 🙏");
+            await client.stopTyping(senderNumber);
         }
-
-        // Prepend systemInstruction from JS Orchestrator Gates (if any)
-        const finalMessage = systemInstruction
-            ? `${systemInstruction}\n\n${combinedMessage}`
-            : combinedMessage;
-
-        const aiResponseResult = await getAIResponse(finalMessage, senderName, senderNumber, '', mediaItems, modelOverride);
-        const aiResponse = aiResponseResult.content;
-
-        // Fire and forget — update CRM classification
-        classifyAndSaveCustomer(senderNumber).catch(err => console.warn('[Classifier] Failed:', err.message));
-
-        // Fire and forget — track follow-up signals
-        updateSignalsOnIncomingMessage(senderNumber, combinedMessage).catch(err => console.warn('[SignalTracker] Failed:', err.message));
-
-        // Save messages to Prisma
-        if (prisma) {
-            await saveMessageToPrisma(senderNumber, combinedMessage, 'user');
-            await saveMessageToPrisma(senderNumber, aiResponse, 'ai');
-        }
-
-        // Send response back to user
-        if (aiResponse) {
-            const targetNumber = toSenderNumberWithSuffix(senderNumber);
-
-            // Delay dinamis tambahan berdasarkan panjang teks agar typing indicator terlihat cukup lama untuk pesan panjang
-            const dynamicDelay = Math.min(Math.max(aiResponse.length * 10, 1000), 4000);
-            await delay(dynamicDelay);
-
-            markBotMessage(targetNumber, aiResponse.trim());
-            await client.sendText(targetNumber, aiResponse.trim());
-        }
-
-        await client.stopTyping(senderNumber);
     } catch (err) {
         console.error(`[ERROR] Handler error for ${senderNumber}:`, err);
         await client.stopTyping(senderNumber);

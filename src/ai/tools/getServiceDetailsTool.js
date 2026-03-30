@@ -258,7 +258,8 @@ async function processSingleService(parsedServiceName, input, promoText) {
     input.motor_model_name ||
     '').toString().trim() || null;
 
-  const colorNameInput = (input.color_name || input.colorName || '').toString().trim() || null;
+  const extraContext = input.extraContext || {};
+  const colorNameInput = extraContext.colorChoice || (input.color_name || input.colorName || '').toString().trim() || null;
   const sizeFromArgs = normalizeSizeInput(input.size || input.motorSize || input.motor_size || input.vehicle_size || input.vehicleSize);
 
   const queryLower = parsedServiceName.trim().toLowerCase();
@@ -317,10 +318,28 @@ async function processSingleService(parsedServiceName, input, promoText) {
       const lookup = await lookupRepaintPrice(motorModel, sub, finalSize);
       const info = formatRepaintPriceResult(lookup);
       if (info && info.price) {
+        let finalPrice = info.price;
+        let surchargeNote = "";
+
+        // Apply Color Surcharge
+        if (sub === 'bodi_halus' && colorNameInput) {
+            const sc = await lookupColorSurcharge(colorNameInput);
+            if (sc) {
+                finalPrice += sc.surcharge;
+                surchargeNote += ` (+ Rp${sc.surcharge.toLocaleString('id-ID')} warna ${sc.name})`;
+            }
+        }
+
+        // Apply Remover Fee
+        if (sub === 'velg' && extraContext.isPreviouslyPainted === true) {
+            finalPrice += 75000;
+            surchargeNote += ` (+ Rp75.000 jasa remover)`;
+        }
+
         results.push({ 
             name: sub === 'bodi_halus' ? 'Repaint Bodi Halus' : (sub === 'bodi_kasar' ? 'Repaint Bodi Kasar' : 'Repaint Velg'), 
-            price: info.price, 
-            price_formatted: info.price_formatted, 
+            price: finalPrice, 
+            price_formatted: `Rp${finalPrice.toLocaleString('id-ID')}${surchargeNote}`, 
             note: info.note 
         });
       }
@@ -374,7 +393,13 @@ async function processSingleService(parsedServiceName, input, promoText) {
 
   const durationFormatted = formatDuration(service.estimatedDuration);
   const surchargeMatch = colorNameInput ? await lookupColorSurcharge(colorNameInput) : null;
-  const colorSurcharge = surchargeMatch ? surchargeMatch.surcharge : 0;
+  const colorSurcharge = (service.category === 'repaint' && surchargeMatch) ? surchargeMatch.surcharge : 0;
+  
+  // Remover fee logic for specific velg service
+  let removerFee = 0;
+  if (service.subcategory === 'velg' && extraContext.isPreviouslyPainted === true) {
+      removerFee = 75000;
+  }
 
   if (service.usesModelPricing) {
     const lookup = await lookupRepaintPrice(motorModel, service.subcategory, finalSize);
@@ -382,7 +407,7 @@ async function processSingleService(parsedServiceName, input, promoText) {
 
     if (priceInfo) {
       const basePrice = priceInfo.price || null;
-      const finalPrice = basePrice ? basePrice + colorSurcharge : null;
+      const finalPrice = basePrice ? basePrice + colorSurcharge + removerFee : null;
       const syarat = await getSyaratKetentuan();
 
       return {
@@ -398,7 +423,7 @@ async function processSingleService(parsedServiceName, input, promoText) {
         ...priceInfo,
         color_name: surchargeMatch ? surchargeMatch.name : colorNameInput,
         color_surcharge: colorSurcharge,
-        color_surcharge_formatted: `Rp${colorSurcharge.toLocaleString('id-ID')}`,
+        remover_fee: removerFee,
         final_price: finalPrice,
         final_price_formatted: finalPrice ? `Rp${finalPrice.toLocaleString('id-ID')}` : null,
         promo_active: !!promoText,
@@ -410,6 +435,7 @@ async function processSingleService(parsedServiceName, input, promoText) {
   // Variant-based or Flat price
   const priceEntry = service.prices.find(p => p.size === finalSize) || service.prices.find(p => !p.size && !p.vehicleModelId);
   const basePrice = priceEntry?.price || 0;
+  const finalPrice = basePrice ? basePrice + colorSurcharge + removerFee : null;
 
   return {
     success: true,
@@ -421,11 +447,11 @@ async function processSingleService(parsedServiceName, input, promoText) {
     motor_size: finalSize || null,
     price: basePrice || null,
     price_formatted: basePrice ? `Rp${basePrice.toLocaleString('id-ID')}` : 'Harga perlu model motor',
-    color_name: surchargeMatch ? surchargeMatch.name : colorNameInput,
+    color_name: surchargeMatch ? surchargeMatch.name : (colorNameInput || null),
     color_surcharge: colorSurcharge,
-    color_surcharge_formatted: `Rp${colorSurcharge.toLocaleString('id-ID')}`,
-    final_price: basePrice ? basePrice + colorSurcharge : null,
-    final_price_formatted: basePrice ? `Rp${(basePrice + colorSurcharge).toLocaleString('id-ID')}` : null,
+    remover_fee: removerFee,
+    final_price: finalPrice,
+    final_price_formatted: finalPrice ? `Rp${finalPrice.toLocaleString('id-ID')}` : null,
     promo_active: !!promoText,
   };
 }
