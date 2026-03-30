@@ -253,3 +253,70 @@ model KeyValueStore {
 
   @@unique([collection, key])
 }
+
+// ============================================
+// MASTER DATA & PRICING
+// ============================================
+
+model VehicleModel {
+  id           String   @id @default(uuid())
+  brand        String   // honda, yamaha, suzuki, kawasaki, vespa, ev, harley, bmw, kymco, benelli
+  modelName    String   @unique
+  serviceSize  String   // S, M, L, XL
+  repaintSize  String   // S, M, L, XL
+  aliases      String[] // For fuzzy matching
+  
+  servicePrices ServicePrice[]
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([brand])
+}
+
+model Service {
+  id                String         @id @default(uuid())
+  name              String         @unique
+  category          String         // repaint, detailing, coating
+  subcategory       String?        // bodi_halus, bodi_kasar, velg
+  summary           String?
+  description       String?
+  note              String?
+  estimatedDuration Int            @default(0) // in minutes
+  usesModelPricing  Boolean        @default(false) // true if price depends on specific VehicleModel
+  
+  prices            ServicePrice[]
+  
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+}
+
+model ServicePrice {
+  id             String        @id @default(uuid())
+  serviceId      String
+  service        Service       @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  
+  // Pricing context (one of these should be set if not global)
+  size           String?       // S, M, L, XL
+  vehicleModelId String?
+  vehicleModel   VehicleModel? @relation(fields: [vehicleModelId], references: [id], onDelete: Cascade)
+  
+  price          Float
+  
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([serviceId, size, vehicleModelId])
+}
+
+model Surcharge {
+  id          String   @id @default(uuid())
+  name        String   @unique // Candy Colors, Stabilo, etc.
+  aliases     String[]
+  amount      Float
+  description String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+

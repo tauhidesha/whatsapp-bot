@@ -1088,7 +1088,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                 cartServices = [...new Set(cartServices)];
 
                 // --- 3. HARGA & INSTRUKSI SINGKAT ---
-                const exactPricePrompt = getSpecificPriceContext(customerCtx.motor_model, cartServices.join(', '));
+                const exactPricePrompt = await getSpecificPriceContext(customerCtx.motor_model, cartServices.join(', '));
 
                 if (exactPricePrompt) {
                     // Kita tambahkan instruksi 'SINGKAT' langsung di sini agar Agent 2 nggak cerewet

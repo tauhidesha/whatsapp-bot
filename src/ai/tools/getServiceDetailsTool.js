@@ -1,32 +1,24 @@
 // File: src/ai/tools/getServiceDetailsTool.js
 // Tool gabungan untuk mendapatkan deskripsi, SOP, harga, dan estimasi waktu layanan.
 
-const admin = require('firebase-admin');
-const masterLayanan = require('../../data/masterLayanan.js');
-const {
-  repaintBodiHalus,
-  repaintBodiKasar,
-  repaintVelg,
-  warnaSpesial,
-  syaratKetentuan,
-  VELG_PRICE_MAP,
-} = require('../../data/repaintPrices.js');
-const daftarUkuranMotor = require('../../data/daftarUkuranMotor.js');
+const prisma = require('../../lib/prisma');
 
 // --- Helper Functions ---
 
-function lookupColorSurcharge(colorName) {
+async function lookupColorSurcharge(colorName) {
   if (!colorName || typeof colorName !== 'string') return null;
   const query = colorName.trim().toLowerCase();
 
-  // Fuzzy match with warnaSpesial
-  for (const entry of warnaSpesial) {
-    const candidates = [entry.type, ...(entry.aliases || [])].map(a => a.toLowerCase());
+  const surcharges = await prisma.surcharge.findMany();
+
+  // Fuzzy match with surcharge
+  for (const entry of surcharges) {
+    const candidates = [entry.name, ...(entry.aliases || [])].map(a => a.toLowerCase());
     for (const candidate of candidates) {
       if (candidate === query || query.includes(candidate) || candidate.includes(query)) {
         return {
-          name: entry.type,
-          surcharge: entry.surcharge,
+          name: entry.name,
+          surcharge: entry.amount,
         };
       }
     }
@@ -97,11 +89,14 @@ function inferCategory(name) {
   return 'other';
 }
 
-function lookupMotorSizeFromData(motorModel) {
+async function lookupMotorSizeFromData(motorModel) {
   if (!motorModel) return null;
   const query = motorModel.trim().toLowerCase();
-  for (const entry of daftarUkuranMotor) {
-    const candidates = [entry.model, ...(entry.aliases || [])].map(a => a.toLowerCase());
+  
+  const vehicleModels = await prisma.vehicleModel.findMany();
+  
+  for (const entry of vehicleModels) {
+    const candidates = [entry.modelName, ...(entry.aliases || [])].map(a => a.toLowerCase());
     if (candidates.some(c => c === query || query.includes(c) || c.includes(query))) {
       return entry;
     }
@@ -155,81 +150,94 @@ const BODI_KASAR_SIZE_MAP = {
   XL: 'Extra Big Matic',
 };
 
-function lookupRepaintPrice(motorModel, subcategory, motorSize) {
+async function getSyaratKetentuan() {
+  const kv = await prisma.keyValueStore.findUnique({
+    where: { collection_key: { collection: 'settings', key: 'syarat_ketentuan_repaint' } }
+  });
+  return kv ? kv.value : [
+    "Harga di atas adalah harga FIX untuk Body Halus.",
+    "Harga belum termasuk Body Kasar.",
+    "Harga belum termasuk Pretelan/Aksesoris.",
+    "Harga bisa berubah sesuai kondisi Body/Motor (lecet parah/pecah).",
+    "Untuk warna Bunglon, Hologram, atau Chrome, harga melalui kesepakatan khusus.",
+    "Harga Velg belum termasuk tambahan CAT Behel/Arm/Shock (+50rb) atau CVT (+100rb).",
+    "Biaya Remover Velg (bekas cat/jamur) +50rb s/d 100rb.",
+  ];
+}
+
+async function lookupRepaintPrice(motorModel, subcategory, motorSize) {
   if (!motorModel) return null;
   const query = motorModel.trim().toLowerCase();
 
-  // 1. Bodi Halus (default jika subcategory tidak spesifik)
-  if (!subcategory || subcategory === 'bodi_halus') {
-    for (const entry of repaintBodiHalus) {
-      const candidates = [entry.model, ...entry.aliases].map(a => a.toLowerCase());
-      for (const candidate of candidates) {
-        if (candidate === query || query.includes(candidate) || candidate.includes(query)) {
-          return {
-            found: true,
-            model: entry.model,
-            price: entry.price || null,
-            min: entry.min || null,
-            max: entry.max || null,
-            note: entry.note,
-            brand: entry.brand,
-            subcategory: 'bodi_halus',
-          };
-        }
-      }
-    }
-  }
+  const motorData = await lookupMotorSizeFromData(motorModel);
+  if (!motorData) return null;
 
-  // 2. Bodi Kasar – resolve specific price if motor size is known
-  if (subcategory === 'bodi_kasar') {
-    if (motorSize && BODI_KASAR_SIZE_MAP[motorSize]) {
-      const targetCategory = BODI_KASAR_SIZE_MAP[motorSize];
-      const match = repaintBodiKasar.find(r => r.category === targetCategory);
-      if (match) {
+  // 1. Bodi Halus
+  if (!subcategory || subcategory === 'bodi_halus') {
+    const service = await prisma.service.findFirst({ where: { subcategory: 'bodi_halus' } });
+    if (service) {
+      const priceEntry = await prisma.servicePrice.findFirst({
+        where: { serviceId: service.id, vehicleModelId: motorData.id }
+      });
+      if (priceEntry) {
         return {
           found: true,
-          model: motorModel,
-          price: match.price,
-          subcategory: 'bodi_kasar',
-          note: `Kategori: ${match.category}`,
+          model: motorData.modelName,
+          price: priceEntry.price,
+          note: service.note,
+          brand: motorData.brand,
+          subcategory: 'bodi_halus',
         };
       }
     }
-    // Fallback: return all ranges if size unknown
-    return {
-      found: true,
-      model: motorModel,
-      price: null,
-      ranges: repaintBodiKasar,
-      subcategory: 'bodi_kasar',
-      note: 'Harga tergantung kategori ukuran motor.',
-    };
   }
 
-  // 3. Velg – resolve fixed price from VELG_PRICE_MAP
-  if (subcategory === 'velg') {
-    // Try historical model match first
-    for (const [modelKey, fixedPrice] of Object.entries(VELG_PRICE_MAP)) {
-      if (query === modelKey || query.includes(modelKey) || modelKey.includes(query)) {
+  // 2. Bodi Kasar
+  if (subcategory === 'bodi_kasar') {
+    const service = await prisma.service.findFirst({ where: { subcategory: 'bodi_kasar' } });
+    const size = motorSize || motorData.repaintSize;
+    if (service && size) {
+      const priceEntry = await prisma.servicePrice.findFirst({
+        where: { serviceId: service.id, size: size }
+      });
+      if (priceEntry) {
         return {
           found: true,
-          model: motorModel,
-          price: fixedPrice,
+          model: motorData.modelName,
+          price: priceEntry.price,
+          subcategory: 'bodi_kasar',
+          note: `Kategori: ${size}`,
+        };
+      }
+    }
+  }
+
+  // 3. Velg
+  if (subcategory === 'velg') {
+    const service = await prisma.service.findFirst({ where: { subcategory: 'velg' } });
+    if (service) {
+      // Try model-specific first
+      let priceEntry = await prisma.servicePrice.findFirst({
+        where: { serviceId: service.id, vehicleModelId: motorData.id }
+      });
+      // Fallback to size-based
+      if (!priceEntry) {
+        const size = motorSize || motorData.repaintSize;
+        priceEntry = await prisma.servicePrice.findFirst({
+          where: { serviceId: service.id, size: size }
+        });
+      }
+
+      if (priceEntry) {
+        return {
+          found: true,
+          model: motorData.modelName,
+          price: priceEntry.price,
           subcategory: 'velg',
           note: 'Harga per pasang, sudah termasuk bongkar pasang ban.',
         };
       }
     }
-
-    // Fallback: return all ranges if model not found
-    return {
-      found: true,
-      model: motorModel,
-      price: null,
-      ranges: repaintVelg,
-      subcategory: 'velg',
-      note: 'Harga per pasang, sudah termasuk bongkar pasang ban.',
-    };
   }
 
   return null;
@@ -285,9 +293,9 @@ async function processSingleService(parsedServiceName, input, promoText) {
 
   // Final fallback: Extract motor model from parsedServiceName if still null
   if (!motorModel && parsedServiceName) {
-    const motorData = lookupMotorSizeFromData(parsedServiceName);
+    const motorData = await lookupMotorSizeFromData(parsedServiceName);
     if (motorData) {
-      motorModel = motorData.model;
+      motorModel = motorData.modelName;
       console.log(`[getServiceDetailsTool] Extracted motor model "${motorModel}" from service name "${parsedServiceName}"`);
     }
   }
@@ -304,15 +312,19 @@ async function processSingleService(parsedServiceName, input, promoText) {
   const colorNameInput = (input.color_name || input.colorName || '').toString().trim() || null;
   const sizeFromArgs = normalizeSizeInput(input.size || input.motorSize || input.motor_size || input.vehicle_size || input.vehicleSize);
 
+  const queryLower = parsedServiceName.trim().toLowerCase();
+
   // Special case for "coating" generic query
-  if (parsedServiceName.trim().toLowerCase() === 'coating') {
-    const names = ['Coating Motor Doff', 'Coating Motor Glossy', 'Complete Service Doff', 'Complete Service Glossy'];
-    const services = masterLayanan.filter(s => names.includes(s.name));
+  if (queryLower === 'coating') {
+    const services = await prisma.service.findMany({
+      where: { category: 'coating' },
+      include: { prices: true }
+    });
 
     const results = await Promise.all(services.map(async (service) => {
       const { finalSize } = await resolveSizeForService({ service, sizeArg: sizeFromArgs, motorModel });
-      const variant = service.variants?.find(v => v.name === finalSize);
-      const basePrice = variant?.price ?? service.price;
+      const priceEntry = service.prices.find(p => p.size === finalSize);
+      const basePrice = priceEntry?.price ?? 0;
 
       return {
         name: service.name,
@@ -335,13 +347,16 @@ async function processSingleService(parsedServiceName, input, promoText) {
   }
 
   // Special case for "detailing" generic query
-  if (parsedServiceName.trim().toLowerCase() === 'detailing' || parsedServiceName.trim().toLowerCase() === 'poles') {
-    const services = masterLayanan.filter(s => s.category === 'detailing');
+  if (queryLower === 'detailing' || queryLower === 'poles') {
+    const services = await prisma.service.findMany({
+      where: { category: 'detailing' },
+      include: { prices: true }
+    });
 
     const results = await Promise.all(services.map(async (service) => {
       const { finalSize } = await resolveSizeForService({ service, sizeArg: sizeFromArgs, motorModel });
-      const variant = service.variants?.find(v => v.name === finalSize);
-      const basePrice = variant?.price ?? service.price;
+      const priceEntry = service.prices.find(p => p.size === finalSize);
+      const basePrice = priceEntry?.price ?? 0;
 
       return {
         name: service.name,
@@ -364,7 +379,7 @@ async function processSingleService(parsedServiceName, input, promoText) {
   }
 
   // Special case for "repaint" generic query
-  if (parsedServiceName.trim().toLowerCase() === 'repaint') {
+  if (queryLower === 'repaint') {
     if (!motorModel) {
       return {
         success: true,
@@ -374,35 +389,27 @@ async function processSingleService(parsedServiceName, input, promoText) {
       };
     }
 
-    // We have a motor model, let's gather all repaint prices for it
     const results = [];
     const { finalSize } = await resolveSizeForService({ service: { category: 'repaint' }, sizeArg: sizeFromArgs, motorModel });
 
-    // 1. Bodi Halus
-    const halusLookup = lookupRepaintPrice(motorModel, 'bodi_halus', finalSize);
-    const halusInfo = formatRepaintPriceResult(halusLookup);
-    if (halusInfo && halusInfo.price) {
-      results.push({ name: 'Repaint Bodi Halus', price: halusInfo.price, price_formatted: halusInfo.price_formatted, note: halusInfo.note });
+    // Gather specific repaint prices
+    const subs = ['bodi_halus', 'bodi_kasar', 'velg'];
+    for (const sub of subs) {
+      const lookup = await lookupRepaintPrice(motorModel, sub, finalSize);
+      const info = formatRepaintPriceResult(lookup);
+      if (info && info.price) {
+        results.push({ name: info.subcategory === 'bodi_halus' ? 'Repaint Bodi Halus' : (info.subcategory === 'bodi_kasar' ? 'Repaint Bodi Kasar' : 'Repaint Velg'), price: info.price, price_formatted: info.price_formatted, note: info.note });
+      }
     }
 
-    // 2. Bodi Kasar
-    const kasarLookup = lookupRepaintPrice(motorModel, 'bodi_kasar', finalSize);
-    const kasarInfo = formatRepaintPriceResult(kasarLookup);
-    if (kasarInfo && kasarInfo.price) {
-      results.push({ name: 'Repaint Bodi Kasar', price: kasarInfo.price, price_formatted: kasarInfo.price_formatted, note: kasarInfo.note });
-    }
-
-    // 3. Velg
-    const velgLookup = lookupRepaintPrice(motorModel, 'velg', finalSize);
-    const velgInfo = formatRepaintPriceResult(velgLookup);
-    if (velgInfo && velgInfo.price) {
-      results.push({ name: 'Repaint Velg', price: velgInfo.price, price_formatted: velgInfo.price_formatted, note: velgInfo.note });
-    }
-
-    // 4. Cover CVT / Arm (Fixed price from masterLayanan)
-    const cvtService = masterLayanan.find(s => s.name === 'Repaint Cover CVT / Arm');
-    if (cvtService) {
-      results.push({ name: cvtService.name, price: cvtService.price, price_formatted: `Rp${cvtService.price.toLocaleString('id-ID')}`, note: cvtService.summary });
+    // Fixed price repaint services
+    const fixedRepaints = await prisma.service.findMany({
+        where: { category: 'repaint', usesModelPricing: false },
+        include: { prices: true }
+    });
+    for (const s of fixedRepaints) {
+        const price = s.prices[0]?.price || 0;
+        results.push({ name: s.name, price, price_formatted: `Rp${price.toLocaleString('id-ID')}`, note: s.summary });
     }
 
     return {
@@ -417,10 +424,11 @@ async function processSingleService(parsedServiceName, input, promoText) {
     };
   }
 
-  // Fuzzy matching
-  const candidates = masterLayanan
+  // Fuzzy matching against all services
+  const allServices = await prisma.service.findMany({ include: { prices: true } });
+  const candidates = allServices
     .map(s => ({ ...s, similarity: stringSimilarity(parsedServiceName, s.name) }))
-    .filter(s => s.similarity >= 0.4) // Threshold agak longgar untuk menangkap variasi
+    .filter(s => s.similarity >= 0.4)
     .sort((a, b) => b.similarity - a.similarity);
 
   if (candidates.length === 0) {
@@ -435,12 +443,9 @@ async function processSingleService(parsedServiceName, input, promoText) {
   });
 
   const durationFormatted = formatDuration(service.estimatedDuration);
-
-  // --- Surcharge resolution ---
-  const surchargeMatch = colorNameInput ? lookupColorSurcharge(colorNameInput) : null;
+  const surchargeMatch = colorNameInput ? await lookupColorSurcharge(colorNameInput) : null;
   const colorSurcharge = surchargeMatch ? surchargeMatch.surcharge : 0;
 
-  // --- Model-based pricing for repaint services ---
   if (service.usesModelPricing) {
     if (!motorModel) {
       return {
@@ -451,19 +456,19 @@ async function processSingleService(parsedServiceName, input, promoText) {
       };
     }
 
-    const subcategory = service.subcategory || null;
-    const lookup = lookupRepaintPrice(motorModel, subcategory, finalSize);
+    const lookup = await lookupRepaintPrice(motorModel, service.subcategory, finalSize);
     const priceInfo = formatRepaintPriceResult(lookup);
 
     if (priceInfo) {
       const basePrice = priceInfo.price || null;
       const finalPrice = basePrice ? basePrice + colorSurcharge : null;
+      const syarat = await getSyaratKetentuan();
 
-      const result = {
+      return {
         success: true,
         service_name: service.name,
         category: service.category,
-        subcategory: subcategory,
+        subcategory: service.subcategory,
         summary: service.summary,
         description: service.description,
         estimated_duration: durationFormatted,
@@ -476,16 +481,14 @@ async function processSingleService(parsedServiceName, input, promoText) {
         final_price: finalPrice,
         final_price_formatted: finalPrice ? `Rp${finalPrice.toLocaleString('id-ID')}` : null,
         promo_active: !!promoText,
-        syarat_ketentuan: syaratKetentuan,
+        syarat_ketentuan: syarat,
       };
-
-      return result;
     }
   }
 
-  // --- Fallback: variant-based (S/M/L/XL) or flat price ---
-  const variant = service.variants?.find(v => v.name === finalSize);
-  const basePrice = variant?.price ?? service.price;
+  // Fallback: variant-based or flat price
+  const priceEntry = service.prices.find(p => p.size === finalSize) || service.prices.find(p => !p.size && !p.vehicleModelId);
+  const basePrice = priceEntry?.price || 0;
 
   const result = {
     success: true,
@@ -496,16 +499,15 @@ async function processSingleService(parsedServiceName, input, promoText) {
     estimated_duration: durationFormatted,
     motor_size: finalSize || null,
     price: basePrice || null,
-    price_formatted: (basePrice !== null && basePrice !== undefined) ? `Rp${basePrice.toLocaleString('id-ID')}` : 'Harga perlu model motor',
+    price_formatted: basePrice ? `Rp${basePrice.toLocaleString('id-ID')}` : 'Harga perlu model motor',
     color_name: surchargeMatch ? surchargeMatch.name : colorNameInput,
     color_surcharge: colorSurcharge,
     color_surcharge_formatted: `Rp${colorSurcharge.toLocaleString('id-ID')}`,
-    final_price: (basePrice !== null && basePrice !== undefined) ? basePrice + colorSurcharge : null,
-    final_price_formatted: (basePrice !== null && basePrice !== undefined) ? `Rp${(basePrice + colorSurcharge).toLocaleString('id-ID')}` : null,
+    final_price: basePrice ? basePrice + colorSurcharge : null,
+    final_price_formatted: basePrice ? `Rp${(basePrice + colorSurcharge).toLocaleString('id-ID')}` : null,
     promo_active: !!promoText,
   };
 
-  // Jika repaint dan tidak ada model, beri hint
   if (service.usesModelPricing && !motorModel) {
     result.hint = 'Untuk harga yang lebih akurat, sertakan model motor (contoh: Scoopy, NMax, Beat).';
   }
