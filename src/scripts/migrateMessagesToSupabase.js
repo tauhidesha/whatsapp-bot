@@ -56,10 +56,27 @@ async function migrateMessages() {
             continue;
         }
         
-        const customerId = customerMap.get(normalized);
+        let customerId = customerMap.get(normalized);
         if (!customerId) {
-            ignoredDocs++;
-            continue; // Skip if no linked customer (should not happen if previous ETL ran)
+            // Upsert Customer if missing
+            try {
+                const newCustomer = await prisma.customer.upsert({
+                    where: { phone: normalized },
+                    create: {
+                        phone: normalized,
+                        name: doc.data()?.name || null,
+                        whatsappLid: docId.endsWith('@lid') ? docId : null
+                    },
+                    update: {}
+                });
+                customerId = newCustomer.id;
+                customerMap.set(normalized, customerId);
+                console.log(`\n🆕 Created customer for ${normalized}`);
+            } catch (e) {
+                console.error(`\n❌ Failed to upsert customer ${normalized}: ${e.message}`);
+                ignoredDocs++;
+                continue;
+            }
         }
 
         // Fetch messages subcollection
@@ -81,10 +98,18 @@ async function migrateMessages() {
                 contentTxt = '[Empty Message]';
             }
 
+            // Map role correctly
+            let role = m.role || m.sender || 'user';
+            if (role === 'admin' || role === 'assistant' || role === 'bot' || role === 'ai') {
+                role = 'assistant';
+            } else {
+                role = 'user';
+            }
+
             messagesToInsert.push({
                 customerId: customerId,
-                senderId: docId, 
-                role: m.role || 'user',
+                senderId: role === 'assistant' ? 'assistant' : docId, 
+                role: role,
                 content: contentTxt,
                 mediaUrl: m.mediaUrl || null,
                 createdAt: m.timestamp ? m.timestamp.toDate() : new Date()
@@ -94,11 +119,15 @@ async function migrateMessages() {
 
         // Batch insert or createMany
         if (messagesToInsert.length > 0) {
-            await prisma.directMessage.createMany({
-                data: messagesToInsert,
-                skipDuplicates: true
-            });
-            process.stdout.write(`.`);
+            try {
+                await prisma.directMessage.createMany({
+                    data: messagesToInsert,
+                    skipDuplicates: true
+                });
+                process.stdout.write(`.`);
+            } catch (e) {
+                console.error(`\n❌ Failed to insert messages for ${normalized}: ${e.message}`);
+            }
         }
     }
     console.log(`\n🎉 Migrated ${totalMessages} historical chat records to Supabase! (${ignoredDocs} unmapped threads)`);

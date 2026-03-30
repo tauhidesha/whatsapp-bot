@@ -4,14 +4,19 @@
 
 const prisma = require('../../lib/prisma');
 const { normalizePlate } = require('../../lib/vehicleService');
+const { parseSenderIdentity } = require('../../lib/utils');
+
 
 /**
  * Normalize phone number for use as ID.
  */
 function normalizePhone(senderNumber) {
     if (!senderNumber) return null;
-    return senderNumber.replace(/[^0-9]/g, '');
+    // Use centralized identity parsing to ensure consistency with DB (including suffixes)
+    const { docId } = parseSenderIdentity(senderNumber);
+    return docId;
 }
+
 
 /**
  * Map LLM snake_case output to Prisma camelCase field names.

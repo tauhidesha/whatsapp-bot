@@ -3,6 +3,14 @@
 
 const WHATSAPP_SUFFIX = '@c.us';
 
+function normalizePhone(phone) {
+    if (!phone) return '';
+    let clean = String(phone).split('@')[0].replace(/\D/g, '');
+    if (clean.startsWith('0')) clean = '62' + clean.slice(1);
+    else if (clean.length >= 10 && !clean.startsWith('62')) clean = '62' + clean;
+    return clean;
+}
+
 function parseSenderIdentity(rawValue) {
     const trimmed = (rawValue || '').trim();
     if (!trimmed) {
@@ -14,40 +22,21 @@ function parseSenderIdentity(rawValue) {
         };
     }
 
-    // Handle @lid suffix (Meta Business / Linked Devices)
-    if (trimmed.endsWith('@lid')) {
-        const baseId = trimmed.slice(0, -4);
-        return {
-            docId: baseId,
-            channel: 'whatsapp',
-            platformId: baseId,
-            normalizedAddress: trimmed,
-        };
-    }
-
-    const hasWhatsappSuffix = trimmed.endsWith(WHATSAPP_SUFFIX);
-    const baseId = hasWhatsappSuffix ? trimmed.slice(0, -WHATSAPP_SUFFIX.length) : trimmed;
-
-    let channel = 'whatsapp';
-    let platformId = baseId;
-
-    if (baseId.includes(':')) {
-        const [channelPart, ...rest] = baseId.split(':');
-        channel = channelPart || 'unknown';
-        platformId = rest.length ? rest.join(':') : null;
-    }
-
-    const normalizedAddress = channel === 'whatsapp'
-        ? `${baseId}${WHATSAPP_SUFFIX}`
-        : baseId;
+    const isLid = trimmed.endsWith('@lid');
+    const numericPart = normalizePhone(trimmed); // Numeric version (62...)
+    const fullId = isLid ? trimmed : `${numericPart}@c.us`;
 
     return {
-        docId: baseId,
-        channel,
-        platformId,
-        normalizedAddress,
+        docId: fullId, // Now returns full ID (with suffix) to match DB phone field
+        numericId: numericPart, // Added numeric version for cases that need it
+        channel: 'whatsapp',
+        platformId: fullId,
+        normalizedAddress: fullId,
+        isLid,
+        originalId: trimmed
     };
 }
+
 
 module.exports = {
     parseSenderIdentity,

@@ -127,6 +127,15 @@ const createBookingTool = {
     try {
       const workingArgs = { ...args };
 
+      // Handle common aliases from orchestrator
+      if (workingArgs.services && !workingArgs.serviceName) {
+        workingArgs.serviceName = Array.isArray(workingArgs.services) ? workingArgs.services.join(', ') : workingArgs.services;
+      }
+      if (workingArgs.tanggal && !workingArgs.bookingDate) workingArgs.bookingDate = workingArgs.tanggal;
+      if (workingArgs.jam && !workingArgs.bookingTime) workingArgs.bookingTime = workingArgs.jam;
+      if (workingArgs.motor_model && !workingArgs.motorModel) workingArgs.motorModel = workingArgs.motor_model;
+      if (workingArgs.motor_plate && !workingArgs.motorPlate) workingArgs.motorPlate = workingArgs.motor_plate;
+
       if (!workingArgs.customerPhone && typeof workingArgs.senderNumber === 'string') {
         const cleaned = workingArgs.senderNumber.replace(/@c\.us$/i, '').replace(/[^0-9+]/g, '');
         workingArgs.customerPhone = cleaned || workingArgs.senderNumber;
@@ -209,7 +218,20 @@ const createBookingTool = {
 
       const normalizedPhone = normalizeWhatsappNumber(customerPhone);
 
-      const dateTimeString = `${bookingDate}T${bookingTime}:00`;
+      const { parseDateTime } = require('../utils/dateTime');
+      let finalDate = bookingDate;
+      let finalTime = bookingTime;
+
+      // Parse natural language if needed
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      const timeRegex = /^\d{2}:\d{2}$/;
+      if (!dateRegex.test(finalDate) || (finalTime && !timeRegex.test(finalTime))) {
+        const parsed = parseDateTime(`${finalDate} ${finalTime || ''}`);
+        if (parsed.date) finalDate = parsed.date;
+        if (parsed.time) finalTime = parsed.time;
+      }
+
+      const dateTimeString = `${finalDate}T${finalTime || '09:00'}:00`;
       const bookingDateTime = new Date(dateTimeString);
       if (Number.isNaN(bookingDateTime.getTime())) {
         return {

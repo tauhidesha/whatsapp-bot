@@ -61,42 +61,51 @@ async function findMotorSize(motorModel) {
  * Cari layanan di database berdasarkan nama/keyword.
  */
 async function findService(targetService) {
-    if (!targetService) return null;
+    if (!targetService) return { service: null, isAmbiguous: false };
     const norm = normalizeService(targetService.toString());
-    if (!norm) return null;
+    if (!norm) return { service: null, isAmbiguous: false };
 
     const allServices = await prisma.service.findMany({
         include: { prices: true }
     });
 
+    const broadKeywords = ['detailing', 'coating', 'repaint', 'cuci'];
+    const isBroad = broadKeywords.includes(norm);
+
     for (const svc of allServices) {
         if (!svc.name) continue;
         const svcNorm = svc.name.toLowerCase();
-        if (svcNorm === norm) return svc;
-        if (norm.includes(svcNorm) || svcNorm.includes(norm)) return svc;
+        
+        // Exact match ALWAYS wins
+        if (svcNorm === norm) return { service: svc, isAmbiguous: false };
+
+        // Partial match: only if it's NOT a lone broad keyword
+        if (!isBroad && (norm.includes(svcNorm) || svcNorm.includes(norm))) {
+            return { service: svc, isAmbiguous: false };
+        }
     }
 
     // Fallback keywords — HANYA jika sangat spesifik
     // Jangan paksa pilih layanan untuk kategori umum (detailing, coating)
     // biarkan AI bertanya dulu user mau paket apa
     if (norm.includes('repaint') && (norm.includes('halus') || norm.includes('full'))) {
-        return allServices.find(s => s.subcategory === 'bodi_halus') || null;
+        return { service: allServices.find(s => s.subcategory === 'bodi_halus') || null, isAmbiguous: false };
     }
     if (norm.includes('repaint') && norm.includes('kasar')) {
-        return allServices.find(s => s.subcategory === 'bodi_kasar') || null;
+        return { service: allServices.find(s => s.subcategory === 'bodi_kasar') || null, isAmbiguous: false };
     }
     if (norm.includes('repaint') && norm.includes('velg')) {
-        return allServices.find(s => s.subcategory === 'velg') || null;
+        return { service: allServices.find(s => s.subcategory === 'velg') || null, isAmbiguous: false };
     }
 
-    return null;
+    return { service: null, isAmbiguous: isBroad };
 }
 
 /**
  * Main function: Hitung harga spesifik untuk motor + layanan.
  */
 async function getSpecificPriceContext(motorModel, targetServicesStr) {
-    if (!motorModel || !targetServicesStr) return null;
+    if (!motorModel || !targetServicesStr) return { prompt: null, isAmbiguous: false };
 
     const motor = await findMotorSize(motorModel);
     const parts = targetServicesStr.split(/,|\bdan\b|\band\b|&|\+/i).map(s => s.trim()).filter(Boolean);
@@ -104,9 +113,11 @@ async function getSpecificPriceContext(motorModel, targetServicesStr) {
     let combinedResult = "";
     const calculatedNames = new Set();
     let totalCalculated = 0;
+    let anyAmbiguity = false;
 
     for (const part of parts) {
-        const service = await findService(part);
+        const { service, isAmbiguous } = await findService(part);
+        if (isAmbiguous) anyAmbiguity = true;
         if (!service) continue;
         
         if (calculatedNames.has(service.name)) continue;
@@ -152,7 +163,7 @@ async function getSpecificPriceContext(motorModel, targetServicesStr) {
         }
     }
 
-    if (!combinedResult) return null;
+    if (!combinedResult) return { prompt: null, isAmbiguous: anyAmbiguity };
 
     let finalPrompt = `\n\n[HARGA SPESIFIK - SUDAH DIHITUNG OTOMATIS]\n`;
     finalPrompt += combinedResult.trim() + `\n`;
@@ -161,7 +172,7 @@ async function getSpecificPriceContext(motorModel, targetServicesStr) {
     }
     finalPrompt += `\n⚠️ INSTRUKSI: Langsung sebutkan harga otomatis di atas ke pelanggan. JANGAN panggil tool getServiceDetails lagi!`;
 
-    return finalPrompt;
+    return { prompt: finalPrompt, isAmbiguous: anyAmbiguity };
 }
 
 module.exports = { getSpecificPriceContext, findMotorSize, findService };

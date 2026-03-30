@@ -75,7 +75,7 @@ const readDirectMessagesTool = {
         const conversations = customers.map(c => {
           const lastMessage = c.messages[0];
           return {
-            number: c.phone + '@c.us',
+            number: c.phone, // Already has suffix from DB
             name: c.name || 'Tanpa Nama',
             lastMessage: lastMessage?.content || '-',
             time: c.updatedAt.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })
@@ -84,7 +84,7 @@ const readDirectMessagesTool = {
 
         // Format output agar mudah dibaca AI
         const summaryList = conversations.map((c, i) =>
-          `${i + 1}. ${c.name} (${c.number})\n   🕒 ${c.time}\n   💬 "${c.lastMessage.substring(0, 50)}..."`
+          `${i + 1}. ${c.name} (${c.number})\n   🕒 ${c.time}\n   💬 "${typeof c.lastMessage === 'string' ? c.lastMessage.substring(0, 50) : '[Media]'}..."`
         ).join('\n\n');
 
         return {
@@ -98,12 +98,9 @@ const readDirectMessagesTool = {
           return { success: false, message: 'targetNumber wajib diisi untuk membaca percakapan.' };
         }
 
-        // Normalisasi nomor target (hapus karakter non-digit)
-        let cleanTarget = targetNumber.replace(/\D/g, '');
-        // Konversi 08xx ke 628xx jika perlu, asumsi standar ID
-        if (cleanTarget.startsWith('08')) {
-          cleanTarget = '62' + cleanTarget.slice(1);
-        }
+        // Use the common utility for normalization consistent with DB
+        const { parseSenderIdentity } = require('../../lib/utils.js');
+        const { docId: cleanTarget } = parseSenderIdentity(targetNumber);
 
         // Find customer
         const customer = await prisma.customer.findUnique({
@@ -115,6 +112,7 @@ const readDirectMessagesTool = {
             }
           }
         });
+
 
         if (!customer || customer.messages.length === 0) {
           return { success: true, message: `Belum ada riwayat pesan tersimpan dengan nomor: ${cleanTarget}.` };

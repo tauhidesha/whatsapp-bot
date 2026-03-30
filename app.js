@@ -303,6 +303,11 @@ Tawarkan promo aktif secara natural. Jika Repaint, tawarkan Cuci Komplit. Jika D
 - Balas singkat, gaul, natural ala teman chat (jangan yapping kepanjangan).
 - Escalation: Jika pelanggan marah/komplain berat, gunakan tool \`triggerBosMat\`.
 
+[CRITICAL: Broad vs Specific Services]
+- JANGAN langsung panggil \`getServiceDetails\` jika pelanggan hanya menyebutkan kategori umum (seperti 'Detailing', 'Coating', 'Repaint') tanpa menyebutkan paket spesifiknya.
+- Kamu WAJIB bertanya dulu: "Mau paket [Kategori] mana yang Mas cari?" (contoh: "Mau Detailing Mesin atau Full Detailing bodi?") atau tanyakan kondisi motornya (kusam, banyak jamur, atau kerak oli).
+- Hanya panggil tool jika nama layanan sudah spesifik.
+
 [CONTEKAN PRODUK (CHEAT SHEET) - Gunakan untuk menjawab pertanyaan teknis secara singkat]
 * REPAINT BODI HALUS: Cat ulang bodi utama motor pakai bahan premium (PU & HS) hasil mulus pabrikan. Bisa request warna standar atau spesial (Candy/Bunglon ada tambahan harga).
 * REPAINT BODI KASAR: Hitamkan lagi dek/bodi kasar yang kusam pakai cat khusus tekstur (PP Primer).
@@ -1016,6 +1021,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
 
                     // --- DYNAMIC FLOW CONTROLLER (Tanpa Token Bengkak) ---
                     // Mengarahkan AI sesuai alur obrolan: Kualifikasi -> Konsultasi -> Upsell -> Booking
+                    const intents = customerCtx.detected_intents || [];
                     let actionDirective = "";
                     const m_model = customerCtx.motor_model || (state && state.motor_model);
                     const m_plate = customerCtx.motor_plate;
@@ -1099,7 +1105,10 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                 cartServices = [...new Set(cartServices)];
 
                 // --- 3. HARGA & INSTRUKSI SINGKAT ---
-                const exactPricePrompt = await getSpecificPriceContext(customerCtx.motor_model, cartServices.join(', '));
+                const { prompt: exactPricePrompt, isAmbiguous } = await getSpecificPriceContext(customerCtx.motor_model, cartServices.join(', '));
+                
+                // Save ambiguity state for tool routing later
+                customerCtx._isPriceAmbiguous = isAmbiguous;
 
                 if (exactPricePrompt) {
                     // Kita tambahkan instruksi 'SINGKAT' langsung di sini agar Agent 2 nggak cerewet
@@ -1108,6 +1117,8 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                         `Jangan yapping soal promo kepanjangan. Fokus beri tahu harga dan tanya konfirmasi warna/kondisi bodi.`;
 
                     console.log(`💰[PRICE_CALC] Harga otomatis dihitung (with business rules).`);
+                } else if (isAmbiguous) {
+                    console.log(`💰[PRICE_CALC] Ambigu (Kategori Umum) untuk: ${customerCtx.motor_model} + ${cartServices.join(', ')}. Menunggu klarifikasi.`);
                 } else {
                     console.log(`💰[PRICE_CALC] Gagal hitung otomatis untuk: ${customerCtx.motor_model} + ${cartServices.join(', ')} → fallback ke tool`);
                 }
@@ -1118,7 +1129,7 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
 
         // Inject tanggal & waktu langsung ke prompt (hemat 1 tool call)
         const now = DateTime.now().setZone('Asia/Jakarta').setLocale('id');
-        let dateTimePart = `\nSekarang: ${now.toFormat("cccc, d LLLL yyyy HH:mm")} WIB.`;
+        let dateTimePart = `\n\n[TIME_CONTEXT]\nSekarang adalah: ${now.toFormat("cccc, dd MMMM yyyy HH:mm")} WIB. Gunakan ini untuk memahami "hari ini", "besok", atau "minggu depan" secara akurat dalam percakapan.`;
 
         // Inject User Identity
         const identityPart = `\n\n[USER IDENTITY]\n- Nama Pengirim: ${senderName || 'Tidak Diketahui'}\n- Nomor WhatsApp: ${senderNumber || 'Tidak Diketahui'}\n(Sapa pelanggan dengan nama ini jika tersedia dan terlihat natural untuk sapaan awal).`;
@@ -1186,9 +1197,9 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                     msgLower.includes('jasa') || msgLower.includes('layanan') ||
                     msgLower.includes('repaint') || msgLower.includes('coating') || msgLower.includes('detailing');
 
-                // Hanya bind getServiceDetails jika harga BELUM dihitung otomatis
+                // Hanya bind getServiceDetails jika harga BELUM dihitung otomatis DAN TIDAK AMBIGU
                 if (intents.length === 0 || intents.includes('tanya_harga') || intents.includes('tanya_layanan') || isAskingPrice || isAskingService) {
-                    if (!specificPriceInjection) {
+                    if (!specificPriceInjection && !ctx?._isPriceAmbiguous) {
                         routedTools.push(getServiceDetailsTool);
                     }
                 }
@@ -1732,7 +1743,8 @@ async function processBufferedMessages(senderNumber, client) {
                 }
 
                 // ═══════════════════════════════════════════════════════
-                // GATE 3: Strict Booking Validation
+                // ═══════════════════════════════════════════════════════
+                // GATE 3: Strict Booking Validation & Auto-Recommendation
                 // ═══════════════════════════════════════════════════════
                 const wantsBooking = intents.includes('mulai_booking') || customerCtx.conversation_stage === 'closing';
 
@@ -1740,57 +1752,66 @@ async function processBufferedMessages(senderNumber, client) {
                     const day = customerCtx.preferred_day;
                     const time = customerCtx.preferred_time;
 
-                    // 3a. Missing Parameters
-                    if (!day || !time) {
-                        const missingParts = [];
-                        if (!day) missingParts.push('hari/tanggal');
-                        if (!time) missingParts.push('jam kedatangan');
-                        systemInstruction = `[SYSTEM_INSTRUCTION]: User ingin booking tapi ${missingParts.join(' dan ')} belum lengkap. Tanyakan jadwal kedatangannya (Jam buka: 09:00 - 18:00). JANGAN panggil tool booking.`;
-                        console.log(`📋 [ORCHESTRATOR] Gate 3a: Missing booking params (${missingParts.join(', ')}). Injecting NLG instruction.`);
+                    // 3a. Missing Date
+                    if (!day) {
+                        systemInstruction = `[SYSTEM_INSTRUCTION]: User ingin booking tapi hari/tanggal belum ditentukan. Tanyakan kapan Mas/Kak mau ke studio? (Jam buka: 09:00 - 18:00). JANGAN panggil tool booking.`;
+                        console.log(`📋 [ORCHESTRATOR] Gate 3a: Missing booking date. Injecting NLG instruction.`);
                     } else {
-                        // 3b. Check Availability via JS
+                        // 3b. Check Availability / Find Recommendations
                         try {
-                            console.log(`📅 [ORCHESTRATOR] Gate 3b: Checking availability for ${day} ${time}...`);
-                            const availResult = await checkBookingAvailabilityTool.implementation({ day, time });
+                            console.log(`📅 [ORCHESTRATOR] Gate 3b: Checking availability for ${day} ${time || '(Auto-Search)'}...`);
+                            const availResult = await checkBookingAvailabilityTool.implementation({ 
+                                bookingDate: day, 
+                                bookingTime: time,
+                                serviceName: customerCtx.target_services?.[0] || customerCtx.target_service
+                            });
 
-                            if (!availResult || availResult.available === false || availResult.error) {
-                                // Slot penuh / tutup
-                                systemInstruction = `[SYSTEM_INSTRUCTION]: Jadwal ${day} jam ${time} sudah penuh/tutup. Minta maaf dan tawarkan user untuk memilih hari/jam lain. JANGAN panggil tool booking.`;
-                                console.log(`❌ [ORCHESTRATOR] Gate 3b: Slot ${day} ${time} unavailable.`);
-                            } else {
-                                // 3c. ALL CLEAR — Execute Booking via JS!
-                                console.log(`✅ [ORCHESTRATOR] Gate 3c: Slot available! Executing booking...`);
-                                const bookingResult = await createBookingTool.implementation({
-                                    senderNumber: senderNumber,
-                                    sender_number: senderNumber,
-                                    motor_model: customerCtx.motor_model,
-                                    services: customerCtx.target_services && customerCtx.target_services.length > 0 ? customerCtx.target_services : [customerCtx.target_service],
-                                    tanggal: day,
-                                    jam: time,
-                                });
+                            if (availResult.available) {
+                                if (time) {
+                                    // 3c. ALL CLEAR — Slot matches user request — Execute Booking!
+                                    console.log(`✅ [ORCHESTRATOR] Gate 3c: Slot available & confirmed! Executing booking...`);
+                                    const bookingResult = await createBookingTool.implementation({
+                                        senderNumber: senderNumber,
+                                        senderName: senderName,
+                                        motorModel: customerCtx.motor_model,
+                                        serviceName: (customerCtx.target_services && customerCtx.target_services.length > 0 ? customerCtx.target_services : [customerCtx.target_service]).join(', '),
+                                        bookingDate: day,
+                                        bookingTime: time,
+                                    });
 
-                                console.log(`📅 [ORCHESTRATOR] Booking Result:`, JSON.stringify(bookingResult));
+                                    console.log(`📅 [ORCHESTRATOR] Booking Success:`, JSON.stringify(bookingResult));
 
-                                // Use Agent 2 ONLY for NLG confirmation
-                                const nlgPrompt = `[SYSTEM_INSTRUCTION]: Booking BERHASIL dibuat! Data: ${JSON.stringify(bookingResult)}. Sampaikan ke user dengan sangat ramah, konfirmasi jadwalnya, dan ingatkan jam operasional kita. JANGAN panggil tool lagi.`;
-                                const aiResponseResult = await getAIResponse(nlgPrompt, senderName, senderNumber, '', mediaItems, 'gemini-2.0-flash');
-                                const aiResponse = aiResponseResult.content;
+                                    const nlgPrompt = `[SYSTEM_INSTRUCTION]: Booking BERHASIL dibuat! Data: ${JSON.stringify(bookingResult)}. Sampaikan ke user dengan sangat ramah, konfirmasi jadwalnya, dan ingatkan jam operasional kita. JANGAN panggil tool lagi.`;
+                                    const aiResponseResult = await getAIResponse(nlgPrompt, senderName, senderNumber, '', mediaItems, 'gemini-2.0-flash');
+                                    const aiResponse = aiResponseResult.content;
 
-                                if (aiResponse) {
-                                    const targetNumber = toSenderNumberWithSuffix(senderNumber);
-                                    markBotMessage(targetNumber, aiResponse.trim());
-                                    await client.sendText(targetNumber, aiResponse.trim());
-                                    if (prisma) {
-                                        await saveMessageToFirestore(senderNumber, combinedMessage, 'user');
-                                        await saveMessageToFirestore(senderNumber, aiResponse, 'ai');
+                                    if (aiResponse) {
+                                        const targetNumber = toSenderNumberWithSuffix(senderNumber);
+                                        markBotMessage(targetNumber, aiResponse.trim());
+                                        await client.sendText(targetNumber, aiResponse.trim());
+                                        if (prisma) {
+                                            await saveMessageToFirestore(senderNumber, combinedMessage, 'user');
+                                            await saveMessageToFirestore(senderNumber, aiResponse, 'ai');
+                                        }
                                     }
+                                    await client.stopTyping(senderNumber);
+                                    return; // DONE
+                                } else if (availResult.recommendedTime) {
+                                    // Found a slot! Zoya recommends it.
+                                    systemInstruction = `[SYSTEM_INSTRUCTION]: User belum menentukan jam, tapi Zoya cek hari ${day} ada slot kosong jam ${availResult.recommendedTime}. TAWARKAN jam ini ke user secara ramah untuk konfirmasi. JANGAN panggil tool booking dulu.`;
+                                    console.log(`💡 [ORCHESTRATOR] Gate 3b: Recommended slot found at ${availResult.recommendedTime}.`);
+                                } else {
+                                    // Available but no specific time yet
+                                    systemInstruction = `[SYSTEM_INSTRUCTION]: Hari ${day} masih ada slot kosong. Tanyakan jam berapa user mau datang? (Jam buka: 09:00 - 18:00).`;
                                 }
-                                await client.stopTyping(senderNumber);
-                                return; // DONE — booking completed
+                            } else {
+                                // Slot penuh / tutup / Error
+                                systemInstruction = `[SYSTEM_INSTRUCTION]: Jadwal ${day} ${time ? 'jam ' + time : ''} tidak tersedia. ${availResult.summary || 'Mohon tawarkan hari lain.'} JANGAN panggil tool booking.`;
+                                console.log(`❌ [ORCHESTRATOR] Gate 3b: Unavailable (${availResult.summary}).`);
                             }
                         } catch (bookErr) {
                             console.error('❌ [ORCHESTRATOR] Booking Failed:', bookErr.message);
-                            systemInstruction = `[SYSTEM_INSTRUCTION]: Terjadi error teknis saat booking (${bookErr.message}). Minta maaf ke user dan bilang Zoya sedang melapor ke Admin untuk dibantu manual.`;
+                            systemInstruction = `[SYSTEM_INSTRUCTION]: Terjadi error teknis saat booking (${bookErr.message}). Minta maaf ke user dan bilang Zoya sedang melapor ke Admin untuk dibantu manual agar jadwalnya aman.`;
                             await triggerBosMatTool.implementation({
                                 senderNumber: senderNumber,
                                 reason: `Gagal booking otomatis: ${bookErr.message}`,
@@ -2208,11 +2229,11 @@ const fetchedProfilePics = new Set(); // Keep track of numbers we already fetche
 async function saveSenderMeta(senderNumber, displayName, client = null) {
     const prisma = require('./src/lib/prisma');
 
-    const { docId, channel, platformId } = parseSenderIdentity(senderNumber);
+    const { docId, channel, isLid, originalId } = parseSenderIdentity(senderNumber);
     if (!docId) return;
 
     let profilePicUrl = null;
-    if (client && channel === 'whatsapp' && !senderNumber.endsWith('@lid') && !fetchedProfilePics.has(senderNumber)) {
+    if (client && channel === 'whatsapp' && !isLid && !fetchedProfilePics.has(senderNumber)) {
         try {
             const picResult = await client.getProfilePicFromServer(senderNumber);
             // Extract URL string from the object returned by WhatsApp
@@ -2239,9 +2260,8 @@ async function saveSenderMeta(senderNumber, displayName, client = null) {
             aiPauseReason: snoozeInfo.reason,
         };
         
-        // If sender uses @lid format, save it to whatsappLid field
-        if (senderNumber.endsWith('@lid')) {
-            customerData.whatsappLid = senderNumber;
+        if (isLid) {
+            customerData.whatsappLid = originalId;
         }
 
         const customer = await prisma.customer.upsert({
@@ -2250,7 +2270,7 @@ async function saveSenderMeta(senderNumber, displayName, client = null) {
             update: {
                 name: displayName,
                 profilePicUrl: profilePicUrl || undefined,
-                whatsappLid: senderNumber.endsWith('@lid') ? senderNumber : undefined,
+                whatsappLid: isLid ? originalId : undefined,
                 aiPaused: snoozeInfo.active || false,
                 aiPausedUntil: snoozeInfo.expiresAt ? new Date(snoozeInfo.expiresAt) : null,
                 aiPauseReason: snoozeInfo.reason,
@@ -2307,7 +2327,7 @@ async function listConversations(limit = 100) {
 
             return {
                 id: c.id,
-                senderNumber: c.phone + '@c.us',
+                senderNumber: c.phone, // Already has suffix from DB
                 name: c.name || null,
                 lastMessage: lastMessage?.content || null,
                 lastMessageSender: lastMessage?.role || null,
@@ -2317,6 +2337,7 @@ async function listConversations(limit = 100) {
                 channel: 'whatsapp',
                 platformId: c.phone,
                 aiPaused: c.aiPaused || snoozeInfo.active,
+
                 aiPausedUntil: c.aiPausedUntil?.toISOString() || snoozeInfo.expiresAt,
                 aiPausedManual: snoozeInfo.manual,
                 aiPausedReason: snoozeInfo.reason,
@@ -2555,10 +2576,11 @@ app.post('/send-message', async (req, res) => {
                 console.log(`[API] LID targeted for sending: ${targetNumber} (Resolution disabled)`);
             }
             
-            // Ensure proper suffix for non-LID numbers
+            // Ensure proper suffix for non-suffixed numbers (fallback)
             if (targetNumber && !targetNumber.includes('@')) {
                 targetNumber = targetNumber + '@c.us';
             }
+
             
             console.log(`[API] Sending to: ${targetNumber}`);
             markBotMessage(targetNumber, finalMessage);
@@ -2811,6 +2833,21 @@ app.get('/bookings', async (req, res) => {
             });
 
             const durationDays = Math.ceil(maxDurationMinutes / 480) || 1;
+            const { parseDateTime } = require('../utils/dateTime');
+            let finalDate = b.bookingDate.toISOString().split('T')[0];
+            let finalTime = b.bookingDate.toISOString().slice(11, 16);
+
+            // Parse natural language if needed
+            const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+            const timeRegex = /^\d{2}:\d{2}$/;
+            if (!dateRegex.test(finalDate) || !timeRegex.test(finalTime)) {
+                const parsed = parseDateTime(`${finalDate} ${finalTime}`);
+                if (parsed.date) finalDate = parsed.date;
+                if (parsed.time) finalTime = parsed.time;
+            }
+
+            const dateTimeString = `${finalDate}T${finalTime}:00`;
+            const bookingDateTime = new Date(dateTimeString);
             const startDate = new Date(b.bookingDate);
             const endDate = new Date(startDate);
             endDate.setDate(startDate.getDate() + (durationDays - 1));

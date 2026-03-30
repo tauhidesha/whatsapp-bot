@@ -4,14 +4,15 @@
 const { z } = require('zod');
 const prisma = require('../../lib/prisma');
 const { parseDateTime } = require('../utils/dateTime');
+const { DateTime } = require('luxon');
 
 const STATUS_ACTIVE = ['PENDING', 'CONFIRMED', 'IN_PROGRESS', 'IN_QUEUE'];
 
 const InputSchema = z.object({
   bookingDate: z.string().describe('Tanggal booking. Format YYYY-MM-DD atau bahasa alami seperti "besok".'),
-  bookingTime: z.string().describe('Jam booking. Format HH:mm atau bahasa alami seperti "jam 2 siang".'),
-  serviceName: z.string().describe('Nama layanan yang ingin dibooking'),
-  estimatedDurationMinutes: z.number().describe('Estimasi durasi layanan dalam menit'),
+  bookingTime: z.string().optional().describe('Jam booking. Format HH:mm atau bahasa alami seperti "jam 2 siang". Jika kosong, tool akan cari slot tersedia.'),
+  serviceName: z.string().optional().describe('Nama layanan yang ingin dibooking'),
+  estimatedDurationMinutes: z.number().optional().describe('Estimasi durasi layanan dalam menit'),
 });
 
 function formatDate(date) {
@@ -88,7 +89,6 @@ async function getDailyBookings(date, category) {
       id: true,
       bookingDate: true,
       serviceType: true,
-      estimatedDurationMinutes: true,
       status: true
     }
   });
@@ -243,6 +243,10 @@ async function checkRepaintCapacity(input) {
 }
 
 async function implementation(rawInput) {
+  // Handle alias names common in orchestrator calls
+  if (rawInput.day && !rawInput.bookingDate) rawInput.bookingDate = rawInput.day;
+  if (rawInput.time && !rawInput.bookingTime) rawInput.bookingTime = rawInput.time;
+
   const parsedInput = InputSchema.parse(rawInput);
 
   let bookingDate = parsedInput.bookingDate;
@@ -251,8 +255,10 @@ async function implementation(rawInput) {
   const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
   const timeRegex = /^\d{2}:\d{2}$/;
 
-  if (!dateRegex.test(bookingDate) || !timeRegex.test(bookingTime)) {
-    const parsed = parseDateTime(`${parsedInput.bookingDate} ${parsedInput.bookingTime}`);
+  // Parse Date/Time if natural language
+  if (!dateRegex.test(bookingDate) || (bookingTime && !timeRegex.test(bookingTime))) {
+    const combinedStr = bookingTime ? `${bookingDate} ${bookingTime}` : bookingDate;
+    const parsed = parseDateTime(combinedStr);
     if (parsed.date) bookingDate = parsed.date;
     if (parsed.time) bookingTime = parsed.time;
   }
@@ -261,15 +267,71 @@ async function implementation(rawInput) {
     ...parsedInput,
     bookingDate,
     bookingTime,
+    serviceName: parsedInput.serviceName || 'Layanan Umum (Cuci/Detailing)',
+    estimatedDurationMinutes: parsedInput.estimatedDurationMinutes || 120, // default 2 jam
   };
-
-  const startDate = new Date(`${normalizedInput.bookingDate}T${normalizedInput.bookingTime}:00`);
-  const finishDate = computeFinishDate(startDate, normalizedInput.estimatedDurationMinutes);
-  const finishTimeString = formatTime(finishDate);
 
   const serviceCategory = determineServiceCategory(normalizedInput.serviceName);
   const isRepaint = serviceCategory === 'repaint';
   const isDetailingOrCoating = serviceCategory === 'detailing' || serviceCategory === 'coating';
+
+  // --- LOGIKA REKOMENDASI SLOT JIKA JAM KOSONG ---
+  if (!normalizedInput.bookingTime) {
+    const nowJkt = DateTime.now().setZone('Asia/Jakarta');
+    const isToday = normalizedInput.bookingDate === formatDate(nowJkt.toJSDate());
+    
+    // Start searching from 09:00 or Now + 30 mins
+    let startHour = 9;
+    let startMin = 0;
+
+    if (isToday) {
+      const earliestStart = nowJkt.plus({ minutes: 30 });
+      startHour = earliestStart.hour;
+      startMin = earliestStart.minute > 30 ? 60 : 30; // Round to next 30 min block
+      if (startMin === 60) {
+        startHour += 1;
+        startMin = 0;
+      }
+      if (startHour < 9) {
+        startHour = 9;
+        startMin = 0;
+      }
+    }
+
+    // Iterate through slots every 30 mins until 16:30
+    for (let h = startHour; h <= 16; h++) {
+      for (let m = (h === startHour ? startMin : 0); m < 60; m += 30) {
+        const testTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        const testInput = { ...normalizedInput, bookingTime: testTime };
+        
+        let availCheck;
+        if (isRepaint) availCheck = await checkRepaintCapacity(testInput);
+        else if (isDetailingOrCoating) availCheck = await checkDetailingOrCoatingCapacity(testInput);
+        else {
+          const res = await checkSimpleSlotAvailability(testInput);
+          availCheck = { available: res.isAvailable };
+        }
+
+        if (availCheck.available) {
+          return {
+            available: true,
+            recommendedTime: testTime,
+            summary: `Slot tersedia untuk ${normalizedInput.serviceName} pada ${normalizedInput.bookingDate}. Jam paling dekat yang tersedia adalah: ${testTime}.`,
+          };
+        }
+      }
+    }
+
+    return {
+      available: false,
+      summary: `Maaf, untuk tanggal ${normalizedInput.bookingDate} sepertinya semua slot sudah penuh atau sudah melewati jam operasional. Silakan pilih hari lain?`,
+    };
+  }
+
+  // --- LOGIKA CEK SLOT SPESIFIK (Default Path) ---
+  const startDate = new Date(`${normalizedInput.bookingDate}T${normalizedInput.bookingTime}:00`);
+  const finishDate = computeFinishDate(startDate, normalizedInput.estimatedDurationMinutes);
+  const finishTimeString = formatTime(finishDate);
 
   let overnightWarning;
   if (!isRepaint && (finishDate.getHours() > 17 || (finishDate.getHours() === 17 && finishDate.getMinutes() > 0))) {

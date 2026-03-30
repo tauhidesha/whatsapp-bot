@@ -60,8 +60,8 @@ async function syncBookingFinance(bookingId) {
         console.log(`[financeSync] Updated Booking ${bookingId}: Paid=${totalPaid}, Status=${paymentStatus}`);
 
         // 5. Trigger Customer Sync as well
-        if (booking.customer && booking.customer.phone) {
-            await syncCustomer(booking.customer.phone);
+        if (booking.customerId) {
+            await syncCustomer(booking.customerId);
         }
 
     } catch (error) {
