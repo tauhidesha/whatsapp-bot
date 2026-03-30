@@ -45,6 +45,8 @@ const ZoyaState = Annotation.Root({
             colorChoice: null, // string (warna untuk Repaint Bodi)
             velgColorChoice: null, // string (warna untuk Repaint Velg)
             isPreviouslyPainted: null, // boolean (for Velg)
+            bookingDate: null, // 'YYYY-MM-DD' or natural language 'besok'
+            bookingTime: null, // 'HH:mm' or natural language 'jam 2'
             comboOffered: false, // Track apakah promo combo sudah ditawarkan
             missingQuestions: [], // Daftar pertanyaan yang harus diajukan Zoya
             isReadyForTools: false

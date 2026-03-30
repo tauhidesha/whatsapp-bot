@@ -101,9 +101,10 @@ Mau langsung dibooking jadwalnya?`;
 
         inform: `ATURAN INFORMASI:
 1. Berikan informasi/estimasi harga berdasarkan data hasil tool: ${JSON.stringify(toolResult || {})}.
-2. JANGAN pernah menyebutkan kata "promo" (termasuk "tidak ada promo") jika tidak ada instruksi PROMOSI COMBO di bawah.
-3. WAJIB Akhiri dengan 1 CTA: ajak booking jadwal atau tanya hal lain.
-4. JIKA LECET PARAH (lebih dari 2 panel): WAJIB sarankan *Repaint Full Bodi Halus* ketimbang spot repair karena hasil lebih rata dan jatuhnya lebih murah dibanding ngecer per spot.
+2. JIKA hasil tool berisi data AVAILABILITY (ketersediaan booking), WAJIB sampaikan hasilnya ke user (contoh: "Slot tersedia jam..." atau "Maaf jam itu penuh, adanya jam...").
+3. JANGAN pernah menyebutkan kata "promo" (termasuk "tidak ada promo") jika tidak ada instruksi PROMOSI COMBO di bawah.
+4. WAJIB Akhiri dengan 1 CTA: ajak booking jadwal atau tanya hal lain.
+5. JIKA LECET PARAH (lebih dari 2 panel): WAJIB sarankan *Repaint Full Bodi Halus* ketimbang spot repair karena hasil lebih rata dan jatuhnya lebih murah dibanding ngecer per spot.
 ${comboOfferInstruction}
 ${comboResultInstruction}`
     };

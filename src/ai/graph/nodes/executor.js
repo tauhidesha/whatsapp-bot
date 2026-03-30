@@ -69,6 +69,28 @@ async function toolExecutorNode(state) {
                 }
             }
             
+            
+            // Cek Booking Availability jika ada tanggal/jam
+            if (context.bookingDate) {
+                console.log(`[executorNode] Checking availability for ${context.bookingDate} at ${context.bookingTime || 'anytime'}...`);
+                const tool = toolsByName['checkBookingAvailability'];
+                if (tool) {
+                    const availResult = await tool({
+                        bookingDate: context.bookingDate,
+                        bookingTime: context.bookingTime || '',
+                        serviceName: context.serviceTypes?.join(', ') || 'Layanan Umum',
+                        estimatedDurationMinutes: context.serviceTypes?.length > 1 ? 240 : 120 // 4h for multi, 2h for single
+                    });
+
+                    // Merge into toolResult or set if toolResult was null
+                    if (!toolResult) {
+                        toolResult = availResult;
+                    } else {
+                        toolResult.availability = availResult;
+                    }
+                }
+            }
+
             // Cek Jam Buka/Studio Info
             if (intent === 'GENERAL_INQUIRY' && !toolResult) {
                 const tool = toolsByName['getStudioInfo'];

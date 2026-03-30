@@ -59,6 +59,8 @@ DATA YANG HARUS DIEKSTRAK:
 6. color_choice: warna yang diinginkan user untuk Repaint BODI (Halus/Kasar). Ini KHUSUS warna bodi. "Standar" atau "Original" adalah nilai yang valid jika user ingin kembali ke warna asli pabrikan.
 7. velg_color_choice: warna yang diinginkan user untuk Repaint VELG. Ini KHUSUS warna velg, TERPISAH dari warna bodi. "Standar" atau "Original" juga valid di sini.
 8. is_previously_painted: boolean (khusus velg, apakah sudah pernah cat ulang/bukan ori?).
+9. booking_date: Tanggal user ingin booking (contoh: "2026-03-31", "besok", "hari ini", "senin depan").
+10. booking_time: Jam user ingin booking (contoh: "10:00", "jam 2 siang", "pagi", "sore").
 
 PANDUAN:
 - Jika user bilang "NMAX", itu adalah motor_model.
@@ -68,6 +70,7 @@ PANDUAN:
 - Jika user menerima tawaran combo/tambah layanan, TAMBAHKAN ke service_types (jangan replace).
 - Jika user menyebutkan warna dalam konteks velg, isi ke velg_color_choice. Jika dalam konteks bodi, isi ke color_choice.
 - Jika user bilang "balik standar", "warna aslinya", atau "original", isi color_choice atau velg_color_choice dengan "standar".
+- Jika user bertanya ketersediaan hari ini/besok, isi booking_date sesuai konteksnya.
 
 FORMAT JAWABAN (JSON ONLY):
 {
@@ -78,7 +81,9 @@ FORMAT JAWABAN (JSON ONLY):
   "detailing_focus": "baret" | "mesin" | "kerangka" | null,
   "color_choice": string | null,
   "velg_color_choice": string | null,
-  "is_previously_painted": boolean | null
+  "is_previously_painted": boolean | null,
+  "booking_date": string | null,
+  "booking_time": string | null
 }`;
 
     try {
@@ -139,6 +144,8 @@ FORMAT JAWABAN (JSON ONLY):
         if (extracted.color_choice && !ctx.colorChoice) ctx.colorChoice = extracted.color_choice;
         if (extracted.velg_color_choice && !ctx.velgColorChoice) ctx.velgColorChoice = extracted.velg_color_choice;
         if (extracted.is_previously_painted !== null && ctx.isPreviouslyPainted === null) ctx.isPreviouslyPainted = extracted.is_previously_painted;
+        if (extracted.booking_date) ctx.bookingDate = extracted.booking_date;
+        if (extracted.booking_time) ctx.bookingTime = extracted.booking_time;
 
     } catch (error) {
         console.error('[INFO_COLLECTOR_NODE] Extraction failed:', error.message);
