@@ -10,8 +10,8 @@ const prisma = require('../../lib/prisma');
  */
 function normalizeModel(raw) {
     if (!raw) return '';
-    return raw
-        .toLowerCase()
+    const str = raw.toString().toLowerCase();
+    return str
         .replace(/yamaha|honda|suzuki|kawasaki|vespa|polytron|selis|smoot|united|viar|bmw|harley/gi, '')
         .replace(/[^a-z0-9\s\-]/g, '')
         .trim();
@@ -22,8 +22,8 @@ function normalizeModel(raw) {
  */
 function normalizeService(raw) {
     if (!raw) return '';
-    return raw
-        .toLowerCase()
+    const str = raw.toString().toLowerCase();
+    return str
         .replace(/full\s*body/gi, 'bodi')
         .replace(/full\s*bodi/gi, 'bodi')
         .trim();
@@ -33,7 +33,8 @@ function normalizeService(raw) {
  * Cari motor di database berdasarkan model name.
  */
 async function findMotorSize(motorModel) {
-    const norm = normalizeModel(motorModel);
+    if (!motorModel) return null;
+    const norm = normalizeModel(motorModel.toString());
     if (!norm) return null;
 
     const motor = await prisma.vehicleModel.findFirst({
@@ -60,7 +61,8 @@ async function findMotorSize(motorModel) {
  * Cari layanan di database berdasarkan nama/keyword.
  */
 async function findService(targetService) {
-    const norm = normalizeService(targetService);
+    if (!targetService) return null;
+    const norm = normalizeService(targetService.toString());
     if (!norm) return null;
 
     const allServices = await prisma.service.findMany({
@@ -68,26 +70,23 @@ async function findService(targetService) {
     });
 
     for (const svc of allServices) {
+        if (!svc.name) continue;
         const svcNorm = svc.name.toLowerCase();
         if (svcNorm === norm) return svc;
         if (norm.includes(svcNorm) || svcNorm.includes(norm)) return svc;
     }
 
-    // Fallback keywords
+    // Fallback keywords — HANYA jika sangat spesifik
+    // Jangan paksa pilih layanan untuk kategori umum (detailing, coating)
+    // biarkan AI bertanya dulu user mau paket apa
     if (norm.includes('repaint') && (norm.includes('halus') || norm.includes('full'))) {
-        return allServices.find(s => s.subcategory === 'bodi_halus');
+        return allServices.find(s => s.subcategory === 'bodi_halus') || null;
     }
     if (norm.includes('repaint') && norm.includes('kasar')) {
-        return allServices.find(s => s.subcategory === 'bodi_kasar');
+        return allServices.find(s => s.subcategory === 'bodi_kasar') || null;
     }
     if (norm.includes('repaint') && norm.includes('velg')) {
-        return allServices.find(s => s.subcategory === 'velg');
-    }
-    if (norm.includes('coating')) {
-        return allServices.find(s => s.name.toLowerCase().includes('coating motor glossy'));
-    }
-    if (norm.includes('detailing')) {
-        return allServices.find(s => s.category === 'detailing');
+        return allServices.find(s => s.subcategory === 'velg') || null;
     }
 
     return null;

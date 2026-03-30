@@ -56,7 +56,7 @@ const { getState } = require('./src/ai/utils/conversationState.js');
 const { extractAndSaveContext } = require('./src/ai/agents/contextExtractor.js');
 const { classifyAndSaveCustomer } = require('./src/ai/agents/customerClassifier.js');
 const { startAudit, handleAuditResponse, handleResumeAudit, hasActiveSession } = require('./src/ai/agents/customerAudit.js');
-const { getCustomerContext } = require('./src/ai/utils/mergeCustomerContext.js');
+const { getCustomerContext, normalizePhone } = require('./src/ai/utils/mergeCustomerContext.js');
 const masterLayanan = require('./src/data/masterLayanan.js');
 const daftarUkuranMotor = require('./src/data/daftarUkuranMotor.js');
 const { repaintBodiHalus } = require('./src/data/repaintPrices.js');
@@ -840,9 +840,9 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
             process.env.ADMIN_WHATSAPP_NUMBER
         ].filter(Boolean);
 
-        const normalize = (n) => n ? n.toString().replace(/\D/g, '') : '';
-        const senderNormalized = normalize(senderNumber);
-        const isAdmin = adminNumbers.some(num => normalize(num) === senderNormalized);
+        /* normalize replaced by normalizePhone in mergeCustomerContext.js */
+        const senderNormalized = normalizePhone(senderNumber);
+        const isAdmin = adminNumbers.some(num => normalizePhone(num) === senderNormalized);
 
         // --- 4. FULL CONVERSATION HISTORY ---
         let conversationHistoryMessages = [];
@@ -921,19 +921,27 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
                 customerCtx.target_services = customerCtx.target_services || [];
                 try {
                     const { findMotorSize, findService } = require('./src/ai/utils/priceCalculator.js');
-                    if (!customerCtx.motor_model) {
-                        const foundMotor = findMotorSize(humanMessageContent);
-                        if (foundMotor) {
-                            customerCtx.motor_model = foundMotor.model;
-                            console.log(`⚡ [FAST_EXTRACT] Motor terdeteksi saat ini: ${foundMotor.model}`);
+                    
+                    // Pastikan input ke extractor adalah string
+                    const extractInput = Array.isArray(humanMessageContent) 
+                        ? humanMessageContent.find(c => c.type === 'text')?.text || ''
+                        : humanMessageContent;
+
+                    if (!customerCtx.motor_model && extractInput) {
+                        const foundMotor = await findMotorSize(extractInput.toString());
+                        if (foundMotor && foundMotor.modelName) {
+                            customerCtx.motor_model = foundMotor.modelName;
+                            console.log(`⚡ [FAST_EXTRACT] Motor terdeteksi saat ini: ${foundMotor.modelName}`);
                         }
                     }
 
                     // Multi-service fast extract
-                    const foundService = findService(humanMessageContent);
-                    if (foundService && !customerCtx.target_services.includes(foundService.name)) {
-                        customerCtx.target_services.push(foundService.name);
-                        console.log(`⚡ [FAST_EXTRACT] Layanan baru ditambahkan ke cart: ${foundService.name}`);
+                    if (extractInput) {
+                        const foundService = await findService(extractInput.toString());
+                        if (foundService && foundService.name && !customerCtx.target_services.includes(foundService.name)) {
+                            customerCtx.target_services.push(foundService.name);
+                            console.log(`⚡ [FAST_EXTRACT] Layanan baru ditambahkan ke cart: ${foundService.name}`);
+                        }
                     }
                 } catch (err) {
                     console.warn('[FAST_EXTRACT] Failed:', err.message);
@@ -1071,6 +1079,9 @@ async function getAIResponse(userMessage, senderName = "User", senderNumber = nu
         if (customerCtx && customerCtx.motor_model && cartServices.length > 0) {
             try {
                 // --- 1. AUTO-CONVERT BUSINESS RULE ---
+                // Pastikan semua layanan adalah string dan ada nilainya
+                cartServices = cartServices.filter(s => typeof s === 'string' && s.length > 0);
+
                 // Jika ada 'Repaint' di keranjang, OTOMATIS tambahkan/ubah Detailing jadi 'Cuci Komplit'
                 const hasRepaint = cartServices.some(s => s.toLowerCase().includes('repaint'));
                 if (hasRepaint) {
@@ -1895,10 +1906,10 @@ function start(client) {
         const normalized = normalizePhone(senderNumber);
         
         if (normalized) {
-            // Keep suffix for parseSenderIdentity if it had one, or force it
-            senderNumber = senderNumber.endsWith('@c.us') || senderNumber.endsWith('@lid') 
-                ? `${normalized}${senderNumber.substring(senderNumber.indexOf('@'))}` 
-                : `${normalized}@c.us`; 
+            // Keep suffix only if normalized doesn't already have one
+            senderNumber = normalized.includes('@') 
+                ? normalized 
+                : (senderNumber.includes('@') ? `${normalized}${senderNumber.substring(senderNumber.indexOf('@'))}` : `${normalized}@c.us`);
         } else if (originalLid) {
             // Unresolved lid, set fallback empty so AI can ask
             realPhoneFallback = '';
@@ -2055,9 +2066,9 @@ function start(client) {
             process.env.ADMIN_WHATSAPP_NUMBER
         ].filter(Boolean);
 
-        const normalize = (n) => n ? n.toString().replace(/\D/g, '') : '';
-        const senderNormalized = normalize(senderNumber);
-        const isAdmin = adminNumbers.some(num => normalize(num) === senderNormalized);
+        /* normalize replaced by normalizePhone in mergeCustomerContext.js */
+        const senderNormalized = normalizePhone(senderNumber);
+        const isAdmin = adminNumbers.some(num => normalizePhone(num) === senderNormalized);
 
         if (isAdmin) {
             console.log(`[BUFFER] ⚡ Admin detected (${senderNumber}), skipping debounce buffer.`);
