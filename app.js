@@ -489,10 +489,23 @@ async function getConversationHistory(senderNumber, limit = MEMORY_CONFIG.maxMes
     if (!docId) return [];
 
     try {
+        // Find canonical phone from database (handles @c.us vs @lid vs numeric)
+        const customer = await prisma.customer.findFirst({
+            where: {
+                OR: [
+                    { phone: docId },
+                    { phone: { startsWith: senderNumber.toString().replace(/\D/g, '') } }
+                ]
+            },
+            select: { phone: true }
+        });
+
+        const targetPhone = customer ? customer.phone : docId;
+
         // Fetch from DirectMessage table
         const messages = await prisma.directMessage.findMany({
             where: {
-                customer: { phone: docId }
+                customer: { phone: targetPhone }
             },
             take: limit,
             orderBy: { createdAt: 'desc' }
@@ -2349,8 +2362,8 @@ async function listConversations(limit = 100) {
         }));
 
         conversations.sort((a, b) => {
-            const timeA = a.updatedAt ? Date.parse(a.updatedAt) : 0;
-            const timeB = b.updatedAt ? Date.parse(b.updatedAt) : 0;
+            const timeA = a.lastMessageAt ? Date.parse(a.lastMessageAt) : (a.updatedAt ? Date.parse(a.updatedAt) : 0);
+            const timeB = b.lastMessageAt ? Date.parse(b.lastMessageAt) : (b.updatedAt ? Date.parse(b.updatedAt) : 0);
             return timeB - timeA;
         });
 
