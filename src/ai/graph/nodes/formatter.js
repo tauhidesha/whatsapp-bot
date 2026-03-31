@@ -89,6 +89,13 @@ Mau langsung dibooking jadwalnya?`;
 - Warna Velg: ${context.velgColorChoice || 'Belum ditentukan'}
 `.trim();
 
+    const modeInstructions = {
+        greet: "Mode PERKENALAN. Sapa user dengan sangat ramah, kenalkan dirimu sebagai Zoya, dan tanyakan apa yang bisa dibantu hari ini.",
+        ask: `Mode TANYA DATA. Zoya sedang mengumpulkan info. Fokus utama: Tanyakan soal "${missingQ}" secara sangat santai tapi jelas. JANGAN tanya data lain dulu.`,
+        inform: `Mode INFO HARGA/JADWAL. Sampaikan detail biaya atau ketersediaan jadwal dari Tool Result secara transparan. ${comboOfferInstruction} ${comboResultInstruction}`,
+        consult: "Mode KONSULTASI. User sedang bingung atau tanya saran. Berikan masukan ahli otomotif tentang pilihan warna atau jenis layanan (Contoh: 'Kalau Nmax hitam, velg Bronze keren banget Mas!')"
+    };
+
     // --- PROMPT FRAMEWORK: RACE (Role, Audience, Context, Expectation) ---
     const systemPrompt = `[ROLE]
 Kamu adalah Zoya, Automotive Consultant & Studio Assistant di BosMat Studio. 
