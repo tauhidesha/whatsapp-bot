@@ -2,7 +2,7 @@ const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
 const { SystemMessage, HumanMessage } = require('@langchain/core/messages');
 
 const model = new ChatGoogleGenerativeAI({
-    model: process.env.AI_MODEL || 'gemini-2.5-flash-lite',
+    model: process.env.AI_MODEL || 'gemini-flash-lite-latest',
     maxOutputTokens: 2048,
     temperature: 0,
     responseMimeType: "application/json",
@@ -17,6 +17,17 @@ async function infoCollectorNode(state) {
     console.log('--- [INFO_COLLECTOR_NODE] Starting ---');
     const { messages, context, intent, metadata } = state;
     const prevIntent = metadata?.prevIntent;
+
+    // Helper to clean JSON string from potential markdown code blocks
+    const cleanJson = (str) => {
+        try {
+            // Remove markdown code blocks if present
+            const cleaned = str.replace(/```json\n?|```/g, '').trim();
+            return cleaned;
+        } catch (e) {
+            return str;
+        }
+    };
 
     // Siapkan context lokal untuk diolah
     const ctx = { ...context };
@@ -43,59 +54,43 @@ async function infoCollectorNode(state) {
         return { context: { ...context, missingQuestions: [] } };
     }
 
-    const systemPrompt = `[ROLE]
-Kamu adalah Senior Entity Extractor spesialis Otomotif untuk Bengkel BosMat Studio. 
-Keahlianmu adalah membedah percakapan WhatsApp yang berantakan menjadi data terstruktur JSON dengan akurasi 100%.
+    const systemPrompt = `# ROLE
+Kamu adalah Expert Data Extractor untuk Bengkel BosMat Studio. 
+Tugasmu adalah menganalisis percakapan dan mengekstrak informasi teknis kendaraan serta layanan.
 
-[OBJECTIVE]
-Ekstrak informasi entitas dari riwayat chat. Prioritaskan kejujuran data (jangan menebak jika tidak ada) dan deteksi KOREKSI oleh user. 
-Kamu harus membedakan antara "Pertanyaan umum/harga" vs "Niat booking".
+# EXTRACTION RULES
+Ekstrak data ke dalam format JSON dengan field berikut:
+1. **internal_thought**: (Chain-of-Thought) Analisis singkat: Apa yang user mau? Data apa yang baru didapat? Apa data yang masih kurang?
+2. **motor_model**: Jenis motor (Nmax, Scoopy, dll).
+3. **service_types**: Array layanan (Repaint, Detailing, Coating, Cuci).
+4. **paint_type**: Jenis cat (Glossy / Doff).
+5. **is_bongkar_total**: (Boolean/null) Jika user sebut "bongkar total" atau "bongkar mesin".
+6. **detailing_focus**: Fokus area (Bodi Halus, Bodi Kasar, Velg, Mesin).
+7. **color_choice**: Warna bodi yang diinginkan.
+8. **velg_color_choice**: Warna velg (SERINGKALI berbeda dengan bodi).
+9. **is_previously_painted**: (Boolean/null) Jika motor sudah pernah dicat ulang sebelumnya (bukan cat pabrik).
 
-[DETAILS: DATA YANG HARUS DIEKSTRAK]
-1. motor_model: Nama model motor (contoh: NMAX, Nmax Old, Vario 160). Deteksi jika user ganti motor di pesan terakhir.
-2. service_types: ARRAY dari jenis layanan resmi. User bisa minta lebih dari 1 layanan. 
-   Layanan resmi:
-   - 'Repaint Bodi Halus', 'Repaint Bodi Kasar', 'Repaint Velg', 'Repaint Cover CVT', 'Spot Repair'
-   - 'Detailing Mesin', 'Cuci Komplit', 'Poles Bodi Glossy', 'Full Detailing Glossy'
-   - 'Coating Doff', 'Coating Glossy', 'Complete Service Doff', 'Complete Service Glossy'
-   PENTING: Jika hanya minta "repaint", isi "Repaint". Jika "detailing", isi "Detailing".
-3. paint_type: 'glossy' | 'doff'.
-4. is_bongkar_total: boolean (mau bongkar sampai rangka?).
-5. detailing_focus: 'baret' (poles bodi), 'mesin' (detailing mesin), 'kerangka' (cuci komplit).
-6. color_choice: warna khusus bodi halus/kasar (misal: "Hitam Lembayung Ungu", "Standar").
-7. velg_color_choice: warna khusus velg (misal: "Gold Marchesini").
-8. is_previously_painted: boolean (khusus velg, sudah pernah cat ulang?).
-9. booking_date: Tanggal (misal: "2026-03-31", "besok", "sabtu").
-10. booking_time: Jam (misal: "10:00", "pagi", "jam 2 siang").
+# EXTRACTION STRATEGY
+- **Bodi Halus vs Kasar**: Jika user sebut "bodi kasar", masukkan ke \`detailing_focus\`.
+- **Warna**: Bedakan dengan teliti antara warna bodi dan warna velg.
+- **Negative Constraint**: JANGAN menebak data yang tidak ada. Jika ragu, berikan \`null\`.
+- **Context Awareness**: Gunakan riwayat untuk melengkapi data yang sebelumnya sudah disebutkan.
 
-[EXPECTED OUTPUT (JSON ONLY)]
-{
-  "internal_thought": "Analisis singkat: Apakah user melakukan koreksi? Apakah ini niat booking atau tanya harga? Kenapa nilai X dipilih?",
-  "motor_model": string | null,
-  "service_types": string[],
-  "paint_type": "glossy" | "doff" | null,
-  "is_bongkar_total": boolean | null,
-  "detailing_focus": "baret" | "mesin" | "kerangka" | null,
-  "color_choice": string | null,
-  "velg_color_choice": string | null,
-  "is_previously_painted": boolean | null,
-  "booking_date": string | null,
-  "booking_time": string | null
-}
-
-[EXAMPLES]
-- User: "Cat velg nmax berapa?" AI: "Untuk velg Nmax 400rb mas." User: "Oke bsk jam 10 ya." 
-  -> motor_model: "Nmax", service_types: ["Repaint Velg"], booking_date: "besok", booking_time: "10:00".
-- User: "Vario 160 repaint halus hitam. Eh ganti deh, Vario 125 aja."
-  -> motor_model: "Vario 125" (Koreksi terdeteksi).
-
-[SENSE CHECK]
-- Jika user tanya "Cat Nmax berapa?", service_types adalah ["Repaint"] tapi JANGAN paksa isi booking_date jika user belum setuju booking.
-- Periksa spek warna: Jangan campur warna velg ke color_choice (bodi).`;
+# EXAMPLE
+User: "repaint nmax glossy warna merah candy, velgnya silver"
+Output: {
+  "internal_thought": "User ingin repaint Nmax warna merah candy glossy dengan velg silver.",
+  "motor_model": "Nmax",
+  "service_types": ["Repaint"],
+  "paint_type": "Glossy",
+  "detailing_focus": "Bodi Halus & Velg",
+  "color_choice": "Merah Candy",
+  "velg_color_choice": "Silver"
+}`;
 
     try {
-        // Process chat history with speaker labels
-        const chatTranscript = messages.map(m => {
+        // Process limited chat history with speaker labels (max 10 messages)
+        const chatTranscript = messages.slice(-10).map(m => {
             const role = (m.type === 'human' || m.role === 'user') ? '[USER]' : '[AI]';
             return `${role}: ${m.content}`;
         }).join('\n');
@@ -106,7 +101,8 @@ Kamu harus membedakan antara "Pertanyaan umum/harga" vs "Niat booking".
         ]);
 
         console.log(`[INFO_COLLECTOR_NODE] Raw extraction: ${response.content}`);
-        const extracted = JSON.parse(response.content);
+        const cleanedContent = cleanJson(response.content);
+        const extracted = JSON.parse(cleanedContent);
         console.log(`[INFO_COLLECTOR_NODE] Thread Analysis: ${extracted.internal_thought}`);
 
         // Update vehicleType (overwrite with latest if provided)
@@ -169,11 +165,11 @@ Kamu harus membedakan antara "Pertanyaan umum/harga" vs "Niat booking".
 
     // Priority 1: Vehicle Type (Mandatory for everything)
     if (!ctx.vehicleType) {
-        missingQuestion = "Boleh sebutin tipe motornya? (misal: Scoopy 2021, NMax old, PCX 160)";
+        missingQuestion = "Tanyakan tipe motor user (contoh: Nmax, Scoopy, Vario)";
     }
     // Priority 2: At least 1 service type
     else if (ctx.serviceTypes.length === 0) {
-        missingQuestion = "Rencananya mau pakai layanan apa nih? (Misalnya: Repaint full bodi, Coating, atau Detailing aja?)";
+        missingQuestion = "Tanyakan rencana layanan yang diinginkan (Repaint, Coating, atau Detailing)";
     }
     // Priority 3: Resolve generic service names
     else {
@@ -183,17 +179,17 @@ Kamu harus membedakan antara "Pertanyaan umum/harga" vs "Niat booking".
 
             // Generic "Repaint" needs sub-category
             if (svc === 'repaint') {
-                missingQuestion = "Mau cat bagian mana? Bodi Halus, Bodi Kasar, Velg, atau CVT/Arm?";
+                missingQuestion = "Tanyakan detail bagian yang mau di-repaint (Bodi Halus, Kasar, Velg, atau CVT)";
                 break;
             }
             // Generic "Detailing" needs sub-category
             if (svc === 'detailing') {
-                missingQuestion = "Masalah utamanya di mana? Mau ngilangin baret bodi, mesin kotor, atau cuci bongkar total?";
+                missingQuestion = "Tanyakan fokus detailingnya (Hilangkan baret bodi, bersihkan mesin, atau cuci bongkar total)";
                 break;
             }
             // Generic "Coating" needs sub-category
             if (svc === 'coating') {
-                missingQuestion = "Cat motornya sekarang jenisnya Glossy (mengkilap) atau Doff/Matte?";
+                missingQuestion = "Tanyakan jenis cat saat ini (Glossy atau Doff/Matte)";
                 break;
             }
         }
@@ -206,37 +202,37 @@ Kamu harus membedakan antara "Pertanyaan umum/harga" vs "Niat booking".
                 // Coating & Complete Service specifics
                 if (svcLower.includes('coating') || svcLower.includes('complete service')) {
                     if (!ctx.paintType) {
-                        missingQuestion = "Cat motor sekarang jenisnya Glossy (mengkilap) atau Doff/Matte?";
+                        missingQuestion = "Cari tahu jenis cat motor (Glossy atau Doff)";
                         break;
                     }
                     if (ctx.isBongkarTotal === null && svcLower.includes('coating')) {
-                        missingQuestion = "Mau proteksi bodi luarnya aja, atau mau dibongkar total sampai ke rangka dan mesin (Complete Service)?";
+                        missingQuestion = "Tanyakan apakah mau proteksi bodi saja atau bongkar total (Complete Service)";
                         break;
                     }
                 }
                 // Detailing specifics
                 else if (svcLower.includes('detailing') || svcLower.includes('poles') || svcLower.includes('cuci')) {
                     if (!ctx.detailingFocus) {
-                        missingQuestion = "Masalah utamanya di mana? Mau ngilangin baret bodi, mesin kotor, atau cuci bongkar total?";
+                        missingQuestion = "Tanyakan fokus pembersihan (Bodi, Mesin, atau Kolong)";
                         break;
                     }
                     if (!ctx.paintType && (svcLower.includes('poles') || svcLower.includes('full detailing'))) {
-                        missingQuestion = "Cat motornya sekarang jenisnya Glossy atau Doff?";
+                        missingQuestion = "Pastikan jenis catnya Glossy atau Doff";
                         break;
                     }
                 }
                 // Repaint specifics
                 else if (svcLower.includes('repaint')) {
                     if (svcLower.includes('halus') && !ctx.colorChoice) {
-                        missingQuestion = `Untuk Repaint Bodi Halus ${ctx.vehicleType}-nya, rencana mau ganti warna apa? (misal: Hitam, Putih, Abu-abu)`;
+                        missingQuestion = "Tanyakan rencana warna baru untuk bodi halusnya";
                         break;
                     }
                     if (svcLower.includes('velg') && !ctx.velgColorChoice) {
-                        missingQuestion = `Untuk Repaint Velg ${ctx.vehicleType}-nya, rencananya mau warna apa? (misal: Silver, Gold, atau Hitam)`;
+                        missingQuestion = "Tanyakan pilihan warna untuk repaint velgnya";
                         break;
                     }
                     if (svcLower.includes('velg') && ctx.isPreviouslyPainted === null) {
-                        missingQuestion = "Khusus velg, apakah catnya masih ori pabrik atau sudah pernah dicat ulang?";
+                        missingQuestion = "Tanyakan apakah velg masih cat ori pabrik atau sudah pernah repaint";
                         break;
                     }
                 }

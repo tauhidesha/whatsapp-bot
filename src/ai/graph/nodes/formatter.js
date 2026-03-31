@@ -3,7 +3,7 @@ const { SystemMessage, HumanMessage, AIMessage } = require('@langchain/core/mess
 const { z } = require('zod');
 
 const model = new ChatGoogleGenerativeAI({
-    model: process.env.AI_MODEL || 'gemini-1.5-flash-lite-latest',
+    model: process.env.AI_MODEL || 'gemini-flash-lite-latest',
     maxOutputTokens: 2048,
     temperature: 0,
     responseMimeType: "application/json",
@@ -20,20 +20,20 @@ async function formatterNode(state) {
     const lastUserMessage = messages[messages.length - 1];
     const toolResult = metadata?.toolResult;
     const comboPromo = metadata?.comboPromo; // Structured: { promoText, comboDiscount, comboMinServices }
-    
+
     // Ambil mode balasan dari metadata
     const replyMode = metadata?.replyMode || 'inform';
     const missingQ = (context.missingQuestions || [])[0] || '';
 
     // Detect gender dari nama customer
     const customerName = customer.name || 'Kak';
-    
+
     // Upselling suggestions based on service type
     const upsellMap = {
-        'repaint': 'Cuci Komplit / Detailing',
+        'repaint': 'Cuci Komplit',
         'detailing': 'Coating Ceramic',
-        'coating': 'Full Detailing',
-        'cuci': 'Coating Ceramic',
+        'coating': 'Complete Service',
+        'cuci': 'Full Detailing',
         'poles': 'Coating Ceramic',
     };
     let upsellSuggestion = '';
@@ -78,9 +78,9 @@ Format contoh:
 
 Mau langsung dibooking jadwalnya?`;
     }
-    
-    const dateInfo = state.metadata?.currentDateTime 
-        ? `Tanggal Sekarang: ${state.metadata.currentDateTime.dayName}, ${state.metadata.currentDateTime.formatted}` 
+
+    const dateInfo = state.metadata?.currentDateTime
+        ? `Tanggal Sekarang: ${state.metadata.currentDateTime.dayName}, ${state.metadata.currentDateTime.formatted}`
         : `Tanggal Sekarang: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}`;
 
     // Build context summary for the model
@@ -103,50 +103,52 @@ ${dateInfo}
     };
 
     // --- PROMPT FRAMEWORK: RACE (Role, Audience, Context, Expectation) ---
-    const systemPrompt = `[ROLE]
-Kamu adalah Zoya, Automotive Consultant & Studio Assistant di BosMat Studio. 
-Vibes-mu adalah penasihat otomotif yang "asik", friend-like (seperti teman lama), punya selera bagus, tapi tetap profesional dan bisa diandalkan.
+    const systemPrompt = `# ROLE
+Kamu adalah Zoya, Automotive Consultant & Studio Assistant di BosMat Studio.
+Persona: "The Cool Expert Friend". Penasihat yang asik, paham hobi otomotif, jujur, dan hangat.
 
-[AUDIENCE]
-Pecinta motor (Mas/Kak) yang sangat peduli dengan tampilan motor mereka agar tampil "pangling" dan "klimis" di jalan. Mereka tidak suka bahasa kaku sales, mereka lebih suka saran tulus dari teman hobi.
-
-[CONTEXT]
-Status User saat ini:
+# CONTEXT & DATA
+- Data Motor & Layanan:
 ${contextInfo}
-
-Hasil Cek Teknis/Tool:
+- Hasil Teknis/Tool:
 ${JSON.stringify(toolResult || 'Tidak ada data tambahan')}
 
-Riwayat Chat Terakhir:
-"${lastUserMessage.content}"
+# REPLY GUIDELINES (WHATSAPP STYLE)
+- **Casing**: WAJIB gunakan HURUF KECIL SEMUA (lowercase) agar terkesan santai dan asik (seperti chat antar teman).
+- **Sapaan**: Panggil mas/kak. JANGAN panggil "Mbak". JANGAN sebut namamu sendiri (zoya) kecuali saat perkenalan pertama.
+- **Tone**: Santai, antusias (Gunakan emoji: 😄, ✨, 🎨, 🏍️), dan profesional soal mutu.
+- **Layout**: WAJIB double-newline (2x enter) antar paragraf agar lega di HP.
+- **Formatting Cheat Sheet**:
+  - *Tebal*: Gunakan asteris (*teks*)
+  - _Miring_: Gunakan underscore (_teks_)
+  - ~Coret~: Gunakan tilde (~teks~)
+  - \`Monospace\`: Gunakan triple backtick (\`\`\`teks\`\`\`)
 
-[EXPECTATION - WHATSAPP STYLE]
-1. Sapaan: Panggil Mas/Kak sesuai sapaan yang ditentukan. JANGAN panggil "Mbak".
-2. Gaya Bahasa: Gunakan "aku" atau "saya" untuk diri sendiri. JANGAN sebut namamu sendiri "Zoya ...".
-3. Layout: WAJIB gunakan DOUBLE NEWLINE (2x enter) di antara setiap poin/kalimat baru agar chat lega di HP.
-4. Simbol: Gunakan SINGLE-ASTERISK untuk *tebal* (jangan double **).
-5. Kepribadian: Luwes, santai, gunakan emoji secukupnya (😄, ✨, 🎨, 🏍️). 
+# STRATEGY MODE: ${replyMode.toUpperCase()}
+1. **GREET**: Sapaan awal yang hangat + kenalin diri + nanya motor/kendala.
+2. **ASK**: Gunakan "${missingQ}" hanya sebagai CONTEKAN/INSTRUKSI. Tanyakan hal tersebut dengan gaya bahasa kamu sendiri yang santai dan asik (seperti teman nongkrong yang ahli motor).
+3. **INFORM**: Sampaikan harga/estimasi secara transparan. ${comboOfferInstruction} ${comboResultInstruction}
+4. **CONSULT**: Berikan saran ahli (misal: warna cat yang lagi tren atau perawatan coating).
 
-[STRATEGI MODE: ${replyMode.toUpperCase()}]
-${modeInstructions[replyMode]}
+# FEW-SHOT EXAMPLES (RACE)
+- **Mode ASK (missing: motor_model)**: "hallo mas! wah, seru nih mau repaint. btw motornya apa mas? biar aku pas-in harganya nih. 😄"
+- **Mode INFORM (repaint nmax)**: "siapp mas! untuk *nmax bodi halus* repaint harganya *rp1.200.000* ya. sudah termasuk pengerjaan detail sampai klimis. rencana mau warna apa nih mas? ✨"
 
-[ATURAN EMAS]
-- Selalu akhiri dengan satu Call-to-Action (CTA) yang jelas.
-- Jika mode ASK: Parafrasa pertanyaan "${missingQ}" menjadi sangat natural tapi tetap eksplisit.
-- JIKA mode INFORM: Sampaikan breakdown harga dengan jujur, jangan menutup-nutupi biaya ekstra (seperti bongkar/pengerjaan sebulan).
-- Pastikan emosimu "excited" saat user mau bikin motornya keren!`;
+# ATURAN EMAS
+- Sapaan (\`greeting\`) hanya diberikan jika ini awal diskusi atau perpindahan topik yang butuh "lem" percakapan. Kosongkan jika sedang diskusi intens.
+- Selalu akhiri dengan Call-to-Action (CTA) yang jelas.`;
 
     console.log(`[FORMATTER_NODE] missingQ detected: "${missingQ}"`);
 
     try {
+        // Define Structured Output Schema
         const structuredModel = model.withStructuredOutput(
             z.object({
                 greeting: z.string().optional().describe("Sapaan ramah pembuka (max 1 kalimat). Wajib di pesan pertama, OPSIONAL/KOSONGKAN jika ini lanjutan diskusi agar tidak kaku."),
-                main_content: z.string().describe("Isi pesan utama. Jika mode ASK, WAJIB diisi dengan pertanyaan verbatim: " + (missingQ || "N/A")),
+                main_content: z.string().describe("Isi pesan utama. Jika ada contekan di 'missingQ', tanyakan hal tersebut dengan gaya bahasa kamu sendiri (Cool Expert Friend)."),
                 internal_thought: z.string().describe("Analisis singkat pemilihan pesan")
             })
         );
-
 
         const response = await structuredModel.invoke([
             new SystemMessage(systemPrompt),
@@ -154,17 +156,10 @@ ${modeInstructions[replyMode]}
         ]);
 
         console.log(`[FORMATTER_NODE] [${replyMode}] Thought: ${response.internal_thought}`);
-        
-        let finalReply = (response.greeting && response.greeting.trim()) 
+
+        let finalReply = (response.greeting && response.greeting.trim())
             ? response.greeting.trim() + "\n\n" + response.main_content
             : response.main_content;
-
-        // Force check: Jika mode ASK tapi model 'lupa' masukin pertanyaan di main_content
-        if (replyMode === 'ask' && missingQ && !response.main_content.toLowerCase().includes(missingQ.substring(0, 5).toLowerCase())) {
-            console.log("[FORMATTER_NODE] Adherence failure detected. Forcing missingQ into reply.");
-            const intro = (response.greeting && response.greeting.trim()) ? response.greeting.trim() + "\n\n" : "";
-            finalReply = intro + missingQ;
-        }
 
         console.log(`[FORMATTER_NODE] Reply formulated: "${finalReply.substring(0, 50).replace(/\n/g, ' ')}..."`);
 

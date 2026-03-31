@@ -2,7 +2,7 @@ const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
 const { SystemMessage, HumanMessage } = require('@langchain/core/messages');
 
 const model = new ChatGoogleGenerativeAI({
-    model: process.env.AI_MODEL || 'gemini-1.5-flash-lite-latest',
+    model: process.env.AI_MODEL || 'gemini-flash-lite-latest',
     maxOutputTokens: 1024,
     temperature: 0,
 });
@@ -16,37 +16,38 @@ async function classifierNode(state) {
     const { messages } = state;
     const lastMessage = messages[messages.length - 1];
 
-    const systemPrompt = `Kamu adalah AI Classifier untuk Bengkel BosMat Studio.
-Tugas: Tentukan INTENT dari pesan user terakhir.
+    const systemPrompt = `# ROLE
+Kamu adalah AI Intent Classifier untuk Bengkel BosMat Studio.
 
-JAWAB HANYA DENGAN SATU KATA KUNCI BERIKUT:
-- GREETING: User menyapa (Halo, P, Hai, Assalamualaikum, dll).
-- CONSULTATION: User membuka percakapan untuk bertanya-tanya secara umum, tanya promo, atau minta konsultasi tanpa detail teknis (misal: "mau tanya-tanya", "konsultasi dong", "ada promo ga?").
-- BOOKING_SERVICE: User ingin pesan jadwal, servis, cat, repaint, atau detailing. Termasuk pertanyaan harga yang disertai niat servis.
-- GENERAL_INQUIRY: User tanya harga spesifik, lokasi, jam buka, atau konsultasi teknis yang jelas pertanyaannya (misal: "cat Nmax berapa?", "lokasi di mana?").
-- HUMAN_HANDOVER: User minta bicara dengan orang/admin atau terlihat marah/frustasi.
-- OTHER: Tidak masuk kategori di atas.
+# TASK
+Tentukan SATU intent yang paling sesuai dari pesan terakhir user.
 
-CONTOH KLASIFIKASI:
-"Halo Zoya!" → GREETING
-"malam kak mau tanya tanya kak" → CONSULTATION
-"Mau repaint NMax bodi kasar, berapa?" → BOOKING_SERVICE
-"pagi kak mau konsultasi" → CONSULTATION
-"ada promo ga kak?" → CONSULTATION
-"Apa bedanya coating glossy sama doff?" → GENERAL_INQUIRY
-"Bisa langsung besok?" → BOOKING_SERVICE
-"Lokasi bengkel di mana ya?" → GENERAL_INQUIRY
-"panggil admin" → HUMAN_HANDOVER
-"warna standar aja" → BOOKING_SERVICE
-"nggak ngerti kak" → BOOKING_SERVICE
+# CONSTRAINTS
+- JAWAB HANYA DENGAN SATU KATA KUNCI kategori intent.
+- JANGAN berikan penjelasan, tanda baca, atau karakter tambahan.
+- JIKA user hanya menyapa (Halo, P, Assalamualaikum), WAJIB klasifikasikan sebagai **GREETING**.
 
-Chat Terakhir:
-"${lastMessage.content}"`;
+# INTENT CATEGORIES
+- **GREETING**: Sapaan awal (Halo, P, Assalamualaikum).
+- **CONSULTATION**: Tanya promo atau tanya saran umum tanpa detail motor.
+- **BOOKING_SERVICE**: Niat servis, tanya harga layanan tertentu, atau menjawab pertanyaan teknis AI.
+- **GENERAL_INQUIRY**: Tanya lokasi, jam buka, kontak studio.
+- **HUMAN_HANDOVER**: Minta bicara dengan admin manusia.
+- **OTHER**: Di luar kategori di atas.
+
+# INPUT DATA
+Pesan Terakhir User: "${lastMessage.content}"`;
 
     try {
+        // Process limited chat history with speaker labels (max 10 messages)
+        const chatTranscript = messages.slice(-10).map(m => {
+            const role = (m.type === 'human' || m.role === 'user') ? '[USER]' : '[AI]';
+            return `${role}: ${m.content}`;
+        }).join('\n');
+
         const response = await model.invoke([
             new SystemMessage(systemPrompt),
-            new HumanMessage(lastMessage.content)
+            new HumanMessage(`Berikut riwayat chat terakhir untuk konteks:\n${chatTranscript}\n\nPESAN TERAKHIR USER: "${lastMessage.content}"`)
         ]);
 
         let intent = response.content.trim().toUpperCase();
