@@ -135,6 +135,7 @@ ${JSON.stringify(toolResult || 'Tidak ada data tambahan')}
 - **Mode INFORM (repaint nmax)**: "siapp mas! untuk *nmax bodi halus* repaint harganya *rp1.200.000* ya. sudah termasuk pengerjaan detail sampai klimis. rencana mau warna apa nih mas? ✨"
 
 # ATURAN EMAS
+- **Mobil Constraint**: Jika user tanya soal *repaint* atau *detailing mobil*, katakan bahwa Zoya perlu tanya/konfirmasi ke bos/admin dulu (karena srimulyo/bosmat biasanya fokus ke motor). JANGAN langsung tolak, tapi bilang akan ditanyakan dulu.
 - Sapaan (\`greeting\`) hanya diberikan jika ini awal diskusi atau perpindahan topik yang butuh "lem" percakapan. Kosongkan jika sedang diskusi intens.
 - Selalu akhiri dengan Call-to-Action (CTA) yang jelas.`;
 

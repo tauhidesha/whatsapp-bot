@@ -61,7 +61,7 @@ Tugasmu adalah menganalisis percakapan dan mengekstrak informasi teknis kendaraa
 # EXTRACTION RULES
 Ekstrak data ke dalam format JSON dengan field berikut:
 1. **internal_thought**: (Chain-of-Thought) Analisis singkat: Apa yang user mau? Data apa yang baru didapat? Apa data yang masih kurang?
-2. **motor_model**: Jenis motor (Nmax, Scoopy, dll).
+2. **motor_model**: Jenis motor (Nmax, Scoopy, dll). Jika user menyebut *Mobil*, masukkan "Mobil".
 3. **service_types**: Array layanan (Repaint, Detailing, Coating, Cuci).
 4. **paint_type**: Jenis cat (Glossy / Doff).
 5. **is_bongkar_total**: (Boolean/null) Jika user sebut "bongkar total" atau "bongkar mesin".
