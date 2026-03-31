@@ -248,6 +248,33 @@ function formatRepaintPriceResult(lookup) {
   return null;
 }
 
+function guessingPricingPerSize(size, type) {
+  const s = size || 'M';
+  if (type === 'Add-on Part') {
+    if (s === 'S') return 50000;
+    if (s === 'M') return 75000;
+    if (s === 'L') return 100000;
+    if (s === 'XL') return 125000;
+    return 75000;
+  }
+  return 0;
+}
+
+async function getColorSurcharge(colorName, size) {
+  const result = await lookupColorSurcharge(colorName);
+  if (!result) return 0;
+  
+  // Base surcharge from DB
+  let amount = result.surcharge;
+  
+  // Scale by size if needed (optional logic, can be customized)
+  const s = size || 'M';
+  if (s === 'L') amount = Math.round(amount * 1.2 / 25000) * 25000;
+  if (s === 'XL') amount = Math.round(amount * 1.5 / 25000) * 25000;
+  
+  return amount;
+}
+
 // --- Implementation ---
 async function processSingleService(parsedServiceName, input, promoText) {
     let motorModel = (
@@ -278,7 +305,7 @@ async function processSingleService(parsedServiceName, input, promoText) {
     }
 
     // Helper for applying all surcharges including color, disassembly, and add-ons
-    function applyAllSurcharges(basePrice, serviceName, guess, motor_model, extraContext) {
+    async function applyAllSurcharges(basePrice, serviceName, guess, motor_model, extraContext) {
         let finalPrice = basePrice;
         let breakdown = [];
         
@@ -289,7 +316,7 @@ async function processSingleService(parsedServiceName, input, promoText) {
         if (serviceName.toLowerCase().includes('repaint')) {
             const colorType = extraContext.colorChoice || extraContext.paintType;
             if (colorType) {
-                const colorSurcharge = getColorSurcharge(colorType, guess);
+                const colorSurcharge = await getColorSurcharge(colorType, guess);
                 if (colorSurcharge > 0) {
                     finalPrice += colorSurcharge;
                     breakdown.push(`+Rp${colorSurcharge.toLocaleString('id-ID')} (Warna ${colorType})`);
@@ -302,7 +329,7 @@ async function processSingleService(parsedServiceName, input, promoText) {
         if (serviceName.toLowerCase().includes('velg')) {
             const velgColor = extraContext.velgColorChoice || extraContext.colorChoice;
             if (velgColor) {
-                const colorSurcharge = getColorSurcharge(velgColor, guess);
+                const colorSurcharge = await getColorSurcharge(velgColor, guess);
                 if (colorSurcharge > 0) {
                     finalPrice += colorSurcharge;
                     breakdown.push(`+Rp${colorSurcharge.toLocaleString('id-ID')} (Warna ${velgColor})`);
