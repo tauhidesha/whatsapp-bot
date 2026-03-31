@@ -78,7 +78,7 @@ CRITICAL:
 3. Don't repeat what the admin knows. Provide value.
 
 Current Context:
-- Studio: Tapos, Depok.
+- Studio: Cimnanggis, Depok.
 - Service: Repaint & Detailing Motorcycles.`;
 
     const response = await model.invoke([
@@ -105,7 +105,7 @@ Current Context:
 async function adminExecutorNode(state) {
     console.log('🛠️ --- [ADMIN_EXECUTOR_NODE] Executing Tools ---');
     const lastMessage = state.messages[state.messages.length - 1];
-    
+
     if (!lastMessage.tool_calls || lastMessage.tool_calls.length === 0) {
         return state;
     }
@@ -117,11 +117,11 @@ async function adminExecutorNode(state) {
             console.log(`[adminExecutor] Running ${toolCall.name}...`);
             try {
                 // Auto-inject senderNumber for tools that need it
-                const args = { 
-                    ...toolCall.args, 
-                    senderNumber: state.customer?.phone || state.metadata?.phoneReal 
+                const args = {
+                    ...toolCall.args,
+                    senderNumber: state.customer?.phone || state.metadata?.phoneReal
                 };
-                
+
                 const output = await toolImplementation(args);
                 toolOutputs.push(new ToolMessage({
                     content: typeof output === 'string' ? output : JSON.stringify(output),
@@ -143,7 +143,7 @@ async function adminExecutorNode(state) {
         messages: toolOutputs,
         context: {
             ...state.context,
-            isReadyForTools: false 
+            isReadyForTools: false
         }
     };
 }

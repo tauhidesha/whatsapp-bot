@@ -141,7 +141,7 @@ ${modeInstructions[replyMode]}
     try {
         const structuredModel = model.withStructuredOutput(
             z.object({
-                greeting: z.string().describe("Sapaan ramah pembuka (max 1 kalimat). Gunakan Mas/Kak sesuai gender."),
+                greeting: z.string().optional().describe("Sapaan ramah pembuka (max 1 kalimat). Wajib di pesan pertama, OPSIONAL/KOSONGKAN jika ini lanjutan diskusi agar tidak kaku."),
                 main_content: z.string().describe("Isi pesan utama. Jika mode ASK, WAJIB diisi dengan pertanyaan verbatim: " + (missingQ || "N/A")),
                 internal_thought: z.string().describe("Analisis singkat pemilihan pesan")
             })
@@ -155,12 +155,15 @@ ${modeInstructions[replyMode]}
 
         console.log(`[FORMATTER_NODE] [${replyMode}] Thought: ${response.internal_thought}`);
         
-        let finalReply = response.greeting + "\n\n" + response.main_content;
+        let finalReply = (response.greeting && response.greeting.trim()) 
+            ? response.greeting.trim() + "\n\n" + response.main_content
+            : response.main_content;
 
         // Force check: Jika mode ASK tapi model 'lupa' masukin pertanyaan di main_content
         if (replyMode === 'ask' && missingQ && !response.main_content.toLowerCase().includes(missingQ.substring(0, 5).toLowerCase())) {
             console.log("[FORMATTER_NODE] Adherence failure detected. Forcing missingQ into reply.");
-            finalReply = response.greeting + "\n\n" + missingQ;
+            const intro = (response.greeting && response.greeting.trim()) ? response.greeting.trim() + "\n\n" : "";
+            finalReply = intro + missingQ;
         }
 
         console.log(`[FORMATTER_NODE] Reply formulated: "${finalReply.substring(0, 50).replace(/\n/g, ' ')}..."`);

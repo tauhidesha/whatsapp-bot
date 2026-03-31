@@ -48,7 +48,9 @@ const zoyaTools = [
 
 // Mapping nama ke implementasi (untuk manual call jika diperlukan)
 const toolsByName = Object.fromEntries(
-    zoyaTools.map(t => [t.toolDefinition.function.name, t.implementation])
+    zoyaTools
+        .filter(t => t && t.toolDefinition) // Defensive filter
+        .map(t => [t.toolDefinition.function.name, t.implementation])
 );
 
 module.exports = {
