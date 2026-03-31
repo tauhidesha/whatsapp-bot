@@ -58,10 +58,17 @@ Chat Terakhir:
         const containsBookingKeywords = /warna|cat|nmax|scoopy|pcx|vespa|vario|repaint|detailing|coating|poles/i.test(lastMessage.content);
 
         if (prevIntent === 'BOOKING_SERVICE' && (isShortReply || containsBookingKeywords)) {
-             // Cek jika model salah klasifikasi ke OTHER, GREETING, atau GENERAL_INQUIRY padahal ini flow booking
+             // Cek jika model sudah klasifikasi ke GENERAL_INQUIRY tapi ini tanya studio info (lokasi/jam buka)
+             // Jangan override jika user tanya spesifik tentang studio
+             const studioKeywords = /lokasi|alamat|dimana|buka|tutup|istirahat|jam berapa|kontak|wa|map|maps|koordinat/i.test(lastMessage.content);
+             
              if (['OTHER', 'GREETING', 'GENERAL_INQUIRY'].includes(intent)) {
-                 console.log(`[CLASSIFIER_NODE] Intent recovery: Overriding ${intent} to BOOKING_SERVICE due to flow continuation.`);
-                 intent = 'BOOKING_SERVICE';
+                 if (intent === 'GENERAL_INQUIRY' && studioKeywords) {
+                     console.log(`[CLASSIFIER_NODE] Keeping GENERAL_INQUIRY for studio info request.`);
+                 } else {
+                     console.log(`[CLASSIFIER_NODE] Intent recovery: Overriding ${intent} to BOOKING_SERVICE due to flow continuation.`);
+                     intent = 'BOOKING_SERVICE';
+                 }
              }
         }
 

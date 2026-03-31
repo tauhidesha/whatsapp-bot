@@ -91,11 +91,20 @@ async function toolExecutorNode(state) {
                 }
             }
 
-            // Cek Jam Buka/Studio Info
-            if (intent === 'GENERAL_INQUIRY' && !toolResult) {
+            // Cek Jam Buka/Studio Info (Selalu panggil jika intent GENERAL_INQUIRY atau ada keyword studio)
+            const studioKeywords = /lokasi|alamat|dimana|buka|tutup|istirahat|jam berapa|kontak|wa|map|maps|koordinat/i.test(state.messages[state.messages.length - 1].content);
+            if (intent === 'GENERAL_INQUIRY' || studioKeywords) {
                 const tool = toolsByName['getStudioInfo'];
                 if (tool) {
-                    toolResult = await tool({});
+                    const studioResult = await tool({});
+                    if (!toolResult) {
+                        toolResult = studioResult;
+                    } else {
+                        // Merge if both exist
+                        if (typeof toolResult === 'object') {
+                            toolResult.studioInfo = studioResult;
+                        }
+                    }
                 }
             }
         }

@@ -49,24 +49,25 @@ async function generateFollowUpMessage(customer, strategy) {
 
     // Fetch promo
     const activePromo = await getActivePromo();
+    const promoText = activePromo?.promoText || null;
 
     // Window shopper + tidak ada promo → skip
-    if (angle === 'promo' && !activePromo) {
-        console.log(`[Generator] Skip promo angle — no active promo`);
+    if (angle === 'promo' && !promoText) {
+        console.log(`[Generator] Skip promo angle — no active promo text`);
         return null;
     }
 
     // Build angle instruction
     let angleInstruction = ANGLE_INSTRUCTIONS[angle];
-    if (angle === 'promo' && activePromo) {
+    if (angle === 'promo' && promoText) {
         angleInstruction = `Sampaikan promo ini secara natural dalam
             1-2 kalimat, jangan copy paste langsung.
-            Promo aktif: "${activePromo}"`;
+            Promo aktif: "${promoText}"`;
     }
 
     // Inject promo ke angle lain kalau relevan
-    const promoNote = activePromo && angle !== 'promo'
-        ? `\nInfo tambahan: Ada promo aktif "${activePromo}".
+    const promoNote = promoText && angle !== 'promo'
+        ? `\nInfo tambahan: Ada promo aktif "${promoText}".
            Sebutkan hanya jika sangat relevan dengan konteks,
            jangan dipaksakan.`
         : '';

@@ -8,8 +8,7 @@ const prisma = require('../../../lib/prisma');
  * @returns {{ stop: boolean, reason?: string, action?: string }}
  */
 function shouldStop(context) {
-    // Lazy require to avoid circular dependency with scheduler.js
-    const { STRATEGY_CONFIG } = require('./scheduler.js');
+    const { STRATEGY_CONFIG } = require('./config.js');
 
     // ─── Hard stops — tidak pernah kirim ───
     if (context.explicitlyRejected) {

@@ -33,53 +33,7 @@ async function saveMessageToPrisma(senderNumber, message, senderType) {
     });
 }
 
-// ─── Strategy Config ─────────────────────────────────────────────────────────
-
-const STRATEGY_CONFIG = {
-    hot_lead: {
-        action: 'follow_up',
-        waitDays: 1,
-        intervalDays: 3,
-        maxFollowUps: 2,
-        angle: 'urgency',
-    },
-    warm_lead: {
-        action: 'follow_up',
-        waitDays: 2,
-        intervalDays: 7,
-        maxFollowUps: 2,
-        angle: 'value',
-    },
-    window_shopper: {
-        action: 'follow_up',
-        waitDays: 7,
-        intervalDays: 14,
-        maxFollowUps: 1,
-        angle: 'promo',
-    },
-    existing: {
-        action: 'follow_up',
-        waitDays: 45,
-        intervalDays: 30,
-        maxFollowUps: 3,
-        angle: 'maintenance',
-    },
-    loyal: {
-        action: 'follow_up',
-        waitDays: 60,
-        intervalDays: 30,
-        maxFollowUps: 2,
-        angle: 'exclusive',
-    },
-    churned: {
-        action: 'follow_up',
-        waitDays: 0,
-        intervalDays: 30,
-        maxFollowUps: 2,
-        angle: 'winback',
-    },
-    dormant_lead: { action: 'stop' },
-};
+const { STRATEGY_CONFIG } = require('./config.js');
 
 // ─── Downgrade Rules ─────────────────────────────────────────────────────────
 
@@ -100,10 +54,10 @@ const DOWNGRADE_RULES = [
         reason: 'warm_lead ghosted > 14 hari',
     },
     {
-        from: 'existing',
+        from: 'existing_customer',
         to: 'churned',
         condition: (ctx) => getDaysSince(ctx.lastTransactionAt) > 90,
-        reason: 'existing tidak balik > 90 hari',
+        reason: 'existing_customer tidak balik > 90 hari',
     },
 ];
 
