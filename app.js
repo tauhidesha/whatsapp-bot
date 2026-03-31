@@ -1836,9 +1836,8 @@ function start(client) {
                 senderNumber = msg.sender.pnJid;
                 console.log(`[LID] Resolved via pnJid: ${senderNumber}`);
             } else {
-                console.log(`[LID] Unresolved LID accepted: ${senderNumber}. Proceeding with masked identity for Privacy API.`);
-                // We DO NOT drop the message here because WhatsApp Business masks incoming messages as @lid.
-                // Our safeguarded client methods above will protect us from Webpack crashes!
+                console.log(`[LID] Unresolved LID ignored: ${senderNumber}. These are usually system sync messages.`);
+                return; // SKIP: Jangan diproses agar tidak memicu crash/logout
             }
         }
 
