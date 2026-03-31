@@ -248,8 +248,10 @@ Output: {
     }
 
     // Tentukan Shifting ke Executor
-    const isReady = (intent === 'BOOKING_SERVICE' || intent === 'GENERAL_INQUIRY') && 
-                   !!ctx.vehicleType && ctx.serviceTypes.length > 0 && ctx.missingQuestions.length === 0;
+    const isHumanHandoff = intent === 'HUMAN_HANDOVER' || ctx.vehicleType === 'Mobil';
+    const isReady = isHumanHandoff || 
+                   ((intent === 'BOOKING_SERVICE' || intent === 'GENERAL_INQUIRY') && 
+                   !!ctx.vehicleType && ctx.serviceTypes.length > 0 && ctx.missingQuestions.length === 0);
     
     ctx.isReadyForTools = Boolean(isReady);
 

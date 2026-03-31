@@ -60,7 +60,7 @@ workflow.addConditionalEdges(
         const { intent, context } = state;
 
         if (intent === 'HUMAN_HANDOVER') {
-            return 'END';
+            return 'executor';
         }
 
         // Tentukan mode balasan (replyMode)

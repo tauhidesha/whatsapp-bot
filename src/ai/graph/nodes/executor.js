@@ -69,7 +69,30 @@ async function toolExecutorNode(state) {
                 }
             }
             
-            
+            // --- AUTOMATED HUMAN HANDOVER / BOSMAT TRIGGER ---
+            const isCar = context.vehicleType === 'Mobil';
+            if (intent === 'HUMAN_HANDOVER' || isCar) {
+                console.log(`[executorNode] Triggering HUMAN HANDOVER (Reason: ${isCar ? 'Car Inquiry' : 'User Request'})...`);
+                const tool = toolsByName['triggerBosMatTool'];
+                if (tool) {
+                    const lastUserMsg = state.messages.slice().reverse().find(m => m.type === 'human' || m.role === 'user')?.content || 'No text found';
+                    
+                    const handoffResult = await tool({
+                        reason: isCar ? 'Tanya repaint/detailing Mobil (perlu konfirmasi bos)' : 'User minta bantuan admin/human handover',
+                        customerQuestion: lastUserMsg,
+                        senderNumber: state.metadata?.phoneReal || ''
+                    });
+
+                    // Merge into toolResult
+                    if (!toolResult) {
+                        toolResult = { handoff: handoffResult };
+                    } else {
+                        toolResult.handoff = handoffResult;
+                    }
+                    console.log(`[executorNode] Handover Success: ${handoffResult.success}`);
+                }
+            }
+
             // Cek Booking Availability jika ada tanggal/jam
             if (context.bookingDate) {
                 console.log(`[executorNode] Checking availability for ${context.bookingDate} at ${context.bookingTime || 'anytime'}...`);

@@ -6,7 +6,7 @@ async function testCar() {
     const inputs = {
         messages: [new HumanMessage("halo, bisa repaint mobil toyota avanza gak?")],
         context: {},
-        metadata: { conversationId: 'car-test' }
+        metadata: { conversationId: 'car-test', phoneReal: '628123456789' }
     };
     const config = { configurable: { thread_id: "car-test-123" } };
     const result = await zoyaAgent.invoke(inputs, config);
