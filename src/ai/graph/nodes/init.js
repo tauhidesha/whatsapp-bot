@@ -48,7 +48,17 @@ async function initNode(state) {
             time: nowJkt.toFormat('HH:mm')
         };
 
+        // Admin Detection
+        const adminNumber = (process.env.BOSMAT_ADMIN_NUMBER || '').replace(/\D/g, '');
+        const senderNumber = (metadata?.fullSenderId || '').replace(/\D/g, '');
+        const isAdmin = adminNumber && senderNumber.includes(adminNumber);
+
+        if (isAdmin) {
+            console.log('👑 [INIT_NODE] Admin detected! Switching to Admin Mode.');
+        }
+
         return {
+            isAdmin: !!isAdmin,
             customer: {
                 id: customer.id,
                 name: customer.name || 'Sobat BosMat',

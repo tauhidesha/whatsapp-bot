@@ -11,11 +11,15 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const checkpointer = new PrismaCheckpointer(prisma);
 
+const { adminNode, adminExecutorNode } = require('./nodes/admin');
+
 /**
  * Konstruksi Graph Zoya
  */
 const workflow = new StateGraph(ZoyaState)
     .addNode('init', initNode)
+    .addNode('admin', adminNode)
+    .addNode('adminExecutor', adminExecutorNode)
     .addNode('classifier', classifierNode)
     .addNode('infoCollector', infoCollectorNode)
     .addNode('executor', toolExecutorNode)
@@ -25,8 +29,29 @@ const workflow = new StateGraph(ZoyaState)
  * Alur Kerja (Edges)
  */
 workflow.addEdge(START, 'init');
-workflow.addEdge('init', 'classifier');
+
+// Admin Router:
+workflow.addConditionalEdges(
+    'init',
+    (state) => (state.isAdmin ? 'admin' : 'classifier'),
+    {
+        'admin': 'admin',
+        'classifier': 'classifier'
+    }
+);
+
 workflow.addEdge('classifier', 'infoCollector');
+
+// Admin Flow:
+workflow.addConditionalEdges(
+    'admin',
+    (state) => (state.context.isReadyForTools ? 'adminExecutor' : END),
+    {
+        'adminExecutor': 'adminExecutor',
+        'END': END
+    }
+);
+workflow.addEdge('adminExecutor', 'admin');
 
 // Router Logika:
 workflow.addConditionalEdges(

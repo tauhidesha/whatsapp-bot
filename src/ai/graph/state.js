@@ -59,6 +59,12 @@ const ZoyaState = Annotation.Root({
         default: () => false
     }),
 
+    // Flag untuk Admin Mode (Personal Assistant Flow)
+    isAdmin: Annotation({
+        reducer: (old, next) => next,
+        default: () => false
+    }),
+
     // Metadata untuk tracking
     metadata: Annotation({
         reducer: (old, updated) => ({ ...old, ...updated }),

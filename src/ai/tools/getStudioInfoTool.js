@@ -6,7 +6,8 @@ const { z } = require('zod');
 const getStudioInfoSchema = z.object({
   infoType: z
     .enum(['location', 'hours', 'contact', 'booking_policy', 'all'])
-    .describe('Jenis informasi yang diminta: lokasi, jam buka, kontak, kebijakan booking, atau semua'),
+    .optional()
+    .default('all'),
 });
 
 async function implementation(input) {

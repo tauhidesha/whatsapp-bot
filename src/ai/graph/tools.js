@@ -2,7 +2,14 @@ const { getServiceDetailsTool } = require('../tools/getServiceDetailsTool.js');
 const { getStudioInfoTool } = require('../tools/getStudioInfoTool.js');
 const { checkBookingAvailabilityTool } = require('../tools/checkBookingAvailabilityTool.js');
 const { createBookingTool } = require('../tools/createBookingTool.js');
+const { updateBookingTool } = require('../tools/updateBookingTool.js');
+const { crmManagementTool } = require('../tools/crmManagementTool.js');
+const { financeManagementTool } = require('../tools/financeManagementTool.js');
+const { readDirectMessagesTool } = require('../tools/readDirectMessagesTool.js');
+const { sendMessageTool } = require('../tools/sendMessageTool.js');
 const { getCurrentDateTimeTool } = require('../tools/getCurrentDateTimeTool.js');
+const { updateCustomerLabelTool } = require('../tools/updateCustomerLabelTool.js');
+const { updateCustomerContextTool } = require('../tools/updateCustomerContextTool.js');
 const { triggerBosMatTool } = require('../tools/triggerBosMatTool.js');
 const { sendStudioPhotoTool } = require('../tools/sendStudioPhotoTool.js');
 const { calculateHomeServiceFeeTool } = require('../tools/calculateHomeServiceFeeTool.js');
@@ -16,7 +23,14 @@ const zoyaTools = [
     getStudioInfoTool,
     checkBookingAvailabilityTool,
     createBookingTool,
+    updateBookingTool,
+    crmManagementTool,
+    financeManagementTool,
+    readDirectMessagesTool,
+    sendMessageTool,
     getCurrentDateTimeTool,
+    updateCustomerLabelTool,
+    updateCustomerContextTool,
     triggerBosMatTool,
     sendStudioPhotoTool,
     calculateHomeServiceFeeTool
