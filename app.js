@@ -1836,8 +1836,7 @@ function start(client) {
                 senderNumber = msg.sender.pnJid;
                 console.log(`[LID] Resolved via pnJid: ${senderNumber}`);
             } else {
-                console.log(`[LID] Unresolved LID ignored: ${senderNumber}. These are usually system sync messages.`);
-                return; // SKIP: Jangan diproses agar tidak memicu crash/logout
+                console.log(`[LID] Unresolved LID accepted: ${senderNumber}. Proceeding with masked identity.`);
             }
         }
 
@@ -1855,7 +1854,7 @@ function start(client) {
             realPhoneFallback = '';
         }
 
-        const senderName = msg.sender.pushname || msg.notifyName || senderNumber;
+        const senderName = msg.sender?.pushname || msg.sender?.name || msg.notifyName || senderNumber;
         let messageContent = msg.body;
         const isMedia = msg.isMedia || msg.type === 'image' || msg.type === 'video' || msg.type === 'tv' || msg.type === 'document';
         const isImage = msg.type === 'image';
