@@ -151,12 +151,12 @@ Kamu harus membedakan antara "Pertanyaan umum/harga" vs "Niat booking".
         }
 
         // Update other fields
-        if (extracted.paint_type && !ctx.paintType) ctx.paintType = extracted.paint_type;
-        if (extracted.is_bongkar_total !== null && ctx.isBongkarTotal === null) ctx.isBongkarTotal = extracted.is_bongkar_total;
-        if (extracted.detailing_focus && !ctx.detailingFocus) ctx.detailingFocus = extracted.detailing_focus;
-        if (extracted.color_choice && !ctx.colorChoice) ctx.colorChoice = extracted.color_choice;
-        if (extracted.velg_color_choice && !ctx.velgColorChoice) ctx.velgColorChoice = extracted.velg_color_choice;
-        if (extracted.is_previously_painted !== null && ctx.isPreviouslyPainted === null) ctx.isPreviouslyPainted = extracted.is_previously_painted;
+        if (extracted.paint_type) ctx.paintType = extracted.paint_type;
+        if (extracted.is_bongkar_total !== null) ctx.isBongkarTotal = extracted.is_bongkar_total;
+        if (extracted.detailing_focus) ctx.detailingFocus = extracted.detailing_focus;
+        if (extracted.color_choice) ctx.colorChoice = extracted.color_choice;
+        if (extracted.velg_color_choice) ctx.velgColorChoice = extracted.velg_color_choice;
+        if (extracted.is_previously_painted !== null) ctx.isPreviouslyPainted = extracted.is_previously_painted;
         if (extracted.booking_date) ctx.bookingDate = extracted.booking_date;
         if (extracted.booking_time) ctx.bookingTime = extracted.booking_time;
 
