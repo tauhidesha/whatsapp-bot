@@ -250,211 +250,253 @@ function formatRepaintPriceResult(lookup) {
 
 // --- Implementation ---
 async function processSingleService(parsedServiceName, input, promoText) {
-  let motorModel = (
-    input.motor_model || input.motorModel ||
-    input.motor_type || input.motorType ||
-    input.vehicle_type || input.vehicleType ||
-    input.vehicle_model || input.vehicleModel ||
-    input.motor_model_name ||
-    '').toString().trim() || null;
+    let motorModel = (
+        input.motor_model || input.motorModel ||
+        input.motor_type || input.motorType ||
+        input.vehicle_type || input.vehicleType ||
+        input.vehicle_model || input.vehicleModel ||
+        input.motor_model_name ||
+        '').toString().trim() || null;
 
-  const extraContext = input.extraContext || {};
-  const colorNameInput = extraContext.colorChoice || (input.color_name || input.colorName || '').toString().trim() || null;
-  const sizeFromArgs = normalizeSizeInput(input.size || input.motorSize || input.motor_size || input.vehicle_size || input.vehicleSize);
+    const extraContext = input.extraContext || {};
+    const colorChoice = extraContext.colorChoice || (input.color_name || input.colorName || '').toString().trim() || null;
+    const velgColorChoice = extraContext.velgColorChoice || null;
+    const sizeFromArgs = normalizeSizeInput(input.size || input.motorSize || input.motor_size || input.vehicle_size || input.vehicleSize);
 
-  const queryLower = parsedServiceName.trim().toLowerCase();
+    const queryLower = parsedServiceName.trim().toLowerCase();
 
-  // 1. Check for generic category queries - MANDATORY MOTOR MODEL
-  if (queryLower === 'coating' || queryLower === 'detailing' || queryLower === 'poles' || queryLower === 'repaint') {
-    if (!motorModel) {
-      return {
-        success: true,
-        needs_clarification: true,
-        message: `Untuk memberikan estimasi harga ${queryLower}, mohon infokan tipe motornya (misal: Vario, NMAX, Scoopy, Beat) agar aku bisa berikan harga yang pas kak.`,
-        action: 'ASK_USER'
-      };
+    // 1. Check for generic category queries - MANDATORY MOTOR MODEL
+    if (queryLower === 'coating' || queryLower === 'detailing' || queryLower === 'poles' || queryLower === 'repaint') {
+        if (!motorModel) {
+            return {
+                success: true,
+                needs_clarification: true,
+                message: `Untuk memberikan estimasi harga ${queryLower}, mohon infokan tipe motornya (misal: Vario, NMAX, Scoopy, Beat) agar aku bisa berikan harga yang pas kak.`,
+                action: 'ASK_USER'
+            };
+        }
     }
-  }
 
-  // Handle generic category results if motor model IS provided
-  if (queryLower === 'coating' || queryLower === 'detailing' || queryLower === 'poles') {
-    const cat = queryLower === 'poles' ? 'detailing' : queryLower;
-    const services = await prisma.service.findMany({
-      where: { category: cat },
-      include: { prices: true }
-    });
+    // Helper for applying all surcharges including color, disassembly, and add-ons
+    function applyAllSurcharges(basePrice, serviceName, guess, motor_model, extraContext) {
+        let finalPrice = basePrice;
+        let breakdown = [];
+        
+        console.log(`[applyAllSurcharges] Processing "${serviceName}" (Size ${guess}) for ${motor_model}`);
+        console.log(`[applyAllSurcharges] ExtraContext:`, JSON.stringify(extraContext));
 
-    const results = await Promise.all(services.map(async (service) => {
-      const { finalSize } = await resolveSizeForService({ service, sizeArg: sizeFromArgs, motorModel });
-      const priceEntry = service.prices.find(p => p.size === finalSize) || service.prices.find(p => !p.size && !p.vehicleModelId);
-      const basePrice = priceEntry?.price ?? 0;
-
-      return {
-        name: service.name,
-        summary: service.summary,
-        price: basePrice || 'Hubungi Admin',
-        price_formatted: basePrice ? `Rp${basePrice.toLocaleString('id-ID')}` : 'Hubungi Admin',
-        size: finalSize || 'Belum diketahui'
-      };
-    }));
-
-    return {
-      success: true,
-      multiple_candidates: true,
-      category: cat,
-      motor_model: motorModel,
-      candidates: results,
-      promo_active: !!promoText,
-      message: `Berikut estimasi harga ${cat} untuk motor ${motorModel}.`
-    };
-  }
-
-  if (queryLower === 'repaint') {
-    const results = [];
-    const { finalSize } = await resolveSizeForService({ service: { category: 'repaint' }, sizeArg: sizeFromArgs, motorModel });
-
-    const subs = ['bodi_halus', 'bodi_kasar', 'velg'];
-    for (const sub of subs) {
-      const lookup = await lookupRepaintPrice(motorModel, sub, finalSize);
-      const info = formatRepaintPriceResult(lookup);
-      if (info && info.price) {
-        let finalPrice = info.price;
-        let surchargeNote = "";
-
-        // Apply Color Surcharge
-        if (sub === 'bodi_halus' && colorNameInput) {
-            const sc = await lookupColorSurcharge(colorNameInput);
-            if (sc) {
-                finalPrice += sc.surcharge;
-                surchargeNote += ` (+ Rp${sc.surcharge.toLocaleString('id-ID')} warna ${sc.name})`;
+        // 1. Color Surcharge (for Repaint services)
+        if (serviceName.toLowerCase().includes('repaint')) {
+            const colorType = extraContext.colorChoice || extraContext.paintType;
+            if (colorType) {
+                const colorSurcharge = getColorSurcharge(colorType, guess);
+                if (colorSurcharge > 0) {
+                    finalPrice += colorSurcharge;
+                    breakdown.push(`+Rp${colorSurcharge.toLocaleString('id-ID')} (Warna ${colorType})`);
+                    console.log(`[applyAllSurcharges] Color surcharge applied: ${colorSurcharge}`);
+                }
             }
         }
 
-        // Apply Remover Fee
-        if (sub === 'velg' && extraContext.isPreviouslyPainted === true) {
-            finalPrice += 75000;
-            surchargeNote += ` (+ Rp75.000 jasa remover)`;
+        // 2. Velg Color Surcharge
+        if (serviceName.toLowerCase().includes('velg')) {
+            const velgColor = extraContext.velgColorChoice || extraContext.colorChoice;
+            if (velgColor) {
+                const colorSurcharge = getColorSurcharge(velgColor, guess);
+                if (colorSurcharge > 0) {
+                    finalPrice += colorSurcharge;
+                    breakdown.push(`+Rp${colorSurcharge.toLocaleString('id-ID')} (Warna ${velgColor})`);
+                    console.log(`[applyAllSurcharges] Velg color surcharge applied: ${colorSurcharge}`);
+                }
+            }
         }
 
-        results.push({ 
-            name: sub === 'bodi_halus' ? 'Repaint Bodi Halus' : (sub === 'bodi_kasar' ? 'Repaint Bodi Kasar' : 'Repaint Velg'), 
-            price: finalPrice, 
-            price_formatted: `Rp${finalPrice.toLocaleString('id-ID')}${surchargeNote}`, 
-            note: info.note 
-        });
-      }
+        // 3. Remover fee (Cat Lama)
+        if (extraContext.isPreviouslyPainted === true) {
+            let removerFee = 0;
+            if (serviceName.toLowerCase().includes('velg')) {
+                removerFee = 75000; // Fixed for velg
+            } else if (serviceName.toLowerCase().includes('bodi kasar')) {
+                removerFee = 125000; // Fixed for bodi kasar
+            }
+            
+            if (removerFee > 0) {
+                finalPrice += removerFee;
+                breakdown.push(`+Rp${removerFee.toLocaleString('id-ID')} (Remover Cat Lama)`);
+                console.log(`[applyAllSurcharges] Remover fee applied: ${removerFee}`);
+            }
+        }
+
+        // 4. Bongkar Total
+        if (extraContext.isBongkarTotal === true) {
+            const bongkarFee = 150000; // Fixed fee for disassembly
+            finalPrice += bongkarFee;
+            breakdown.push(`+Rp${bongkarFee.toLocaleString('id-ID')} (Bongkar Pasang)`);
+            console.log(`[applyAllSurcharges] Disassembly fee applied: ${bongkarFee}`);
+        }
+
+        // 5. Specific Add-ons (CVT, Behel, Arm, Shock)
+        const addOnParts = ['cvt', 'behel', 'arm', 'shock'];
+        if (extraContext.detailingFocus) {
+            const focus = extraContext.detailingFocus.toLowerCase();
+            for (const part of addOnParts) {
+                if (focus.includes(part)) {
+                    const surcharge = guessingPricingPerSize(guess, 'Add-on Part');
+                    if (surcharge > 0) {
+                        finalPrice += surcharge;
+                        breakdown.push(`+Rp${surcharge.toLocaleString('id-ID')} (Add-on ${part.toUpperCase()})`);
+                        console.log(`[applyAllSurcharges] Add-on surcharge applied for ${part}: ${surcharge}`);
+                    }
+                }
+            }
+        }
+
+        return { finalPrice, breakdownText: breakdown.length > 0 ? ` [${breakdown.join(', ')}]` : '' };
     }
 
-    const fixedRepaints = await prisma.service.findMany({
-        where: { category: 'repaint', usesModelPricing: false, subcategory: null },
-        include: { prices: true }
-    });
-    for (const s of fixedRepaints) {
-        const price = s.prices[0]?.price || 0;
-        results.push({ name: s.name, price, price_formatted: `Rp${price.toLocaleString('id-ID')}`, note: s.summary });
+    // Handle generic category results
+    if (queryLower === 'coating' || queryLower === 'detailing' || queryLower === 'poles') {
+        const cat = queryLower === 'poles' ? 'detailing' : queryLower;
+        const services = await prisma.service.findMany({
+            where: { category: cat },
+            include: { prices: true }
+        });
+
+        const results = await Promise.all(services.map(async (service) => {
+            const { finalSize } = await resolveSizeForService({ service, sizeArg: sizeFromArgs, motorModel });
+            const priceEntry = service.prices.find(p => p.size === finalSize) || service.prices.find(p => !p.size && !p.vehicleModelId);
+            const basePrice = priceEntry?.price ?? 0;
+
+            const { finalPrice, breakdownText } = await applyAllSurcharges(basePrice, service.name, finalSize, motorModel, extraContext);
+
+            return {
+                name: service.name,
+                summary: service.summary,
+                price: finalPrice || 'Hubungi Admin',
+                price_formatted: finalPrice ? `Rp${finalPrice.toLocaleString('id-ID')}${breakdownText}` : 'Hubungi Admin',
+                size: finalSize || 'Belum diketahui'
+            };
+        }));
+
+        return {
+            success: true,
+            multiple_candidates: true,
+            category: cat,
+            motor_model: motorModel,
+            candidates: results,
+            promo_active: !!promoText,
+            message: `Berikut estimasi harga ${cat} untuk motor ${motorModel}.`
+        };
     }
+
+    if (queryLower === 'repaint') {
+        const results = [];
+        const { finalSize } = await resolveSizeForService({ service: { category: 'repaint' }, sizeArg: sizeFromArgs, motorModel });
+
+        const subs = ['bodi_halus', 'bodi_kasar', 'velg'];
+        for (const sub of subs) {
+            const lookup = await lookupRepaintPrice(motorModel, sub, finalSize);
+            const info = formatRepaintPriceResult(lookup);
+            if (info && info.price) {
+                const sName = sub === 'bodi_halus' ? 'Repaint Bodi Halus' : (sub === 'bodi_kasar' ? 'Repaint Bodi Kasar' : 'Repaint Velg');
+                const { finalPrice, breakdownText } = await applyAllSurcharges(info.price, sName, finalSize, motorModel, extraContext);
+
+                results.push({
+                    name: sName,
+                    price: finalPrice,
+                    price_formatted: `Rp${finalPrice.toLocaleString('id-ID')}${breakdownText}`,
+                    note: info.note
+                });
+            }
+        }
+
+        const fixedRepaints = await prisma.service.findMany({
+            where: { category: 'repaint', usesModelPricing: false, subcategory: null },
+            include: { prices: true }
+        });
+        for (const s of fixedRepaints) {
+            const basePrice = s.prices[0]?.price || 0;
+            const { finalPrice, breakdownText } = await applyAllSurcharges(basePrice, s.name, finalSize, motorModel, extraContext);
+            results.push({ 
+                name: s.name, 
+                price: finalPrice, 
+                price_formatted: `Rp${finalPrice.toLocaleString('id-ID')}${breakdownText}`, 
+                note: s.summary 
+            });
+        }
+
+        return {
+            success: true,
+            multiple_candidates: true,
+            category: 'repaint',
+            motor_model: motorModel,
+            motor_size: finalSize,
+            candidates: results,
+            promo_active: !!promoText,
+            message: `Berikut estimasi harga repaint untuk motor ${motorModel}.`
+        };
+    }
+
+    // 2. Specific Service Query
+    const allServices = await prisma.service.findMany({ include: { prices: true } });
+    const candidates = allServices
+        .map(s => ({ ...s, similarity: stringSimilarity(parsedServiceName, s.name) }))
+        .filter(s => s.similarity >= 0.4)
+        .sort((a, b) => b.similarity - a.similarity);
+
+    if (candidates.length === 0) {
+        return { success: false, error: 'not_found', message: `Layanan "${parsedServiceName}" tidak ditemukan.` };
+    }
+
+    const service = candidates[0];
+    const { finalSize } = await resolveSizeForService({ service, sizeArg: sizeFromArgs, motorModel });
+
+    // CHECK IF MOTOR MODEL IS NEEDED
+    const isSizeBased = service.prices.some(p => p.size);
+    if ((service.usesModelPricing || isSizeBased) && !motorModel) {
+        return {
+            success: true,
+            needs_clarification: true,
+            message: `Layanan "${service.name}" harganya tergantung pada tipe motor. Boleh tahu motor kakak tipe apa (misal: NMax, Vario, Beat)?`,
+            action: "ASK_USER"
+        };
+    }
+
+    const durationFormatted = formatDuration(service.estimatedDuration);
+    
+    // Find base price
+    let basePrice = 0;
+    if (service.usesModelPricing) {
+        const lookup = await lookupRepaintPrice(motorModel, service.subcategory, finalSize);
+        if (lookup) basePrice = lookup.price;
+    } else {
+        const priceEntry = service.prices.find(p => p.size === finalSize) || service.prices.find(p => !p.size && !p.vehicleModelId);
+        basePrice = priceEntry?.price || 0;
+    }
+
+    // Apply Surcharges
+    if (!basePrice && !service.prices.some(p => p.price > 0)) {
+        return { success: false, error: 'price_not_found', message: `Harga "${service.name}" belum tersedia.` };
+    }
+
+    const { finalPrice, breakdownText } = await applyAllSurcharges(basePrice, service.name, finalSize, motorModel, extraContext);
 
     return {
-      success: true,
-      multiple_candidates: true,
-      category: 'repaint',
-      motor_model: motorModel,
-      motor_size: finalSize,
-      candidates: results,
-      promo_active: !!promoText,
-      message: `Berikut estimasi harga repaint untuk motor ${motorModel}.`
-    };
-  }
-
-  // 2. Specific Service Query
-  const allServices = await prisma.service.findMany({ include: { prices: true } });
-  const candidates = allServices
-    .map(s => ({ ...s, similarity: stringSimilarity(parsedServiceName, s.name) }))
-    .filter(s => s.similarity >= 0.4)
-    .sort((a, b) => b.similarity - a.similarity);
-
-  if (candidates.length === 0) {
-    return { success: false, error: 'not_found', message: `Layanan "${parsedServiceName}" tidak ditemukan.` };
-  }
-
-  const service = candidates[0];
-  const { finalSize } = await resolveSizeForService({ service, sizeArg: sizeFromArgs, motorModel });
-
-  // CHECK IF MOTOR MODEL IS NEEDED (Size-based or Model-based)
-  const isSizeBased = service.prices.some(p => p.size);
-  if ((service.usesModelPricing || isSizeBased) && !motorModel) {
-      return {
-          success: true,
-          needs_clarification: true,
-          message: `Layanan "${service.name}" harganya tergantung pada tipe motor. Boleh tahu motor kakak tipe apa (misal: NMax, Vario, Beat)?`,
-          action: "ASK_USER"
-      };
-  }
-
-  const durationFormatted = formatDuration(service.estimatedDuration);
-  const surchargeMatch = colorNameInput ? await lookupColorSurcharge(colorNameInput) : null;
-  const colorSurcharge = (service.category === 'repaint' && surchargeMatch) ? surchargeMatch.surcharge : 0;
-  
-  // Remover fee logic for specific velg service
-  let removerFee = 0;
-  if (service.subcategory === 'velg' && extraContext.isPreviouslyPainted === true) {
-      removerFee = 75000;
-  }
-
-  if (service.usesModelPricing) {
-    const lookup = await lookupRepaintPrice(motorModel, service.subcategory, finalSize);
-    const priceInfo = formatRepaintPriceResult(lookup);
-
-    if (priceInfo) {
-      const basePrice = priceInfo.price || null;
-      const finalPrice = basePrice ? basePrice + colorSurcharge + removerFee : null;
-      const syarat = await getSyaratKetentuan();
-
-      return {
         success: true,
+        service_id: service.id,
         service_name: service.name,
-        category: service.category,
-        subcategory: service.subcategory,
         summary: service.summary,
-        description: service.description,
+        price: finalPrice,
+        price_formatted: `Rp${finalPrice.toLocaleString('id-ID')}${breakdownText}`,
         estimated_duration: durationFormatted,
-        motor_model: priceInfo.motor_model,
-        motor_size: finalSize || null,
-        ...priceInfo,
-        color_name: surchargeMatch ? surchargeMatch.name : colorNameInput,
-        color_surcharge: colorSurcharge,
-        remover_fee: removerFee,
-        final_price: finalPrice,
-        final_price_formatted: finalPrice ? `Rp${finalPrice.toLocaleString('id-ID')}` : null,
+        motor_model: motorModel,
+        motor_size: finalSize,
         promo_active: !!promoText,
-        syarat_ketentuan: syarat,
-      };
-    }
-  }
-
-  // Variant-based or Flat price
-  const priceEntry = service.prices.find(p => p.size === finalSize) || service.prices.find(p => !p.size && !p.vehicleModelId);
-  const basePrice = priceEntry?.price || 0;
-  const finalPrice = basePrice ? basePrice + colorSurcharge + removerFee : null;
-
-  return {
-    success: true,
-    service_name: service.name,
-    category: service.category,
-    summary: service.summary,
-    description: service.description,
-    estimated_duration: durationFormatted,
-    motor_size: finalSize || null,
-    price: basePrice || null,
-    price_formatted: basePrice ? `Rp${basePrice.toLocaleString('id-ID')}` : 'Harga perlu model motor',
-    color_name: surchargeMatch ? surchargeMatch.name : (colorNameInput || null),
-    color_surcharge: colorSurcharge,
-    remover_fee: removerFee,
-    final_price: finalPrice,
-    final_price_formatted: finalPrice ? `Rp${finalPrice.toLocaleString('id-ID')}` : null,
-    promo_active: !!promoText,
-  };
+        promo_text: promoText,
+        message: `Estimasi harga ${service.name} untuk motor ${motorModel} adalah Rp${finalPrice.toLocaleString('id-ID')}.`
+    };
 }
+
 
 async function implementation(input) {
   try {

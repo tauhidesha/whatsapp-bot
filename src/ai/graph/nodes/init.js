@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const { DateTime } = require('luxon');
 const prisma = new PrismaClient();
 
 /**
@@ -37,6 +38,16 @@ async function initNode(state) {
         }
 
         // Simpan data pelanggan yang relevan ke state
+        // Add timestamp and formatted date for AI reference
+        const nowJkt = DateTime.now().setZone('Asia/Jakarta');
+        const currentDateTime = {
+            iso: nowJkt.toISO(),
+            formatted: nowJkt.toFormat('dd MMMM yyyy, HH:mm'),
+            dayName: nowJkt.toFormat('cccc'),
+            date: nowJkt.toFormat('yyyy-MM-dd'),
+            time: nowJkt.toFormat('HH:mm')
+        };
+
         return {
             customer: {
                 id: customer.id,
@@ -47,6 +58,10 @@ async function initNode(state) {
                     model: v.modelName,
                     plate: v.plateNumber
                 }))
+            },
+            metadata: {
+                ...metadata,
+                currentDateTime: currentDateTime
             }
         };
 

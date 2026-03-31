@@ -79,8 +79,13 @@ Format contoh:
 Mau langsung dibooking jadwalnya?`;
     }
     
+    const dateInfo = state.metadata?.currentDateTime 
+        ? `Tanggal Sekarang: ${state.metadata.currentDateTime.dayName}, ${state.metadata.currentDateTime.formatted}` 
+        : `Tanggal Sekarang: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}`;
+
     // Build context summary for the model
     const contextInfo = `
+${dateInfo}
 - Motor: ${context.vehicleType || 'Belum diketahui'}
 - Layanan yang dipilih: ${context.serviceTypes?.join(', ') || 'Belum ada'}
 - Detail/Fokus: ${context.detailingFocus || 'General'}
@@ -88,6 +93,7 @@ Mau langsung dibooking jadwalnya?`;
 - Warna Body: ${context.colorChoice || 'Belum ditentukan'}
 - Warna Velg: ${context.velgColorChoice || 'Belum ditentukan'}
 `.trim();
+
 
     const modeInstructions = {
         greet: "Mode PERKENALAN. Sapa user dengan sangat ramah, kenalkan dirimu sebagai Zoya, dan tanyakan apa yang bisa dibantu hari ini.",
