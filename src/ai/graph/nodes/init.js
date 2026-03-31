@@ -12,16 +12,39 @@ async function initNode(state) {
     console.log('--- [INIT_NODE] Starting ---');
     const { messages, metadata } = state;
     const phoneReal = metadata?.phoneReal;
+    
+    // Admin Detection (Always check at start)
+    const adminNumber = (process.env.BOSMAT_ADMIN_NUMBER || '').replace(/\D/g, '');
+    const senderNumber = (metadata?.fullSenderId || metadata?.phoneReal || '').replace(/\D/g, '');
+    const isAdmin = !!(adminNumber && senderNumber.includes(adminNumber));
 
-    if (!phoneReal) {
+    if (isAdmin) {
+        console.log('👑 [INIT_NODE] Admin detected! Switching to Admin Mode.');
+    }
+
+    // Default Date/Time for AI Reference
+    const nowJkt = DateTime.now().setZone('Asia/Jakarta');
+    const currentDateTime = {
+        iso: nowJkt.toISO(),
+        formatted: nowJkt.toFormat('dd MMMM yyyy, HH:mm'),
+        dayName: nowJkt.toFormat('cccc'),
+        date: nowJkt.toFormat('yyyy-MM-dd'),
+        time: nowJkt.toFormat('HH:mm')
+    };
+
+    if (!phoneReal && !isAdmin) {
         console.log('[INIT_NODE] No phoneReal, using default Stranger.');
-        return { customer: { name: 'Stranger' } };
+        return { 
+            isAdmin: false,
+            customer: { name: 'Stranger' },
+            metadata: { ...metadata, currentDateTime }
+        };
     }
 
     try {
         // Cari pelanggan di database
         const customer = await prisma.customer.findUnique({
-            where: { phone: phoneReal },
+            where: { phone: phoneReal || senderNumber },
             include: {
                 vehicles: true,
                 customerContext: true
@@ -30,38 +53,21 @@ async function initNode(state) {
 
         if (!customer) {
             return {
+                isAdmin: isAdmin,
                 customer: {
-                    name: 'Guest',
+                    name: isAdmin ? 'Admin' : 'Guest',
                     status: 'new'
-                }
+                },
+                metadata: { ...metadata, currentDateTime }
             };
         }
 
-        // Simpan data pelanggan yang relevan ke state
-        // Add timestamp and formatted date for AI reference
-        const nowJkt = DateTime.now().setZone('Asia/Jakarta');
-        const currentDateTime = {
-            iso: nowJkt.toISO(),
-            formatted: nowJkt.toFormat('dd MMMM yyyy, HH:mm'),
-            dayName: nowJkt.toFormat('cccc'),
-            date: nowJkt.toFormat('yyyy-MM-dd'),
-            time: nowJkt.toFormat('HH:mm')
-        };
-
-        // Admin Detection
-        const adminNumber = (process.env.BOSMAT_ADMIN_NUMBER || '').replace(/\D/g, '');
-        const senderNumber = (metadata?.fullSenderId || '').replace(/\D/g, '');
-        const isAdmin = adminNumber && senderNumber.includes(adminNumber);
-
-        if (isAdmin) {
-            console.log('👑 [INIT_NODE] Admin detected! Switching to Admin Mode.');
-        }
-
+        // Return state update
         return {
-            isAdmin: !!isAdmin,
+            isAdmin: isAdmin,
             customer: {
                 id: customer.id,
-                name: customer.name || 'Sobat BosMat',
+                name: customer.name || (isAdmin ? 'Admin' : 'Sobat BosMat'),
                 phone: customer.phone,
                 status: customer.status,
                 vehicles: customer.vehicles.map(v => ({
@@ -77,7 +83,11 @@ async function initNode(state) {
 
     } catch (error) {
         console.error('[initNode] Error loading customer:', error);
-        return { customer: { name: 'Sobat BosMat' } };
+        return { 
+            isAdmin: isAdmin,
+            customer: { name: 'Sobat BosMat' },
+            metadata: { ...metadata, currentDateTime }
+        };
     }
 }
 

@@ -16,33 +16,47 @@ async function adminNode(state) {
         return { messages: [new AIMessage('Maaf, sesi ini terbatas untuk Admin.')] };
     }
 
-    // Identifikasi alat yang relevan untuk Admin
+    // Identifikasi alat yang relevan untuk Admin (gunakan nama fungsi dari toolDefinition)
     const adminToolNames = [
-        'crmManagementTool',
-        'financeManagementTool',
-        'createBookingTool',
-        'updateBookingTool',
-        'checkBookingAvailabilityTool',
-        'readDirectMessagesTool',
-        'sendMessageTool',
-        'updateCustomerLabelTool',
-        'updateCustomerContextTool',
-        'getServiceDetailsTool',
-        'getStudioInfoTool'
+        'crmManagement',
+        'addTransaction',
+        'updateTransaction',
+        'deleteTransaction',
+        'getTransactionHistory',
+        'calculateFinances',
+        'createBooking',
+        'updateBooking',
+        'checkBookingAvailability',
+        'readDirectMessages',
+        'sendMessage',
+        'updateCustomerLabel',
+        'updateCustomerContext',
+        'getServiceDetails',
+        'getStudioInfo',
+        'getCurrentDateTime'
     ];
 
     // Filter tool definition untuk binding ke LLM
     const toolDefinitions = zoyaTools
-        .filter(t => adminToolNames.includes(t.toolDefinition.function.name))
+        .filter(t => t && t.toolDefinition && t.toolDefinition.function && adminToolNames.includes(t.toolDefinition.function.name))
         .map(t => t.toolDefinition);
 
-    const model = new ChatGoogleGenerativeAI({
+    const modelConfig = {
         model: process.env.AI_MODEL || 'gemini-1.5-flash',
         maxOutputTokens: 1024,
         temperature: 0.2
-    }).bind({
-        tools: toolDefinitions
-    });
+    };
+
+    let model = new ChatGoogleGenerativeAI(modelConfig);
+
+    // Defensive binding for different LangChain versions
+    if (typeof model.bindTools === 'function') {
+        model = model.bindTools(toolDefinitions);
+    } else if (typeof model.bind === 'function') {
+        model = model.bind({ tools: toolDefinitions });
+    } else {
+        console.warn('[ADMIN_NODE] Model does not support bindTools or bind. Proceeding without tools.');
+    }
 
     const currentDateTime = metadata.currentDateTime?.formatted || 'Now';
     const systemPrompt = `You are Zoya, the AI Business Partner for the owner of BosMat Studio.
@@ -102,7 +116,13 @@ async function adminExecutorNode(state) {
         if (toolImplementation) {
             console.log(`[adminExecutor] Running ${toolCall.name}...`);
             try {
-                const output = await toolImplementation(toolCall.args);
+                // Auto-inject senderNumber for tools that need it
+                const args = { 
+                    ...toolCall.args, 
+                    senderNumber: state.customer?.phone || state.metadata?.phoneReal 
+                };
+                
+                const output = await toolImplementation(args);
                 toolOutputs.push(new ToolMessage({
                     content: typeof output === 'string' ? output : JSON.stringify(output),
                     tool_call_id: toolCall.id,

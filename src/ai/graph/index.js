@@ -45,7 +45,7 @@ workflow.addEdge('classifier', 'infoCollector');
 // Admin Flow:
 workflow.addConditionalEdges(
     'admin',
-    (state) => (state.context.isReadyForTools ? 'adminExecutor' : END),
+    (state) => (state.context.isReadyForTools ? 'adminExecutor' : 'END'),
     {
         'adminExecutor': 'adminExecutor',
         'END': END
