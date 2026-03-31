@@ -1786,26 +1786,25 @@ async function processBufferedMessages(senderNumber, client) {
 
 // --- WhatsApp Event Handlers ---
 function start(client) {
-    // 🛡️ SAFEGUARD FOR @LID CRASHES
-    // Override UI state methods to silently ignore @lid identifiers,
-    // which crash WPPConnect internal Webpack state when called.
-    const origSendSeen = client.sendSeen.bind(client);
-    client.sendSeen = async (to) => {
-        if (to && to.toString().endsWith('@lid')) return;
-        try { return await origSendSeen(to); } catch (e) { /* ignore */ }
+    // 🛡️ ENHANCED SAFEGUARD FOR UI INTERACTIONS
+    // Many @lid identifiers are now standard for WA Business.
+    // We wrap these methods to prevent library-level crashes while attempting to interact.
+    const wrapSafe = (originalMethod) => async (to, ...args) => {
+        try {
+            return await originalMethod(to, ...args);
+        } catch (e) {
+            if (to?.toString().endsWith('@lid')) {
+                // Silently log and ignore failures for @lid to prevent cascading crashes
+                console.warn(`[Safeguard] UI Interaction Failed for @lid (${to}): ${e.message}`);
+            } else {
+                throw e; // Rethrow for normal @c.us numbers
+            }
+        }
     };
 
-    const origStartTyping = client.startTyping.bind(client);
-    client.startTyping = async (to, ...args) => {
-        if (to && to.toString().endsWith('@lid')) return;
-        try { return await origStartTyping(to, ...args); } catch (e) { /* ignore */ }
-    };
-
-    const origStopTyping = client.stopTyping.bind(client);
-    client.stopTyping = async (to) => {
-        if (to && to.toString().endsWith('@lid')) return;
-        try { return await origStopTyping(to); } catch (e) { /* ignore */ }
-    };
+    client.sendSeen = wrapSafe(client.sendSeen.bind(client));
+    client.startTyping = wrapSafe(client.startTyping.bind(client));
+    client.stopTyping = wrapSafe(client.stopTyping.bind(client));
 
     // Initialize Coating Maintenance Reminders
     const { initCoatingRemindersSchedule } = require('./src/ai/utils/coatingReminders');
