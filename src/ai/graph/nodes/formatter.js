@@ -3,7 +3,7 @@ const { SystemMessage, HumanMessage, AIMessage } = require('@langchain/core/mess
 const { z } = require('zod');
 
 const model = new ChatGoogleGenerativeAI({
-    model: process.env.AI_MODEL || 'gemini-2.5-flash-lite',
+    model: process.env.AI_MODEL || 'gemini-1.5-flash-lite-latest',
     maxOutputTokens: 2048,
     temperature: 0,
     responseMimeType: "application/json",

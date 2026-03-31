@@ -1627,8 +1627,8 @@ async function processBufferedMessages(senderNumber, client) {
                 markBotMessage(targetNumber, auditResponse);
                 await client.sendText(targetNumber, auditResponse);
                 if (prisma) {
-                    await saveMessageToFirestore(senderNumber, combinedMessage, 'user');
-                    await saveMessageToFirestore(senderNumber, auditResponse, 'ai');
+                    await saveMessageToPrisma(senderNumber, combinedMessage, 'user');
+                    await saveMessageToPrisma(senderNumber, auditResponse, 'ai');
                 }
                 await client.stopTyping(senderNumber);
                 return;
@@ -1641,8 +1641,8 @@ async function processBufferedMessages(senderNumber, client) {
                 markBotMessage(targetNumber, auditResponse);
                 await client.sendText(targetNumber, auditResponse);
                 if (prisma) {
-                    await saveMessageToFirestore(senderNumber, combinedMessage, 'user');
-                    await saveMessageToFirestore(senderNumber, auditResponse, 'ai');
+                    await saveMessageToPrisma(senderNumber, combinedMessage, 'user');
+                    await saveMessageToPrisma(senderNumber, auditResponse, 'ai');
                 }
                 await client.stopTyping(senderNumber);
                 return;
@@ -1658,8 +1658,8 @@ async function processBufferedMessages(senderNumber, client) {
                     markBotMessage(targetNumber, auditResponse);
                     await client.sendText(targetNumber, auditResponse);
                     if (prisma) {
-                        await saveMessageToFirestore(senderNumber, combinedMessage, 'user');
-                        await saveMessageToFirestore(senderNumber, auditResponse, 'ai');
+                        await saveMessageToPrisma(senderNumber, combinedMessage, 'user');
+                        await saveMessageToPrisma(senderNumber, auditResponse, 'ai');
                     }
                     await client.stopTyping(senderNumber);
                     return;
@@ -1678,33 +1678,9 @@ async function processBufferedMessages(senderNumber, client) {
         // --- PENTING: Ekstrak Context SEBELUM Minta AI Merespons ---
         let systemInstruction = '';
 
-        // 🚨 BYPASS EXTRACTOR UNTUK ADMIN 🚨
-        if (isAdmin) {
-            console.log(`👮 [Pipeline] Admin detected. Bypassing Context Extractor...`);
-
-            // Langsung panggil AI dengan history 6 chat (sudah di-handle default oleh getAIResponse)
-            const aiResponseResult = await getAIResponse(combinedMessage, senderName, senderNumber, '', mediaItems, modelOverride || 'gemini-flash-latest');
-            const aiResponse = aiResponseResult.content;
-
-            // Kirim balasan
-            if (aiResponse) {
-                const targetNumber = toSenderNumberWithSuffix(senderNumber);
-                markBotMessage(targetNumber, aiResponse.trim());
-                await client.sendText(targetNumber, aiResponse.trim());
-
-                if (prisma) {
-                    // Simpan sebagai 'admin' di sender field agar riwayat di Firestore terbaca rapi
-                    await saveMessageToFirestore(senderNumber, combinedMessage, 'admin');
-                    await saveMessageToFirestore(senderNumber, aiResponse, 'ai');
-                }
-            }
-            await client.stopTyping(senderNumber);
-            return; // STOP DI SINI UNTUK ADMIN. Jangan lanjut ke JS Orchestrator Gate 1-3.
-        }
-
-        // --- FLOW UNTUK CUSTOMER BIASA (Migrasi LangGraph) ---
+        // LANGGRAPH UNIFIED PIPELINE (Admin & Customer)
         try {
-            console.log(`[LangGraph] Invoking ZoyaAgent for ${senderNumber}...`);
+            console.log(`[LangGraph] Invoking ZoyaAgent for ${senderNumber} (${isAdmin ? 'ADMIN' : 'CUSTOMER'})...`);
             
             const { HumanMessage } = require('@langchain/core/messages');
             
@@ -1714,7 +1690,8 @@ async function processBufferedMessages(senderNumber, client) {
                 metadata: {
                     phoneReal: senderNumber,
                     senderName: senderName,
-                    mediaItems: mediaItems
+                    mediaItems: mediaItems,
+                    isAdmin: isAdmin // Extra flag for safety
                 }
             };
 
@@ -1742,7 +1719,7 @@ async function processBufferedMessages(senderNumber, client) {
                 await client.sendText(targetNumber, finalReply);
                 
                 if (prisma) {
-                    await saveMessageToPrisma(senderNumber, combinedMessage, 'user');
+                    await saveMessageToPrisma(senderNumber, combinedMessage, isAdmin ? 'admin' : 'user');
                     await saveMessageToPrisma(senderNumber, finalReply, 'ai');
                 }
                 await client.stopTyping(senderNumber);
@@ -1755,28 +1732,32 @@ async function processBufferedMessages(senderNumber, client) {
                 
                 // Simpan Riwayat
                 if (prisma) {
-                    await saveMessageToPrisma(senderNumber, combinedMessage, 'user');
+                    await saveMessageToPrisma(senderNumber, combinedMessage, isAdmin ? 'admin' : 'user');
                     await saveMessageToPrisma(senderNumber, aiResponse, 'ai');
                 }
 
                 // Kirim ke WhatsApp dengan delay dinamis
-                const dynamicDelay = Math.min(Math.max(aiResponse.length * 10, 1000), 4000);
+                const dynamicDelay = isAdmin ? 500 : Math.min(Math.max(aiResponse.length * 10, 1000), 4000);
                 await delay(dynamicDelay);
                 
                 markBotMessage(targetNumber, aiResponse.trim());
                 await client.sendText(targetNumber, aiResponse.trim());
 
-                // Update metadata async (Fire & Forget)
-                classifyAndSaveCustomer(senderNumber).catch(err => console.warn('[Classifier] Failed:', err.message));
-                updateSignalsOnIncomingMessage(senderNumber, combinedMessage).catch(err => console.warn('[SignalTracker] Failed:', err.message));
+                if (!isAdmin) {
+                    // Update metadata async (Fire & Forget) - Hanya untuk customer
+                    classifyAndSaveCustomer(senderNumber).catch(err => console.warn('[Classifier] Failed:', err.message));
+                    updateSignalsOnIncomingMessage(senderNumber, combinedMessage).catch(err => console.warn('[SignalTracker] Failed:', err.message));
+                }
             }
 
             await client.stopTyping(senderNumber);
+            return; // Finished processing via LangGraph
 
         } catch (err) {
             console.error('[LangGraph] Error during agent execution:', err);
             await client.sendText(senderNumber, "Aduh Kak, Zoya lagi agak pusing dengerinnya. Bisa diulang pelan-pelan? 🙏");
             await client.stopTyping(senderNumber);
+            return;
         }
     } catch (err) {
         console.error(`[ERROR] Handler error for ${senderNumber}:`, err);
@@ -1945,7 +1926,7 @@ function start(client) {
                 return '[Pesan kosong]';
             })();
 
-            await saveMessageToFirestore(senderNumber, storedContent, 'user');
+            await saveMessageToPrisma(senderNumber, storedContent, 'user');
             console.log(`[SNOOZE] Pesan dari ${senderName} disimpan tanpa respons AI (handover aktif).`);
             return;
         }
@@ -2540,7 +2521,7 @@ app.post('/send-message', async (req, res) => {
         }
 
         await sendMetaMessage(channel, platformId, finalMessage, console);
-        await saveMessageToFirestore(identity.docId, finalMessage, 'admin');
+        await saveMessageToPrisma(identity.docId, finalMessage, 'admin');
         console.log(`[API] Successfully sent ${channel} message to ${platformId}`);
         return res.status(200).json({ success: true, channel, rewritten });
     } catch (e) {
