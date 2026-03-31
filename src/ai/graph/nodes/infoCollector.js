@@ -96,7 +96,7 @@ Kamu harus membedakan antara "Pertanyaan umum/harga" vs "Niat booking".
     try {
         // Process chat history with speaker labels
         const chatTranscript = messages.map(m => {
-            const role = m._getType() === 'human' ? '[USER]' : '[AI]';
+            const role = (m.type === 'human' || m.role === 'user') ? '[USER]' : '[AI]';
             return `${role}: ${m.content}`;
         }).join('\n');
 

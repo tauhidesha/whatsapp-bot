@@ -78,6 +78,16 @@ Format contoh:
 
 Mau langsung dibooking jadwalnya?`;
     }
+    
+    // Build context summary for the model
+    const contextInfo = `
+- Motor: ${context.vehicleType || 'Belum diketahui'}
+- Layanan yang dipilih: ${context.serviceTypes?.join(', ') || 'Belum ada'}
+- Detail/Fokus: ${context.detailingFocus || 'General'}
+- Bongkar Total: ${context.isBongkarTotal ? 'Ya' : 'Tidak'}
+- Warna Body: ${context.colorChoice || 'Belum ditentukan'}
+- Warna Velg: ${context.velgColorChoice || 'Belum ditentukan'}
+`.trim();
 
     // --- PROMPT FRAMEWORK: RACE (Role, Audience, Context, Expectation) ---
     const systemPrompt = `[ROLE]
@@ -123,6 +133,7 @@ ${modeInstructions[replyMode]}
                 internal_thought: z.string().describe("Analisis singkat pemilihan pesan")
             })
         );
+
 
         const response = await structuredModel.invoke([
             new SystemMessage(systemPrompt),
