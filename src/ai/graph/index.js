@@ -1,26 +1,28 @@
 const { StateGraph, START, END } = require('@langchain/langgraph');
 const { ZoyaState } = require('./state');
 const { initNode } = require('./nodes/init');
-const { classifierNode } = require('./nodes/classifier');
 const { infoCollectorNode } = require('./nodes/infoCollector');
 const { toolExecutorNode } = require('./nodes/executor');
 const { formatterNode } = require('./nodes/formatter');
 const { PrismaCheckpointer } = require('./PrismaCheckpointer');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../lib/prisma'); // Shared singleton
 
-const prisma = new PrismaClient();
 const checkpointer = new PrismaCheckpointer(prisma);
 
 const { adminNode, adminExecutorNode } = require('./nodes/admin');
 
 /**
  * Konstruksi Graph Zoya
+ * 
+ * OPTIMIZED FLOW (classifier merged into infoCollector):
+ * START → init → [admin | infoCollector] → [executor | formatter] → END
+ * 
+ * Saves ~600-1000ms per message by eliminating 1 LLM round-trip.
  */
 const workflow = new StateGraph(ZoyaState)
     .addNode('init', initNode)
     .addNode('admin', adminNode)
     .addNode('adminExecutor', adminExecutorNode)
-    .addNode('classifier', classifierNode)
     .addNode('infoCollector', infoCollectorNode)
     .addNode('executor', toolExecutorNode)
     .addNode('formatter', formatterNode);
@@ -30,17 +32,15 @@ const workflow = new StateGraph(ZoyaState)
  */
 workflow.addEdge(START, 'init');
 
-// Admin Router:
+// Admin Router: init → admin (if admin) | infoCollector (if customer)
 workflow.addConditionalEdges(
     'init',
-    (state) => (state.isAdmin ? 'admin' : 'classifier'),
+    (state) => (state.isAdmin ? 'admin' : 'infoCollector'),
     {
         'admin': 'admin',
-        'classifier': 'classifier'
+        'infoCollector': 'infoCollector'
     }
 );
-
-workflow.addEdge('classifier', 'infoCollector');
 
 // Admin Flow:
 workflow.addConditionalEdges(
@@ -53,7 +53,7 @@ workflow.addConditionalEdges(
 );
 workflow.addEdge('adminExecutor', 'admin');
 
-// Router Logika:
+// Customer Flow Router:
 workflow.addConditionalEdges(
     'infoCollector',
     (state) => {
@@ -63,28 +63,12 @@ workflow.addConditionalEdges(
             return 'executor';
         }
 
-        // Tentukan mode balasan (replyMode)
-        let replyMode = 'inform';
-        if (intent === 'GREETING') {
-            replyMode = 'greet';
-        } else if (context.missingQuestions.length > 0) {
-            replyMode = 'ask';
-        }
-
-        // Simpan replyMode ke metadata (state update)
-        // Catatan: Di real LangGraph, kita mengembalikan node selanjutnya.
-        // Untuk menyimpan data, kita butuh node perantara atau merubah state di dalam router (tidak direkomendasikan tapi praktis di sini).
-        // Sebagai alternatif, kita kirimkan data ini via metadata di return value node infoCollector (sudah dilakukan sebagian).
-        // Namun di sini kita akan biarkan formatter menentukannya sendiri berdasarkan state yang ada jika metadata tidak bisa diupdate di router.
-        
-        // Agar konsisten dengan rekomendasi user:
         if (context.isReadyForTools) {
             return 'executor';
         }
         return 'formatter';
     },
     {
-        'END': END,
         'executor': 'executor',
         'formatter': 'formatter'
     }

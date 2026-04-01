@@ -1596,12 +1596,10 @@ async function processBufferedMessages(senderNumber, client) {
     }
 
     try {
-        // Simulasi perilaku manusia: Baca dulu (mark as read)
+        // Mark as read + start typing immediately (no artificial pre-delay)
         await client.sendSeen(senderNumber);
-
-        const typingDelay = 500 + Math.random() * 1000;
-        await delay(typingDelay);
         await client.startTyping(senderNumber);
+        const pipelineStart = Date.now();
 
         // Check for Admin Model Override (#pro or !pro)
         let modelOverride = null;
@@ -1729,25 +1727,24 @@ async function processBufferedMessages(senderNumber, client) {
                 return;
             }
 
-            // Normal Flow: Kirim balasan AI
+            // Normal Flow: Kirim balasan AI (OPTIMIZED: send first, save later)
             if (aiResponse) {
                 const targetNumber = toSenderNumberWithSuffix(senderNumber);
                 
-                // Simpan Riwayat
-                if (prisma) {
-                    await saveMessageToPrisma(senderNumber, combinedMessage, isAdmin ? 'admin' : 'user');
-                    await saveMessageToPrisma(senderNumber, aiResponse, 'ai');
-                }
-
-                // Kirim ke WhatsApp dengan delay dinamis
-                const dynamicDelay = isAdmin ? 500 : Math.min(Math.max(aiResponse.length * 10, 1000), 4000);
-                await delay(dynamicDelay);
-                
+                // Send to WhatsApp IMMEDIATELY (no artificial delay)
                 markBotMessage(targetNumber, aiResponse.trim());
                 await client.sendText(targetNumber, aiResponse.trim());
+                console.log(`⚡ [PERF] Pipeline took ${Date.now() - pipelineStart}ms for ${senderNumber}`);
+
+                // Fire & Forget: Save history + metadata AFTER sending
+                if (prisma) {
+                    Promise.all([
+                        saveMessageToPrisma(senderNumber, combinedMessage, isAdmin ? 'admin' : 'user'),
+                        saveMessageToPrisma(senderNumber, aiResponse, 'ai')
+                    ]).catch(err => console.warn('[SaveMessage] Failed:', err.message));
+                }
 
                 if (!isAdmin) {
-                    // Update metadata async (Fire & Forget) - Hanya untuk customer
                     classifyAndSaveCustomer(senderNumber).catch(err => console.warn('[Classifier] Failed:', err.message));
                     updateSignalsOnIncomingMessage(senderNumber, combinedMessage).catch(err => console.warn('[SignalTracker] Failed:', err.message));
                 }

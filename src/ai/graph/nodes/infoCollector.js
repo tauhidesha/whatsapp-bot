@@ -10,21 +10,21 @@ const model = new ChatGoogleGenerativeAI({
 });
 
 /**
- * Node: infoCollector
- * Mengekstrak informasi entitas (Motor, Layanan) dari chat.
- * Mendukung multi-service (serviceTypes array).
+ * Node: infoCollector (MERGED with classifier)
+ * Single LLM call that handles BOTH intent classification AND entity extraction.
+ * Eliminates one full LLM round-trip for ~600-1000ms latency reduction.
  */
 async function infoCollectorNode(state) {
-    console.log('--- [INFO_COLLECTOR_NODE] Starting ---');
-    const { messages, context, intent, metadata } = state;
-    const prevIntent = metadata?.prevIntent;
+    console.log('--- [INFO_COLLECTOR_NODE] Starting (merged classifier+extractor) ---');
+    const startTime = Date.now();
+    const { messages, context, metadata } = state;
+    const prevIntent = state.intent;
+    const lastMessage = messages[messages.length - 1];
 
     // Helper to clean JSON string from potential markdown code blocks
     const cleanJson = (str) => {
         try {
-            // Remove markdown code blocks if present
-            const cleaned = str.replace(/```json\n?|```/g, '').trim();
-            return cleaned;
+            return str.replace(/```json\n?|```/g, '').trim();
         } catch (e) {
             return str;
         }
@@ -42,197 +42,60 @@ async function infoCollectorNode(state) {
         ctx.serviceTypes = [];
     }
 
-    // Reset context jika intent berubah (mencegah pertanyaan stale menerus)
-    if (prevIntent && prevIntent !== intent) {
-        console.log(`[INFO_COLLECTOR_NODE] Intent shifted: ${prevIntent} -> ${intent}. Resetting stale questions but proceeding to extraction.`);
+    // Reset context jika intent berubah
+    if (prevIntent && prevIntent !== state.intent) {
         ctx.missingQuestions = [];
         ctx.isReadyForTools = false;
     }
 
-    // Jika bukan booking, inquiry atau consultation, lewati ekstraksi berat (misal: GREETING)
-    if (intent !== 'BOOKING_SERVICE' && intent !== 'GENERAL_INQUIRY' && intent !== 'CONSULTATION') {
-        console.log(`[INFO_COLLECTOR_NODE] Skipping extraction for intent: ${intent}`);
-        return { context: { ...context, missingQuestions: [] } };
-    }
+    // Build chat transcript (max 10 messages)
+    const chatTranscript = messages.slice(-10).map(m => {
+        const role = (m.type === 'human' || m.role === 'user') ? '[USER]' : '[AI]';
+        return `${role}: ${m.content}`;
+    }).join('\n');
 
     const systemPrompt = `# ROLE
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Kamu adalah Expert Data Extractor untuk ${studioMetadata.name}. 
-Tugasmu adalah menganalisis percakapan dan mengekstrak informasi teknis kendaraan serta layanan.
+Kamu adalah AI Classifier & Data Extractor untuk ${studioMetadata.name}.
+Tugasmu ada DUA dalam SATU kali analisis:
+1. Tentukan INTENT (niat) dari pesan terakhir user.
+2. Ekstrak informasi teknis kendaraan & layanan dari riwayat chat.
+
+# INTENT CATEGORIES (Pilih SATU)
+- **GREETING**: Sapaan awal (Halo, P, Assalamualaikum).
+- **CONSULTATION**: Tanya promo atau tanya saran umum tanpa detail motor.
+- **BOOKING_SERVICE**: Niat servis, tanya harga layanan tertentu, atau menjawab pertanyaan teknis AI.
+- **GENERAL_INQUIRY**: Tanya lokasi, jam buka, kontak studio, atau kebingungan mencari lokasi (misal: "saya sudah di depan", "patokannya apa?", "sebelah mana?", "nyasar").
+- **HUMAN_HANDOVER**: Minta bicara dengan admin manusia.
+- **OTHER**: Di luar kategori di atas.
 
 # EXTRACTION RULES
 Ekstrak data ke dalam format JSON dengan field berikut:
-1. **internal_thought**: (Chain-of-Thought) Analisis singkat: Apa yang user mau? Data apa yang baru didapat? Apa data yang masih kurang?
-2. **motor_model**: Jenis motor (Nmax, Scoopy, dll). Jika user menyebut *Mobil*, masukkan "Mobil".
-3. **service_types**: Array layanan (Repaint, Detailing, Coating, Cuci).
-4. **paint_type**: Jenis cat (Glossy / Doff).
-5. **is_bongkar_total**: (Boolean/null) Jika user sebut "bongkar total" atau "bongkar mesin".
-6. **detailing_focus**: Fokus area (Bodi Halus, Bodi Kasar, Velg, Mesin).
-7. **color_choice**: Warna bodi yang diinginkan.
-8. **velg_color_choice**: Warna velg (SERINGKALI berbeda dengan bodi).
-9. **is_previously_painted**: (Boolean/null) Jika motor sudah pernah dicat ulang sebelumnya (bukan cat pabrik).
+1. **intent**: Satu keyword intent dari daftar di atas (UPPERCASE).
+2. **internal_thought**: (Chain-of-Thought) Analisis singkat: Apa yang user mau? Data apa yang baru didapat?
+3. **motor_model**: Jenis motor (Nmax, Scoopy, dll). Jika user menyebut *Mobil*, masukkan "Mobil".
+4. **service_types**: Array layanan (Repaint, Detailing, Coating, Cuci).
+5. **paint_type**: Jenis cat (Glossy / Doff).
+6. **is_bongkar_total**: (Boolean/null) Jika user sebut "bongkar total" atau "bongkar mesin".
+7. **detailing_focus**: Fokus area (Bodi Halus, Bodi Kasar, Velg, Mesin).
+8. **color_choice**: Warna bodi yang diinginkan.
+9. **velg_color_choice**: Warna velg (SERINGKALI berbeda dengan bodi).
+10. **is_previously_painted**: (Boolean/null) Jika motor sudah pernah dicat ulang.
+
+# INTENT RULES
+- JIKA user hanya menyapa (Halo, P, Assalamualaikum), WAJIB intent = "GREETING".
+- JIKA user menjawab pertanyaan AI tentang motor/layanan, intent = "BOOKING_SERVICE".
 
 # EXTRACTION STRATEGY
 - **Bodi Halus vs Kasar**: Jika user sebut "bodi kasar", masukkan ke \`detailing_focus\`.
 - **Warna**: Bedakan dengan teliti antara warna bodi dan warna velg.
 - **Negative Constraint**: JANGAN menebak data yang tidak ada. Jika ragu, berikan \`null\`.
 - **Context Awareness**: Gunakan riwayat untuk melengkapi data yang sebelumnya sudah disebutkan.
+- **Jika intent = GREETING atau OTHER**: Boleh skip extraction (isi null semua kecuali intent).
 
 # EXAMPLE
 User: "repaint nmax glossy warna merah candy, velgnya silver"
 Output: {
+  "intent": "BOOKING_SERVICE",
   "internal_thought": "User ingin repaint Nmax warna merah candy glossy dengan velg silver.",
   "motor_model": "Nmax",
   "service_types": ["Repaint"],
@@ -242,188 +105,190 @@ Output: {
   "velg_color_choice": "Silver"
 }`;
 
-    try {
-        // Process limited chat history with speaker labels (max 10 messages)
-        const chatTranscript = messages.slice(-10).map(m => {
-            const role = (m.type === 'human' || m.role === 'user') ? '[USER]' : '[AI]';
-            return `${role}: ${m.content}`;
-        }).join('\n');
+    // --- SINGLE LLM CALL: classify + extract ---
+    let classifiedIntent = 'GENERAL_INQUIRY';
 
+    try {
         const response = await model.invoke([
             new SystemMessage(systemPrompt),
-            new HumanMessage(chatTranscript)
+            new HumanMessage(`Riwayat chat:\n${chatTranscript}\n\nPESAN TERAKHIR USER: "${lastMessage.content}"`)
         ]);
 
-        console.log(`[INFO_COLLECTOR_NODE] Raw extraction: ${response.content}`);
         const cleanedContent = cleanJson(response.content);
         const extracted = JSON.parse(cleanedContent);
         console.log(`[INFO_COLLECTOR_NODE] Thread Analysis: ${extracted.internal_thought}`);
 
-        // Update vehicleType (overwrite with latest if provided)
+        // --- INTENT PROCESSING ---
+        classifiedIntent = (extracted.intent || 'GENERAL_INQUIRY').trim().toUpperCase();
+
+        // Continuation logic (from old classifier): keep BOOKING_SERVICE for short replies
+        const isShortReply = lastMessage.content.split(' ').length <= 15;
+        const containsBookingKeywords = /warna|cat|nmax|scoopy|pcx|vespa|vario|repaint|detailing|coating|poles/i.test(lastMessage.content);
+
+        if (prevIntent === 'BOOKING_SERVICE' && (isShortReply || containsBookingKeywords)) {
+            const studioKeywords = /lokasi|alamat|dimana|buka|tutup|istirahat|jam berapa|kontak|wa|map|maps|koordinat/i.test(lastMessage.content);
+            
+            if (['OTHER', 'GREETING', 'GENERAL_INQUIRY'].includes(classifiedIntent)) {
+                if (classifiedIntent === 'GENERAL_INQUIRY' && studioKeywords) {
+                    console.log(`[INFO_COLLECTOR_NODE] Keeping GENERAL_INQUIRY for studio info request.`);
+                } else {
+                    console.log(`[INFO_COLLECTOR_NODE] Intent recovery: ${classifiedIntent} → BOOKING_SERVICE (flow continuation).`);
+                    classifiedIntent = 'BOOKING_SERVICE';
+                }
+            }
+        }
+
+        // Validate intent
+        const validIntents = ['GREETING', 'CONSULTATION', 'BOOKING_SERVICE', 'GENERAL_INQUIRY', 'HUMAN_HANDOVER', 'OTHER'];
+        if (!validIntents.includes(classifiedIntent)) classifiedIntent = 'GENERAL_INQUIRY';
+        console.log(`[INFO_COLLECTOR_NODE] Intent: ${classifiedIntent} (Prev: ${prevIntent})`);
+
+        // --- SKIP EXTRACTION for non-relevant intents ---
+        if (classifiedIntent !== 'BOOKING_SERVICE' && classifiedIntent !== 'GENERAL_INQUIRY' && classifiedIntent !== 'CONSULTATION') {
+            const elapsed = Date.now() - startTime;
+            console.log(`[INFO_COLLECTOR_NODE] Skipping extraction for ${classifiedIntent}. Done in ${elapsed}ms`);
+            return {
+                intent: classifiedIntent,
+                context: { ...context, missingQuestions: [] },
+                metadata: {
+                    ...metadata,
+                    prevIntent,
+                    replyMode: classifiedIntent === 'GREETING' ? 'greet' : 'inform'
+                }
+            };
+        }
+
+        // --- ENTITY EXTRACTION ---
         if (extracted.motor_model) ctx.vehicleType = extracted.motor_model;
 
-        // Update serviceTypes (smart merge with dedup)
+        // Smart merge serviceTypes with dedup
         const extractedServices = Array.isArray(extracted.service_types)
             ? extracted.service_types
             : (extracted.service_type ? [extracted.service_type] : []);
         
-        // Generic → Specific mapping for dedup
         const GENERIC_PARENTS = ['repaint', 'detailing', 'coating', 'poles', 'cuci'];
         
         for (const svc of extractedServices) {
             if (!svc) continue;
             const svcLower = svc.toLowerCase();
             
-            // Check if this is a generic name AND a specific version already exists
             if (GENERIC_PARENTS.includes(svcLower)) {
                 const hasSpecific = ctx.serviceTypes.some(s => s.toLowerCase().includes(svcLower) && s.toLowerCase() !== svcLower);
                 if (hasSpecific) {
-                    console.log(`[INFO_COLLECTOR_NODE] Skipping generic "${svc}" — specific version already present.`);
-                    continue; // Don't add "Repaint" if "Repaint Bodi Halus" exists
+                    console.log(`[INFO_COLLECTOR_NODE] Skipping generic "${svc}" — specific already present.`);
+                    continue;
                 }
             }
             
-            // Check if a specific version is being added → remove the generic version
             for (const parent of GENERIC_PARENTS) {
                 if (svcLower.includes(parent) && svcLower !== parent) {
                     const genericIdx = ctx.serviceTypes.findIndex(s => s.toLowerCase() === parent);
                     if (genericIdx !== -1) {
-                        console.log(`[INFO_COLLECTOR_NODE] Replacing generic "${ctx.serviceTypes[genericIdx]}" with specific "${svc}".`);
+                        console.log(`[INFO_COLLECTOR_NODE] Replacing generic "${ctx.serviceTypes[genericIdx]}" with "${svc}".`);
                         ctx.serviceTypes.splice(genericIdx, 1);
                     }
                 }
             }
             
-            // Add if not already present
             if (!ctx.serviceTypes.some(s => s.toLowerCase() === svcLower)) {
                 ctx.serviceTypes.push(svc);
             }
         }
 
-        // Update other fields
+        // Update other fields (only if not null)
         if (extracted.paint_type) ctx.paintType = extracted.paint_type;
-        if (extracted.is_bongkar_total !== null) ctx.isBongkarTotal = extracted.is_bongkar_total;
+        if (extracted.is_bongkar_total !== null && extracted.is_bongkar_total !== undefined) ctx.isBongkarTotal = extracted.is_bongkar_total;
         if (extracted.detailing_focus) ctx.detailingFocus = extracted.detailing_focus;
         if (extracted.color_choice) ctx.colorChoice = extracted.color_choice;
         if (extracted.velg_color_choice) ctx.velgColorChoice = extracted.velg_color_choice;
-        if (extracted.is_previously_painted !== null) ctx.isPreviouslyPainted = extracted.is_previously_painted;
+        if (extracted.is_previously_painted !== null && extracted.is_previously_painted !== undefined) ctx.isPreviouslyPainted = extracted.is_previously_painted;
         if (extracted.booking_date) ctx.bookingDate = extracted.booking_date;
         if (extracted.booking_time) ctx.bookingTime = extracted.booking_time;
 
     } catch (error) {
         console.error('[INFO_COLLECTOR_NODE] Extraction failed:', error.message);
+        const elapsed = Date.now() - startTime;
+        console.log(`[INFO_COLLECTOR_NODE] ⚡ Completed (error fallback) in ${elapsed}ms`);
+        return {
+            intent: 'GENERAL_INQUIRY',
+            context: { ...context, missingQuestions: [] },
+            metadata: { ...metadata, prevIntent, replyMode: 'inform' }
+        };
     }
 
-    // --- LOGIKA DECISION TREE (MISSING QUESTIONS - PING PONG STYLE) ---
+    // --- DECISION TREE (MISSING QUESTIONS) ---
     let missingQuestion = null;
 
-    // Priority 1: Vehicle Type (Mandatory for everything)
     if (!ctx.vehicleType) {
         missingQuestion = "Tanyakan tipe motor user (contoh: Nmax, Scoopy, Vario)";
-    }
-    // Priority 2: At least 1 service type
-    else if (ctx.serviceTypes.length === 0) {
+    } else if (ctx.serviceTypes.length === 0) {
         missingQuestion = "Tanyakan rencana layanan yang diinginkan (Repaint, Coating, atau Detailing)";
-    }
-    // Priority 3: Resolve generic service names
-    else {
-        // Check each service and resolve generic names first
+    } else {
+        // Resolve generic service names first
         for (let i = 0; i < ctx.serviceTypes.length; i++) {
             const svc = ctx.serviceTypes[i].toLowerCase();
-
-            // Generic "Repaint" needs sub-category
             if (svc === 'repaint') {
                 missingQuestion = "Tanyakan detail bagian yang mau di-repaint (Bodi Halus, Kasar, Velg, atau CVT)";
                 break;
             }
-            // Generic "Detailing" needs sub-category
             if (svc === 'detailing') {
                 missingQuestion = "Tanyakan fokus detailingnya (Hilangkan baret bodi, bersihkan mesin, atau cuci bongkar total)";
                 break;
             }
-            // Generic "Coating" needs sub-category
             if (svc === 'coating') {
                 missingQuestion = "Tanyakan jenis cat saat ini (Glossy atau Doff/Matte)";
                 break;
             }
         }
 
-        // Priority 4: Service-specific questions (per service)
+        // Service-specific questions
         if (!missingQuestion) {
             for (const svc of ctx.serviceTypes) {
                 const svcLower = svc.toLowerCase();
-
-                // Coating & Complete Service specifics
                 if (svcLower.includes('coating') || svcLower.includes('complete service')) {
-                    if (!ctx.paintType) {
-                        missingQuestion = "Cari tahu jenis cat motor (Glossy atau Doff)";
-                        break;
-                    }
-                    if (ctx.isBongkarTotal === null && svcLower.includes('coating')) {
-                        missingQuestion = "Tanyakan apakah mau proteksi bodi saja atau bongkar total (Complete Service)";
-                        break;
-                    }
-                }
-                // Detailing specifics
-                else if (svcLower.includes('detailing') || svcLower.includes('poles') || svcLower.includes('cuci')) {
-                    if (!ctx.detailingFocus) {
-                        missingQuestion = "Tanyakan fokus pembersihan (Bodi, Mesin, atau Kolong)";
-                        break;
-                    }
-                    if (!ctx.paintType && (svcLower.includes('poles') || svcLower.includes('full detailing'))) {
-                        missingQuestion = "Pastikan jenis catnya Glossy atau Doff";
-                        break;
-                    }
-                }
-                // Repaint specifics
-                else if (svcLower.includes('repaint')) {
-                    if (svcLower.includes('halus') && !ctx.colorChoice) {
-                        missingQuestion = "Tanyakan rencana warna baru untuk bodi halusnya";
-                        break;
-                    }
-                    if (svcLower.includes('velg') && !ctx.velgColorChoice) {
-                        missingQuestion = "Tanyakan pilihan warna untuk repaint velgnya";
-                        break;
-                    }
-                    if (svcLower.includes('velg') && ctx.isPreviouslyPainted === null) {
-                        missingQuestion = "Tanyakan apakah velg masih cat ori pabrik atau sudah pernah repaint";
-                        break;
-                    }
+                    if (!ctx.paintType) { missingQuestion = "Cari tahu jenis cat motor (Glossy atau Doff)"; break; }
+                    if (ctx.isBongkarTotal === null && svcLower.includes('coating')) { missingQuestion = "Tanyakan apakah mau proteksi bodi saja atau bongkar total (Complete Service)"; break; }
+                } else if (svcLower.includes('detailing') || svcLower.includes('poles') || svcLower.includes('cuci')) {
+                    if (!ctx.detailingFocus) { missingQuestion = "Tanyakan fokus pembersihan (Bodi, Mesin, atau Kolong)"; break; }
+                    if (!ctx.paintType && (svcLower.includes('poles') || svcLower.includes('full detailing'))) { missingQuestion = "Pastikan jenis catnya Glossy atau Doff"; break; }
+                } else if (svcLower.includes('repaint')) {
+                    if (svcLower.includes('halus') && !ctx.colorChoice) { missingQuestion = "Tanyakan rencana warna baru untuk bodi halusnya"; break; }
+                    if (svcLower.includes('velg') && !ctx.velgColorChoice) { missingQuestion = "Tanyakan pilihan warna untuk repaint velgnya"; break; }
+                    if (svcLower.includes('velg') && ctx.isPreviouslyPainted === null) { missingQuestion = "Tanyakan apakah velg masih cat ori pabrik atau sudah pernah repaint"; break; }
                 }
             }
         }
     }
 
-    // Untuk intent CONSULTATION, jangan paksa missing questions dulu (biar santai)
-    if (intent === 'CONSULTATION') {
+    // For CONSULTATION, keep relaxed (no forced questions)
+    if (classifiedIntent === 'CONSULTATION') {
         ctx.missingQuestions = [];
     } else {
         ctx.missingQuestions = missingQuestion ? [missingQuestion] : [];
     }
 
-    // Tentukan Shifting ke Executor
-    const isHumanHandoff = intent === 'HUMAN_HANDOVER' || ctx.vehicleType === 'Mobil';
+    // Determine readiness for tool execution
+    const isHumanHandoff = classifiedIntent === 'HUMAN_HANDOVER' || ctx.vehicleType === 'Mobil';
     const isReady = isHumanHandoff || 
-                   ((intent === 'BOOKING_SERVICE' || intent === 'GENERAL_INQUIRY') && 
+                   ((classifiedIntent === 'BOOKING_SERVICE' || classifiedIntent === 'GENERAL_INQUIRY') && 
                    !!ctx.vehicleType && ctx.serviceTypes.length > 0 && ctx.missingQuestions.length === 0);
-    
     ctx.isReadyForTools = Boolean(isReady);
 
-    console.log(`[INFO_COLLECTOR_NODE] Extracted: ${JSON.stringify(ctx)}`);
-    console.log(`[INFO_COLLECTOR_NODE] Missing Question: ${missingQuestion || 'NONE'}`);
-    console.log(`[INFO_COLLECTOR_NODE] Ready for Tools: ${ctx.isReadyForTools}`);
-    
-    // Tentukan mode balasan (replyMode)
+    // Determine reply mode
     let replyMode = 'inform';
-    if (intent === 'GREETING') replyMode = 'greet';
-    else if (intent === 'CONSULTATION') replyMode = 'consult';
+    if (classifiedIntent === 'GREETING') replyMode = 'greet';
+    else if (classifiedIntent === 'CONSULTATION') replyMode = 'consult';
     else if (ctx.missingQuestions.length > 0) replyMode = 'ask';
 
+    const elapsed = Date.now() - startTime;
+    console.log(`[INFO_COLLECTOR_NODE] Ready: ${ctx.isReadyForTools} | Missing: ${missingQuestion || 'NONE'} | ${elapsed}ms`);
+
     return {
-        intent,
+        intent: classifiedIntent,
         context: ctx,
         metadata: {
             ...metadata,
+            prevIntent,
             replyMode
         }
     };

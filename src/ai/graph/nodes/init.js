@@ -1,6 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../../lib/prisma');
 const { DateTime } = require('luxon');
-const prisma = new PrismaClient();
 
 /**
  * Node: init
