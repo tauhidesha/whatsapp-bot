@@ -35,6 +35,7 @@ function createMetaWebhookRouter(deps = {}) {
         getAIResponse,
         saveMessageToFirestore,
         saveSenderMeta,
+        debounceQueue,
         logger = console,
     } = deps;
 
@@ -47,6 +48,22 @@ function createMetaWebhookRouter(deps = {}) {
             return;
         }
         logger.log(`[MetaWebhook] ${message}`, ...args);
+    }
+
+    // Helper: Normalize phone for admin check
+    function normalizePhone(num) {
+        if (!num) return '';
+        return String(num).replace(/\D/g, '');
+    }
+
+    function isAdminMessage(senderId) {
+        const adminNumbers = [
+            process.env.BOSMAT_ADMIN_NUMBER,
+            process.env.ADMIN_WHATSAPP_NUMBER
+        ].filter(Boolean);
+
+        const normalizedSender = normalizePhone(senderId);
+        return adminNumbers.some(num => normalizePhone(num) === normalizedSender);
     }
 
     router.get('/', (req, res) => {
@@ -156,17 +173,34 @@ function createMetaWebhookRouter(deps = {}) {
 
         if (text && typeof saveMessageToFirestore === 'function') {
             try {
+                // We always save to firestore/database first for consistency
                 await saveMessageToFirestore(normalizedSenderId, text, 'user');
             } catch (error) {
                 log('Failed to persist inbound message', error);
             }
         }
 
+        const isAdmin = isAdminMessage(senderId);
+
+        // --- DEBOUNCE LOGIC ---
+        if (text && typeof debounceQueue?.schedule === 'function' && !isAdmin) {
+            log(`[BUFFER] ⏳ Message from ${normalizedSenderId} scheduled to debounce queue.`);
+            debounceQueue.schedule(normalizedSenderId, { 
+                text, 
+                displayName, 
+                senderId, 
+                channel,
+                timestamp: Date.now()
+            });
+            return; 
+        }
+
+        // Direct AI Processing (For Admins or if no debounceQueue)
         if (text && typeof getAIResponse === 'function') {
             try {
                 const aiResult = await getAIResponse(text, displayName, normalizedSenderId);
                 const aiResponse = aiResult.content;
-                log('AI response ready for outbound delivery', { channel, senderId });
+                log('AI response ready for outbound delivery (Direct)', { channel, senderId });
                 await sendMetaMessage(channel, senderId, aiResponse, logger);
 
                 if (typeof saveMessageToFirestore === 'function' && aiResponse) {

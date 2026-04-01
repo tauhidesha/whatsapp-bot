@@ -67,7 +67,7 @@ async function initNode(state) {
             isAdmin: isAdmin,
             customer: {
                 id: customer.id,
-                name: customer.name || (isAdmin ? 'Admin' : 'Sobat BosMat'),
+                name: customer.name || (isAdmin ? 'Admin' : `Sobat ${studioMetadata.shortName}`),
                 phone: customer.phone,
                 status: customer.status,
                 vehicles: customer.vehicles.map(v => ({
@@ -85,7 +85,7 @@ async function initNode(state) {
         console.error('[initNode] Error loading customer:', error);
         return { 
             isAdmin: isAdmin,
-            customer: { name: 'Sobat BosMat' },
+            customer: { name: `Sobat ${studioMetadata.shortName}` },
             metadata: { ...metadata, currentDateTime }
         };
     }

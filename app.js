@@ -1765,6 +1765,52 @@ async function processBufferedMessages(senderNumber, client) {
     }
 }
 
+/**
+ * Process aggregated messages from Meta Messenger/Instagram
+ * @param {string} normalizedSenderId - e.g. "instagram:123"
+ * @param {Array} queue - Array of message objects from DebounceQueue
+ */
+async function processBufferedMetaMessages(normalizedSenderId, queue) {
+    if (!queue || queue.length === 0) return;
+
+    try {
+        const firstEntry = queue[0];
+        const { displayName, channel, senderId } = firstEntry;
+
+        const messageParts = queue
+            .map(m => (m.text || '').trim())
+            .filter(part => part.length > 0);
+
+        const combinedMessage = messageParts.join('\n').trim();
+        if (!combinedMessage) return;
+
+        console.log(`[MetaDebounce] 📥 Buffered message for ${displayName}: "${combinedMessage}"`);
+
+        // Check for Snooze/Handover using normalized address
+        if (await isSnoozeActive(normalizedSenderId)) {
+            console.log(`[MetaDebounce] 👋 AI skipped for ${normalizedSenderId} (handover active).`);
+            return;
+        }
+
+        // Invoke AI (which now uses LangGraph)
+        const aiResult = await getAIResponse(combinedMessage, displayName, normalizedSenderId);
+        const aiResponse = aiResult.content;
+
+        if (aiResponse) {
+            const { sendMetaMessage } = require('./src/server/metaClient.js');
+            console.log(`[MetaDebounce] 📤 Outbound to ${channel}: "${aiResponse.substring(0, 50)}..."`);
+            
+            await sendMetaMessage(channel, senderId, aiResponse);
+            
+            if (typeof saveMessageToFirestore === 'function') {
+                await saveMessageToFirestore(normalizedSenderId, aiResponse, 'ai');
+            }
+        }
+    } catch (error) {
+        console.error(`❌ [MetaDebounce] Error processing ${normalizedSenderId}:`, error);
+    }
+}
+
 // --- WhatsApp Event Handlers ---
 function start(client) {
     // 🛡️ ENHANCED SAFEGUARD FOR UI INTERACTIONS
@@ -1795,6 +1841,11 @@ function start(client) {
         await processBufferedMessages(senderNumber, client);
     });
     client.__debounceQueue = debounceQueue;
+
+    // --- META DEBOUNCE QUEUE ---
+    const metaDebounceQueue = new DebounceQueue(DEBOUNCE_DELAY_MS, async (normalizedSenderId, queue) => {
+        await processBufferedMetaMessages(normalizedSenderId, queue);
+    });
 
     client.onAnyMessage(async (msg) => {
         await handleAdminHpMessage(msg);
@@ -2273,6 +2324,7 @@ const metaWebhookRouter = createMetaWebhookRouter({
     getAIResponse,
     saveMessageToFirestore,
     saveSenderMeta,
+    debounceQueue: metaDebounceQueue,
     logger: console,
 });
 
@@ -2445,9 +2497,6 @@ app.post('/generate-invoice', async (req, res) => {
         if (result.success) {
             console.log(`[API] Invoice (${documentType}) sent to customer: ${recipientNumber}`);
             return res.status(200).json({ success: true, message: result.message });
-        } else {
-            console.error('[API] Invoice generation failed:', result.message);
-            return res.status(500).json({ success: false, error: result.message });
         }
     } catch (error) {
         console.error('[API] Error generating invoice:', error);

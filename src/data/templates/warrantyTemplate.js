@@ -20,6 +20,8 @@ function formatDateShort(date) {
   });
 }
 
+const studioMetadata = require('../../ai/constants/studioMetadata.js');
+
 function generateWarrantyHTML({
   type = 'repaint',
   customerName = 'Pelanggan',
@@ -64,7 +66,7 @@ function generateWarrantyHTML({
 
   const coatingTerms = [
     { title: 'CAKUPAN GARANSI', items: ['Coating retak/terkelupas akibat cacat produk', 'Hilangnya efek hydrophobic sebelum garansi habis (dengan riwayat maintenance rutin)'] },
-    { title: 'KEWAJIBAN MAINTENANCE', items: ['Wajib maintenance setiap 3 bulan di Bosmat Studio', 'Toleransi keterlambatan: 7 hari', 'Garansi hangus otomatis jika melewati jadwal'] },
+    { title: 'KEWAJIBAN MAINTENANCE', items: [`Wajib maintenance setiap 3 bulan di ${studioMetadata.name}`, 'Toleransi keterlambatan: 7 hari', 'Garansi hangus otomatis jika melewati jadwal'] },
     { title: 'TIDAK BERLAKU JIKA', items: ['Kerusakan akibat benturan/goresan', 'Water spot karena air dibiarkan mengering', 'Dicuci dengan sabun tidak pH-netral', 'Dicoating ulang oleh pihak lain'] },
   ];
 
@@ -467,11 +469,11 @@ function generateWarrantyHTML({
   <div class="watermark">BOSMAT</div>
 
   <!-- HEADER -->
-  ${logoSrc ? `<img src="${logoSrc}" class="logo" alt="Bosmat Studio"/>` : ''}
+  ${logoSrc ? `<img src="${logoSrc}" class="logo" alt="${studioMetadata.name}"/>` : ''}
   <div class="header">
     <div class="header-left">
       <div class="doc-title">${isCoating ? 'GARANSI COATING' : 'GARANSI REPAINT'}</div>
-      <div class="doc-subtitle">Premium Automotive Finish · Bosmat Studio</div>
+      <div class="doc-subtitle">Premium Automotive Finish · ${studioMetadata.name}</div>
     </div>
     <div class="header-right">
       <div class="cert-label">No. Sertifikat</div>
@@ -562,7 +564,7 @@ function generateWarrantyHTML({
 
   <!-- FOOTER -->
   <div class="footer">
-    <div class="footer-text">Bosmat Studio · Precision & Passion</div>
+    <div class="footer-text">${studioMetadata.name} · Precision & Passion</div>
     <div class="footer-dates">
       Terbit: ${formatDateShort(issueDate)} &nbsp;·&nbsp; Expire: ${formatDateShort(expiryDate)}
     </div>

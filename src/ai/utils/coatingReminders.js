@@ -1,9 +1,10 @@
 const prisma = require('../../lib/prisma.js');
+const studioMetadata = require('../constants/studioMetadata');
 
 const COATING_MAINTENANCE_MESSAGES = {
-  h7: (name, vehicle) => `Halo Kak ${name},\n\nIni dari admin Bosmat Detailing. Sekedar mengingatkan bahwa jadwal *Coating Maintenance* untuk kendaraan ${vehicle} Kakak jatuh tempo dalam *7 hari* lagi.\n\nAgar kualitas coating tetap prima dan garansi tetap berlaku, yuk jadwalkan maintenance-nya sekarang. Kakak bisa balas pesan ini untuk booking jadwal ya!`,
+  h7: (name, vehicle) => `Halo Kak ${name},\n\nIni dari admin ${studioMetadata.name}. Sekedar mengingatkan bahwa jadwal *Coating Maintenance* untuk kendaraan ${vehicle} Kakak jatuh tempo dalam *7 hari* lagi.\n\nAgar kualitas coating tetap prima dan garansi tetap berlaku, yuk jadwalkan maintenance-nya sekarang. Kakak bisa balas pesan ini untuk booking jadwal ya!`,
   h3: (name, vehicle) => `Halo Kak ${name},\n\nMengingatkan kembali ya Kak, jadwal *Coating Maintenance* untuk ${vehicle} sisa *3 hari* lagi. \n\nJangan sampai terlewat ya Kak agar perlindungan cat kendaraannya tetap maksimal. Mau booking untuk hari apa Kak?`,
-  h1: (name, vehicle) => `Panggilan terakhir untuk Kak ${name}! 🚨\n\nBesok adalah hari jatuh tempo *Coating Maintenance* untuk ${vehicle} Kakak.\n\nJika belum sempat ke Garasi 54 besok, Kakak tetap bisa booking jadwalnya hari ini agar hak maintenance-nya tidak hangus. Yuk balas pesan ini untuk reservasi!`,
+  h1: (name, vehicle) => `Panggilan terakhir untuk Kak ${name}! 🚨\n\nBesok adalah hari jatuh tempo *Coating Maintenance* untuk ${vehicle} Kakak.\n\nJika belum sempat ke ${studioMetadata.name} besok, Kakak tetap bisa booking jadwalnya hari ini agar hak maintenance-nya tidak hangus. Yuk balas pesan ini untuk reservasi!`,
 };
 
 async function processCoatingReminders(client) {

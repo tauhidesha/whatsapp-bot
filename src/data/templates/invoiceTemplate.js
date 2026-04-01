@@ -1,5 +1,5 @@
-// File: src/data/templates/invoiceTemplate.js
-// Export function yang return HTML string
+const studioMetadata = require('../../ai/constants/studioMetadata.js');
+
 module.exports = function generateInvoiceHTML(data) {
   const {
     documentType, customerName, motorDetails, items,
@@ -134,11 +134,10 @@ module.exports = function generateInvoiceHTML(data) {
       </div>
       <div class="bg-dark" style="padding:28px">
         <p class="text-yellow" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.2em; margin-bottom:20px">Studio Layanan</p>
-        <p class="font-headline" style="font-size:24px; font-weight:700; text-transform:uppercase; margin-bottom:8px">BOSMAT STUDIO</p>
+        <p class="font-headline" style="font-size:24px; font-weight:700; text-transform:uppercase; margin-bottom:8px">${studioMetadata.name.toUpperCase()}</p>
         <p class="text-muted" style="font-size:14px; line-height:1.8">
-          Bukit Cengkeh 1, Jl. Medan No.B3/2<br/>
-          Kota Depok, Jawa Barat 16451<br/>
-          0895401527556
+          ${studioMetadata.location.address}<br/>
+          WA: ${studioMetadata.contact.phone}
         </p>
       </div>
     </div>

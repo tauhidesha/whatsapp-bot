@@ -10,40 +10,15 @@ const getStudioInfoSchema = z.object({
     .default('all'),
 });
 
+const studioMetadata = require('../constants/studioMetadata.js');
+
 async function implementation(input) {
   try {
     const { infoType } = getStudioInfoSchema.parse(input);
 
     console.log('[getStudioInfo] Getting studio information:', infoType);
 
-    const studioInfo = {
-      location: {
-        address: 'Bukit Cengkeh 1, Jl. Medan No.B3/2, Kota Depok, Jawa Barat 16451',
-        landmark: 'Bosmat Repaint Detailing Motor',
-        googleMaps: 'https://maps.app.goo.gl/JrH7TxyfPtGxBjW19',
-        directions: 'Dari gapura Bukit Cengkeh 1 lurus sedikit, di perempatan pertama belok kanan. Rumah pertama cat hijau pagar hitam (dekat portal). Kalau portal ditutup, bisa masuk dari Jl. Padang atau Jl. Bengkulu. Langsung ketok atau panggil orang di dalam saja.',
-        description: 'Lokasi Bosmat Repaint Detailing Motor',
-        exteriorPhoto: 'data/c46dbcbe-7d71-45b7-bdd6-5eeb99b4c2f4.jpg',
-      },
-      contact: {
-        phone: '0895401527556',
-        whatsapp: '0895401527556',
-      },
-      hours: {
-        senin: '08.00–17.00',
-        selasa: '08.00–17.00',
-        rabu: '08.00–17.00',
-        kamis: '08.00–17.00',
-        jumat: 'Tutup',
-        sabtu: '08.00–17.00',
-        minggu: '08.00–17.00',
-      },
-      bookingPolicy: {
-        walkIn: true,
-        appointmentRequired: false,
-        description: 'Walk-in diterima, tetapi disarankan booking terlebih dahulu agar slot aman',
-      },
-    };
+    const studioInfo = studioMetadata; // Use Single Source of Truth
 
     let response = '';
 
@@ -63,13 +38,9 @@ Ancer-ancer: ${studioInfo.location.directions}
       case 'hours':
         response = `🕒 *Jam Operasional Bosmat Studio:*
 
-• Senin: ${studioInfo.hours.senin}
-• Selasa: ${studioInfo.hours.selasa}
-• Rabu: ${studioInfo.hours.rabu}
-• Kamis: ${studioInfo.hours.kamis}
+• Senin-Kamis: ${studioInfo.hours.senin}
 • Jumat: ${studioInfo.hours.jumat}
-• Sabtu: ${studioInfo.hours.sabtu}
-• Minggu: ${studioInfo.hours.minggu}
+• Sabtu-Minggu: ${studioInfo.hours.sabtu}
 
 ⚠️ *Penting:* ${studioInfo.bookingPolicy.description}`;
         break;

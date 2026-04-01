@@ -6,12 +6,14 @@ const fs = require('fs');
 const { z } = require('zod');
 const { sendMetaAttachment } = require('../../server/metaClient.js');
 
+const studioMetadata = require('../constants/studioMetadata.js');
+
 const sendStudioPhotoSchema = z.object({
   caption: z.string().min(1).max(500).optional(),
   senderNumber: z.string().optional(),
 });
 
-const DEFAULT_CAPTION = 'Bosmat Repaint Detailing Motor, Bukit Cengkeh 1, Jl. Medan No.B3/2, Kota Depok, Jawa Barat 16451. Mohon kabari sebelum tiba agar tim siap menyambut.';
+const DEFAULT_CAPTION = `${studioMetadata.name}, ${studioMetadata.location.address}. Mohon kabari sebelum tiba agar tim siap menyambut.`;
 const STUDIO_PHOTO_PATH = path.resolve(__dirname, '../../../data/c46dbcbe-7d71-45b7-bdd6-5eeb99b4c2f4.jpg');
 const STUDIO_PHOTO_FILENAME = 'bosmat-studio.jpg';
 const SUPPORTED_META_CHANNELS = new Set(['instagram', 'messenger']);
@@ -127,7 +129,7 @@ const sendStudioPhotoTool = {
     type: 'function',
     function: {
       name: 'sendStudioPhoto',
-      description: 'Kirim foto eksterior Bosmat (berlokasi di Bukit Cengkeh 1, Jl. Medan No.B3/2, Kota Depok, Jawa Barat 16451) ke pelanggan via WhatsApp. Gunakan saat pelanggan sulit menemukan lokasi.',
+      description: `Kirim foto eksterior Bosmat (berlokasi di ${studioMetadata.location.address}) ke pelanggan via WhatsApp. Gunakan saat pelanggan sulit menemukan lokasi.`,
       parameters: {
         type: 'object',
         properties: {

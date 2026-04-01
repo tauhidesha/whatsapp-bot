@@ -115,7 +115,9 @@ async function toolExecutorNode(state) {
             }
 
             // Cek Jam Buka/Studio Info (Selalu panggil jika intent GENERAL_INQUIRY atau ada keyword studio)
-            const studioKeywords = /lokasi|alamat|dimana|buka|tutup|istirahat|jam berapa|kontak|wa|map|maps|koordinat/i.test(state.messages[state.messages.length - 1].content);
+            const lastMsgContent = (state.messages[state.messages.length - 1].content || '').toLowerCase();
+            const studioKeywords = /lokasi|alamat|dimana|buka|tutup|istirahat|jam berapa|kontak|wa|map|maps|koordinat/i.test(lastMsgContent);
+            
             if (intent === 'GENERAL_INQUIRY' || studioKeywords) {
                 const tool = toolsByName['getStudioInfo'];
                 if (tool) {
@@ -127,6 +129,21 @@ async function toolExecutorNode(state) {
                         if (typeof toolResult === 'object') {
                             toolResult.studioInfo = studioResult;
                         }
+                    }
+                }
+
+                // --- PHOTO SENDING LOGIC (Nearby/Confused) ---
+                const locationConfusionKeywords = /bingung|nyasar|depan|dimananya|liat tempatnya|foto|sebelah|patokan|pintu/i.test(lastMsgContent);
+                if (locationConfusionKeywords) {
+                    console.log(`[executorNode] Location confusion detected. Triggering sendStudioPhoto...`);
+                    const photoTool = toolsByName['sendStudioPhoto'];
+                    if (photoTool) {
+                        const photoResult = await photoTool({
+                            senderNumber: state.metadata?.phoneReal || ''
+                        });
+                        
+                        if (!toolResult) toolResult = { studioPhoto: photoResult };
+                        else toolResult.studioPhoto = photoResult;
                     }
                 }
             }

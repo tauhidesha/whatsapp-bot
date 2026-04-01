@@ -2,6 +2,7 @@ const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
 const { HumanMessage, SystemMessage, AIMessage, ToolMessage } = require('@langchain/core/messages');
 const { toolsByName, zoyaTools } = require('../tools');
 const { getActivePromo } = require('../../utils/promoConfig');
+const studioMetadata = require('../../constants/studioMetadata');
 
 /**
  * Node: adminNode
@@ -33,6 +34,7 @@ async function adminNode(state) {
         'updateCustomerContext',
         'getServiceDetails',
         'getStudioInfo',
+        'sendStudioPhoto',
         'getCurrentDateTime'
     ];
 
@@ -60,7 +62,7 @@ async function adminNode(state) {
 
     const currentDateTime = metadata.currentDateTime?.formatted || 'Now';
     const systemPrompt = `# ROLE
-Kamu adalah Zoya, **AI Business Partner** resmi untuk owner BosMat Studio. 
+Kamu adalah Zoya, **AI Business Partner** resmi untuk owner ${studioMetadata.name}. 
 Kamu bukan sekadar asisten, tapi delegasi terpercaya yang membantu mengelola CRM, Finance, dan Booking dengan visi bisnis yang tajam.
 
 # PERSONALITY
@@ -79,7 +81,7 @@ Kamu bukan sekadar asisten, tapi delegasi terpercaya yang membantu mengelola CRM
 - Jika ada customer yang belum bayar atau telat ambil motor, ingatkan secara proaktif.
 
 # CURRENT CONTEXT
-- Lokasi Studio: Cimanggis, Depok.
+- Lokasi Studio: ${studioMetadata.location.address} (Landmark: ${studioMetadata.location.landmark}).
 - Spesialisasi: Repaint Bodi Halus/Kasar, Velg, Detailing, Coating.`;
 
     const response = await model.invoke([

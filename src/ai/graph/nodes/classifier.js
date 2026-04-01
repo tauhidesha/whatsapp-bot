@@ -1,5 +1,6 @@
 const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
 const { SystemMessage, HumanMessage } = require('@langchain/core/messages');
+const studioMetadata = require('../../constants/studioMetadata');
 
 const model = new ChatGoogleGenerativeAI({
     model: process.env.AI_MODEL || 'gemini-flash-lite-latest',
@@ -17,7 +18,7 @@ async function classifierNode(state) {
     const lastMessage = messages[messages.length - 1];
 
     const systemPrompt = `# ROLE
-Kamu adalah AI Intent Classifier untuk Bengkel BosMat Studio.
+Kamu adalah AI Intent Classifier untuk ${studioMetadata.name}.
 
 # TASK
 Tentukan SATU intent yang paling sesuai dari pesan terakhir user.
@@ -31,7 +32,7 @@ Tentukan SATU intent yang paling sesuai dari pesan terakhir user.
 - **GREETING**: Sapaan awal (Halo, P, Assalamualaikum).
 - **CONSULTATION**: Tanya promo atau tanya saran umum tanpa detail motor.
 - **BOOKING_SERVICE**: Niat servis, tanya harga layanan tertentu, atau menjawab pertanyaan teknis AI.
-- **GENERAL_INQUIRY**: Tanya lokasi, jam buka, kontak studio.
+- **GENERAL_INQUIRY**: Tanya lokasi, jam buka, kontak studio, atau **kebingungan mencari lokasi** (misal: "saya sudah di depan", "patokannya apa?", "sebelah mana?", "nyasar").
 - **HUMAN_HANDOVER**: Minta bicara dengan admin manusia.
 - **OTHER**: Di luar kategori di atas.
 

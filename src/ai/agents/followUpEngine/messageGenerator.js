@@ -5,6 +5,7 @@
 const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
 const { HumanMessage } = require('@langchain/core/messages');
 const { getActivePromo } = require('../../utils/promoConfig.js');
+const studioMetadata = require('../../constants/studioMetadata.js');
 
 const GENERATOR_MODEL = 'gemini-3.1-flash-lite-preview';
 
@@ -27,7 +28,7 @@ const ANGLE_INSTRUCTIONS = {
                 Customer ini pelanggan setia — jangan jualan,
                 buat mereka merasa diperhatikan.`,
 
-    winback: `Sebut 1 hal baru di Bosmat (teknik, layanan, atau
+    winback: `Sebut 1 hal baru di ${studioMetadata.shortName} (teknik, layanan, atau
               hasil kerja terbaru). Jangan minta mereka balik —
               biarkan mereka penasaran sendiri.`,
 };
@@ -75,7 +76,7 @@ async function generateFollowUpMessage(customer, strategy) {
     const daysSinceChat = getDaysSince(metadata?.lastMessageAt);
 
     const prompt = `
-Kamu Zoya dari Bosmat Repainting & Detailing Studio.
+Kamu Zoya dari ${studioMetadata.name}.
 Tulis 1 pesan WhatsApp follow up untuk customer ini.
 
 Data customer:
@@ -100,6 +101,7 @@ Aturan ketat:
 - Jangan terlalu formal
 - Jika data motor tidak ada, jangan sebut motor
 - Jangan ulangi angle yang sama dengan follow up sebelumnya
+- Mobil Constraint: Jika user tanya soal repaint atau detailing mobil, katakan bahwa Zoya perlu tanya/konfirmasi ke bos/admin dulu (karena ${studioMetadata.shortName} biasanya fokus ke motor). JANGAN langsung tolak, tapi bilang akan ditanyakan dulu.
 `;
 
     try {

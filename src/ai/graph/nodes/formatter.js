@@ -1,6 +1,7 @@
 const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
 const { SystemMessage, HumanMessage, AIMessage } = require('@langchain/core/messages');
 const { z } = require('zod');
+const studioMetadata = require('../../constants/studioMetadata');
 
 const model = new ChatGoogleGenerativeAI({
     model: process.env.AI_MODEL || 'gemini-flash-lite-latest',
@@ -104,8 +105,9 @@ ${dateInfo}
 
     // --- PROMPT FRAMEWORK: RACE (Role, Audience, Context, Expectation) ---
     const systemPrompt = `# ROLE
-Kamu adalah Zoya, Automotive Consultant & Studio Assistant di BosMat Studio.
+Kamu adalah Zoya, Automotive Consultant & Studio Assistant di ${studioMetadata.name}.
 Persona: "The Cool Expert Friend". Penasihat yang asik, paham hobi otomotif, jujur, dan hangat.
+dan hangat.
 
 # CONTEXT & DATA
 - Data Motor & Layanan:
@@ -135,7 +137,8 @@ ${JSON.stringify(toolResult || 'Tidak ada data tambahan')}
 - **Mode INFORM (repaint nmax)**: "siapp mas! untuk *nmax bodi halus* repaint harganya *rp1.200.000* ya. sudah termasuk pengerjaan detail sampai klimis. rencana mau warna apa nih mas? ✨"
 
 # ATURAN EMAS
-- **Mobil Constraint**: Jika user tanya soal *repaint* atau *detailing mobil*, katakan bahwa Zoya perlu tanya/konfirmasi ke bos/admin dulu (karena srimulyo/bosmat biasanya fokus ke motor). JANGAN langsung tolak, tapi bilang akan ditanyakan dulu.
+- **Mobil Constraint**: Jika user tanya soal *repaint* atau *detailing mobil*, katakan bahwa Zoya perlu tanya/konfirmasi ke bos/admin dulu (karena ${studioMetadata.shortName} biasanya fokus ke motor). JANGAN langsung tolak, tapi bilang akan ditanyakan dulu.
+- **Studio Photo**: Jika \`toolResult\` mengandung \`studioPhoto\`, sebutkan dengan santai bahwa kamu sudah mengirimkan foto depan studio agar mas/kak tidak bingung carinya. 
 - Sapaan (\`greeting\`) hanya diberikan jika ini awal diskusi atau perpindahan topik yang butuh "lem" percakapan. Kosongkan jika sedang diskusi intens.
 - Selalu akhiri dengan Call-to-Action (CTA) yang jelas.`;
 

@@ -2,6 +2,7 @@
 const { DateTime } = require('luxon');
 const prisma = require('../../lib/prisma.js');
 const { normalizeWhatsappNumber } = require('./humanHandover.js');
+const studioMetadata = require('../constants/studioMetadata');
 
 const REMINDER_ENABLED = process.env.BOOKING_REMINDER_ENABLED !== 'false';
 const REMINDER_HOUR = parseInt(process.env.BOOKING_REMINDER_HOUR || '8', 10);
@@ -25,13 +26,13 @@ async function sendReminderMessage(booking) {
     return false;
   }
 
-  const customerName = booking.customerName || (booking.customer && booking.customer.name) || 'BosMat Friend';
-  const layanan = booking.serviceType || 'Layanan Bosmat';
+  const customerName = booking.customerName || (booking.customer && booking.customer.name) || `Sobat ${studioMetadata.shortName}`;
+  const layanan = booking.serviceType || `Layanan ${studioMetadata.shortName}`;
   
   const message = [
     `Halo ${customerName}! 👋`,
     '',
-    'Reminder booking kamu hari ini di *Bosmat*:',
+    `Reminder booking kamu hari ini di *${studioMetadata.name}*:`,
     `• Tanggal: ${DateTime.fromJSDate(booking.bookingDate).setZone(TIMEZONE).toFormat('dd MMM yyyy')}`,
     `• Jam: ${DateTime.fromJSDate(booking.bookingDate).setZone(TIMEZONE).toFormat('HH:mm')}`,
     `• Layanan: ${layanan}`,
