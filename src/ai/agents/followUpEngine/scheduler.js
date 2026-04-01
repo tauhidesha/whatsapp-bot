@@ -126,7 +126,7 @@ async function runDailyFollowUp() {
         const metadata = {
             lastMessageAt: customer.lastMessageAt,
             name: customer.name,
-            fullSenderId: customer.phone + '@c.us'
+            fullSenderId: customer.phone.includes('@') ? customer.phone : customer.phone + '@c.us'
         };
 
         // 2. Label downgrade check
@@ -156,7 +156,7 @@ async function runDailyFollowUp() {
 
         queue.push({
             docId,
-            senderNumber: customer.phone + '@c.us',
+            senderNumber: customer.phone.includes('@') ? customer.phone : customer.phone + '@c.us',
             name: customer.name || 'Mas',
             context,
             metadata,

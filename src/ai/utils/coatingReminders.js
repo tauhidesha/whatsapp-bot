@@ -53,9 +53,12 @@ async function processCoatingReminders(client) {
       }
 
       if (messageToSend && newStatus) {
-        let phone = record.customerPhone.replace(/\D/g, '');
-        if (phone.startsWith('0')) phone = `62${phone.slice(1)}`;
-        if (!phone.includes('@c.us')) phone = `${phone}@c.us`;
+        const { normalizeWhatsappNumber } = require('./humanHandover.js');
+        const phone = normalizeWhatsappNumber(record.customerPhone);
+        if (!phone) {
+          console.warn(`[CoatingReminders] Invalid phone for record ${record.id}: ${record.customerPhone}`);
+          continue;
+        }
 
         try {
           await client.sendText(phone, messageToSend);

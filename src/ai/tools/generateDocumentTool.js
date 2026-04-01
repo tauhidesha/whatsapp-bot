@@ -93,7 +93,8 @@ const generateDocumentTool = {
         if (lastCustomer && lastCustomer.whatsappLid) {
           targetRecipient = lastCustomer.whatsappLid;
         } else if (lastCustomer && lastCustomer.phone) {
-          targetRecipient = lastCustomer.phone + '@c.us';
+          const ph = lastCustomer.phone;
+          targetRecipient = ph.includes('@') ? ph : ph + '@c.us';
         }
       } catch (err) {
         console.log(`[generateDocument] Failed to auto-detect customer: ${err.message}`);
@@ -253,7 +254,8 @@ const generateDocumentTool = {
             if (warrantyServiceType === '-') warrantyServiceType = booking.serviceType || '-';
             if (!warrantyBookingDate) warrantyBookingDate = booking.bookingDate?.toISOString().split('T')[0];
             if (booking.customer?.phoneReal) {
-              warrantyRecipient = booking.customer.phoneReal + '@c.us';
+              const ph = booking.customer.phoneReal;
+              warrantyRecipient = ph.includes('@') ? ph : ph + '@c.us';
             }
           }
         } catch (err) {

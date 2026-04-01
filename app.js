@@ -13,6 +13,7 @@ const http = require('http');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const { requireAuth } = require('./src/middleware/auth.js');
 const prisma = require('./src/lib/prisma');
 const qrcode = require('qrcode-terminal');
 const fetch = require('node-fetch');
@@ -92,9 +93,55 @@ server.maxConnections = 1000;
 
 // Middleware
 app.use(helmet());
-app.use(cors());
+
+// CORS: Restrict to known origins (was: wildcard *)
+const allowedOrigins = [
+    'https://bosmatstudioadmin.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:3001',
+];
+app.use(cors({
+    origin: (origin, callback) => {
+        // Allow requests with no origin (mobile apps, curl, webhooks)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+        console.warn(`[CORS] Blocked origin: ${origin}`);
+        return callback(new Error('Not allowed by CORS'), false);
+    },
+    credentials: true,
+}));
+
 app.use(morgan('combined'));
 app.use(express.json({ limit: '50mb' }));
+
+// Rate Limiting: Protect sensitive endpoints from abuse
+let rateLimit;
+try {
+    rateLimit = require('express-rate-limit');
+} catch (e) {
+    console.warn('⚠️ [SECURITY] express-rate-limit not installed. Run: npm install express-rate-limit');
+    rateLimit = null;
+}
+
+if (rateLimit) {
+    // General API rate limit: 100 requests per minute
+    const generalLimiter = rateLimit({ windowMs: 60 * 1000, max: 100 });
+    // Strict limit for message-sending: 20 per minute
+    const messageLimiter = rateLimit({ windowMs: 60 * 1000, max: 20 });
+    // Very strict limit for AI test endpoint: 10 per minute
+    const aiLimiter = rateLimit({ windowMs: 60 * 1000, max: 10 });
+
+    app.use('/conversations', generalLimiter);
+    app.use('/bookings', generalLimiter);
+    app.use('/conversation-history', generalLimiter);
+    app.use('/send-message', messageLimiter);
+    app.use('/send-media', messageLimiter);
+    app.use('/generate-invoice', messageLimiter);
+    app.use('/test-ai', aiLimiter);
+    console.log('🛡️ [SECURITY] Rate limiting enabled on sensitive endpoints');
+}
 
 // --- Utility Functions ---
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -2390,7 +2437,7 @@ app.get('/ping', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.get('/conversations', async (req, res) => {
+app.get('/conversations', requireAuth, async (req, res) => {
     try {
         const limit = req.query.limit ? parseInt(req.query.limit, 10) : 100;
         const conversations = await listConversations(limit);
@@ -2417,7 +2464,7 @@ app.get('/conversations', async (req, res) => {
 });
 
 // --- Invoice Generation & Send to Customer WA ---
-app.post('/generate-invoice', async (req, res) => {
+app.post('/generate-invoice', requireAuth, async (req, res) => {
     try {
         const {
             documentType = 'invoice',
@@ -2501,7 +2548,7 @@ app.post('/generate-invoice', async (req, res) => {
     }
 });
 
-app.post('/send-message', async (req, res) => {
+app.post('/send-message', requireAuth, async (req, res) => {
     const { number, message, channel: channelOverride, platformId: platformOverride } = req.body || {};
     if (!number || !message) {
         return res.status(400).json({ error: 'Number and message are required.' });
@@ -2576,7 +2623,7 @@ app.post('/send-message', async (req, res) => {
     }
 });
 
-app.post('/send-media', async (req, res) => {
+app.post('/send-media', requireAuth, async (req, res) => {
     const { number, base64, mimetype, filename, caption } = req.body;
     if (!number || !base64 || !mimetype) {
         return res.status(400).json({ error: 'Number, base64, and mimetype are required.' });
@@ -2598,7 +2645,7 @@ app.post('/send-media', async (req, res) => {
     }
 });
 
-app.post('/test-ai', async (req, res) => {
+app.post('/test-ai', requireAuth, async (req, res) => {
     try {
         const { message, senderNumber, mode, model_override, history, media } = req.body;
         const testMessage = message || "Hello, test message";
@@ -2654,7 +2701,7 @@ app.post('/test-ai', async (req, res) => {
     }
 });
 
-app.get('/conversation-history/:number', async (req, res) => {
+app.get('/conversation-history/:number', requireAuth, async (req, res) => {
     try {
         const { number } = req.params;
         const { limit } = req.query;
@@ -2697,7 +2744,7 @@ app.get('/memory-config', (req, res) => {
     });
 });
 
-app.post('/conversation/:number/ai-state', async (req, res) => {
+app.post('/conversation/:number/ai-state', requireAuth, async (req, res) => {
     try {
         const { number } = req.params;
         const { enabled, durationMinutes, reason } = req.body || {};
@@ -2746,7 +2793,7 @@ app.post('/conversation/:number/ai-state', async (req, res) => {
     }
 });
 
-app.get('/bookings', async (req, res) => {
+app.get('/bookings', requireAuth, async (req, res) => {
     try {
         const { start, end } = req.query;
 
@@ -2838,7 +2885,7 @@ app.get('/bookings', async (req, res) => {
 });
 
 // Create manual booking
-app.post('/bookings', async (req, res) => {
+app.post('/bookings', requireAuth, async (req, res) => {
     try {
         const { createBookingTool } = require('./src/ai/tools/createBookingTool.js');
         const result = await createBookingTool.implementation(req.body);
@@ -2854,7 +2901,7 @@ app.post('/bookings', async (req, res) => {
 });
 
 
-app.patch('/bookings/:id/status', async (req, res) => {
+app.patch('/bookings/:id/status', requireAuth, async (req, res) => {
     try {
         const { id } = req.params;
         const { status, notes } = req.body;
