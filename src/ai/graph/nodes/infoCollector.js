@@ -209,8 +209,10 @@ Output: {
         // When user says "bodi halus sama velg" → detailing_focus = "Bodi Halus & Velg"
         // but serviceTypes stays generic ["Repaint"]. Resolve it into specifics.
         const genericRepaintIdx = ctx.serviceTypes.findIndex(s => s.toLowerCase() === 'repaint');
-        if (genericRepaintIdx !== -1 && ctx.detailingFocus) {
-            const focus = ctx.detailingFocus.toLowerCase();
+        const focusRaw = ctx.detailingFocus;
+        const focusStr = typeof focusRaw === 'string' ? focusRaw : (Array.isArray(focusRaw) ? focusRaw.join(' ') : String(focusRaw || ''));
+        if (genericRepaintIdx !== -1 && focusStr) {
+            const focus = focusStr.toLowerCase();
             const resolvedServices = [];
 
             if (focus.includes('halus') || focus.includes('bodi')) {
