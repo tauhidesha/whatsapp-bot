@@ -205,6 +205,36 @@ Output: {
         if (extracted.booking_date) ctx.bookingDate = extracted.booking_date;
         if (extracted.booking_time) ctx.bookingTime = extracted.booking_time;
 
+        // --- AUTO-RESOLVE generic "Repaint" using detailing_focus ---
+        // When user says "bodi halus sama velg" → detailing_focus = "Bodi Halus & Velg"
+        // but serviceTypes stays generic ["Repaint"]. Resolve it into specifics.
+        const genericRepaintIdx = ctx.serviceTypes.findIndex(s => s.toLowerCase() === 'repaint');
+        if (genericRepaintIdx !== -1 && ctx.detailingFocus) {
+            const focus = ctx.detailingFocus.toLowerCase();
+            const resolvedServices = [];
+
+            if (focus.includes('halus') || focus.includes('bodi')) {
+                resolvedServices.push('Repaint Bodi Halus');
+            }
+            if (focus.includes('kasar')) {
+                resolvedServices.push('Repaint Bodi Kasar');
+            }
+            if (focus.includes('velg')) {
+                resolvedServices.push('Repaint Velg');
+            }
+            if (focus.includes('cvt')) {
+                resolvedServices.push('Repaint CVT');
+            }
+
+            if (resolvedServices.length > 0) {
+                // Replace generic "Repaint" with specific services
+                ctx.serviceTypes.splice(genericRepaintIdx, 1, ...resolvedServices);
+                // Dedup
+                ctx.serviceTypes = [...new Set(ctx.serviceTypes)];
+                console.log(`[INFO_COLLECTOR_NODE] Resolved "Repaint" → [${resolvedServices.join(', ')}] from detailing_focus="${ctx.detailingFocus}"`);
+            }
+        }
+
     } catch (error) {
         console.error('[INFO_COLLECTOR_NODE] Extraction failed:', error.message);
         const elapsed = Date.now() - startTime;
