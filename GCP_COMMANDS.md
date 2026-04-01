@@ -56,7 +56,10 @@ sudo systemctl stop whatsapp-ai
 
 ### Opsi B: Menggunakan PM2 (Jika Anda menginstalnya)
 ```bash
-# Restart aplikasi
+# Restart aplikasi (khusus whatsapp)
+pm2 restart whatsapp-ai
+
+# Restart semua aplikasi
 pm2 restart all
 
 # Cek daftar aplikasi
@@ -76,7 +79,12 @@ Sangat berguna untuk melihat QR Code atau pesan error.
 sudo journalctl -u whatsapp-ai -f
 ```
 
-### Logs PM2
+### Logs PM2 (Khusus whatsapp)
+```bash
+pm2 logs whatsapp-ai
+```
+
+### Logs PM2 (Semua)
 ```bash
 pm2 logs
 ```
