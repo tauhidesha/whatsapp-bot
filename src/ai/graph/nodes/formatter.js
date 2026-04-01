@@ -153,7 +153,7 @@ ${JSON.stringify(toolResult || 'Tidak ada data tambahan')}
         const structuredModel = model.withStructuredOutput(
             z.object({
                 greeting: z.string().optional().describe("Sapaan BALASAN singkat (max 5 kata). JANGAN echo/ulangi kata-kata user. Misal user bilang 'selamat pagi' → balas 'pagi juga kak!' (BUKAN 'selamat pagi'). Wajib di pesan pertama, KOSONGKAN jika lanjutan diskusi."),
-                main_content: z.string().describe("Isi pesan utama. WAJIB gunakan double-newline (2x enter) untuk memisahkan antar paragraf/topik agar tidak padat. Jika ada contekan 'missingQ', tanyakan dengan gaya bahasa sendiri (Cool Expert Friend)."),
+                main_content: z.string().describe("Isi pesan utama. DILARANG KERAS memulai dengan sapaan/greeting apapun (itu sudah di field 'greeting'). Langsung ke konten. WAJIB gunakan double-newline (2x enter) antar paragraf/topik agar tidak padat."),
                 internal_thought: z.string().describe("Analisis singkat pemilihan pesan")
             })
         );
