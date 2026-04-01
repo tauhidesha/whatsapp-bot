@@ -434,6 +434,9 @@ function getTracingConfig(label, options = {}) {
 
 // --- Message Buffering & Debouncing ---
 const { DebounceQueue } = require('./src/ai/utils/debounceQueue.js');
+const metaDebounceQueue = new DebounceQueue(DEBOUNCE_DELAY_MS, async (normalizedSenderId, queue) => {
+    await processBufferedMetaMessages(normalizedSenderId, queue);
+});
 
 const pendingMessages = new Map();
 const { getChromiumPath, DEFAULT_CHROME_ARGS } = require('./src/ai/utils/browser');
@@ -1842,10 +1845,7 @@ function start(client) {
     });
     client.__debounceQueue = debounceQueue;
 
-    // --- META DEBOUNCE QUEUE ---
-    const metaDebounceQueue = new DebounceQueue(DEBOUNCE_DELAY_MS, async (normalizedSenderId, queue) => {
-        await processBufferedMetaMessages(normalizedSenderId, queue);
-    });
+    // --- META DEBOUNCE QUEUE ALREADY INITIALIZED AT TOP LEVEL ---
 
     client.onAnyMessage(async (msg) => {
         await handleAdminHpMessage(msg);
