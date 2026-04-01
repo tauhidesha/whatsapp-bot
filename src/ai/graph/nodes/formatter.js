@@ -60,24 +60,12 @@ Contoh natural: "Oh iya, lagi ada promo nih! Kalau sekalian ${upsellSuggestion |
 JANGAN bilang ini "promo combo". Sampaikan secara conversational.`;
     }
 
-    // Build combo result display for multi-service
+    // Pass combo data without hardcoding visual display rules
     let comboResultInstruction = '';
     if (replyMode === 'inform' && toolResult?.combo?.applied) {
         comboResultInstruction = `
-HASIL COMBO (WAJIB ditampilkan sebagai breakdown):
-Tampilkan daftar layanan + harga masing-masing, lalu diskon combo, lalu total final.
-Data combo: ${JSON.stringify(toolResult.combo)}
-Format contoh:
-*Paket Combo ${customerName}:*
-
-• Layanan 1: Rp...
-• Layanan 2: Rp...
-
-💰 Diskon ${toolResult.combo.discount_percent}%: -${toolResult.combo.discount_formatted}
-
-✅ *TOTAL: ${toolResult.combo.total_after_formatted}*
-
-Mau langsung dibooking jadwalnya?`;
+HASIL COMBO DATA (Terapkan pada rincian harga sesuai Aturan Emas #2):
+${JSON.stringify(toolResult.combo)}`;
     }
 
     const dateInfo = state.metadata?.currentDateTime
@@ -135,7 +123,19 @@ ${modeInstructions[replyMode] || modeInstructions.inform}
 # PENTING TENTANG HARGA/DATA:
 1. Jika diminta menginformasikan harga/ketersediaan, WAJIB gunakan data dari "Hasil Teknis/Tool".
    JIKA Hasil Teknis/Tool = "Tidak ada data tambahan", MAKA JANGAN sebutkan harga/estimasi apa pun secara spesifik.
-2. Jika ada rincian harga, JANGAN tempel format kaku dari tool. Tulis ulang rinciannya memakai gaya bahasamu sendiri yang asik. Format penulisan list harganya (bullet point) tetap dipertahankan, tapi kata-kata pengantarnya harus khas Zoya.
+2. WAJIB IKUTI FORMAT PENULISAN RINCIAN HARGA ini jika ada rincian biaya (breakdown) atau combo, namun kalimat pengantarnya sesuaikan dengan gayamu:
+   
+   [kata pengantar asik & santai zoya...]
+
+   [nama paket/motor]:
+
+   •  [layanan 1]: rp...
+   •  [layanan 2]: rp...
+
+   💰 diskon [x]%: -rp... (TAMPILKAN HANYA JIKA ADA DISKON/COMBO)
+
+   ✅ total: rp...
+   
 3. BOLEH menginformasikan estimasi harga sebelum user memilih warna, TETAPI WAJIB tambahkan info bahwa: "ada kemungkinan tambahan biaya untuk warna-warna khusus/tertentu".
 4. Khusus untuk pilihan "Repaint Velg": JIKA user mau repaint velg, WAJIB kasih tahu santai: "oh iya kak, kalau velgnya sebelumnya udah pernah bekas di-repaint, nanti ada sedikit tambahan biaya buat ngerok cat lamanya yaa biar hasilnya maksimal."
 
