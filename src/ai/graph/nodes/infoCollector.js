@@ -304,10 +304,15 @@ Output: {
     }
 
     // Determine readiness for tool execution
+    // Tool bisa dieksekusi ASALKAN kita tahu motor apa dan mau servis bagian spesifik apa.
+    // Nggak perlu nunggu "warna" lengkap untuk ngasih estimasi harga dasar!
+    const hasGenericService = ctx.serviceTypes.some(s => ['repaint', 'detailing', 'coating'].includes(s.toLowerCase()));
+    
     const isHumanHandoff = classifiedIntent === 'HUMAN_HANDOVER' || ctx.vehicleType === 'Mobil';
     const isReady = isHumanHandoff || 
                    ((classifiedIntent === 'BOOKING_SERVICE' || classifiedIntent === 'GENERAL_INQUIRY') && 
-                   !!ctx.vehicleType && ctx.serviceTypes.length > 0 && ctx.missingQuestions.length === 0);
+                   !!ctx.vehicleType && ctx.serviceTypes.length > 0 && !hasGenericService);
+                   
     ctx.isReadyForTools = Boolean(isReady);
 
     // Determine reply mode
