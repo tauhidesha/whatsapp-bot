@@ -365,7 +365,9 @@ async function processSingleService(parsedServiceName, input, promoText) {
         // 5. Specific Add-ons (CVT, Behel, Arm, Shock)
         const addOnParts = ['cvt', 'behel', 'arm', 'shock'];
         if (extraContext.detailingFocus) {
-            const focus = extraContext.detailingFocus.toLowerCase();
+            const focusRaw = extraContext.detailingFocus;
+            const focusStr = typeof focusRaw === 'string' ? focusRaw : (Array.isArray(focusRaw) ? focusRaw.join(' ') : String(focusRaw));
+            const focus = focusStr.toLowerCase();
             for (const part of addOnParts) {
                 if (focus.includes(part)) {
                     const surcharge = guessingPricingPerSize(guess, 'Add-on Part');
