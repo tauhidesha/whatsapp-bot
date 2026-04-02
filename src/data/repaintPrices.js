@@ -134,7 +134,7 @@ const warnaSpesial = [
     { type: "Stabilo (Fluo)", aliases: ["stabilo", "fluo", "fluorescent"], surcharge: 170000 },
     { type: "Two-Tone / Polish", aliases: ["twotone", "polished", "velg polish"], surcharge: 210000 },
     { type: "Bunglon", aliases: ["cameleon", "chameleon"], surcharge: 300000 },
-    { type: "Chrome / Hologram", aliases: ["chrome", "kroom", "hologram"], surcharge: 500000 },
+    { type: "Chrome / Hologram", aliases: ["chrome", "kroom", "hologram"], surcharge: 300000 },
 ];
 
 // ─── SYARAT & KETENTUAN ───

@@ -312,8 +312,8 @@ async function processSingleService(parsedServiceName, input, promoText) {
         console.log(`[applyAllSurcharges] Processing "${serviceName}" (Size ${guess}) for ${motor_model}`);
         console.log(`[applyAllSurcharges] ExtraContext:`, JSON.stringify(extraContext));
 
-        // 1. Color Surcharge (for Repaint services)
-        if (serviceName.toLowerCase().includes('repaint')) {
+        // 1. Color Surcharge (for Repaint services excluding Velg)
+        if (serviceName.toLowerCase().includes('repaint') && !serviceName.toLowerCase().includes('velg')) {
             const colorType = extraContext.colorChoice || extraContext.paintType;
             if (colorType) {
                 const colorSurcharge = await getColorSurcharge(colorType, guess);
@@ -329,11 +329,21 @@ async function processSingleService(parsedServiceName, input, promoText) {
         if (serviceName.toLowerCase().includes('velg')) {
             const velgColor = extraContext.velgColorChoice || extraContext.colorChoice;
             if (velgColor) {
-                const colorSurcharge = await getColorSurcharge(velgColor, guess);
-                if (colorSurcharge > 0) {
-                    finalPrice += colorSurcharge;
-                    breakdown.push(`+Rp${colorSurcharge.toLocaleString('id-ID')} (Warna ${velgColor})`);
-                    console.log(`[applyAllSurcharges] Velg color surcharge applied: ${colorSurcharge}`);
+                const colorLookup = await lookupColorSurcharge(velgColor);
+                if (colorLookup) {
+                    const matchName = colorLookup.name.toLowerCase();
+                    const isChromeOrTwoTone = matchName.includes('chrome') || matchName.includes('hologram') || matchName.includes('two-tone') || matchName.includes('polish');
+                    
+                    if (isChromeOrTwoTone) {
+                        const colorSurcharge = await getColorSurcharge(velgColor, guess);
+                        if (colorSurcharge > 0) {
+                            finalPrice += colorSurcharge;
+                            breakdown.push(`+Rp${colorSurcharge.toLocaleString('id-ID')} (Warna ${velgColor})`);
+                            console.log(`[applyAllSurcharges] Velg color surcharge applied: ${colorSurcharge}`);
+                        }
+                    } else {
+                        console.log(`[applyAllSurcharges] Velg color surcharge SKIPPED for color: ${velgColor} (Not Chrome or Two-Tone)`);
+                    }
                 }
             }
         }
@@ -380,7 +390,11 @@ async function processSingleService(parsedServiceName, input, promoText) {
             }
         }
 
-        return { finalPrice, breakdownText: breakdown.length > 0 ? ` [${breakdown.join(', ')}]` : '' };
+        let breakdownText = '';
+        if (breakdown.length > 0) {
+            breakdownText = ` (Rincian: Harga Dasar Rp${basePrice.toLocaleString('id-ID')}, ${breakdown.join(', ')})`;
+        }
+        return { finalPrice, breakdownText };
     }
 
     // Handle generic category results

@@ -157,20 +157,28 @@ async function getSpecificPriceContext(motorModel, targetServicesStr, extraConte
         }
 
         if (price !== null) {
-            serviceBreakdown = `*Rp${price.toLocaleString('id-ID')}*`;
+            let breakdownDetails = `Harga Dasar: Rp${price.toLocaleString('id-ID')}`;
 
             // --- ULTRA DETAIL SURCHARGES ---
             
             // A. Color Surcharge (Repaint only)
             if (service.category === 'repaint' && extraContext.colorChoice) {
+                const isVelg = service.subcategory === 'velg';
                 const normColor = extraContext.colorChoice.toLowerCase();
                 const match = surcharges.find(s => 
                     normColor.includes(s.name.toLowerCase()) || 
                     s.aliases.some(a => normColor.includes(a.toLowerCase()))
                 );
+                
                 if (match) {
-                    serviceSurcharge += match.amount;
-                    serviceBreakdown += ` + Rp${match.amount.toLocaleString('id-ID')} (Warna ${match.name})`;
+                    const matchName = match.name.toLowerCase();
+                    const isChromeOrTwoTone = matchName.includes('chrome') || matchName.includes('hologram') || matchName.includes('two-tone') || matchName.includes('polish');
+                    
+                    // Apply surcharge if NOT velg, OR if velg AND color is Chrome/TwoTone
+                    if (!isVelg || isChromeOrTwoTone) {
+                        serviceSurcharge += match.amount;
+                        breakdownDetails += `, Tambahan Warna ${match.name}: +Rp${match.amount.toLocaleString('id-ID')}`;
+                    }
                 }
             }
 
@@ -178,11 +186,12 @@ async function getSpecificPriceContext(motorModel, targetServicesStr, extraConte
             if (service.subcategory === 'velg' && extraContext.isPreviouslyPainted === true) {
                 const removerFee = 75000; // Standar remover fee
                 serviceSurcharge += removerFee;
-                serviceBreakdown += ` + Rp${removerFee.toLocaleString('id-ID')} (Jasa Remover)`;
+                breakdownDetails += `, Jasa Remover Cat Lama: +Rp${removerFee.toLocaleString('id-ID')}`;
             }
 
-            combinedResult += `- ${service.name} (${motorModel.toUpperCase()}): ${serviceBreakdown}\n`;
-            totalCalculated += (price + serviceSurcharge);
+            const totalPrice = price + serviceSurcharge;
+            combinedResult += `- ${service.name} (${motorModel.toUpperCase()}): Total Rp${totalPrice.toLocaleString('id-ID')} (Rincian = ${breakdownDetails})\n`;
+            totalCalculated += totalPrice;
         }
     }
 

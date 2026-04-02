@@ -27,6 +27,7 @@ async function toolExecutorNode(state) {
                             isBongkarTotal: context.isBongkarTotal,
                             detailingFocus: context.detailingFocus,
                             colorChoice: context.colorChoice,
+                            velgColorChoice: context.velgColorChoice,
                             isPreviouslyPainted: context.isPreviouslyPainted
                         }
                     });
