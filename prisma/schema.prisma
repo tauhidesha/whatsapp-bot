@@ -121,6 +121,8 @@ model CustomerContext {
   motorCondition      String?
   targetServices      String[]
   serviceDetail       String?
+  paintType           String?
+  isBongkarTotal      Boolean?
   budgetSignal        String?
   detectedIntents     String[]
   isChangingTopic     Boolean   @default(false)
@@ -155,6 +157,10 @@ model CustomerContext {
   lastGhostCountedAt  DateTime?
   followUpConverted   Boolean   @default(false)
   lastFollowUpAt      DateTime?
+  repliedAfterFollowup Boolean   @default(false)
+  explicitlyRejected  Boolean   @default(false)
+  lastCustomerReplyAt DateTime?
+  visualSummary       String?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
   customer            Customer  @relation(fields: [phone], references: [phone])

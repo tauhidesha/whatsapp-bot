@@ -3,6 +3,7 @@
 // Track sinyal: replied after follow up, stop keywords, converted.
 
 const prisma = require('../../../lib/prisma');
+const { parseSenderIdentity } = require('../../../lib/utils');
 
 const STOP_KEYWORDS = [
     'stop', 'jangan', 'tidak usah', 'ga usam',
@@ -15,7 +16,7 @@ const STOP_KEYWORDS = [
  * Fire & forget — tidak blocking reply.
  */
 async function updateSignalsOnIncomingMessage(senderNumber, messageText) {
-    const docId = (senderNumber || '').replace(/[^0-9]/g, '');
+    const { docId } = parseSenderIdentity(senderNumber);
     if (!docId) return;
 
     try {
@@ -46,8 +47,8 @@ async function updateSignalsOnIncomingMessage(senderNumber, messageText) {
             console.log(`[SignalTracker] ${docId} explicitly rejected follow up`);
         }
 
-        // 3. Track last customer reply timestamp - use updatedAt instead
-        // lastCustomerReplyAt not in schema, using existing fields
+        // 3. Track last customer reply timestamp
+        updates.lastCustomerReplyAt = new Date();
 
         if (Object.keys(updates).length > 0) {
             await prisma.customerContext.update({
@@ -64,7 +65,7 @@ async function updateSignalsOnIncomingMessage(senderNumber, messageText) {
  * Mark customer as converted (booking/bayar setelah follow up).
  */
 async function markAsConverted(senderNumber) {
-    const docId = (senderNumber || '').replace(/[^0-9]/g, '');
+    const { docId } = parseSenderIdentity(senderNumber);
     if (!docId) return;
 
     await prisma.customerContext.update({

@@ -163,7 +163,7 @@ function scoreCustomer(context, metadata, transactions) {
             scores.hot_lead += 60;
         }
 
-        const sharedPhoto = context.sharedPhoto || context.shared_photo;
+        const sharedPhoto = context.sharedPhoto || context.shared_photo || !!context.visualSummary || !!context.visual_summary;
         if (sharedPhoto) scores.hot_lead += 30;
 
         const askedPrice = context.askedPrice || context.asked_price;

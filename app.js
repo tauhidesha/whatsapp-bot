@@ -57,7 +57,7 @@ const { getState } = require('./src/ai/utils/conversationState.js');
 const { extractAndSaveContext } = require('./src/ai/agents/contextExtractor.js');
 const { classifyAndSaveCustomer } = require('./src/ai/agents/customerClassifier.js');
 const { startAudit, handleAuditResponse, handleResumeAudit, hasActiveSession } = require('./src/ai/agents/customerAudit.js');
-const { getCustomerContext, normalizePhone } = require('./src/ai/utils/mergeCustomerContext.js');
+const { getCustomerContext, normalizePhone, syncGraphStateToCRM } = require('./src/ai/utils/mergeCustomerContext.js');
 const masterLayanan = require('./src/data/masterLayanan.js');
 const daftarUkuranMotor = require('./src/data/daftarUkuranMotor.js');
 const { repaintBodiHalus } = require('./src/data/repaintPrices.js');
@@ -1769,10 +1769,14 @@ async function processBufferedMessages(senderNumber, client) {
             const lastMessage = result.messages[result.messages.length - 1];
             const aiResponse = lastMessage ? lastMessage.content : null;
 
+
+
             // Handle HUMAN_HANDOVER intent
             if (result.intent === 'HUMAN_HANDOVER') {
                 console.log(`🚨 [LangGraph] Escalation detected for ${senderNumber}. Triggering Human Handover.`);
                 await setSnoozeMode(senderNumber, 60, { reason: 'eskalasi_otomatis' });
+                // Ensure CRM reflects latest state before handover
+                if (!isAdmin) await syncGraphStateToCRM(senderNumber, result).catch(() => {});
                 await triggerBosMatTool.implementation({
                     senderNumber: senderNumber,
                     reason: 'User meminta bantuan admin atau terdeteksi emosi tinggi.',
@@ -1810,6 +1814,8 @@ async function processBufferedMessages(senderNumber, client) {
                 }
 
                 if (!isAdmin) {
+                    // Sync state to CRM BEFORE running classifier (so classifier sees extraction results)
+                    await syncGraphStateToCRM(senderNumber, result).catch(err => console.warn(`[CRM-Bridge] Failed: ${err.message}`));
                     classifyAndSaveCustomer(senderNumber).catch(err => console.warn('[Classifier] Failed:', err.message));
                     updateSignalsOnIncomingMessage(senderNumber, combinedMessage).catch(err => console.warn('[SignalTracker] Failed:', err.message));
                 }

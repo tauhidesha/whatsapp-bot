@@ -30,6 +30,8 @@ function mapExtractedToPrismaFields(extracted) {
         motorCondition: extracted.motor_condition || null,
         targetServices: Array.isArray(extracted.target_services) ? extracted.target_services : [],
         serviceDetail: extracted.service_detail || null,
+        paintType: extracted.paint_type || null,
+        isBongkarTotal: extracted.is_bongkar_total === true ? true : extracted.is_bongkar_total === false ? false : null,
         budgetSignal: extracted.budget_signal || null,
         detectedIntents: Array.isArray(extracted.detected_intents) ? extracted.detected_intents : [],
         isChangingTopic: extracted.is_changing_topic === true,
@@ -50,6 +52,8 @@ function mapExtractedToPrismaFields(extracted) {
         upsellAccepted: extracted.upsell_accepted === true ? true : extracted.upsell_accepted === false ? false : null,
         butuhBantuanAdmin: extracted.butuh_bantuan_admin === true,
         conversationSummary: extracted.conversation_summary || null,
+        visualSummary: extracted.visual_summary || null,
+        sharedPhoto: (extracted.shared_photo === true || !!extracted.visual_summary) ? true : extracted.shared_photo === false ? false : null,
     };
 }
 
@@ -66,6 +70,8 @@ function mapPrismaToLLMFields(data) {
         motor_condition: data.motorCondition,
         target_services: data.targetServices || [],
         service_detail: data.serviceDetail,
+        paint_type: data.paintType,
+        is_bongkar_total: data.isBongkarTotal,
         budget_signal: data.budgetSignal,
         detected_intents: data.detectedIntents || [],
         is_changing_topic: data.isChangingTopic,
@@ -86,6 +92,7 @@ function mapPrismaToLLMFields(data) {
         upsell_accepted: data.upsellAccepted,
         butuh_bantuan_admin: data.butuhBantuanAdmin,
         conversation_summary: data.conversationSummary,
+        visual_summary: data.visualSummary,
         customer_label: data.customerLabel,
     };
 }
@@ -249,15 +256,15 @@ async function syncLabelToDirectMessages(senderNumber, aiLabel) {
     }
 }
 
-/**
- * Get ghosted times count from context.
- */
 async function getGhostedCount(docId) {
     const ctx = await prisma.customerContext.findUnique({
         where: { id: docId },
         select: { ghostedTimes: true, lastGhostCountedAt: true }
     });
-    return ctx?.ghostingData || { count: 0, lastCounted: null };
+    return { 
+        count: ctx?.ghostedTimes || 0, 
+        lastCounted: ctx?.lastGhostCountedAt || null 
+    };
 }
 
 /**
@@ -273,6 +280,42 @@ async function updateGhostedCountInContext(docId, newCount) {
     });
 }
 
+/**
+ * Sync LangGraph state to CRM (Flat Table).
+ * This bridges the conversation state with the CRM data.
+ */
+async function syncGraphStateToCRM(senderNumber, state) {
+    if (!senderNumber || !state) return;
+    
+    const docId = normalizePhone(senderNumber);
+    if (!docId) return;
+
+    try {
+        const { context, metadata, intent } = state;
+        
+        // Map LangGraph context back to snake_case for the existing merger
+        const extractorData = {
+            motor_model: context.vehicleType,
+            motor_color: context.colorChoice,
+            target_services: context.serviceTypes,
+            service_detail: context.serviceDetail,
+            paint_type: context.paintType,
+            is_bongkar_total: context.isBongkarTotal,
+            visual_summary: metadata.visualSummary || context.visualSummary,
+            detected_intents: [intent],
+            conversation_stage: context.isReadyForTools ? 'ready' : 'collecting',
+            shared_photo: !!(metadata.visualSummary || context.visualSummary)
+        };
+
+        // Merge and Save
+        await mergeAndSaveContext(senderNumber, extractorData);
+        
+        console.log(`[CRM-Sync] Successfully synced LangGraph state for ${docId}`);
+    } catch (err) {
+        console.error(`[CRM-Sync] Error syncing ${docId}:`, err.message);
+    }
+}
+
 module.exports = {
     mergeContextData,
     mergeAndSaveContext,
@@ -283,4 +326,5 @@ module.exports = {
     normalizePhone,
     mapExtractedToPrismaFields,
     mapPrismaToLLMFields,
+    syncGraphStateToCRM
 };

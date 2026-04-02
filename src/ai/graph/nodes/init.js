@@ -1,5 +1,6 @@
 const prisma = require('../../../lib/prisma');
 const { DateTime } = require('luxon');
+const studioMetadata = require('../../../constants/studioMetadata');
 
 /**
  * Node: init
@@ -9,7 +10,7 @@ const { DateTime } = require('luxon');
  */
 async function initNode(state) {
     console.log('--- [INIT_NODE] Starting ---');
-    const { messages, metadata } = state;
+    const { messages, metadata, context } = state;
     const phoneReal = metadata?.phoneReal;
     
     // Admin Detection (Always check at start)
@@ -61,6 +62,8 @@ async function initNode(state) {
             };
         }
 
+        const dbCtx = customer.customerContext || {};
+
         // Return state update
         return {
             isAdmin: isAdmin,
@@ -73,6 +76,20 @@ async function initNode(state) {
                     model: v.modelName,
                     plate: v.plateNumber
                 }))
+            },
+            // Push CRM context into LangGraph context if state is currently empty for those fields
+            context: {
+                ...context,
+                vehicleType: context.vehicleType || dbCtx.motorModel || null,
+                visualSummary: context.visualSummary || dbCtx.visualSummary || null,
+                customerLabel: dbCtx.customerLabel || 'stranger',
+                explicitlyRejected: dbCtx.explicitlyRejected || false,
+                serviceTypes: context.serviceTypes?.length > 0 ? context.serviceTypes : (dbCtx.targetServices || []),
+                colorChoice: context.colorChoice || dbCtx.motorColor || null,
+                paintType: context.paintType || dbCtx.paintType || null,
+                isBongkarTotal: context.isBongkarTotal !== null ? context.isBongkarTotal : (dbCtx.isBongkarTotal ?? null),
+                serviceDetail: context.serviceDetail || dbCtx.serviceDetail || null,
+                isReadyForTools: context.isReadyForTools || (dbCtx.conversationStage === 'ready')
             },
             metadata: {
                 ...metadata,
