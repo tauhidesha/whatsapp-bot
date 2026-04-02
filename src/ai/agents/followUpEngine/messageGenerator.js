@@ -48,6 +48,30 @@ const ANGLE_INSTRUCTIONS = {
         Context: Sudah 3 bulan sejak repaint.
         Goal: Pastikan cat barunya tetap terawat dan gak kusam.
         Zoya Tone: "kak, apa kabar cat barunya? udah 3 bulan nih, biar warnanya tetap deep dan kinclong maksimal, perlu dipoles tipis-tipis atau minimal dicuci komplit kak. mampir yuk, biar zoya liat progresnya juga! 😉"
+    `,
+    reminder_h7: `
+        Angle: Pengingat (Reminder) jatuh tempo Coating Maintenance (H-7).
+        Context: Jadwal maintenance tinggal 7 hari lagi.
+        Goal: Mengingatkan jadwal agar garansi tetap berlaku dan motor tetap terlindungi.
+        Zoya Tone: "Halo kak! Zoya cuma mau infoin nih, jadwal Coating Maintenance buat motornya tinggal 7 hari lagi ya kak. Biar garansinya tetep aman (nggak hangus) dan proteksinya tetep juara, yuk dijadwalin mampir minggu depan! 🛡️✨"
+    `,
+    reminder_h3: `
+        Angle: Pengingat (Reminder) jatuh tempo Coating Maintenance (H-3).
+        Context: Jadwal maintenance tinggal 3 hari lagi.
+        Goal: Reminder mendesak agar tidak terlewat.
+        Zoya Tone: "Mengingatkan kembali ya kak, jadwal Coating Maintenance motornya sisa 3 hari lagi lho. Jangan sampai terlewat ya kak, soalnya kalau kelewat nanti garansi coatingnya sayang banget bisa hangus. Mau booking hari apa kak? 🏍️🔥"
+    `,
+    reminder_h1: `
+        Angle: Pengingat (Reminder) jatuh tempo Coating Maintenance (Besok/H-1).
+        Context: Besok adalah hari jatuh tempo.
+        Goal: Panggilan terakhir untuk reservasi hari ini.
+        Zoya Tone: "Panggilan terakhir buat kak! Besok udah hari jatuh tempo Coating Maintenance kendaraan kakak nih. Biar hak garansi nggak hangus dan proteksi tetep dapet, mampir besok yuk. Kabarin zoya ya buat slotnya! 🚨✨"
+    `,
+    booking_reminder: `
+        Angle: Pengingat (Reminder) jadwal kedatangan (Booking) hari ini.
+        Context: Pelanggan punya jadwal booking hari ini.
+        Goal: Memastikan pelanggan ingat jam kedatangannya dan merasa disambut.
+        Zoya Tone: "Halo kak! 👋 Zoya cuma mau ingetin nih, hari ini kakak ada jadwal booking jam {bookingTime} buat layanan {target_service}. Ditunggu kedatangannya ya kak, studio sudah siap sambut motor gantengnya! 🙌✨"
     `
 };
 

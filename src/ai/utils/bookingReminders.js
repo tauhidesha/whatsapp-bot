@@ -12,54 +12,16 @@ const TIMEZONE = process.env.APP_TIMEZONE || 'Asia/Jakarta';
 
 let reminderIntervalHandle = null;
 
-async function sendReminderMessage(booking) {
-  const client = global.whatsappClient;
-  if (!client || typeof client.sendText !== 'function') {
-    console.warn('[bookingReminders] whatsappClient belum tersedia, reminder ditunda');
-    return false;
-  }
-
-  const target = booking.customerPhone || (booking.customer && booking.customer.phone);
-  const normalizedTarget = normalizeWhatsappNumber(target);
-  if (!normalizedTarget) {
-    console.warn('[bookingReminders] Nomor pelanggan tidak valid, reminder dilewati');
-    return false;
-  }
-
-  const customerName = booking.customerName || (booking.customer && booking.customer.name) || `Sobat ${studioMetadata.shortName}`;
-  const layanan = booking.serviceType || `Layanan ${studioMetadata.shortName}`;
-  
-  const message = [
-    `Halo ${customerName}! 👋`,
-    '',
-    `Reminder booking kamu hari ini di *${studioMetadata.name}*:`,
-    `• Tanggal: ${DateTime.fromJSDate(booking.bookingDate).setZone(TIMEZONE).toFormat('dd MMM yyyy')}`,
-    `• Jam: ${DateTime.fromJSDate(booking.bookingDate).setZone(TIMEZONE).toFormat('HH:mm')}`,
-    `• Layanan: ${layanan}`,
-    '',
-    'Kalau perlu reschedule, kabari Zoya ya mas. Ditunggu kedatangannya! 🙌'
-  ].join('\n');
-
-  try {
-    await client.sendText(normalizedTarget, message);
-    console.log('[bookingReminders] Reminder terkirim ke', normalizedTarget);
-    return true;
-  } catch (error) {
-    console.error('[bookingReminders] Gagal mengirim reminder ke', normalizedTarget, error);
-    return false;
-  }
-}
-
 async function sendBookingReminders(force = false) {
   if (!REMINDER_ENABLED) return;
 
+  const { generateFollowUpMessage } = require('../agents/followUpEngine/messageGenerator');
   const now = DateTime.now().setZone(TIMEZONE);
   if (!force && (now.hour !== REMINDER_HOUR || now.minute >= REMINDER_WINDOW_MINUTES)) {
     return;
   }
 
   // Find bookings for today (local time)
-  // Since SQL stores as UTC, we need to find the range.
   const startOfDayLocal = now.startOf('day');
   const endOfDayLocal = now.endOf('day');
 
@@ -87,24 +49,52 @@ async function sendBookingReminders(force = false) {
 
     if (bookings.length === 0) return;
 
-    console.log(`[bookingReminders] Menemukan ${bookings.length} booking SQL untuk diingatkan`);
+    console.log(`[bookingReminders] Menemukan ${bookings.length} booking SQL untuk diingatkan oleh Zoya`);
 
     for (const booking of bookings) {
-      const sent = await sendReminderMessage(booking);
-      if (sent) {
-        await prisma.booking.update({
-          where: { id: booking.id },
-          data: {
-            reminderSent: true,
-            reminderSentAt: new Date(),
+      const target = booking.customerPhone || (booking.customer && booking.customer.phone);
+      const normalizedTarget = normalizeWhatsappNumber(target);
+      if (!normalizedTarget) continue;
+
+      const bookingTime = DateTime.fromJSDate(booking.bookingDate).setZone(TIMEZONE).toFormat('HH:mm');
+      
+      try {
+        const customerData = {
+          name: booking.customerName || (booking.customer && booking.customer.name) || 'Kak',
+          context: {
+            bookingTime: bookingTime,
+            target_service: booking.serviceType || 'layanan studio',
+            customerLabel: 'active'
           }
+        };
+
+        const message = await generateFollowUpMessage(customerData, { 
+          angle: 'booking_reminder',
+          type: 'booking_reminder'
         });
+
+        if (message) {
+          await global.whatsappClient.sendText(normalizedTarget, message);
+          console.log('[bookingReminders] AI Reminder terkirim ke', normalizedTarget);
+          
+          await prisma.booking.update({
+            where: { id: booking.id },
+            data: {
+              reminderSent: true,
+              reminderSentAt: new Date(),
+            }
+          });
+        }
+      } catch (err) {
+        console.error(`[bookingReminders] Gagal mengirim AI reminder ke ${normalizedTarget}:`, err);
       }
     }
   } catch (err) {
     console.error('[bookingReminders] SQL Error:', err.message);
   }
 }
+
+// startBookingReminderScheduler removed as it is now called by the central scheduler
 
 function startBookingReminderScheduler() {
   if (!REMINDER_ENABLED) {

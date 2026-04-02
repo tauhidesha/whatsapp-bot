@@ -9,6 +9,7 @@ const COATING_MAINTENANCE_MESSAGES = {
 
 async function processCoatingReminders(client) {
   if (!client) return;
+  const { generateFollowUpMessage } = require('../agents/followUpEngine/messageGenerator');
   console.log('[CoatingReminders] Starting daily SQL check...');
 
   try {
@@ -26,8 +27,6 @@ async function processCoatingReminders(client) {
       return;
     }
 
-    const updates = [];
-
     for (const record of records) {
       if (!record.maintenanceDate || !record.customerPhone) continue;
 
@@ -38,21 +37,21 @@ async function processCoatingReminders(client) {
       const diffTime = mDateMidnight.getTime() - today.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-      let messageToSend = null;
+      let strategyAngle = null;
       let newStatus = null;
 
       if (diffDays === 7 && record.status === 'pending') {
-        messageToSend = COATING_MAINTENANCE_MESSAGES.h7(record.customerName, record.vehicleInfo);
+        strategyAngle = 'reminder_h7';
         newStatus = 'reminded_h7';
       } else if (diffDays === 3 && record.status === 'reminded_h7') {
-        messageToSend = COATING_MAINTENANCE_MESSAGES.h3(record.customerName, record.vehicleInfo);
+        strategyAngle = 'reminder_h3';
         newStatus = 'reminded_h3';
       } else if (diffDays === 1 && record.status === 'reminded_h3') {
-        messageToSend = COATING_MAINTENANCE_MESSAGES.h1(record.customerName, record.vehicleInfo);
+        strategyAngle = 'reminder_h1';
         newStatus = 'reminded_h1';
       }
 
-      if (messageToSend && newStatus) {
+      if (strategyAngle && newStatus) {
         const { normalizeWhatsappNumber } = require('./humanHandover.js');
         const phone = normalizeWhatsappNumber(record.customerPhone);
         if (!phone) {
@@ -61,19 +60,38 @@ async function processCoatingReminders(client) {
         }
 
         try {
-          await client.sendText(phone, messageToSend);
-          console.log(`[CoatingReminders] Sent H-${diffDays} reminder to ${phone}`);
-          
-          await prisma.coatingMaintenance.update({
-            where: { id: record.id },
-            data: {
-              status: newStatus,
-              reminderSent: true,
-              reminderSentAt: new Date()
+          // Prepare customer data for AI generation
+          const customerData = {
+            name: record.customerName || 'Kak',
+            context: {
+              motor_model: record.vehicleInfo,
+              customerLabel: 'active' // Fallback label
+            },
+            metadata: {
+              lastMessageAt: new Date()
             }
+          };
+
+          const messageToSend = await generateFollowUpMessage(customerData, { 
+            angle: strategyAngle,
+            type: 'coating_reminder'
           });
+
+          if (messageToSend) {
+            await client.sendText(phone, messageToSend);
+            console.log(`[CoatingReminders] AI Reminder Sent (H-${diffDays}) to ${phone}`);
+            
+            await prisma.coatingMaintenance.update({
+              where: { id: record.id },
+              data: {
+                status: newStatus,
+                reminderSent: true,
+                reminderSentAt: new Date()
+              }
+            });
+          }
         } catch (err) {
-          console.error(`[CoatingReminders] Failed to send WA to ${phone}:`, err);
+          console.error(`[CoatingReminders] Failed to send AI WA to ${phone}:`, err);
         }
       }
     }
@@ -82,11 +100,7 @@ async function processCoatingReminders(client) {
   }
 }
 
-function initCoatingRemindersSchedule(client) {
-  console.log('[CoatingReminders] SQL Scheduler initialized.');
-  setTimeout(() => processCoatingReminders(client), 10000);
-  setInterval(() => processCoatingReminders(client), 12 * 60 * 60 * 1000);
-}
+// initCoatingRemindersSchedule removed as it is now called by the main scheduler
 
 async function markCoatingReminderAsReplied(customerPhone) {
   if (!customerPhone) return;

@@ -257,6 +257,13 @@ async function runDailyFollowUp() {
         if (i < queue.length - 1) await delay(30000);
     }
 
+    const { processCoatingReminders } = require('../../utils/coatingReminders.js');
+    const { sendBookingReminders } = require('../../utils/bookingReminders.js');
+    if (global.whatsappClient) {
+        await processCoatingReminders(global.whatsappClient);
+        await sendBookingReminders(true); // Always check today's bookings
+    }
+
     console.log(`[Scheduler] Done — sent: ${sent}, skipped: ${skipped}, errors: ${errors}`);
     return { sent, skipped, errors, downgrades: downgradeCount };
 }
@@ -309,31 +316,33 @@ async function processFollowUp(customer, promoData = null) {
 let schedulerHandle = null;
 let lastDailyRunDate = null; // Track last run date
 
+const { DateTime } = require('luxon');
+const TIMEZONE = process.env.APP_TIMEZONE || 'Asia/Jakarta';
+
 function startFollowUpScheduler() {
     if (schedulerHandle) return;
 
-    // Cek setiap 15 menit
+    // Check every 15 minutes
     const intervalMs = 15 * 60 * 1000;
 
     schedulerHandle = setInterval(async () => {
-        const now = new Date();
-        const hour = now.getHours();
-        const todayStr = now.toISOString().split('T')[0];
+        const now = DateTime.now().setZone(TIMEZONE);
+        const hour = now.hour;
+        const todayStr = now.toFormat('yyyy-MM-dd');
 
-        // Run daily hanya jam 9 pagi (Local Server Time)
-        // Dan pastikan belum pernah jalan hari ini
+        // Run daily at 9am (Local Studio Time)
         if (hour === 9 && lastDailyRunDate !== todayStr) {
             try {
-                console.log(`[Scheduler] Starting daily follow up at ${now.toISOString()} (Hour: ${hour})`);
+                console.log(`[Scheduler] Starting daily follow up at ${now.toISO()} (Hour: ${hour}, Timezone: ${TIMEZONE})`);
                 await runDailyFollowUp();
-                lastDailyRunDate = todayStr; // Tandai sudah jalan
+                lastDailyRunDate = todayStr; // Mark as run for today
             } catch (err) {
                 console.error('[Scheduler] Daily run failed:', err);
             }
         }
     }, intervalMs);
 
-    console.log('[Scheduler] Follow-up scheduler started (15 min interval, 9am daily run)');
+    console.log(`[Scheduler] Follow-up scheduler started (Target: 09:00 ${TIMEZONE})`);
 }
 
 function stopFollowUpScheduler() {

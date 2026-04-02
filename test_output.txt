@@ -1,0 +1,11 @@
+🧪 Testing Updated Review Follow-Up Prompt Directly...
+
+--- GENERATED MESSAGE ---
+halo mas budi! gimana kabarnya? penasaran banget nih sama vespa sprint matt grey-nya setelah 3 hari di rumah, pastinya makin ganteng dan glowing banget ya pas kena cahaya? ✨
+
+kalau mas budi puas sama hasilnya, boleh dong aku minta sedikit review jujur di google maps buat dukung studio kita? ini linknya ya mas: https://g.page/r/Cb2npq6EDStKEBI/review 🎨
+
+btw, gimana tampilan matt grey-nya pas dipake riding sore-sore, makin keluar nggak warnanya? 😄
+--------------------------
+
+✅ PASS: No mechanical terms found.
