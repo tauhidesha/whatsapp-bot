@@ -146,6 +146,8 @@ model CustomerContext {
   labelReason         String?
   labelScores         Json?
   followUpStrategy    String?
+  followUpCount       Int       @default(0)
+  lastFollowUpStrategy String?
   txCount             Int?
   daysSinceLastChat   Int?
   daysSinceLastTx     Int?

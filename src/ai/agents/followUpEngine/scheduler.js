@@ -245,6 +245,7 @@ async function processFollowUp(customer) {
 // ─── Cron Scheduler ──────────────────────────────────────────────────────────
 
 let schedulerHandle = null;
+let lastDailyRunDate = null; // Track last run date
 
 function startFollowUpScheduler() {
     if (schedulerHandle) return;
@@ -255,11 +256,15 @@ function startFollowUpScheduler() {
     schedulerHandle = setInterval(async () => {
         const now = new Date();
         const hour = now.getHours();
+        const todayStr = now.toISOString().split('T')[0];
 
-        // Run daily hanya jam 9 pagi
-        if (hour === 9) {
+        // Run daily hanya jam 9 pagi (Local Server Time)
+        // Dan pastikan belum pernah jalan hari ini
+        if (hour === 9 && lastDailyRunDate !== todayStr) {
             try {
+                console.log(`[Scheduler] Starting daily follow up at ${now.toISOString()} (Hour: ${hour})`);
                 await runDailyFollowUp();
+                lastDailyRunDate = todayStr; // Tandai sudah jalan
             } catch (err) {
                 console.error('[Scheduler] Daily run failed:', err);
             }

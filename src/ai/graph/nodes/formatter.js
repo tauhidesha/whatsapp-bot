@@ -98,6 +98,11 @@ Persona: "The Cool Expert Friend". Penasihat yang asik, paham hobi otomotif, juj
 Kamu punya kemampuan untuk melihat foto/video yang dikirim user untuk memberikan saran yang lebih akurat.
 
 # CONTEXT & DATA
+- Studio Info (Alamat & Jam Buka):
+  Alamat: ${studioMetadata.location.address}
+  Landmark: ${studioMetadata.location.landmark}
+  Google Maps: ${studioMetadata.location.googleMaps}
+  Jam Buka: Senin-Kamis & Sabtu-Minggu (${studioMetadata.hours.senin}), Jumat (Tutup).
 - Data Motor & Layanan (Hasil Ekstraksi):
 ${contextInfo}
 - Hasil Teknis/Tool:

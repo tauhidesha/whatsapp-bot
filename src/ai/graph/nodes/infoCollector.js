@@ -295,12 +295,17 @@ Output: {
 
     // --- DECISION TREE (MISSING QUESTIONS) ---
     let missingQuestion = null;
+    const lastMsgLower = lastMessageText.toLowerCase();
+    const studioKeywords = /lokasi|alamat|dimana|buka|tutup|istirahat|jam berapa|kontak|wa|map|maps|koordinat/i.test(lastMsgLower);
 
-    if (!ctx.vehicleType) {
+    // Only force motor model if we are in booking/consultation flow and don't have it
+    const needsMotorModel = (classifiedIntent === 'BOOKING_SERVICE' || classifiedIntent === 'CONSULTATION');
+
+    if (needsMotorModel && !ctx.vehicleType) {
         missingQuestion = "Tanyakan tipe motor user (contoh: Nmax, Scoopy, Vario)";
-    } else if (ctx.serviceTypes.length === 0) {
+    } else if (needsMotorModel && ctx.serviceTypes.length === 0) {
         missingQuestion = "Tanyakan rencana layanan yang diinginkan (Repaint, Coating, atau Detailing)";
-    } else {
+    } else if (classifiedIntent === 'BOOKING_SERVICE') {
         // Resolve generic service names first
         for (let i = 0; i < ctx.serviceTypes.length; i++) {
             const svc = ctx.serviceTypes[i].toLowerCase();
@@ -337,9 +342,9 @@ Output: {
         }
     }
 
-    // For CONSULTATION, keep relaxed (no forced questions)
-    if (classifiedIntent === 'CONSULTATION') {
-        ctx.missingQuestions = [];
+    // For CONSULTATION or GENERAL_INQUIRY, keep relaxed (no forced questions unless specifically needed)
+    if (classifiedIntent === 'CONSULTATION' || (classifiedIntent === 'GENERAL_INQUIRY' && !needsMotorModel)) {
+        ctx.missingQuestions = missingQuestion ? [missingQuestion] : [];
     } else {
         ctx.missingQuestions = missingQuestion ? [missingQuestion] : [];
     }
@@ -347,9 +352,14 @@ Output: {
     // Determine readiness for tool execution
     const hasGenericService = ctx.serviceTypes.some(s => ['repaint', 'detailing', 'coating'].includes(s.toLowerCase()));
     const isHumanHandoff = classifiedIntent === 'HUMAN_HANDOVER' || ctx.vehicleType === 'Mobil';
+    
+    // Ready if:
+    // 1. Human handoff
+    // 2. Booking flow has enough data
+    // 3. General inquiry (Location/Studio info)
     const isReady = isHumanHandoff || 
-                   ((classifiedIntent === 'BOOKING_SERVICE' || classifiedIntent === 'GENERAL_INQUIRY') && 
-                   !!ctx.vehicleType && ctx.serviceTypes.length > 0 && !hasGenericService);
+                   (classifiedIntent === 'GENERAL_INQUIRY' || studioKeywords) ||
+                   (classifiedIntent === 'BOOKING_SERVICE' && !!ctx.vehicleType && ctx.serviceTypes.length > 0 && !hasGenericService);
                    
     ctx.isReadyForTools = Boolean(isReady);
 
