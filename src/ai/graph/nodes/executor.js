@@ -2,6 +2,18 @@ const { toolsByName } = require('../tools');
 const { getActivePromo } = require('../../utils/promoConfig');
 
 /**
+ * Mencegah error jika content berupa Array Object (fitur Vision LangGraph)
+ */
+function extractTextMessage(content) {
+    if (!content) return '';
+    if (typeof content === 'string') return content;
+    if (Array.isArray(content)) {
+        return content.filter(c => c.type === 'text').map(c => c.text).join(' ');
+    }
+    return String(content);
+}
+
+/**
  * Node: toolExecutor
  * Mengeksekusi tool berdasarkan intent dan context yang sudah terkumpul.
  * Mendukung multi-service dengan combo discount.
@@ -76,7 +88,8 @@ async function toolExecutorNode(state) {
                 console.log(`[executorNode] Triggering HUMAN HANDOVER (Reason: ${isCar ? 'Car Inquiry' : 'User Request'})...`);
                 const tool = toolsByName['triggerBosMatTool'];
                 if (tool) {
-                    const lastUserMsg = state.messages.slice().reverse().find(m => m.type === 'human' || m.role === 'user')?.content || 'No text found';
+                    const lastUserMsgRecord = state.messages.slice().reverse().find(m => m.type === 'human' || m.role === 'user');
+                    const lastUserMsg = lastUserMsgRecord ? extractTextMessage(lastUserMsgRecord.content) : 'No text found';
                     
                     const handoffResult = await tool({
                         reason: isCar ? 'Tanya repaint/detailing Mobil (perlu konfirmasi bos)' : 'User minta bantuan admin/human handover',
@@ -116,7 +129,8 @@ async function toolExecutorNode(state) {
             }
 
             // Cek Jam Buka/Studio Info (Selalu panggil jika intent GENERAL_INQUIRY atau ada keyword studio)
-            const lastMsgContent = (state.messages[state.messages.length - 1].content || '').toLowerCase();
+            const lastMsgRaw = state.messages[state.messages.length - 1].content;
+            const lastMsgContent = extractTextMessage(lastMsgRaw).toLowerCase();
             const studioKeywords = /lokasi|alamat|dimana|buka|tutup|istirahat|jam berapa|kontak|wa|map|maps|koordinat/i.test(lastMsgContent);
             
             if (intent === 'GENERAL_INQUIRY' || studioKeywords) {

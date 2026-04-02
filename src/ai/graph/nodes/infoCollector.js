@@ -10,6 +10,18 @@ const model = new ChatGoogleGenerativeAI({
 });
 
 /**
+ * Mencegah error jika content berupa Array Object (fitur Vision LangGraph)
+ */
+function extractTextMessage(content) {
+    if (!content) return '';
+    if (typeof content === 'string') return content;
+    if (Array.isArray(content)) {
+        return content.filter(c => c.type === 'text').map(c => c.text).join(' ');
+    }
+    return String(content);
+}
+
+/**
  * Node: infoCollector (MERGED with classifier)
  * Single LLM call that handles BOTH intent classification AND entity extraction.
  * Eliminates one full LLM round-trip for ~600-1000ms latency reduction.
@@ -20,6 +32,7 @@ async function infoCollectorNode(state) {
     const { messages, context, metadata } = state;
     const prevIntent = state.intent;
     const lastMessage = messages[messages.length - 1];
+    const lastMessageText = extractTextMessage(lastMessage.content);
 
     // Helper to clean JSON string from potential markdown code blocks
     const cleanJson = (str) => {
@@ -51,7 +64,7 @@ async function infoCollectorNode(state) {
     // Build chat transcript (max 10 messages)
     const chatTranscript = messages.slice(-10).map(m => {
         const role = (m.type === 'human' || m.role === 'user') ? '[USER]' : '[AI]';
-        return `${role}: ${m.content}`;
+        return `${role}: ${extractTextMessage(m.content)}`;
     }).join('\n');
 
     const systemPrompt = `# ROLE
@@ -111,7 +124,7 @@ Output: {
     try {
         const response = await model.invoke([
             new SystemMessage(systemPrompt),
-            new HumanMessage(`Riwayat chat:\n${chatTranscript}\n\nPESAN TERAKHIR USER: "${lastMessage.content}"`)
+            new HumanMessage(`Riwayat chat:\n${chatTranscript}\n\nPESAN TERAKHIR USER: "${lastMessageText}"`)
         ]);
 
         const cleanedContent = cleanJson(response.content);
@@ -122,11 +135,11 @@ Output: {
         classifiedIntent = (extracted.intent || 'GENERAL_INQUIRY').trim().toUpperCase();
 
         // Continuation logic (from old classifier): keep BOOKING_SERVICE for short replies
-        const isShortReply = lastMessage.content.split(' ').length <= 15;
-        const containsBookingKeywords = /warna|cat|nmax|scoopy|pcx|vespa|vario|repaint|detailing|coating|poles/i.test(lastMessage.content);
+        const isShortReply = lastMessageText.split(' ').length <= 15;
+        const containsBookingKeywords = /warna|cat|nmax|scoopy|pcx|vespa|vario|repaint|detailing|coating|poles/i.test(lastMessageText);
 
         if (prevIntent === 'BOOKING_SERVICE' && (isShortReply || containsBookingKeywords)) {
-            const studioKeywords = /lokasi|alamat|dimana|buka|tutup|istirahat|jam berapa|kontak|wa|map|maps|koordinat/i.test(lastMessage.content);
+            const studioKeywords = /lokasi|alamat|dimana|buka|tutup|istirahat|jam berapa|kontak|wa|map|maps|koordinat/i.test(lastMessageText);
             
             if (['OTHER', 'GREETING', 'GENERAL_INQUIRY'].includes(classifiedIntent)) {
                 if (classifiedIntent === 'GENERAL_INQUIRY' && studioKeywords) {
