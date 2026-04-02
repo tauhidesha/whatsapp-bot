@@ -1732,9 +1732,27 @@ async function processBufferedMessages(senderNumber, client) {
             
             const { HumanMessage } = require('@langchain/core/messages');
             
-            // Format input untuk Graph
+            // Format input untuk Graph (Dukung Gambar/Media lewat content array)
+            const messageContent = [];
+            if (combinedMessage) {
+                messageContent.push({ type: 'text', text: combinedMessage });
+            }
+            if (mediaItems && mediaItems.length > 0) {
+                mediaItems.forEach(media => {
+                    if (media.mimetype && media.data) {
+                        messageContent.push({
+                            type: 'image_url',
+                            image_url: { url: `data:${media.mimetype};base64,${media.data}` }
+                        });
+                    }
+                });
+            }
+            if (messageContent.length === 0) {
+                messageContent.push({ type: 'text', text: '[Pesan Kosong]' });
+            }
+
             const input = {
-                messages: [new HumanMessage(combinedMessage)],
+                messages: [new HumanMessage({ content: messageContent })],
                 metadata: {
                     phoneReal: senderNumber,
                     senderName: senderName,
