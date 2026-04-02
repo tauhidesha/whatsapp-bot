@@ -3120,8 +3120,6 @@ server.listen(PORT, '0.0.0.0', async () => {
             }
 
             start(client);
-            startBookingReminderScheduler();
-            startFollowUpScheduler();
             console.log('✅ WhatsApp client initialized successfully!');
 
             if (process.env.RUN_ADMIN_BACKFILL === 'true') {
