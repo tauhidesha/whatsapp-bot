@@ -104,24 +104,22 @@ async function processCoatingReminders(client) {
 
 async function markCoatingReminderAsReplied(customerPhone) {
   if (!customerPhone) return;
-  try {
-    let rawPhone = customerPhone.replace(/\D/g, '');
-    let localPhone = rawPhone.startsWith('62') ? '0' + rawPhone.slice(2) : (rawPhone.startsWith('0') ? rawPhone : '0' + rawPhone);
 
+  try {
     const records = await prisma.coatingMaintenance.findMany({
       where: {
-        status: { in: ['reminded_h7', 'reminded_h3', 'reminded_h1'] }
+        customerPhone: { contains: customerPhone.replace(/\D/g, '') },
+        status: { in: ['pending', 'reminded_h7', 'reminded_h3'] }
       }
     });
 
-    for (const record of records) {
-      const dbPhone = record.customerPhone ? record.customerPhone.replace(/\D/g, '') : '';
-      if (dbPhone.endsWith(localPhone) || rawPhone.endsWith(dbPhone)) {
+    if (records.length > 0) {
+      for (const record of records) {
         await prisma.coatingMaintenance.update({
           where: { id: record.id },
           data: {
             status: 'replied',
-            reminderSentAt: new Date() // Reusing the field or should use updated_at
+            reminderSentAt: new Date()
           }
         });
         console.log(`[CoatingReminders] SQL: Marked reminder for ${customerPhone} as replied.`);
@@ -134,6 +132,5 @@ async function markCoatingReminderAsReplied(customerPhone) {
 
 module.exports = {
   processCoatingReminders,
-  initCoatingRemindersSchedule,
   markCoatingReminderAsReplied
 };
