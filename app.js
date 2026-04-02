@@ -44,7 +44,6 @@ const { updatePromoOfTheMonthTool } = require('./src/ai/tools/updatePromoOfTheMo
 // updateCustomerContextTool REMOVED — digantikan oleh background context extractor agent
 const { createMetaWebhookRouter } = require('./src/server/metaWebhook.js');
 const { sendMetaMessage } = require('./src/server/metaClient.js');
-const { startBookingReminderScheduler } = require('./src/ai/utils/bookingReminders.js');
 const { startFollowUpScheduler, updateSignalsOnIncomingMessage } = require('./src/ai/agents/followUpEngine/index.js');
 const { isSnoozeActive, setSnoozeMode, clearSnoozeMode, getSnoozeInfo } = require('./src/ai/utils/humanHandover.js');
 const { handleAdminHpMessage, markBotMessage } = require('./src/ai/utils/adminMessageSync.js');
@@ -1904,9 +1903,9 @@ function start(client) {
     client.startTyping = wrapSafe(client.startTyping.bind(client));
     client.stopTyping = wrapSafe(client.stopTyping.bind(client));
 
-    // Initialize Coating Maintenance Reminders
-    const { initCoatingRemindersSchedule } = require('./src/ai/utils/coatingReminders');
-    initCoatingRemindersSchedule(client);
+    // Background Schedulers (Nurturing & Follow-up)
+    const { startFollowUpScheduler } = require('./src/ai/agents/followUpEngine/index');
+    startFollowUpScheduler();
 
     const debounceQueue = new DebounceQueue(DEBOUNCE_DELAY_MS, async (senderNumber) => {
         await processBufferedMessages(senderNumber, client);
