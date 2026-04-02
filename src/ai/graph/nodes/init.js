@@ -1,6 +1,6 @@
 const prisma = require('../../../lib/prisma');
 const { DateTime } = require('luxon');
-const studioMetadata = require('../../../constants/studioMetadata');
+const studioMetadata = require('../../constants/studioMetadata');
 
 /**
  * Node: init
