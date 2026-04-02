@@ -5,6 +5,7 @@ const prisma = require('../../../lib/prisma');
 const { generateFollowUpMessage, getDaysSince } = require('./messageGenerator.js');
 const { shouldStop, handleStopAction } = require('./stopCondition.js');
 const { markBotMessage } = require('../../utils/adminMessageSync.js');
+const { getActivePromo } = require('../../utils/promoConfig');
 
 // ─── Helper: Save message to Prisma ────────────────────────────────────────
 
@@ -61,6 +62,14 @@ const DOWNGRADE_RULES = [
     },
 ];
 
+// ─── Rebooking Rules ───────────────────────────────────────────────────────
+
+const REBOOKING_INTERVALS = {
+    detailing: 30,  // 1 month
+    repaint:   90,  // 3 months
+    coating:   180, // 6 months
+};
+
 // ─── Eligibility Check ──────────────────────────────────────────────────────
 
 function isEligible(context, metadata) {
@@ -97,7 +106,8 @@ function delay(ms) {
 // ─── Main Daily Run ──────────────────────────────────────────────────────────
 
 async function runDailyFollowUp() {
-    console.log('[Scheduler] Starting daily follow up run...');
+    const now = new Date(); // Definisi di paling atas scope function
+    console.log('[Scheduler] Running daily follow-up check...');
 
     // 1. Scan semua customerContext dari Prisma
     const contexts = await prisma.customerContext.findMany({
@@ -109,6 +119,7 @@ async function runDailyFollowUp() {
         }
     });
 
+    // 2. Identify eligible customers
     const queue = [];
     let downgradeCount = 0;
 
@@ -151,17 +162,72 @@ async function runDailyFollowUp() {
             }
         }
 
-        // 3. Eligibility check
-        if (!isEligible(context, metadata)) continue;
+        // 3. Eligibility checks
+        const isNurtureEligible = isEligible(context, metadata);
+        
+        // 4. Review eligibility (Post-Service 3 Days)
+        let isReviewEligible = false;
+        const lastService = customer.lastService ? new Date(customer.lastService) : null;
+        if (lastService && !context.reviewFollowUpSent) {
+            const daysSinceService = Math.floor((now - lastService) / (1000 * 60 * 60 * 24));
+            if (daysSinceService >= 3 && daysSinceService <= 7) {
+                isReviewEligible = true;
+            }
+        }
 
-        queue.push({
-            docId,
-            senderNumber: customer.phone.includes('@') ? customer.phone : customer.phone + '@c.us',
-            name: customer.name || 'Mas',
-            context,
-            metadata,
-            strategy: STRATEGY_CONFIG[context.customerLabel],
-        });
+        // 5. Rebooking eligibility (Maintenance Reminders)
+        let isRebookingEligible = false;
+        let rebookingAngle = null;
+        if (lastService && context.lastServiceType) {
+            const daysSinceService = Math.floor((now - lastService) / (1000 * 60 * 60 * 24));
+            const interval = REBOOKING_INTERVALS[context.lastServiceType];
+            
+            // Trigger exactly on interval or within 3-day window after interval
+            if (interval && daysSinceService >= interval && daysSinceService <= interval + 3) {
+                // Also check if we haven't sent a rebooking follow-up recently
+                const lastFup = context.lastFollowUpAt ? new Date(context.lastFollowUpAt) : null;
+                const daysSinceLastFup = lastFup ? Math.floor((now - lastFup) / (1000 * 60 * 60 * 24)) : 999;
+                
+                if (daysSinceLastFup > 7) { // Don't spam if they just got a different message
+                    isRebookingEligible = true;
+                    rebookingAngle = `rebooking_${context.lastServiceType}`;
+                }
+            }
+        }
+
+        const senderNumber = customer.phone.includes('@') ? customer.phone : customer.phone + '@c.us';
+
+        if (isReviewEligible) {
+            // Priority 1: Review
+            queue.unshift({
+                docId,
+                senderNumber,
+                name: customer.name || 'Mas',
+                context: { ...context, reviewMode: true },
+                metadata,
+                strategy: { ...STRATEGY_CONFIG[context.customerLabel], angle: 'review' },
+            });
+        } else if (isRebookingEligible) {
+            // Priority 2: Rebooking
+            queue.splice(queue.findIndex(item => !item.context.reviewMode), 0, {
+                docId,
+                senderNumber,
+                name: customer.name || 'Mas',
+                context: { ...context, rebookingMode: true },
+                metadata,
+                strategy: { ...STRATEGY_CONFIG[context.customerLabel], angle: rebookingAngle },
+            });
+        } else if (isNurtureEligible) {
+            // Priority 3: Nurturing
+            queue.push({
+                docId,
+                senderNumber,
+                name: customer.name || 'Mas',
+                context,
+                metadata,
+                strategy: STRATEGY_CONFIG[context.customerLabel],
+            });
+        }
     }
 
     console.log(`[Scheduler] Downgrades: ${downgradeCount}, Queue: ${queue.length} eligible`);
@@ -171,55 +237,44 @@ async function runDailyFollowUp() {
         return { sent: 0, skipped: 0, errors: 0, downgrades: downgradeCount };
     }
 
-    // 4. Process queue — staggered, 30 detik antar customer
+    // Fetch active promo once per daily run
+    const promoData = await getActivePromo();
+
+    // Process queue
     let sent = 0;
     let skipped = 0;
     let errors = 0;
 
     for (let i = 0; i < queue.length; i++) {
         const customer = queue[i];
-
         try {
-            await processFollowUp(customer);
+            await processFollowUp(customer, promoData);
             sent++;
         } catch (err) {
             console.error(`[Scheduler] Error processing ${customer.docId}:`, err.message);
             errors++;
         }
-
-        // Stagger delay
-        if (i < queue.length - 1) {
-            await delay(30000);
-        }
+        if (i < queue.length - 1) await delay(30000);
     }
 
     console.log(`[Scheduler] Done — sent: ${sent}, skipped: ${skipped}, errors: ${errors}`);
     return { sent, skipped, errors, downgrades: downgradeCount };
 }
 
-async function processFollowUp(customer) {
+async function processFollowUp(customer, promoData = null) {
     const { docId, senderNumber, context, strategy } = customer;
 
-    // Check stop conditions
     const stopResult = shouldStop(context);
     if (stopResult.stop) {
         await handleStopAction(docId, stopResult, context.customerLabel);
-        console.log(`[Scheduler] Stopped ${docId}: ${stopResult.reason}`);
         return;
     }
 
-    // Generate pesan
-    const message = await generateFollowUpMessage(customer, strategy);
+    const message = await generateFollowUpMessage(customer, strategy, promoData);
+    if (!message) return;
 
-    // Null = tidak ada promo, skip window_shopper
-    if (!message) {
-        console.log(`[Scheduler] Skip ${docId}: no message generated`);
-        return;
-    }
-
-    // Kirim via WhatsApp
     if (!global.whatsappClient) {
-        console.warn('[Scheduler] WhatsApp client not available, skipping send');
+        console.warn('[Scheduler] WhatsApp client not available');
         return;
     }
 
@@ -227,18 +282,25 @@ async function processFollowUp(customer) {
     await global.whatsappClient.sendText(senderNumber, message);
     console.log(`[Scheduler] ✅ Sent to ${docId}: "${message.substring(0, 50)}..."`);
 
-    // Update signals setelah kirim
+    const updateData = {
+        followUpCount: (context.followUpCount || 0) + 1,
+        lastFollowUpAt: new Date(),
+        lastFollowUpStrategy: strategy.angle,
+    };
+
+    if (context.reviewMode) {
+        updateData.reviewFollowUpSent = true;
+        updateData.lastReviewAt = new Date();
+    }
+
+    // Rebooking mode triggers a "snooze" on nurturing by updating lastFollowUpAt
+    // This is already done by default above.
+
     await prisma.customerContext.update({
         where: { id: docId },
-        data: {
-            followUpCount: (context.followUpCount || 0) + 1,
-            lastFollowUpAt: new Date(),
-            lastFollowUpStrategy: strategy.angle,
-            // repliedAfterFollowup: false // Reset, tunggu reply baru
-        }
+        data: updateData
     });
 
-    // Simpan ke Prisma
     await saveMessageToPrisma(senderNumber, message, 'ai');
 }
 

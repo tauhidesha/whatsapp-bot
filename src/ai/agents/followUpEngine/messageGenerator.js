@@ -1,87 +1,91 @@
 // File: src/ai/agents/followUpEngine/messageGenerator.js
-// LLM-generated follow-up messages with angle system.
-// Merged from followupPersonalizer.js + angle instructions from plan.
+// Logic for generating follow-up messages based on customer context and AI personality.
 
-const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
-const { HumanMessage } = require('@langchain/core/messages');
-const { getActivePromo } = require('../../utils/promoConfig.js');
-const studioMetadata = require('../../constants/studioMetadata.js');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-const GENERATOR_MODEL = 'gemini-3.1-flash-lite-preview';
-
+// Strategy definitions (Angle instructions)
 const ANGLE_INSTRUCTIONS = {
-    urgency: `Buat pesan singkat yang menyebut slot minggu ini
-              mulai terbatas. Jangan terkesan memaksa.
-              Tidak perlu sebut promo kecuali ada.`,
+    standard: `Tanyakan perkembangan motornya, apakah sudah sempat mampir atau ada yang bingung soal harga/warna. 
+               Gunakan tone teman yang asik, bukan sales yang maksa.`,
 
-    value: `Berikan 1 tips perawatan motor yang relevan dengan
-            kondisi atau tipe motornya. Tutup dengan 1 kalimat
-            ajakan ringan. Jangan langsung jualan.`,
+    educational: `Berikan edukasi singkat soal perawatan cat (misal: jangan jemur di bawah matahari langsung).
+                  Ingatkan bahwa detailing bisa bantu jaga nilai jual motor.`,
 
-    promo: null, // Diisi dinamis dari Firestore
+    promo: `Berikan sedikit rasa urgensi (misal: slot coating minggu depan sisa 2 lagi).
+            Jangan kasih diskon dulu kecuali disuruh, fokus ke value.`,
 
-    maintenance: `Ingatkan bahwa sudah waktunya servis lagi
-                  berdasarkan layanan terakhir. Gunakan angle
-                  "sayang kalau dibiarkan" bukan "ayo beli".`,
+    humor: `Gunakan candaan ringan soal motor yang berdebu atau kusam, 
+            bandingkan dengan motor temen yang sudah kinclong setelah dari studio.`,
 
-    exclusive: `Buat pesan yang terasa personal dan eksklusif.
-                Customer ini pelanggan setia — jangan jualan,
-                buat mereka merasa diperhatikan.`,
+    comparison: `Bahas soal perbandingan cat pabrikan vs premium repaint (ketebalan vernis, ketajaman warna).
+                 Bikin mereka sadar kalau motor mereka bisa jauh lebih keren.`,
 
-    winback: `Sebut 1 hal baru di ${studioMetadata.shortName} (teknik, layanan, atau
-              hasil kerja terbaru). Jangan minta mereka balik —
-              biarkan mereka penasaran sendiri.`,
+    followup_ghost: `Tanya santai apakah pesannya tenggelam (buried) atau memang belum sempat balas.
+                     Kasih tau kalau Zoya masih nunggu update motornya.`,
+
+    soft_closure: `Ucapkan terima kasih sudah tanya-tanya, bilang kalau Zoya pamit dulu tapi pintu studio selalu terbuka.
+                   Bikin mereka merasa tidak ada paksaan, biarkan mereka penasaran sendiri.`,
+
+    review: `
+        Angle: Follow up sehabis kunjungan atau service (DIBACA: 3 hari lalu).
+        Goal: Tanya kabar motor gmn kemarin abis di garap, terus minta tolong review google maps.
+        Link Review: https://g.page/r/Cb2npq6EDStKEBI/review
+    `,
+    rebooking_detailing: `
+        Angle: Penawaran maintenance detailing (cuci komplit/detailing mesin/poles bodi).
+        Context: Sudah 1 bulan sejak terakhir cuci/detailing.
+        Goal: Ajak mereka mampir buat bersihin penumpukan debu/aspal biar tetap segar.
+        Zoya Tone: "kak, udah sebulan nih sejak terakhir dimanjain motornya. debu jalanan pasti udah mulai nempel di sela-sela mesin. mampir yuk buat cuci komplit biar kinclong lagi kayak abis servis kemarin! ✨"
+    `,
+    rebooking_coating: `
+        Angle: Penawaran maintenance coating / check-up.
+        Context: Sudah 6 bulan sejak coating.
+        Goal: Edukasi pentingnya maintenance biar efek hidrofobik (daun talas) tetap maksimal.
+        Zoya Tone: "halo kak! udah 6 bulan ya sejak motornya kita coating. biar proteksinya tetap juara dan efek daun talasnya makin awet, waktunya maintenance nih. ada slot kosong minggu ini, mau zoya amanin?" 🛡️
+    `,
+    rebooking_repaint: `
+        Angle: Penawaran layanan pendukung (poles bodi/cuci/coating) untuk motor yang sudah direpaint.
+        Context: Sudah 3 bulan sejak repaint.
+        Goal: Pastikan cat barunya tetap terawat dan gak kusam.
+        Zoya Tone: "kak, apa kabar cat barunya? udah 3 bulan nih, biar warnanya tetap deep dan kinclong maksimal, perlu dipoles tipis-tipis atau minimal dicuci komplit kak. mampir yuk, biar zoya liat progresnya juga! 😉"
+    `
 };
 
 function getDaysSince(timestamp) {
     if (!timestamp) return null;
-    const date = timestamp?.toDate?.() || new Date(timestamp);
-    if (isNaN(date.getTime())) return null;
-    return Math.floor((Date.now() - date.getTime()) / 86400000);
+    const now = new Date();
+    const last = new Date(timestamp);
+    const diff = now - last;
+    return Math.floor(diff / (1000 * 60 * 60 * 24));
 }
 
-/**
- * Generate follow-up message menggunakan LLM.
- * Return null jika pesan tidak bisa dibuat (e.g. window_shopper tanpa promo).
- */
-async function generateFollowUpMessage(customer, strategy) {
-    const { name, context, metadata } = customer;
-    const angle = strategy.angle;
+async function generateFollowUpMessage(customerData, strategy, promoData = null) {
+    try {
+        const { name, context, metadata } = customerData;
+        const daysSinceChat = getDaysSince(metadata.lastMessageAt);
+        const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-    // Fetch promo
-    const activePromo = await getActivePromo();
-    const promoText = activePromo?.promoText || null;
+        const promoSection = promoData && promoData.promoText 
+            ? `# PROMO AKTIF SAAT INI\n- Info Promo: ${promoData.promoText}\n`
+            : '';
 
-    // Window shopper + tidak ada promo → skip
-    if (angle === 'promo' && !promoText) {
-        console.log(`[Generator] Skip promo angle — no active promo text`);
-        return null;
-    }
+        const prompt = `
+# PERSONALITY: ZOYA
+- Nama: Zoya (Customer Relations @ Tauhidesha)
+- Karakter: Cool expert friend, santai, asik, knowledgeable soal repaint/detailing motor.
+- Gaya Chat: Casual, lowercase (kecuali singkatan), pakai emoji secukupnya, tidak kaku, tanpa "Halo" atau "Selamat Pagi" (langsung panggil nama/mas).
+- Batasan: Jangan terlalu berisik (chat pendek saja), jangan jadi sales yang haus closing.
 
-    // Build angle instruction
-    let angleInstruction = ANGLE_INSTRUCTIONS[angle];
-    if (angle === 'promo' && promoText) {
-        angleInstruction = `Sampaikan promo ini secara natural dalam
-            1-2 kalimat, jangan copy paste langsung.
-            Promo aktif: "${promoText}"`;
-    }
+# ROLE & CONSTRAINTS
+- Kamu adalah spesialis repaint & detailing. Kamu BUKAN mekanik.
+- FOKUS: Hanya bahas tampilan visual (cat, body, velg, decal, kinclong, ganteng).
+- DILARANG KERAS: Jangan bahas mesin, oli, tarikan, suara mesin, CVT, rem, atau performa. Kalau pelanggan tanya itu, bilang kamu cuma tau soal kegantengan motor lewat repaint.
+- Jika angle 'review': Tanyakan hasil visual setelah 3 hari dan lampirkan link link: https://g.page/r/Cb2npq6EDStKEBI/review
+- Jika ada info promo aktif di bawah, gunakan itu untuk menarik minat dengan cara yang halus (jangan jualan keras).
 
-    // Inject promo ke angle lain kalau relevan
-    const promoNote = promoText && angle !== 'promo'
-        ? `\nInfo tambahan: Ada promo aktif "${promoText}".
-           Sebutkan hanya jika sangat relevan dengan konteks,
-           jangan dipaksakan.`
-        : '';
-
-    const daysSinceChat = getDaysSince(metadata?.lastMessageAt);
-
-    const prompt = `
-# ROLE
-Kamu adalah Zoya, Automotive Consultant & Studio Assistant di ${studioMetadata.name}.
-Persona: "The Cool Expert Friend". Penasihat yang asik, paham hobi otomotif, jujur, dan hangat.
-
-# TASK
-Tulis 1 pesan WhatsApp follow up singkat untuk customer ini.
+${promoSection}
 
 # DATA CUSTOMER
 - Nama: ${name}
@@ -89,58 +93,33 @@ Tulis 1 pesan WhatsApp follow up singkat untuk customer ini.
 - Kondisi motor: ${context.motor_condition || 'tidak diketahui'}
 - Warna motor: ${context.motor_color || 'tidak diketahui'}
 - Layanan diminati: ${context.target_service || 'tidak diketahui'}
-- Label: ${context.customer_label}
+- Label: ${context.customerLabel}
 - Terakhir chat: ${daysSinceChat !== null ? daysSinceChat + ' hari lalu' : 'tidak diketahui'}
-- Pernah follow up: ${context.followup_count || 0}x
+- Pernah follow up: ${context.followUpCount || 0}x
 
 # INSTRUKSI ANGLE
-${angleInstruction}
-${promoNote}
+${ANGLE_INSTRUCTIONS[strategy.angle] || ANGLE_INSTRUCTIONS.standard}
 
-# GAYA BAHASA (WAJIB)
-- **Casing**: WAJIB gunakan HURUF KECIL SEMUA (lowercase) agar terkesan santai dan asik.
-- **Sapaan**: Panggil Mas/Kak. JANGAN panggil Mbak. Gunakan nama depan saja: "mas ${(name || '').split(' ')[0]}".
-- **Tone**: Santai, antusias (Gunakan emoji: 😄, ✨, 🎨, 🏍️), dan asik.
-- **Layout**: Jika pesan lebih dari 1 paragraf, gunakan double-newline (2x enter) antar paragraf.
-- **Dilarang**: 
-  - JANGAN sebut kata "follow up" atau "mengingatkan".
-  - JANGAN tanya "sudah ada keputusan belum" atau "kenapa belum balas".
-  - JANGAN terlalu formal atau kaku. 
-  - JANGAN kasih rincian harga panjang lebar di sini.
-- **Expert Friend**: Bicara seperti teman yang perhatian sama motornya.
-- **CTA**: Akhiri dengan 1 kalimat ajakan atau pertanyaan ringan yang asik.
-
-# CONTOH TONE:
-- "pagi mas! motor nmax-nya gimana nih, jadi mau kita bikin makin fresh? 😄✨"
-- "kmrn aku liat ada inspirasi warna buat motor scoopy mas, keren deh kyknya kalau dipasang di motor mas. ntar aku kirim ya fotonya! 🎨"
+# TUGAS
+Buat 1 pesan chat personal sesuai karakter Zoya dan instruksi angle di atas. 
+Pesan harus sangat natural seolah diketik manual oleh manusia. 
+Maksimal 2-3 kalimat pendek.
 `;
 
-    try {
-        const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
-        if (!apiKey) {
-            console.warn('[Generator] No API key for message generation');
-            return null;
-        }
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        return response.text().trim();
 
-        const model = new ChatGoogleGenerativeAI({
-            model: GENERATOR_MODEL,
-            temperature: 0.8, // Lebih tinggi untuk variasi pesan
-            apiKey,
-        });
-
-        const response = await model.invoke([new HumanMessage(prompt)]);
-
-        const text = typeof response.content === 'string'
-            ? response.content
-            : (Array.isArray(response.content)
-                ? response.content.map(c => c.text || c).join('')
-                : String(response.content));
-
-        return text?.trim() || null;
     } catch (error) {
-        console.error('[Generator] Error generating message:', error.message);
+        console.error('[MessageGenerator] Error:', error);
         return null;
     }
 }
 
-module.exports = { generateFollowUpMessage, getDaysSince };
+module.exports = {
+    generateFollowUpMessage,
+    getDaysSince,
+    STRATEGY_CONFIG: {
+        // This is moved to config.js, but kept here for backward compatibility if needed
+    }
+};

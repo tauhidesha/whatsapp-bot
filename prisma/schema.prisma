@@ -160,6 +160,10 @@ model CustomerContext {
   repliedAfterFollowup Boolean   @default(false)
   explicitlyRejected  Boolean   @default(false)
   lastCustomerReplyAt DateTime?
+  lastServiceAt       DateTime?
+  lastServiceType     String?
+  lastReviewAt        DateTime?
+  reviewFollowUpSent  Boolean   @default(false)
   visualSummary       String?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
