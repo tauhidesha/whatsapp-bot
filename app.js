@@ -1742,7 +1742,7 @@ async function processBufferedMessages(senderNumber, client) {
                     if (media.mimetype && media.data) {
                         messageContent.push({
                             type: 'image_url',
-                            image_url: { url: `data:${media.mimetype};base64,${media.data}` }
+                            image_url: `data:${media.mimetype};base64,${media.data}`
                         });
                     }
                 });

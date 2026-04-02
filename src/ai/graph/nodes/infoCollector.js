@@ -145,10 +145,18 @@ Output: {
             visionContent.push({ type: 'text', text: lastMessage.content || '[Tanpa Teks]' });
         }
 
+        // Log vision content types for debugging
+        const visionDebug = visionContent.map(c => ({ 
+            type: c.type, 
+            data_sample: (c.text || '').substring(0, 50) || (c.image_url ? c.image_url.substring(0, 50) + '...' : 'no_data') 
+        }));
+        console.log(`[INFO_COLLECTOR_NODE] Vision Payload:`, JSON.stringify(visionDebug));
+
         const response = await model.invoke([
             new SystemMessage(systemPrompt),
             new HumanMessage({ content: visionContent })
         ]);
+        
 
         const cleanedContent = cleanJson(response.content);
         extracted = JSON.parse(cleanedContent);
