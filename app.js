@@ -1739,10 +1739,10 @@ async function processBufferedMessages(senderNumber, client) {
             }
             if (mediaItems && mediaItems.length > 0) {
                 mediaItems.forEach(media => {
-                    if (media.mimetype && media.data) {
+                    if (media.mimetype && media.buffer) {
                         messageContent.push({
                             type: 'image_url',
-                            image_url: `data:${media.mimetype};base64,${media.data}`
+                            image_url: `data:${media.mimetype};base64,${media.buffer.toString('base64')}`
                         });
                     }
                 });
