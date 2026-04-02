@@ -65,7 +65,8 @@ async function generateFollowUpMessage(customerData, strategy, promoData = null)
         const daysSinceChat = getDaysSince(metadata.lastMessageAt);
         const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+        const modelName = process.env.AI_MODEL || 'gemini-1.5-flash';
+        const model = genAI.getGenerativeModel({ model: modelName });
 
         const promoSection = promoData && promoData.promoText 
             ? `# PROMO AKTIF SAAT INI\n- Info Promo: ${promoData.promoText}\n`
