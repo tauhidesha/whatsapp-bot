@@ -68,10 +68,16 @@ async function infoCollectorNode(state) {
     }).join('\n');
 
     const systemPrompt = `# ROLE
-Kamu adalah AI Classifier & Data Extractor untuk ${studioMetadata.name}.
+Kamu adalah AI Classifier & Data Extractor (Vision-Enabled) untuk ${studioMetadata.name}.
 Tugasmu ada DUA dalam SATU kali analisis:
 1. Tentukan INTENT (niat) dari pesan terakhir user.
-2. Ekstrak informasi teknis kendaraan & layanan dari riwayat chat.
+2. Ekstrak informasi teknis kendaraan & layanan dari riwayat chat DAN GAMBAR/FOTO yang dikirim user.
+
+# VISION EXTRACTION (NEW)
+Dukung penuh analisis gambar! Jika user mengirim foto motor/mobil:
+- **Analisis Motor**: Tentukan model motor (Nmax, Vespa, dll) dan warna aslinya dari foto.
+- **Analisis Kondisi**: Perhatikan apakah velg sudah pernah dicat (tidak ori), ada lecet bodi, atau bagian yang kusam.
+- **Warna**: Gunakan foto untuk mengonfirmasi "color_choice" jika user bilang "warna kayak gini".
 
 # INTENT CATEGORIES (Pilih SATU)
 - **GREETING**: Sapaan awal (Halo, P, Assalamualaikum).
@@ -84,7 +90,7 @@ Tugasmu ada DUA dalam SATU kali analisis:
 # EXTRACTION RULES
 Ekstrak data ke dalam format JSON dengan field berikut:
 1. **intent**: Satu keyword intent dari daftar di atas (UPPERCASE).
-2. **internal_thought**: (Chain-of-Thought) Analisis singkat: Apa yang user mau? Data apa yang baru didapat?
+2. **internal_thought**: (Chain-of-Thought) Analisis singkat: Apa yang user mau? Apa yang kamu lihat di foto? Data apa yang baru didapat?
 3. **motor_model**: Jenis motor (Nmax, Scoopy, dll). Jika user menyebut *Mobil*, masukkan "Mobil".
 4. **service_types**: Array layanan (Repaint, Detailing, Coating, Cuci).
 5. **paint_type**: Jenis cat (Glossy / Doff).
@@ -92,7 +98,7 @@ Ekstrak data ke dalam format JSON dengan field berikut:
 7. **detailing_focus**: Fokus area (Bodi Halus, Bodi Kasar, Velg, Mesin).
 8. **color_choice**: Warna bodi yang diinginkan.
 9. **velg_color_choice**: Warna velg (SERINGKALI berbeda dengan bodi).
-10. **is_previously_painted**: (Boolean/null) Jika motor sudah pernah dicat ulang.
+10. **is_previously_painted**: (Boolean/null) Jika motor/velg sudah pernah dicat ulang (terlihat di foto atau disebut user).
 
 # INTENT RULES
 - JIKA user hanya menyapa (Halo, P, Assalamualaikum), WAJIB intent = "GREETING".
@@ -103,28 +109,40 @@ Ekstrak data ke dalam format JSON dengan field berikut:
 - **Warna**: Bedakan dengan teliti antara warna bodi dan warna velg.
 - **Negative Constraint**: JANGAN menebak data yang tidak ada. Jika ragu, berikan \`null\`.
 - **Context Awareness**: Gunakan riwayat untuk melengkapi data yang sebelumnya sudah disebutkan.
-- **Jika intent = GREETING atau OTHER**: Boleh skip extraction (isi null semua kecuali intent).
 
 # EXAMPLE
-User: "repaint nmax glossy warna merah candy, velgnya silver"
+User: (Mengirim foto Nmax Merah) "repaint ini glossy kena berapa?"
 Output: {
   "intent": "BOOKING_SERVICE",
-  "internal_thought": "User ingin repaint Nmax warna merah candy glossy dengan velg silver.",
+  "internal_thought": "User mengirim foto Yamaha Nmax warna merah. Ingin estimasi harga repaint glossy.",
   "motor_model": "Nmax",
   "service_types": ["Repaint"],
   "paint_type": "Glossy",
-  "detailing_focus": "Bodi Halus & Velg",
-  "color_choice": "Merah Candy",
-  "velg_color_choice": "Silver"
+  "detailing_focus": "Bodi Halus",
+  "color_choice": "Merah"
 }`;
 
     // --- SINGLE LLM CALL: classify + extract ---
     let classifiedIntent = 'GENERAL_INQUIRY';
 
     try {
+        const visionContent = [
+            { 
+                type: 'text', 
+                text: `BERIKUT ADALAH KONTEKS PERCAKAPAN:\n\n${chatTranscript}\n\nPESAN TERAKHIR USER (Mungkin disertai gambar/foto):\n` 
+            }
+        ];
+
+        // Masukkan content pesan terakhir (bisa berupa Array [text, image_url] atau string)
+        if (Array.isArray(lastMessage.content)) {
+            visionContent.push(...lastMessage.content);
+        } else {
+            visionContent.push({ type: 'text', text: lastMessage.content || '[Tanpa Teks]' });
+        }
+
         const response = await model.invoke([
             new SystemMessage(systemPrompt),
-            new HumanMessage(`Riwayat chat:\n${chatTranscript}\n\nPESAN TERAKHIR USER: "${lastMessageText}"`)
+            new HumanMessage({ content: visionContent })
         ]);
 
         const cleanedContent = cleanJson(response.content);
