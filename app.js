@@ -69,7 +69,7 @@ const { zoyaAgent } = require('./src/ai/graph/index.js');
 
 // --- Global Constants ---
 const ACTIVE_AI_MODEL = process.env.AI_MODEL || 'gemini-flash-lite-latest';
-const DEBOUNCE_DELAY_MS = 10000;
+const DEBOUNCE_DELAY_MS = parseInt(process.env.DEBOUNCE_DELAY_MS, 10) || 10000;
 const ACTIVE_VISION_MODEL = process.env.VISION_MODEL || 'gemini-1.5-flash';
 const MEMORY_CONFIG = {
     maxMessages: parseInt(process.env.MEMORY_MAX_MESSAGES) || 20,
