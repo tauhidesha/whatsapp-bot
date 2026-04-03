@@ -6,29 +6,68 @@ const studioMetadata = require('../../constants/studioMetadata');
 
 /**
  * Sanitize message history for Gemini API compliance.
- * Gemini strictly requires: ToolMessage must come IMMEDIATELY after its
- * paired AIMessage that contains tool_calls. If the slice cuts mid-cycle,
- * this function trims orphaned ToolMessages from the start and orphaned
- * AIMessages (with tool_calls but no following ToolMessages) from the end.
+ *
+ * Gemini enforces strict turn ordering:
+ *   1. Must start with HumanMessage (not ToolMessage or orphan AIMessage).
+ *   2. Every AIMessage with tool_calls must be IMMEDIATELY followed by
+ *      a ToolMessage for EACH tool_call_id (no gaps, no extra messages).
+ *   3. No orphaned ToolMessages (without a preceding AIMessage with tool_calls).
+ *
+ * Strategy:
+ *   - Trim from the front until we hit a HumanMessage.
+ *   - Do a forward-pass to find and remove any broken tool_call ↔ ToolMessage pairs.
+ *   - Trim trailing AIMessage(tool_calls) with no following ToolMessages.
  */
 function sanitizeMessagesForGemini(messages) {
     let sanitized = [...messages];
 
-    // 1. Trim leading orphan ToolMessages: if history starts with a ToolMessage
-    //    (its AIMessage pair was cut off by slice), remove it and anything after
-    //    that breaks the pairing chain.
-    while (sanitized.length > 0 && sanitized[0]._getType?.() === 'tool') {
+    // --- Step 1: Trim from front until first HumanMessage ---
+    // Handles case where slice(-N) cuts off the paired AIMessage, leaving
+    // an orphaned ToolMessage or an AIMessage(tool_calls) at the start.
+    while (sanitized.length > 0) {
+        const first = sanitized[0];
+        const type = first._getType?.();
+        // Only HumanMessage or AIMessage(without tool_calls) are safe starts
+        if (type === 'human') break;
+        if (type === 'ai' && (!first.tool_calls || first.tool_calls.length === 0)) break;
         sanitized.shift();
     }
 
-    // 2. Trim trailing orphan AIMessages with tool_calls but no following ToolMessage.
-    //    This can happen if the executor ran but the checkpoint wasn't updated yet.
+    // --- Step 2: Forward-pass — validate tool_call ↔ ToolMessage pairing ---
+    // If an AIMessage has tool_calls but the NEXT message is not a ToolMessage
+    // for all of them, strip the AIMessage (and any following ToolMessages) out.
+    let i = 0;
+    while (i < sanitized.length) {
+        const msg = sanitized[i];
+        if (msg._getType?.() === 'ai' && msg.tool_calls?.length > 0) {
+            const expectedIds = new Set(msg.tool_calls.map(tc => tc.id));
+            const foundIds = new Set();
+
+            // Collect consecutive ToolMessages immediately after this AIMessage
+            let j = i + 1;
+            while (j < sanitized.length && sanitized[j]._getType?.() === 'tool') {
+                foundIds.add(sanitized[j].tool_call_id);
+                j++;
+            }
+
+            // If all tool_call_ids are matched → valid, skip over them
+            const allMatched = [...expectedIds].every(id => foundIds.has(id));
+            if (allMatched) {
+                i = j; // jump past all collected ToolMessages
+            } else {
+                // Broken pair: remove the AIMessage + any partial ToolMessages after it
+                sanitized.splice(i, j - i);
+                // Don't increment i; re-check from same position
+            }
+        } else {
+            i++;
+        }
+    }
+
+    // --- Step 3: Trailing guard — remove trailing AIMessage(tool_calls) with no ToolMessages ---
     while (sanitized.length > 0) {
         const last = sanitized[sanitized.length - 1];
-        const hasOrphanToolCall =
-            last._getType?.() === 'ai' &&
-            last.tool_calls?.length > 0;
-        if (hasOrphanToolCall) {
+        if (last._getType?.() === 'ai' && last.tool_calls?.length > 0) {
             sanitized.pop();
         } else {
             break;
