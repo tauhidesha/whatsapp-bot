@@ -96,6 +96,7 @@ app.use(helmet());
 // CORS: Restrict to known origins (was: wildcard *)
 const allowedOrigins = [
     'https://bosmatstudioadmin.vercel.app',
+    'https://admin-ui-bosmat.vercel.app',
     'http://localhost:3000',
     'http://localhost:3001',
 ];
