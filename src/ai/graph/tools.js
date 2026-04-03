@@ -1,3 +1,4 @@
+const { generateMarketingCopyTool } = require('../tools/generateMarketingCopyTool.js');
 const { getServiceDetailsTool } = require('../tools/getServiceDetailsTool.js');
 const { getStudioInfoTool } = require('../tools/getStudioInfoTool.js');
 const { checkBookingAvailabilityTool } = require('../tools/checkBookingAvailabilityTool.js');
@@ -25,6 +26,7 @@ const { calculateHomeServiceFeeTool } = require('../tools/calculateHomeServiceFe
  * Kita menggunakan implementasi yang sudah ada di folder src/ai/tools/.
  */
 const zoyaTools = [
+    generateMarketingCopyTool,
     getServiceDetailsTool,
     getStudioInfoTool,
     checkBookingAvailabilityTool,

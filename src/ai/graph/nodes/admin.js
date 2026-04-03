@@ -19,6 +19,7 @@ async function adminNode(state) {
 
     // Identifikasi alat yang relevan untuk Admin (gunakan nama fungsi dari toolDefinition)
     const adminToolNames = [
+        'generateMarketingCopy',
         'crmManagement',
         'addTransaction',
         'updateTransaction',
