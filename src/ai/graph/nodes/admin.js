@@ -5,6 +5,40 @@ const { getActivePromo } = require('../../utils/promoConfig');
 const studioMetadata = require('../../constants/studioMetadata');
 
 /**
+ * Sanitize message history for Gemini API compliance.
+ * Gemini strictly requires: ToolMessage must come IMMEDIATELY after its
+ * paired AIMessage that contains tool_calls. If the slice cuts mid-cycle,
+ * this function trims orphaned ToolMessages from the start and orphaned
+ * AIMessages (with tool_calls but no following ToolMessages) from the end.
+ */
+function sanitizeMessagesForGemini(messages) {
+    let sanitized = [...messages];
+
+    // 1. Trim leading orphan ToolMessages: if history starts with a ToolMessage
+    //    (its AIMessage pair was cut off by slice), remove it and anything after
+    //    that breaks the pairing chain.
+    while (sanitized.length > 0 && sanitized[0]._getType?.() === 'tool') {
+        sanitized.shift();
+    }
+
+    // 2. Trim trailing orphan AIMessages with tool_calls but no following ToolMessage.
+    //    This can happen if the executor ran but the checkpoint wasn't updated yet.
+    while (sanitized.length > 0) {
+        const last = sanitized[sanitized.length - 1];
+        const hasOrphanToolCall =
+            last._getType?.() === 'ai' &&
+            last.tool_calls?.length > 0;
+        if (hasOrphanToolCall) {
+            sanitized.pop();
+        } else {
+            break;
+        }
+    }
+
+    return sanitized;
+}
+
+/**
  * Node: adminNode
  * Brain asisten pribadi untuk Admin (Persona: Business Partner).
  */
@@ -85,9 +119,13 @@ Kamu bukan sekadar asisten, tapi delegasi terpercaya yang membantu mengelola CRM
 - Lokasi Studio: ${studioMetadata.location.address} (Landmark: ${studioMetadata.location.landmark}).
 - Spesialisasi: Repaint Bodi Halus/Kasar, Velg, Detailing, Coating.`;
 
+    const rawHistory = messages.slice(-10);
+    const safeHistory = sanitizeMessagesForGemini(rawHistory);
+    console.log(`[ADMIN_NODE] History: ${messages.length} total → last 10 → ${safeHistory.length} after sanitize`);
+
     const response = await model.invoke([
         new SystemMessage(systemPrompt),
-        ...messages.slice(-10)
+        ...safeHistory
     ]);
 
     // Check if tool calls exist
