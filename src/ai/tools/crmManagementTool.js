@@ -8,6 +8,7 @@ const {
     assignWhatsAppLabel
 } = require('../../lib/whatsappLabelUtils.js');
 const { traceable } = require('../utils/langsmith.js');
+const { markBotMessage } = require('../utils/adminMessageSync.js');
 
 /**
  * Tool CRM Komprehensif untuk AI Admin (Zoya) menggunakan PostgreSQL via Prisma.
@@ -248,6 +249,8 @@ async function handleExecuteFollowup() {
     for (const item of items) {
         try {
             const target = item.number.includes('@') ? item.number : `${item.number}@c.us`;
+            // Mark before sending so onAnyMessage doesn't treat it as admin-from-HP
+            markBotMessage(target, item.draft);
             await client.sendText(target, item.draft);
             successCount++;
             await new Promise(r => setTimeout(r, 2000));

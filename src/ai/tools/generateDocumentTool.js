@@ -11,6 +11,7 @@ const { isAdmin } = require('../utils/adminAuth.js');
 const { warrantyRepaint, warrantyCoating } = require('../../data/warrantyTerms.js');
 const generateInvoiceHTML = require('../../data/templates/invoiceTemplate.js');
 const { generateWarrantyHTML } = require('../../data/templates/warrantyTemplate.js');
+const { markBotMessage } = require('../utils/adminMessageSync.js');
 
 // Helper untuk membuat garis horizontal
 function generateHr(doc, y) {
@@ -351,12 +352,15 @@ const generateDocumentTool = {
       try {
         // Small delay to ensure browser stability after generation
         await new Promise(resolve => setTimeout(resolve, 2000));
-        
+
+        const fileCaption = `Berikut adalah ${title} untuk pesanan Anda.`;
+        // Mark before sending so onAnyMessage doesn't treat it as admin-from-HP
+        markBotMessage(targetRecipient, fileCaption);
         await global.whatsappClient.sendFile(
           targetRecipient,
           filePath,
           `${title}_${customerName}.pdf`,
-          `Berikut adalah ${title} untuk pesanan Anda.`
+          fileCaption
         );
 
         setTimeout(() => {

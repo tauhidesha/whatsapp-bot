@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const { z } = require('zod');
 const { sendMetaAttachment } = require('../../server/metaClient.js');
+const { markBotMessage } = require('../utils/adminMessageSync.js');
 
 const studioMetadata = require('../constants/studioMetadata.js');
 
@@ -81,6 +82,8 @@ async function implementation(input = {}) {
     // Use recipient as-is (LID stays LID, @c.us stays @c.us)
     const recipient = identity.recipientId;
 
+    // Mark before sending so onAnyMessage doesn't treat it as admin-from-HP
+    markBotMessage(recipient, caption);
     await client.sendImage(recipient, STUDIO_PHOTO_PATH, STUDIO_PHOTO_FILENAME, caption);
 
     return {
