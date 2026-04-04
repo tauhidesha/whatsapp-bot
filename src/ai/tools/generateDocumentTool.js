@@ -95,6 +95,7 @@ const generateDocumentTool = {
           targetRecipient = lastCustomer.whatsappLid;
         } else if (lastCustomer && lastCustomer.phone) {
           const ph = lastCustomer.phone;
+          // Keep @lid or @c.us if already present
           targetRecipient = ph.includes('@') ? ph : ph + '@c.us';
         }
       } catch (err) {
@@ -254,7 +255,9 @@ const generateDocumentTool = {
             if (warrantyMotorDetails === '-') warrantyMotorDetails = `${booking.vehicleModel || ''} (${booking.plateNumber || ''})`;
             if (warrantyServiceType === '-') warrantyServiceType = booking.serviceType || '-';
             if (!warrantyBookingDate) warrantyBookingDate = booking.bookingDate?.toISOString().split('T')[0];
-            if (booking.customer?.phoneReal) {
+            if (booking.customer?.whatsappLid) {
+              warrantyRecipient = booking.customer.whatsappLid;
+            } else if (booking.customer?.phoneReal) {
               const ph = booking.customer.phoneReal;
               warrantyRecipient = ph.includes('@') ? ph : ph + '@c.us';
             }

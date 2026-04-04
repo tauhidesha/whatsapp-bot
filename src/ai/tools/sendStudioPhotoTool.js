@@ -35,20 +35,24 @@ function parseRecipientIdentity(rawValue) {
     }
 
     if (channelRaw === 'wa' || channelRaw === 'whatsapp') {
-      if (identifier.endsWith('@lid')) {
-        return { channel: 'whatsapp', recipientId: identifier.replace('@lid', '@c.us'), raw: trimmed };
+      // Keep @lid as-is — WPPConnect supports both @lid and @c.us
+      if (identifier.endsWith('@lid') || identifier.endsWith('@c.us')) {
+        return { channel: 'whatsapp', recipientId: identifier, raw: trimmed };
       }
-      const normalized = identifier.endsWith('@c.us') ? identifier : `${identifier}@c.us`;
+      // Bare number: normalize to @c.us (standard Indonesian number)
+      const normalized = `${identifier.replace(/\D/g, '')}@c.us`;
       return { channel: 'whatsapp', recipientId: normalized, raw: trimmed };
     }
 
     return { channel: channelRaw, recipientId: identifier, raw: trimmed };
   }
 
-  if (trimmed.endsWith('@lid')) {
-    return { channel: 'whatsapp', recipientId: trimmed.replace('@lid', '@c.us'), raw: trimmed };
+  // Keep whichever suffix is already present (@lid or @c.us)
+  if (trimmed.endsWith('@lid') || trimmed.endsWith('@c.us')) {
+    return { channel: 'whatsapp', recipientId: trimmed, raw: trimmed };
   }
-  const normalized = trimmed.endsWith('@c.us') ? trimmed : `${trimmed}@c.us`;
+  // Bare number: normalize digits then attach @c.us
+  const normalized = `${trimmed.replace(/\D/g, '')}@c.us`;
   return { channel: 'whatsapp', recipientId: normalized, raw: trimmed };
 }
 
