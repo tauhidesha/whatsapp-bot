@@ -24,15 +24,24 @@ module.exports = function generateInvoiceHTML(data) {
 
   // Filter redundant notes
   let filteredNotes = notes || '-';
-  if (filteredNotes.startsWith('Layanan: ')) {
-    const noteContent = filteredNotes.replace('Layanan: ', '').trim();
-    // If the note content is exactly the same as items summary, hide it
+  if (filteredNotes.match(/^Layanan:\s*/i)) {
+    const headerRemoved = filteredNotes.replace(/^Layanan:\s*/i, '').trim();
+    // Extract strictly the service names from the items list for comparison
     const itemsSummary = itemsList.map(i => i.split('||')[0].trim()).join(', ');
-    if (noteContent === itemsSummary) filteredNotes = '';
-    else filteredNotes = noteContent;
+    
+    // If the entire note content is just a repeat of the items, we can hide it
+    if (headerRemoved === itemsSummary) {
+      filteredNotes = '';
+    } else {
+      // Just strip the "Layanan:" prefix but keep the rest
+      filteredNotes = headerRemoved;
+    }
   }
+
   const notesList = (filteredNotes && filteredNotes !== '-') 
-    ? filteredNotes.split('\n').map(n => n.trim()).filter(Boolean)
+    ? filteredNotes.split('\n')
+        .map(n => n.trim())
+        .filter(n => n && !n.match(/^Layanan:?$/i)) // Also filter out standalone header labels
     : [];
 
   return `<!DOCTYPE html>
