@@ -79,14 +79,41 @@ Sangat berguna untuk melihat QR Code atau pesan error.
 sudo journalctl -u whatsapp-ai -f
 ```
 
-### Logs PM2 (Khusus whatsapp)
+### Logs PM2 — Standard (real-time, out + error)
 ```bash
 pm2 logs whatsapp-ai
 ```
 
-### Logs PM2 (Semua)
+### Logs PM2 — Error ONLY (real-time)
 ```bash
-pm2 logs
+pm2 logs whatsapp-ai --err --raw
+```
+
+### Logs PM2 — N baris terakhir (out + error)
+```bash
+pm2 logs whatsapp-ai --lines 100
+```
+
+### Logs PM2 — N baris error saja
+```bash
+pm2 logs whatsapp-ai --lines 200 --err
+```
+
+### Baca file error log langsung (paling lengkap)
+```bash
+# 200 baris terakhir
+tail -n 200 ~/.pm2/logs/whatsapp-ai-error.log
+
+# Full log (semua isi file)
+cat ~/.pm2/logs/whatsapp-ai-error.log
+
+# Cari error spesifik + konteks sekitarnya
+grep -n "ERROR_KEYWORD" ~/.pm2/logs/whatsapp-ai-error.log -B 20 -A 5
+```
+
+### Clear semua log PM2 (reset log file)
+```bash
+pm2 flush whatsapp-ai
 ```
 
 ---
