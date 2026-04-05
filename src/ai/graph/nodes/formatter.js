@@ -182,28 +182,25 @@ ${modeInstructions[replyMode] || modeInstructions.inform}
             })
         );
 
-        // Clean message history for copywriter model (strip out tools and tool calls)
-        const cleanMessages = messages
-            .filter(m => {
-                const type = m._getType();
-                if (type === 'system' || type === 'tool') return false;
-                if (type === 'ai') {
-                    // Filter out AI messages that are purely tool calls without visible text
-                    if (typeof m.content === 'string') return m.content.trim() !== '';
-                    if (Array.isArray(m.content)) return m.content.length > 0;
-                    return false;
-                }
-                return type === 'human';
-            })
+        // 3. Build a text transcript from message history to avoid Gemini strict conversational history issues
+        const transcript = messages
+            .filter(m => m._getType() === 'human' || m._getType() === 'ai')
             .map(m => {
-                if (m._getType() === 'human') return new HumanMessage({ content: m.content });
-                return new AIMessage({ content: m.content });
+                let text = '';
+                if (typeof m.content === 'string') text = m.content;
+                else if (Array.isArray(m.content)) text = m.content.map(c => c.text || '').join('\n');
+                
+                if (!text.trim()) return null;
+                return `[${m._getType() === 'human' ? 'USER' : 'AI'}]: ${text.trim()}`;
             })
-            .slice(-6);
+            .filter(Boolean)
+            .join('\n\n');
+
+        const finalPrompt = `TRANSKIP PERCAKAPAN TERAKHIR:\n\n${transcript}\n\n(Tuliskan balasan AI selanjutnya sesuai arahan sistem)`;
 
         const response = await structuredModel.invoke([
             new SystemMessage(systemPrompt),
-            ...cleanMessages
+            new HumanMessage(finalPrompt)
         ]);
 
         console.log(`[FORMATTER_NODE] [${replyMode}] Thought: ${response.internal_thought}`);
