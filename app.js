@@ -2506,6 +2506,7 @@ app.post('/generate-invoice', requireAuth, async (req, res) => {
             amountPaid,
             paymentMethod,
             notes,
+            serviceType,
         } = req.body;
 
         if (!customerName || !customerPhone) {
@@ -2567,11 +2568,15 @@ app.post('/generate-invoice', requireAuth, async (req, res) => {
             senderNumber: adminSender,
             recipientNumber,
             realPhone: realPhone || '',
+            serviceType: serviceType || items || '-',
         });
 
         if (result.success) {
             console.log(`[API] Invoice (${documentType}) sent to customer: ${recipientNumber}`);
             return res.status(200).json({ success: true, message: result.message });
+        } else {
+            console.error(`[API] Document generation failed (${documentType}):`, result.message);
+            return res.status(400).json({ error: result.message });
         }
     } catch (error) {
         console.error('[API] Error generating invoice:', error);
