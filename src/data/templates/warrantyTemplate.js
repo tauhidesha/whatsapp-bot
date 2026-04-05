@@ -32,7 +32,15 @@ function generateWarrantyHTML({
   bookingDate,
   docNumber = '0001',
   logoBase64 = '',
+  realPhone = '',
 }) {
+  const displayPhone = realPhone
+    ? realPhone.replace(/^62/, '0')
+    : (customerPhone || '-')
+        .replace('@c.us', '')
+        .replace('@lid', '')
+        .replace(/^62/, '0');
+
   const issueDate = bookingDate ? new Date(bookingDate) : new Date();
   const expiryDate = addMonths(issueDate, 12);
   const isCoating = type === 'coating';

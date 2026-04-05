@@ -98,6 +98,7 @@ const BookingArgsSchema = z.object({
   inspection: z.string().optional(),
   senderNumber: z.string().optional(),
   senderName: z.string().optional(),
+  realPhone: z.string().optional(),
 });
 
 const createBookingTool = {
@@ -111,6 +112,7 @@ const createBookingTool = {
         properties: {
           customerPhone: { type: 'string', description: 'No telp pelanggan.' },
           customerName: { type: 'string', description: 'Nama pelanggan.' },
+          realPhone: { type: 'string', description: 'Nomor WhatsApp asli (opsional, jika customer_phone adalah LID).' },
           serviceName: { type: 'string', description: 'Nama layanan (koma dipisah).' },
           bookingDate: { type: 'string', description: 'Tgl (YYYY-MM-DD).' },
           bookingTime: { type: 'string', description: 'Jam (HH:mm).' },
@@ -161,6 +163,7 @@ const createBookingTool = {
         customerLocation,
         pickup,
         inspection,
+        realPhone,
       } = parsed;
 
       const rawServices = serviceName.split(',').map(s => s.trim()).filter(Boolean);
@@ -424,6 +427,7 @@ const createBookingTool = {
           homeService: effectiveHomeService || false,
           pickupService: pickupDetails?.requested || false,
           category: getServiceCategory(primaryServices[0]),
+          realPhone: realPhone || null,
         }
       });
 

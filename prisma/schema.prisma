@@ -88,6 +88,7 @@ model Booking {
   amountPaid         Float               @default(0)
   paymentStatus      String              @default("UNPAID")
   totalAmount        Float?
+  realPhone          String?
   customer           Customer            @relation(fields: [customerId], references: [id])
   vehicle            Vehicle?            @relation(fields: [vehicleId], references: [id])
   coatingMaintenance CoatingMaintenance?

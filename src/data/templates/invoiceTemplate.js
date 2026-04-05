@@ -5,7 +5,7 @@ module.exports = function generateInvoiceHTML(data) {
     documentType, customerName, motorDetails, items,
     finalTotal, amountPaid, paymentMethod, notes,
     recipientNumber, bookingDate, docNumber, now, detectedSize,
-    logoBase64
+    logoBase64, realPhone
   } = data;
 
   // Hitung values
@@ -13,11 +13,13 @@ module.exports = function generateInvoiceHTML(data) {
   const balance = finalTotal - paid;
   const subtotal = finalTotal;
 
-  // Clean recipient number
-  const displayPhone = (recipientNumber || '-')
-    .replace('@c.us', '')
-    .replace('@lid', '')
-    .replace(/^62/, '0');
+  // Clean recipient number - prefer realPhone (actual WA number) over @lid
+  const displayPhone = realPhone
+    ? realPhone.replace(/^62/, '0')
+    : (recipientNumber || '-')
+        .replace('@c.us', '')
+        .replace('@lid', '')
+        .replace(/^62/, '0');
 
   // Parse items jadi array - Split by newline ONLY
   const itemsList = items.split('\n').map(i => i.trim()).filter(Boolean);
@@ -181,7 +183,13 @@ module.exports = function generateInvoiceHTML(data) {
           <tr class="item-row" style="page-break-inside: avoid; break-inside: avoid;">
             <td>
               <p class="font-headline" style="font-size:18px; font-weight:700; text-transform:uppercase">${cleanTitle}</p>
-              ${itemDesc ? `<p class="text-muted" style="font-size:12px; line-height:1.4; margin-top:4px">${itemDesc}</p>` : ''}
+              ${itemDesc ? (
+                itemDesc.startsWith('Catatan Warna:') 
+                ? `<div style="display:flex; align-items:center; gap:6px; margin-top:6px; padding:4px 10px; background:rgba(255,255,0,0.05); border-left:2px solid #FFFF00; width:fit-content">
+                    <span style="font-size:10px; color:#FFFF00; font-weight:800; text-transform:uppercase; letter-spacing:0.1em">🎨 ${itemDesc}</span>
+                   </div>`
+                : `<p class="text-muted" style="font-size:12px; line-height:1.4; margin-top:4px">${itemDesc}</p>`
+              ) : ''}
             </td>
             <td style="text-align:center">
               <p class="font-headline" style="font-size:18px; font-weight:700">01</p>

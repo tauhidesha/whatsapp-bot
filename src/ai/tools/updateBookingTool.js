@@ -40,6 +40,7 @@ const UpdateBookingSchema = z.object({
       baseFee: z.number().optional(),
     })
     .optional(),
+  realPhone: z.string().optional(),
 });
 
 function formatDate(date) {
@@ -79,6 +80,7 @@ const updateBookingTool = {
           notes: { type: 'string', description: 'Catatan tambahan (opsional).' },
           estimatedDurationMinutes: { type: 'number', description: 'Durasi estimasi baru (menit).' },
           totalAmount: { type: 'number', description: 'Total biaya jasa/deal harga (pilihan).' },
+          realPhone: { type: 'string', description: 'Nomor WhatsApp asli (opsional).' },
         },
         required: ['bookingId'],
       },
@@ -107,6 +109,7 @@ const updateBookingTool = {
       if (parsed.customerPhone) {
         updateData.customerPhone = getIdentifier(parsed.customerPhone);
       }
+      if (parsed.realPhone !== undefined) updateData.realPhone = parsed.realPhone;
       if (parsed.notes !== undefined) updateData.notes = parsed.notes;
 
       // Handle vehicle update

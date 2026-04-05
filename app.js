@@ -2499,6 +2499,7 @@ app.post('/generate-invoice', requireAuth, async (req, res) => {
             documentType = 'invoice',
             customerName,
             customerPhone,
+            realPhone,
             motorDetails,
             items,
             totalAmount,
@@ -2565,6 +2566,7 @@ app.post('/generate-invoice', requireAuth, async (req, res) => {
             notes: notes || '',
             senderNumber: adminSender,
             recipientNumber,
+            realPhone: realPhone || '',
         });
 
         if (result.success) {

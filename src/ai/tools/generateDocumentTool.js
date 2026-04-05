@@ -49,7 +49,8 @@ const generateDocumentTool = {
           senderNumber: { type: 'string', description: 'Nomor pengirim (otomatis diisi sistem).' },
           recipientNumber: { type: 'string', description: 'WAJIB: Nomor customer penerima dokumen. Format: 628xxx@c.us atau 176665158225970@lid' },
           bookingDate: { type: 'string', description: 'Tanggal booking (YYYY-MM-DD) untuk kalkulasi estimasi selesai.' },
-          serviceType: { type: 'string', description: 'Layanan yang digaransikan. Pisahkan dengan § jika lebih dari satu. Contoh: "Full Body Repaint § Nano Ceramic Coating".' }
+          serviceType: { type: 'string', description: 'Layanan yang digaransikan. Pisahkan dengan § jika lebih dari satu. Contoh: "Full Body Repaint § Nano Ceramic Coating".' },
+          realPhone: { type: 'string', description: 'Nomor WhatsApp asli customer (human-readable).' }
         },
         required: ['documentType', 'senderNumber', 'recipientNumber']
       }
@@ -68,7 +69,8 @@ const generateDocumentTool = {
       senderNumber,
       recipientNumber,
       bookingDate,
-      serviceType = '-'
+      serviceType = '-',
+      realPhone = ''
     } = input;
 
     let targetRecipient = recipientNumber || senderNumber;
@@ -297,6 +299,7 @@ const generateDocumentTool = {
         bookingDate: warrantyBookingDate,
         docNumber: idSuffix,
         logoBase64,
+        realPhone: realPhone || (customer?.phoneReal) || ''
       });
 
       const { getChromiumPath, DEFAULT_CHROME_ARGS } = require('../utils/browser');
@@ -332,7 +335,7 @@ const generateDocumentTool = {
         items: finalItems, finalTotal, amountPaid,
         paymentMethod, notes, recipientNumber,
         bookingDate, docNumber: idSuffix, now, detectedSize,
-        logoBase64
+        logoBase64, realPhone
       });
 
       const { getChromiumPath, DEFAULT_CHROME_ARGS } = require('../utils/browser');
