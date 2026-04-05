@@ -2645,6 +2645,17 @@ app.post('/send-message', requireAuth, async (req, res) => {
                         fallbackTarget = customerFallback.phone.includes('@') ? customerFallback.phone : `${customerFallback.phone}@c.us`;
                     }
 
+                    // Brute-force flip if DB had no distinct alternative
+                    if (!fallbackTarget || fallbackTarget === targetNumber) {
+                        const rawDigits = cleanPhone.replace(/\D/g, '');
+                        if (targetNumber.endsWith('@c.us')) {
+                            fallbackTarget = `${rawDigits}@lid`;
+                        } else if (targetNumber.endsWith('@lid')) {
+                            fallbackTarget = `${rawDigits}@c.us`;
+                        }
+                        console.log(`[API] DB had no distinct alt, brute-force flip: ${fallbackTarget}`);
+                    }
+
                     if (fallbackTarget && fallbackTarget !== targetNumber) {
                         console.log(`[API] Retrying with fallback: ${fallbackTarget}`);
                         try {

@@ -118,11 +118,21 @@ const sendMessageTool = {
             fallbackTarget = customerFallback.phone.includes('@') ? customerFallback.phone : `${customerFallback.phone}@c.us`;
           }
 
+          // Brute-force flip if DB had no distinct alternative
+          if (!fallbackTarget || fallbackTarget === target) {
+            const rawDigits = cleanPhone.replace(/\D/g, '');
+            if (target.endsWith('@c.us')) {
+              fallbackTarget = `${rawDigits}@lid`;
+            } else if (target.endsWith('@lid')) {
+              fallbackTarget = `${rawDigits}@c.us`;
+            }
+            console.log(`[sendMessageTool] DB had no distinct alt, brute-force flip: ${fallbackTarget}`);
+          }
+
           if (fallbackTarget && fallbackTarget !== target) {
             console.log(`[sendMessageTool] Retrying with fallback: ${fallbackTarget}`);
             markBotMessage(fallbackTarget, message);
             await client.sendText(fallbackTarget, message);
-            // Update target parameter so that subsequent Prisma commands use the correct identifier
             target = fallbackTarget;
           } else {
             throw initialError;

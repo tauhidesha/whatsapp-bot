@@ -103,6 +103,17 @@ async function processCoatingReminders(client) {
                   fallbackTarget = customerFallback.phone.includes('@') ? customerFallback.phone : `${customerFallback.phone}@c.us`;
                 }
 
+                // Brute-force flip if DB had no distinct alternative
+                if (!fallbackTarget || fallbackTarget === phone) {
+                  const rawDigits = cleanPhone.replace(/\D/g, '');
+                  if (phone.endsWith('@c.us')) {
+                    fallbackTarget = `${rawDigits}@lid`;
+                  } else if (phone.endsWith('@lid')) {
+                    fallbackTarget = `${rawDigits}@c.us`;
+                  }
+                  console.log(`[CoatingReminders] DB had no distinct alt, brute-force flip: ${fallbackTarget}`);
+                }
+
                 if (fallbackTarget && fallbackTarget !== phone) {
                   console.log(`[CoatingReminders] Retrying with fallback: ${fallbackTarget}`);
                   await client.sendText(fallbackTarget, messageToSend);

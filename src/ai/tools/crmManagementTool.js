@@ -284,6 +284,17 @@ async function handleExecuteFollowup() {
                         fallbackTarget = customerFallback.phone.includes('@') ? customerFallback.phone : `${customerFallback.phone}@c.us`;
                     }
 
+                    // Brute-force flip if DB had no distinct alternative
+                    if (!fallbackTarget || fallbackTarget === target) {
+                        const rawDigits = cleanPhone.replace(/\D/g, '');
+                        if (target.endsWith('@c.us')) {
+                            fallbackTarget = `${rawDigits}@lid`;
+                        } else if (target.endsWith('@lid')) {
+                            fallbackTarget = `${rawDigits}@c.us`;
+                        }
+                        console.log(`[CRM] DB had no distinct alt, brute-force flip: ${fallbackTarget}`);
+                    }
+
                     if (fallbackTarget && fallbackTarget !== target) {
                         console.log(`[CRM] Retrying with fallback: ${fallbackTarget}`);
                         markBotMessage(fallbackTarget, item.draft);

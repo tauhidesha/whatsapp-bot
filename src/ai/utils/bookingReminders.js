@@ -99,6 +99,17 @@ async function sendBookingReminders(force = false) {
                 fallbackTarget = customerFallback.phone.includes('@') ? customerFallback.phone : `${customerFallback.phone}@c.us`;
               }
 
+              // Brute-force flip if DB had no distinct alternative
+              if (!fallbackTarget || fallbackTarget === normalizedTarget) {
+                const rawDigits = cleanPhone.replace(/\D/g, '');
+                if (normalizedTarget.endsWith('@c.us')) {
+                  fallbackTarget = `${rawDigits}@lid`;
+                } else if (normalizedTarget.endsWith('@lid')) {
+                  fallbackTarget = `${rawDigits}@c.us`;
+                }
+                console.log(`[bookingReminders] DB had no distinct alt, brute-force flip: ${fallbackTarget}`);
+              }
+
               if (fallbackTarget && fallbackTarget !== normalizedTarget) {
                 console.log(`[bookingReminders] Retrying with fallback: ${fallbackTarget}`);
                 await global.whatsappClient.sendText(fallbackTarget, message);

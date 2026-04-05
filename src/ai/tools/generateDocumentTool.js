@@ -403,6 +403,17 @@ const generateDocumentTool = {
               fallbackTarget = customer.phone.includes('@') ? customer.phone : `${customer.phone}@c.us`;
             }
             
+            // If DB didn't provide a DIFFERENT alternative, brute-force flip the suffix
+            if (!fallbackTarget || fallbackTarget === targetRecipient) {
+              const rawDigits = cleanPhone.replace(/\D/g, '');
+              if (targetRecipient.endsWith('@c.us')) {
+                fallbackTarget = `${rawDigits}@lid`;
+              } else if (targetRecipient.endsWith('@lid')) {
+                fallbackTarget = `${rawDigits}@c.us`;
+              }
+              console.log(`[generateDocument] DB had no distinct alt, brute-force flip: ${fallbackTarget}`);
+            }
+
             if (fallbackTarget && fallbackTarget !== targetRecipient) {
               console.log(`[generateDocument] Retrying with fallback: ${fallbackTarget}`);
               markBotMessage(fallbackTarget, fileCaption);
