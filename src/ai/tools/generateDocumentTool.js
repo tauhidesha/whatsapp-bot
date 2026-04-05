@@ -74,6 +74,7 @@ const generateDocumentTool = {
     } = input;
 
     let targetRecipient = recipientNumber || senderNumber;
+    let customerRecord = null;
 
     try {
       const { getIdentifier } = require('../utils/humanHandover.js');
@@ -81,7 +82,7 @@ const generateDocumentTool = {
       
       const prisma = require('../../lib/prisma');
       const phoneNoSuffix = intermediateTarget.replace(/@c\.us$|@lid$/, '');
-      const customer = await prisma.customer.findFirst({
+      customerRecord = await prisma.customer.findFirst({
         where: { 
           OR: [
             { whatsappLid: intermediateTarget },
@@ -90,13 +91,13 @@ const generateDocumentTool = {
             { phone: phoneNoSuffix }
           ]
         },
-        select: { whatsappLid: true, phone: true }
+        select: { whatsappLid: true, phone: true, phoneReal: true }
       });
 
-      if (customer?.whatsappLid) {
-        targetRecipient = customer.whatsappLid;
-      } else if (customer?.phone && customer.phone.includes('@')) {
-        targetRecipient = customer.phone;
+      if (customerRecord?.whatsappLid) {
+        targetRecipient = customerRecord.whatsappLid;
+      } else if (customerRecord?.phone && customerRecord.phone.includes('@')) {
+        targetRecipient = customerRecord.phone;
       } else {
         targetRecipient = intermediateTarget;
       }
@@ -298,7 +299,7 @@ const generateDocumentTool = {
         bookingDate: warrantyBookingDate,
         docNumber: idSuffix,
         logoBase64,
-        realPhone: realPhone || (customer?.phoneReal) || ''
+        realPhone: realPhone || (customerRecord?.phoneReal) || ''
       });
 
       const { getChromiumPath, DEFAULT_CHROME_ARGS } = require('../utils/browser');
