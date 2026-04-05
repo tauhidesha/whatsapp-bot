@@ -74,38 +74,8 @@ const generateDocumentTool = {
     } = input;
 
     let targetRecipient = recipientNumber || senderNumber;
-    
-    // Auth & LID Lookup: Ensure we use LID if available for reliability
-    try {
-      const { getIdentifier } = require('../utils/humanHandover.js');
-      const prisma = require('../../lib/prisma');
-      const identifier = getIdentifier(targetRecipient) || targetRecipient;
-      
-      const customer = await prisma.customer.findFirst({
-        where: {
-          OR: [
-            { whatsappLid: identifier },
-            { phone: identifier },
-            { phoneReal: identifier },
-            { phone: identifier.replace(/@c\.us$|@lid$/, '') },
-            { phoneReal: identifier.replace(/@c\.us$|@lid$/, '') }
-          ]
-        },
-        select: { whatsappLid: true, phone: true }
-      });
-      
-      if (customer?.whatsappLid) {
-        targetRecipient = customer.whatsappLid;
-      } else if (customer?.phone && customer.phone.includes('@')) {
-        targetRecipient = customer.phone;
-      } else {
-        targetRecipient = identifier;
-      }
-    } catch (err) {
-      console.log(`[generateDocument] Identifier lookup failed: ${err.message}`);
-    }
 
-    // Auto-fix WID suffix: WPPConnect requires @c.us or @lid
+    // Auto-fix WID suffix: ONLY if missing '@'
     if (targetRecipient && typeof targetRecipient === 'string' && !targetRecipient.includes('@')) {
       let cleaned = targetRecipient.replace(/\D/g, '');
       if (cleaned.startsWith('0')) {
@@ -371,12 +341,43 @@ const generateDocumentTool = {
         const fileCaption = `Berikut adalah ${title} untuk pesanan Anda.`;
         // Mark before sending so onAnyMessage doesn't treat it as admin-from-HP
         markBotMessage(targetRecipient, fileCaption);
-        await global.whatsappClient.sendFile(
-          targetRecipient,
-          filePath,
-          `${title}_${customerName}.pdf`,
-          fileCaption
-        );
+        
+        try {
+          await global.whatsappClient.sendFile(
+            targetRecipient,
+            filePath,
+            `${title}_${customerName}.pdf`,
+            fileCaption
+          );
+        } catch (initialError) {
+          // FALLBACK LOGIC: If LID fails, try sending to regular @c.us if we can derive it
+          if (initialError.message?.includes('No LID') && targetRecipient.endsWith('@lid')) {
+            console.warn(`[generateDocument] LID send failed, trying fallback for: ${targetRecipient}`);
+            const prisma = require('../../lib/prisma');
+            const customer = await prisma.customer.findFirst({
+              where: { whatsappLid: targetRecipient },
+              select: { phone: true }
+            });
+            
+            if (customer?.phone) {
+              const fallbackTarget = customer.phone.includes('@') ? customer.phone : `${customer.phone}@c.us`;
+              console.log(`[generateDocument] Retrying with fallback: ${fallbackTarget}`);
+              markBotMessage(fallbackTarget, fileCaption);
+              await global.whatsappClient.sendFile(
+                fallbackTarget,
+                filePath,
+                `${title}_${customerName}.pdf`,
+                fileCaption
+              );
+              // Update targetRecipient for the return success message
+              targetRecipient = fallbackTarget;
+            } else {
+              throw initialError; // No fallback found, throw original
+            }
+          } else {
+            throw initialError; // Not a LID error or no fallback possible
+          }
+        }
 
         setTimeout(() => {
           fs.unlink(filePath, (err) => {
