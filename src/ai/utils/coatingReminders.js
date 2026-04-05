@@ -52,8 +52,8 @@ async function processCoatingReminders(client) {
       }
 
       if (strategyAngle && newStatus) {
-        const { normalizeWhatsappNumber } = require('./humanHandover.js');
-        const phone = normalizeWhatsappNumber(record.customerPhone);
+        const { getIdentifier } = require('./humanHandover.js');
+        const phone = getIdentifier(record.customerPhone);
         if (!phone) {
           console.warn(`[CoatingReminders] Invalid phone for record ${record.id}: ${record.customerPhone}`);
           continue;

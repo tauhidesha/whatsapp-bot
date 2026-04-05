@@ -213,8 +213,8 @@ async function notifyNewBooking(bookingData) {
 
 async function setSnoozeMode(senderNumber, durationMinutes = 60, options = {}) {
   const { reason = null, manual = false } = options;
-  const normalizedNumber = normalizeWhatsappNumber(senderNumber) || senderNumber;
-  const phone = normalizedNumber.replace(/@c\.us$|@lid$/, '');
+  const identifier = getIdentifier(senderNumber) || senderNumber;
+  const phone = identifier.replace(/@c\.us$|@lid$/, '');
 
   let expiresAtDate = null;
 
@@ -225,7 +225,7 @@ async function setSnoozeMode(senderNumber, durationMinutes = 60, options = {}) {
 
   // 1. Update HandoverSnooze table
   await prisma.handoverSnooze.upsert({
-    where: { id: normalizedNumber },
+    where: { id: identifier },
     update: {
       expiresAt: expiresAtDate,
       manual,
@@ -233,7 +233,7 @@ async function setSnoozeMode(senderNumber, durationMinutes = 60, options = {}) {
       createdAt: new Date(),
     },
     create: {
-      id: normalizedNumber,
+      id: identifier,
       customerId: phone,
       expiresAt: expiresAtDate,
       manual,
@@ -262,21 +262,21 @@ async function setSnoozeMode(senderNumber, durationMinutes = 60, options = {}) {
     console.warn('[humanHandover] Gagal sinkronisasi snooze ke Customer:', err.message);
   }
 
-  console.log('[humanHandover] Snooze SQL aktif untuk', normalizedNumber, manual ? '(manual)' : `(durasi ${durationMinutes} menit)`);
+  console.log('[humanHandover] Snooze SQL aktif untuk', identifier, manual ? '(manual)' : `(durasi ${durationMinutes} menit)`);
 }
 
 async function clearSnoozeMode(senderNumber) {
-  const normalizedNumber = normalizeWhatsappNumber(senderNumber) || senderNumber;
-  const phone = normalizedNumber.replace(/@c\.us$|@lid$/, '');
+  const identifier = getIdentifier(senderNumber) || senderNumber;
+  const phone = identifier.replace(/@c\.us$|@lid$/, '');
   
   try {
-    await prisma.handoverSnooze.delete({ where: { id: normalizedNumber } }).catch(() => {});
+    await prisma.handoverSnooze.delete({ where: { id: identifier } }).catch(() => {});
     
     // Sync to Customer table
     try {
       let customer = await prisma.customer.findUnique({ where: { phone } });
-      if (!customer && normalizedNumber.endsWith('@lid')) {
-        customer = await prisma.customer.findFirst({ where: { whatsappLid: normalizedNumber } });
+      if (!customer && identifier.endsWith('@lid')) {
+        customer = await prisma.customer.findFirst({ where: { whatsappLid: identifier } });
       }
       if (customer) {
         await prisma.customer.update({
@@ -292,18 +292,18 @@ async function clearSnoozeMode(senderNumber) {
     } catch (err) {
       // Ignored
     }
-    console.log('[humanHandover] Snooze SQL dinonaktifkan untuk', normalizedNumber);
+    console.log('[humanHandover] Snooze SQL dinonaktifkan untuk', identifier);
   } catch (error) {
     console.warn('[humanHandover] Gagal menonaktifkan snooze SQL:', error);
   }
 }
 
 async function getSnoozeInfo(senderNumber, { cleanExpired = false } = {}) {
-  const normalizedNumber = normalizeWhatsappNumber(senderNumber) || senderNumber;
+  const identifier = getIdentifier(senderNumber) || senderNumber;
   
   try {
     const snooze = await prisma.handoverSnooze.findUnique({
-      where: { id: normalizedNumber }
+      where: { id: identifier }
     });
 
     if (!snooze) {
@@ -351,6 +351,6 @@ module.exports = {
   setSnoozeMode,
   clearSnoozeMode,
   getSnoozeInfo,
-  normalizeWhatsappNumber,
+  getIdentifier,
   isSnoozeActive,
 };

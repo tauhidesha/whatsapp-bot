@@ -1,7 +1,7 @@
 // File: src/ai/utils/bookingReminders.js
 const { DateTime } = require('luxon');
 const prisma = require('../../lib/prisma.js');
-const { normalizeWhatsappNumber } = require('./humanHandover.js');
+const { getIdentifier } = require('./humanHandover.js');
 const studioMetadata = require('../constants/studioMetadata');
 
 const REMINDER_ENABLED = process.env.BOOKING_REMINDER_ENABLED !== 'false';
@@ -53,7 +53,7 @@ async function sendBookingReminders(force = false) {
 
     for (const booking of bookings) {
       const target = booking.customerPhone || (booking.customer && booking.customer.phone);
-      const normalizedTarget = normalizeWhatsappNumber(target);
+      const normalizedTarget = getIdentifier(target);
       if (!normalizedTarget) continue;
 
       const bookingTime = DateTime.fromJSDate(booking.bookingDate).setZone(TIMEZONE).toFormat('HH:mm');

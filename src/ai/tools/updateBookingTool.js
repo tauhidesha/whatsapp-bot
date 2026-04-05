@@ -5,7 +5,7 @@ const { z } = require('zod');
 const prisma = require('../../lib/prisma');
 const { parseDateTime } = require('../utils/dateTime.js');
 const { getServiceCategory } = require('./createBookingTool.js');
-const { normalizeWhatsappNumber } = require('../utils/humanHandover.js');
+const { getIdentifier } = require('../utils/humanHandover.js');
 const { calculateHomeServiceFee } = require('../utils/distanceMatrix.js');
 const { saveCustomerLocation, saveHomeServiceQuote, getCustomerLocation } = require('../utils/customerLocations.js');
 const { createOrUpdateVehicle, extractPlateFromText } = require('../../lib/vehicleService');
@@ -105,7 +105,7 @@ const updateBookingTool = {
 
       if (parsed.customerName) updateData.customerName = parsed.customerName;
       if (parsed.customerPhone) {
-        updateData.customerPhone = normalizeWhatsappNumber(parsed.customerPhone);
+        updateData.customerPhone = getIdentifier(parsed.customerPhone);
       }
       if (parsed.notes !== undefined) updateData.notes = parsed.notes;
 

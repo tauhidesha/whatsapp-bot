@@ -1,13 +1,13 @@
 // @ts-ignore
 import prisma from '../../lib/prisma';
 // @ts-ignore
-import { normalizeWhatsappNumber } from './humanHandover';
+import { getIdentifier } from './humanHandover';
 
 function toDocId(senderNumber?: string | null) {
   if (!senderNumber) return null;
-  const normalized = normalizeWhatsappNumber(senderNumber);
+  const normalized = getIdentifier(senderNumber);
   if (!normalized) return null;
-  return normalized.replace(/@c\.us$/, '');
+  return normalized;
 }
 
 type CustomerLocation = {
@@ -38,13 +38,18 @@ export async function saveCustomerLocation(
   }
 
   // Find customer
-  const normalizedPhone = docId.replace(/\D/g, '');
-  const customer = await prisma.customer.findUnique({
-    where: { phone: normalizedPhone }
+  const phoneOnly = docId.replace(/@c\.us$|@lid$/, '').replace(/\D/g, '');
+  const customer = await prisma.customer.findFirst({
+    where: {
+      OR: [
+        { phone: phoneOnly },
+        { whatsappLid: docId.endsWith('@lid') ? docId : undefined }
+      ]
+    }
   });
 
   if (!customer) {
-    console.warn('[customerLocations] Customer tidak ditemukan:', normalizedPhone);
+    console.warn('[customerLocations] Customer tidak ditemukan:', phoneOnly);
     return null;
   }
 
@@ -84,9 +89,14 @@ export async function getCustomerLocation(senderNumber: string) {
     return null;
   }
 
-  const normalizedPhone = docId.replace(/\D/g, '');
-  const customer = await prisma.customer.findUnique({
-    where: { phone: normalizedPhone },
+  const phoneOnly = docId.replace(/@c\.us$|@lid$/, '').replace(/\D/g, '');
+  const customer = await prisma.customer.findFirst({
+    where: {
+      OR: [
+        { phone: phoneOnly },
+        { whatsappLid: docId.endsWith('@lid') ? docId : undefined }
+      ]
+    },
     include: {
       locations: {
         orderBy: { createdAt: 'desc' },
@@ -111,9 +121,14 @@ export async function saveHomeServiceQuote(senderNumber: string, quote: Record<s
   const docId = toDocId(senderNumber);
   if (!docId) return;
 
-  const normalizedPhone = docId.replace(/\D/g, '');
-  const customer = await prisma.customer.findUnique({
-    where: { phone: normalizedPhone }
+  const phoneOnly = docId.replace(/@c\.us$|@lid$/, '').replace(/\D/g, '');
+  const customer = await prisma.customer.findFirst({
+    where: {
+      OR: [
+        { phone: phoneOnly },
+        { whatsappLid: docId.endsWith('@lid') ? docId : undefined }
+      ]
+    }
   });
 
   if (!customer) return;
