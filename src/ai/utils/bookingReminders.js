@@ -53,7 +53,7 @@ async function sendBookingReminders(force = false) {
 
     for (const booking of bookings) {
       const target = booking.customerPhone || (booking.customer && booking.customer.phone);
-      const normalizedTarget = getIdentifier(target);
+      let normalizedTarget = getIdentifier(target);
       if (!normalizedTarget) continue;
 
       const bookingTime = DateTime.fromJSDate(booking.bookingDate).setZone(TIMEZONE).toFormat('HH:mm');
@@ -74,7 +74,42 @@ async function sendBookingReminders(force = false) {
         });
 
         if (message) {
-          await global.whatsappClient.sendText(normalizedTarget, message);
+          try {
+            await global.whatsappClient.sendText(normalizedTarget, message);
+          } catch (initialError) {
+            if (initialError.message && initialError.message.includes('No LID')) {
+              console.warn(`[bookingReminders] Send failed with No LID for: ${normalizedTarget}`);
+              const cleanPhone = normalizedTarget.replace(/@c\.us$|@lid$/, '');
+              const customerFallback = await prisma.customer.findFirst({
+                where: {
+                  OR: [
+                    { whatsappLid: normalizedTarget },
+                    { whatsappLid: cleanPhone },
+                    { phone: normalizedTarget },
+                    { phone: cleanPhone }
+                  ]
+                },
+                select: { phone: true, whatsappLid: true }
+              });
+
+              let fallbackTarget = null;
+              if (normalizedTarget.endsWith('@c.us') && customerFallback?.whatsappLid) {
+                fallbackTarget = customerFallback.whatsappLid;
+              } else if (normalizedTarget.endsWith('@lid') && customerFallback?.phone) {
+                fallbackTarget = customerFallback.phone.includes('@') ? customerFallback.phone : `${customerFallback.phone}@c.us`;
+              }
+
+              if (fallbackTarget && fallbackTarget !== normalizedTarget) {
+                console.log(`[bookingReminders] Retrying with fallback: ${fallbackTarget}`);
+                await global.whatsappClient.sendText(fallbackTarget, message);
+                normalizedTarget = fallbackTarget;
+              } else {
+                throw initialError;
+              }
+            } else {
+              throw initialError;
+            }
+          }
           console.log('[bookingReminders] AI Reminder terkirim ke', normalizedTarget);
           
           await prisma.booking.update({

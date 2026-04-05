@@ -2620,15 +2620,41 @@ app.post('/send-message', requireAuth, async (req, res) => {
                 await global.whatsappClient.sendText(targetNumber, finalMessage);
                 console.log(`[API] Successfully sent WhatsApp message to ${targetNumber}`);
             } catch (sendError) {
-                // If error with resolved number, try with original LID format
+                // If error with resolved number, try with DB fallback
                 if (sendError.message && sendError.message.includes('No LID')) {
-                    const originalLid = number.includes('@lid') ? number : `${number.replace(/[^0-9]/g, '')}@lid`;
-                    console.log(`[API] Send failed, trying original LID: ${originalLid}`);
-                    try {
-                        await global.whatsappClient.sendText(originalLid, finalMessage);
-                        targetNumber = originalLid;
-                        console.log(`[API] Success with original LID`);
-                    } catch (e2) {
+                    console.log(`[API] Send failed with No LID for: ${targetNumber}`);
+                    const cleanPhone = targetNumber.replace(/@c\.us$|@lid$/, '');
+                    
+                    const prisma = require('./src/lib/prisma');
+                    const customerFallback = await prisma.customer.findFirst({
+                        where: {
+                            OR: [
+                                { whatsappLid: targetNumber },
+                                { whatsappLid: cleanPhone },
+                                { phone: targetNumber },
+                                { phone: cleanPhone }
+                            ]
+                        },
+                        select: { phone: true, whatsappLid: true }
+                    });
+
+                    let fallbackTarget = null;
+                    if (targetNumber.endsWith('@c.us') && customerFallback?.whatsappLid) {
+                        fallbackTarget = customerFallback.whatsappLid;
+                    } else if (targetNumber.endsWith('@lid') && customerFallback?.phone) {
+                        fallbackTarget = customerFallback.phone.includes('@') ? customerFallback.phone : `${customerFallback.phone}@c.us`;
+                    }
+
+                    if (fallbackTarget && fallbackTarget !== targetNumber) {
+                        console.log(`[API] Retrying with fallback: ${fallbackTarget}`);
+                        try {
+                            await global.whatsappClient.sendText(fallbackTarget, finalMessage);
+                            targetNumber = fallbackTarget;
+                            console.log(`[API] Success with fallback target`);
+                        } catch (e2) {
+                            throw sendError; // Throw original if fallback also fails
+                        }
+                    } else {
                         throw sendError;
                     }
                 } else {

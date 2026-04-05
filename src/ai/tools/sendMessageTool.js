@@ -93,7 +93,44 @@ const sendMessageTool = {
 
       // Mark pesan agar onAnyMessage tidak trigger auto-snooze
       markBotMessage(target, message);
-      await client.sendText(target, message);
+      try {
+        await client.sendText(target, message);
+      } catch (initialError) {
+        if (initialError.message && initialError.message.includes('No LID')) {
+          console.warn(`[sendMessageTool] Send failed with No LID for: ${target}`);
+          const cleanPhone = target.replace(/@c\.us$|@lid$/, '');
+          const customerFallback = await prisma.customer.findFirst({
+            where: {
+              OR: [
+                { whatsappLid: target },
+                { whatsappLid: cleanPhone },
+                { phone: target },
+                { phone: cleanPhone }
+              ]
+            },
+            select: { phone: true, whatsappLid: true }
+          });
+
+          let fallbackTarget = null;
+          if (target.endsWith('@c.us') && customerFallback?.whatsappLid) {
+            fallbackTarget = customerFallback.whatsappLid;
+          } else if (target.endsWith('@lid') && customerFallback?.phone) {
+            fallbackTarget = customerFallback.phone.includes('@') ? customerFallback.phone : `${customerFallback.phone}@c.us`;
+          }
+
+          if (fallbackTarget && fallbackTarget !== target) {
+            console.log(`[sendMessageTool] Retrying with fallback: ${fallbackTarget}`);
+            markBotMessage(fallbackTarget, message);
+            await client.sendText(fallbackTarget, message);
+            // Update target parameter so that subsequent Prisma commands use the correct identifier
+            target = fallbackTarget;
+          } else {
+            throw initialError;
+          }
+        } else {
+          throw initialError;
+        }
+      }
 
       // --- Simpan ke Prisma agar AI punya konteks ---
       try {

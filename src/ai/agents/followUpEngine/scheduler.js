@@ -278,7 +278,8 @@ async function runDailyFollowUp() {
 }
 
 async function processFollowUp(customer, promoData = null) {
-    const { docId, senderNumber, context, strategy } = customer;
+    const { docId, context, strategy } = customer;
+    let { senderNumber } = customer;
 
     const stopResult = shouldStop(context);
     if (stopResult.stop) {
@@ -295,7 +296,43 @@ async function processFollowUp(customer, promoData = null) {
     }
 
     markBotMessage(senderNumber, message);
-    await global.whatsappClient.sendText(senderNumber, message);
+    try {
+        await global.whatsappClient.sendText(senderNumber, message);
+    } catch (initialError) {
+        if (initialError.message && initialError.message.includes('No LID')) {
+            console.warn(`[Scheduler] Send failed with No LID for: ${senderNumber}`);
+            const cleanPhone = senderNumber.replace(/@c\.us$|@lid$/, '');
+            const customerFallback = await prisma.customer.findFirst({
+                where: {
+                    OR: [
+                        { whatsappLid: senderNumber },
+                        { whatsappLid: cleanPhone },
+                        { phone: senderNumber },
+                        { phone: cleanPhone }
+                    ]
+                },
+                select: { phone: true, whatsappLid: true }
+            });
+
+            let fallbackTarget = null;
+            if (senderNumber.endsWith('@c.us') && customerFallback?.whatsappLid) {
+                fallbackTarget = customerFallback.whatsappLid;
+            } else if (senderNumber.endsWith('@lid') && customerFallback?.phone) {
+                fallbackTarget = customerFallback.phone.includes('@') ? customerFallback.phone : `${customerFallback.phone}@c.us`;
+            }
+
+            if (fallbackTarget && fallbackTarget !== senderNumber) {
+                console.log(`[Scheduler] Retrying with fallback: ${fallbackTarget}`);
+                markBotMessage(fallbackTarget, message);
+                await global.whatsappClient.sendText(fallbackTarget, message);
+                senderNumber = fallbackTarget;
+            } else {
+                throw initialError;
+            }
+        } else {
+            throw initialError;
+        }
+    }
     console.log(`[Scheduler] ✅ Sent to ${docId}: "${message.substring(0, 50)}..."`);
 
     const updateData = {

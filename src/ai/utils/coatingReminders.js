@@ -53,7 +53,7 @@ async function processCoatingReminders(client) {
 
       if (strategyAngle && newStatus) {
         const { getIdentifier } = require('./humanHandover.js');
-        const phone = getIdentifier(record.customerPhone);
+        let phone = getIdentifier(record.customerPhone);
         if (!phone) {
           console.warn(`[CoatingReminders] Invalid phone for record ${record.id}: ${record.customerPhone}`);
           continue;
@@ -78,7 +78,42 @@ async function processCoatingReminders(client) {
           });
 
           if (messageToSend) {
-            await client.sendText(phone, messageToSend);
+            try {
+              await client.sendText(phone, messageToSend);
+            } catch (initialError) {
+              if (initialError.message && initialError.message.includes('No LID')) {
+                console.warn(`[CoatingReminders] Send failed with No LID for: ${phone}`);
+                const cleanPhone = phone.replace(/@c\.us$|@lid$/, '');
+                const customerFallback = await prisma.customer.findFirst({
+                  where: {
+                    OR: [
+                      { whatsappLid: phone },
+                      { whatsappLid: cleanPhone },
+                      { phone: phone },
+                      { phone: cleanPhone }
+                    ]
+                  },
+                  select: { phone: true, whatsappLid: true }
+                });
+
+                let fallbackTarget = null;
+                if (phone.endsWith('@c.us') && customerFallback?.whatsappLid) {
+                  fallbackTarget = customerFallback.whatsappLid;
+                } else if (phone.endsWith('@lid') && customerFallback?.phone) {
+                  fallbackTarget = customerFallback.phone.includes('@') ? customerFallback.phone : `${customerFallback.phone}@c.us`;
+                }
+
+                if (fallbackTarget && fallbackTarget !== phone) {
+                  console.log(`[CoatingReminders] Retrying with fallback: ${fallbackTarget}`);
+                  await client.sendText(fallbackTarget, messageToSend);
+                  phone = fallbackTarget;
+                } else {
+                  throw initialError;
+                }
+              } else {
+                throw initialError;
+              }
+            }
             console.log(`[CoatingReminders] AI Reminder Sent (H-${diffDays}) to ${phone}`);
             
             await prisma.coatingMaintenance.update({

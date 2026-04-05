@@ -255,10 +255,46 @@ async function handleExecuteFollowup() {
     let successCount = 0;
     for (const item of items) {
         try {
-            const target = item.number.includes('@') ? item.number : `${item.number}@c.us`;
+            let target = item.number.includes('@') ? item.number : `${item.number}@c.us`;
             // Mark before sending so onAnyMessage doesn't treat it as admin-from-HP
             markBotMessage(target, item.draft);
-            await client.sendText(target, item.draft);
+            
+            try {
+                await client.sendText(target, item.draft);
+            } catch (initialError) {
+                if (initialError.message && initialError.message.includes('No LID')) {
+                    console.warn(`[CRM] Send failed with No LID for: ${target}`);
+                    const cleanPhone = target.replace(/@c\.us$|@lid$/, '');
+                    const customerFallback = await prisma.customer.findFirst({
+                        where: {
+                            OR: [
+                                { whatsappLid: target },
+                                { whatsappLid: cleanPhone },
+                                { phone: target },
+                                { phone: cleanPhone }
+                            ]
+                        },
+                        select: { phone: true, whatsappLid: true }
+                    });
+
+                    let fallbackTarget = null;
+                    if (target.endsWith('@c.us') && customerFallback?.whatsappLid) {
+                        fallbackTarget = customerFallback.whatsappLid;
+                    } else if (target.endsWith('@lid') && customerFallback?.phone) {
+                        fallbackTarget = customerFallback.phone.includes('@') ? customerFallback.phone : `${customerFallback.phone}@c.us`;
+                    }
+
+                    if (fallbackTarget && fallbackTarget !== target) {
+                        console.log(`[CRM] Retrying with fallback: ${fallbackTarget}`);
+                        markBotMessage(fallbackTarget, item.draft);
+                        await client.sendText(fallbackTarget, item.draft);
+                    } else {
+                        throw initialError;
+                    }
+                } else {
+                    throw initialError;
+                }
+            }
             successCount++;
             await new Promise(r => setTimeout(r, 2000));
         } catch (e) {

@@ -75,6 +75,35 @@ const generateDocumentTool = {
 
     let targetRecipient = recipientNumber || senderNumber;
 
+    try {
+      const { getIdentifier } = require('../utils/humanHandover.js');
+      let intermediateTarget = getIdentifier(targetRecipient) || targetRecipient;
+      
+      const prisma = require('../../lib/prisma');
+      const phoneNoSuffix = intermediateTarget.replace(/@c\.us$|@lid$/, '');
+      const customer = await prisma.customer.findFirst({
+        where: { 
+          OR: [
+            { whatsappLid: intermediateTarget },
+            { whatsappLid: phoneNoSuffix },
+            { phone: intermediateTarget },
+            { phone: phoneNoSuffix }
+          ]
+        },
+        select: { whatsappLid: true, phone: true }
+      });
+
+      if (customer?.whatsappLid) {
+        targetRecipient = customer.whatsappLid;
+      } else if (customer?.phone && customer.phone.includes('@')) {
+        targetRecipient = customer.phone;
+      } else {
+        targetRecipient = intermediateTarget;
+      }
+    } catch (e) {
+      console.warn('[generateDocument] DB resolve target failed:', e.message);
+    }
+
     // Auto-fix WID suffix: ONLY if missing '@'
     if (targetRecipient && typeof targetRecipient === 'string' && !targetRecipient.includes('@')) {
       let cleaned = targetRecipient.replace(/\D/g, '');
@@ -350,17 +379,31 @@ const generateDocumentTool = {
             fileCaption
           );
         } catch (initialError) {
-          // FALLBACK LOGIC: If LID fails, try sending to regular @c.us if we can derive it
-          if (initialError.message?.includes('No LID') && targetRecipient.endsWith('@lid')) {
-            console.warn(`[generateDocument] LID send failed, trying fallback for: ${targetRecipient}`);
+          // FALLBACK LOGIC: If sending to LID or @c.us fails, try the alternative
+          if (initialError.message && initialError.message.includes('No LID')) {
+            console.warn(`[generateDocument] Send failed with No LID for: ${targetRecipient}`);
             const prisma = require('../../lib/prisma');
+            const cleanPhone = targetRecipient.replace(/@c\.us$|@lid$/, '');
             const customer = await prisma.customer.findFirst({
-              where: { whatsappLid: targetRecipient },
-              select: { phone: true }
+              where: {
+                OR: [
+                  { whatsappLid: targetRecipient },
+                  { whatsappLid: cleanPhone },
+                  { phone: targetRecipient },
+                  { phone: cleanPhone }
+                ]
+              },
+              select: { phone: true, whatsappLid: true }
             });
             
-            if (customer?.phone) {
-              const fallbackTarget = customer.phone.includes('@') ? customer.phone : `${customer.phone}@c.us`;
+            let fallbackTarget = null;
+            if (targetRecipient.endsWith('@c.us') && customer?.whatsappLid) {
+              fallbackTarget = customer.whatsappLid;
+            } else if (targetRecipient.endsWith('@lid') && customer?.phone) {
+              fallbackTarget = customer.phone.includes('@') ? customer.phone : `${customer.phone}@c.us`;
+            }
+            
+            if (fallbackTarget && fallbackTarget !== targetRecipient) {
               console.log(`[generateDocument] Retrying with fallback: ${fallbackTarget}`);
               markBotMessage(fallbackTarget, fileCaption);
               await global.whatsappClient.sendFile(
