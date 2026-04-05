@@ -52,20 +52,18 @@ const sendMessageTool = {
         };
       }
 
-      let target = destination.trim();
-
-      // If it's just numbers, add @c.us
-      if (!target.includes('@')) {
-        let digits = target.replace(/\D/g, '');
-        if (digits.startsWith('0')) digits = '62' + digits.slice(1);
-        target = `${digits}@c.us`;
-      }
+      let target = getIdentifier(destination) || destination;
 
       // Auto-fix: if target (from manual input or AI) matches a known LID, use that
       try {
-        const phoneDigits = target.replace(/@c\.us$|@lid$/, '').replace(/\D/g, '');
+        const phone = target.replace(/@c\.us$|@lid$/, '');
         const customer = await prisma.customer.findFirst({
-          where: { whatsappLid: { contains: phoneDigits } },
+          where: { 
+            OR: [
+              { whatsappLid: target },
+              { phone: phone }
+            ]
+          },
           select: { whatsappLid: true }
         });
         if (customer?.whatsappLid) {
@@ -86,19 +84,25 @@ const sendMessageTool = {
 
       // --- Simpan ke Prisma agar AI punya konteks ---
       try {
-        const normalizedPhone = target.replace(/@c\.us$|@lid$/, '').replace(/\D/g, '');
+        const phone = target.replace(/@c\.us$|@lid$/, '');
         
         // Find or create customer
-        let customer = await prisma.customer.findUnique({
-          where: { phone: normalizedPhone }
+        let customer = await prisma.customer.findFirst({
+          where: { 
+            OR: [
+              { phone: phone },
+              { whatsappLid: target }
+            ]
+          }
         });
 
         if (!customer) {
           customer = await prisma.customer.create({
             data: {
-              phone: normalizedPhone,
-              name: normalizedPhone,
-              status: 'new'
+              phone: phone,
+              name: phone,
+              status: 'new',
+              whatsappLid: target.endsWith('@lid') ? target : undefined
             }
           });
         }

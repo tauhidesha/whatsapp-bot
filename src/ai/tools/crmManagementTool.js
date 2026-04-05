@@ -150,10 +150,17 @@ async function handleCrmSummary(days) {
 
 async function handleCustomerDeepDive(phone) {
     if (!phone) return { success: false, message: 'Nomor telepon wajib diisi.' };
-    const { docId } = parseSenderIdentity(phone);
+    const { getIdentifier } = require('../utils/humanHandover.js');
+    const identifier = getIdentifier(phone) || phone;
+    const docId = identifier.replace(/@c\.us$|@lid$/, '');
     
-    const customer = await prisma.customer.findUnique({
-        where: { phone: docId },
+    const customer = await prisma.customer.findFirst({
+        where: {
+            OR: [
+                { phone: docId },
+                { whatsappLid: identifier }
+            ]
+        },
         include: {
             bookings: {
                 orderBy: { bookingDate: 'desc' },
@@ -276,9 +283,17 @@ async function handleBulkLabel(targetNumbers, label, reason) {
     let success = 0;
     for (const num of targetNumbers) {
         try {
-            const { docId } = parseSenderIdentity(num);
-            await prisma.customer.update({
-                where: { phone: docId },
+            const { getIdentifier } = require('../utils/humanHandover.js');
+            const identifier = getIdentifier(num) || num;
+            const docId = identifier.replace(/@c\.us$|@lid$/, '');
+            
+            await prisma.customer.updateMany({
+                where: {
+                    OR: [
+                        { phone: docId },
+                        { whatsappLid: identifier }
+                    ]
+                },
                 data: { 
                     status: label,
                     notes: reason ? { append: `\n[BulkLabel] ${reason}` } : undefined
@@ -292,9 +307,17 @@ async function handleBulkLabel(targetNumbers, label, reason) {
 
 async function handleUpdateNotes(phone, notes) {
     if (!phone || !notes) return { success: false, message: 'Nomor/Catatan wajib.' };
-    const { docId } = parseSenderIdentity(phone);
-    await prisma.customer.update({
-        where: { phone: docId },
+    const { getIdentifier } = require('../utils/humanHandover.js');
+    const identifier = getIdentifier(phone) || phone;
+    const docId = identifier.replace(/@c\.us$|@lid$/, '');
+
+    await prisma.customer.updateMany({
+        where: {
+            OR: [
+                { phone: docId },
+                { whatsappLid: identifier }
+            ]
+        },
         data: { notes, updatedAt: new Date() }
     });
     return { success: true, message: `Notes SQL berhasil diperbarui.` };

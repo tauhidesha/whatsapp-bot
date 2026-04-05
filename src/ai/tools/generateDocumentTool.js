@@ -75,29 +75,28 @@ const generateDocumentTool = {
     
     // Auth & LID Lookup: Ensure we use LID if available for reliability
     try {
+      const { getIdentifier } = require('../utils/humanHandover.js');
       const prisma = require('../../lib/prisma');
-      const identifier = targetRecipient.trim();
+      const identifier = getIdentifier(targetRecipient) || targetRecipient;
       
       const customer = await prisma.customer.findFirst({
         where: {
           OR: [
             { whatsappLid: identifier },
-            { phone: identifier.replace(/@c\.us$|@lid$/, '').replace(/\D/g, '') },
-            { phoneReal: identifier.replace(/@c\.us$|@lid$/, '').replace(/\D/g, '') }
+            { phone: identifier.replace(/@c\.us$|@lid$/, '') },
+            { phoneReal: identifier.replace(/@c\.us$|@lid$/, '') }
           ]
         },
-        select: { whatsappLid: true, phoneReal: true, phone: true }
+        select: { whatsappLid: true }
       });
       
       if (customer?.whatsappLid) {
         targetRecipient = customer.whatsappLid;
-      } else if (!targetRecipient.includes('@')) {
-        let digits = targetRecipient.replace(/\D/g, '');
-        if (digits.startsWith('0')) digits = '62' + digits.slice(1);
-        targetRecipient = `${digits}@c.us`;
+      } else {
+        targetRecipient = identifier;
       }
     } catch (err) {
-      console.log(`[generateDocument] LID lookup failed: ${err.message}`);
+      console.log(`[generateDocument] Identifier lookup failed: ${err.message}`);
     }
     
     // Auto-Calculate Price if totalAmount is 0/missing, or enrich items with descriptions
