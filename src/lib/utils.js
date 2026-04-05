@@ -3,14 +3,6 @@
 
 const WHATSAPP_SUFFIX = '@c.us';
 
-function normalizePhone(phone) {
-    if (!phone) return '';
-    let clean = String(phone).split('@')[0].replace(/\D/g, '');
-    if (clean.startsWith('0')) clean = '62' + clean.slice(1);
-    else if (clean.length >= 10 && !clean.startsWith('62')) clean = '62' + clean;
-    return clean;
-}
-
 function parseSenderIdentity(rawValue) {
     const trimmed = (rawValue || '').trim();
     if (!trimmed) {
@@ -23,12 +15,12 @@ function parseSenderIdentity(rawValue) {
     }
 
     const isLid = trimmed.endsWith('@lid');
-    const numericPart = normalizePhone(trimmed); // Numeric version (62...)
-    const fullId = isLid ? trimmed : `${numericPart}@c.us`;
+    // If it has a suffix, use it. If not, simple numeric + @c.us
+    const fullId = trimmed.includes('@') ? trimmed : `${trimmed.replace(/\D/g, '')}@c.us`;
 
     return {
-        docId: fullId, // Now returns full ID (with suffix) to match DB phone field
-        numericId: numericPart, // Added numeric version for cases that need it
+        docId: fullId, 
+        numericId: fullId.replace(/@c\.us$|@lid$/, '').replace(/\D/g, ''),
         channel: 'whatsapp',
         platformId: fullId,
         normalizedAddress: fullId,

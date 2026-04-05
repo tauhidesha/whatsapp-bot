@@ -5,26 +5,25 @@ const BOSMAT_ADMIN_NUMBER = process.env.BOSMAT_ADMIN_NUMBER || process.env.ADMIN
 const NOTIFY_BOOKING_CREATION = process.env.NOTIFY_BOOKING_CREATION !== 'true';
 const DEFAULT_ADDITIONAL_SERVICE = process.env.BOOKING_DEFAULT_ADDITIONAL_SERVICE || null;
 
-function normalizeWhatsappNumber(number) {
+/**
+ * Tidak lagi melakukan normalisasi agresif. 
+ * Memastikan suffix @c.us atau @lid tetap terjaga.
+ */
+function getIdentifier(number) {
   if (!number) return null;
   let trimmed = number.trim();
   if (!trimmed) return null;
 
+  // Jika sudah punya suffix, biarkan saja
   if (trimmed.endsWith('@c.us') || trimmed.endsWith('@lid')) {
-    return trimmed.replace(/\s+/g, '');
+    return trimmed;
   }
 
-  const isPlus = trimmed.startsWith('+');
-  let digits = trimmed.replace(/[^0-9]/g, '');
-
-  if (!isPlus && digits.startsWith('0')) {
-    digits = '62' + digits.slice(1);
-  }
-
-  if (digits.length >= 14 && !digits.startsWith('62')) {
-    return `${digits}@lid`;
-  }
-
+  // Jika tidak ada suffix, default ke @c.us untuk backward compatibility/input manual
+  let digits = trimmed.replace(/\D/g, '');
+  if (!digits) return null;
+  if (digits.startsWith('0')) digits = '62' + digits.slice(1);
+  
   return `${digits}@c.us`;
 }
 
@@ -34,7 +33,7 @@ async function sendWhatsappNotification(message) {
     return;
   }
 
-  const target = normalizeWhatsappNumber(BOSMAT_ADMIN_NUMBER);
+  const target = getIdentifier(BOSMAT_ADMIN_NUMBER);
   if (!target) {
     console.warn('[humanHandover] BOSMAT_ADMIN_NUMBER tidak valid. Notifikasi WA tidak dikirim.');
     return;
@@ -245,8 +244,8 @@ async function setSnoozeMode(senderNumber, durationMinutes = 60, options = {}) {
   // 2. Sync to Customer table
   try {
     let customer = await prisma.customer.findUnique({ where: { phone } });
-    if (!customer && normalizedNumber.endsWith('@lid')) {
-      customer = await prisma.customer.findFirst({ where: { whatsappLid: normalizedNumber } });
+    if (!customer && identifier.endsWith('@lid')) {
+      customer = await prisma.customer.findFirst({ where: { whatsappLid: identifier } });
     }
     if (customer) {
       await prisma.customer.update({

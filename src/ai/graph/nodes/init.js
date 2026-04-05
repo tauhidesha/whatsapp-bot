@@ -14,9 +14,9 @@ async function initNode(state) {
     const phoneReal = metadata?.phoneReal;
     
     // Admin Detection (Always check at start)
-    const adminNumber = (process.env.BOSMAT_ADMIN_NUMBER || '').replace(/\D/g, '');
-    const senderNumber = (metadata?.fullSenderId || metadata?.phoneReal || '').replace(/\D/g, '');
-    const isAdmin = !!(adminNumber && senderNumber.includes(adminNumber));
+    const adminNumber = process.env.BOSMAT_ADMIN_NUMBER || '';
+    const fullSenderId = metadata?.fullSenderId || '';
+    const isAdmin = !!(adminNumber && fullSenderId === adminNumber);
 
     if (isAdmin) {
         console.log('👑 [INIT_NODE] Admin detected! Switching to Admin Mode.');

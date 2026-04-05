@@ -73,34 +73,31 @@ const generateDocumentTool = {
 
     let targetRecipient = recipientNumber || senderNumber;
     
-    // Auto-detect customer if recipientNumber is missing
-    if (!recipientNumber) {
+    // Auth & LID Lookup: Ensure we use LID if available for reliability
+    try {
       const prisma = require('../../lib/prisma');
-      try {
-        const lastCustomer = await prisma.customer.findFirst({
-          where: {
-            messages: {
-              some: {
-                createdAt: {
-                  gte: new Date(Date.now() - 24 * 60 * 60 * 1000)
-                }
-              }
-            }
-          },
-          orderBy: { updatedAt: 'desc' },
-          select: { phone: true, whatsappLid: true, name: true }
-        });
-        
-        if (lastCustomer && lastCustomer.whatsappLid) {
-          targetRecipient = lastCustomer.whatsappLid;
-        } else if (lastCustomer && lastCustomer.phone) {
-          const ph = lastCustomer.phone;
-          // Keep @lid or @c.us if already present
-          targetRecipient = ph.includes('@') ? ph : ph + '@c.us';
-        }
-      } catch (err) {
-        console.log(`[generateDocument] Failed to auto-detect customer: ${err.message}`);
+      const identifier = targetRecipient.trim();
+      
+      const customer = await prisma.customer.findFirst({
+        where: {
+          OR: [
+            { whatsappLid: identifier },
+            { phone: identifier.replace(/@c\.us$|@lid$/, '').replace(/\D/g, '') },
+            { phoneReal: identifier.replace(/@c\.us$|@lid$/, '').replace(/\D/g, '') }
+          ]
+        },
+        select: { whatsappLid: true, phoneReal: true, phone: true }
+      });
+      
+      if (customer?.whatsappLid) {
+        targetRecipient = customer.whatsappLid;
+      } else if (!targetRecipient.includes('@')) {
+        let digits = targetRecipient.replace(/\D/g, '');
+        if (digits.startsWith('0')) digits = '62' + digits.slice(1);
+        targetRecipient = `${digits}@c.us`;
       }
+    } catch (err) {
+      console.log(`[generateDocument] LID lookup failed: ${err.message}`);
     }
     
     // Auto-Calculate Price if totalAmount is 0/missing, or enrich items with descriptions

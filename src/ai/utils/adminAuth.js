@@ -11,11 +11,7 @@ function isAdmin(senderNumber) {
 
     if (!senderNumber || adminNumbers.length === 0) return false;
 
-    // Normalisasi: hapus karakter non-digit
-    const normalize = (n) => n.toString().replace(/\D/g, '');
-    const sender = normalize(senderNumber);
-
-    return adminNumbers.some(adminProp => normalize(adminProp) === sender);
+    return adminNumbers.some(admin => admin === senderNumber);
 }
 
 /**
