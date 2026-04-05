@@ -14,19 +14,17 @@ async function initNode(state) {
     const phoneReal = metadata?.phoneReal;
     
     // Admin Detection (Always check at start)
-    const adminNumber = process.env.BOSMAT_ADMIN_NUMBER || '';
-    const fullSenderId = metadata?.fullSenderId || '';
-    const isAdmin = !!(adminNumber && fullSenderId === adminNumber);
+    const isAdmin = metadata?.isAdmin || false;
 
     if (isAdmin) {
         console.log('👑 [INIT_NODE] Admin detected! Switching to Admin Mode.');
     }
 
     // Default Date/Time for AI Reference
-    const nowJkt = DateTime.now().setZone('Asia/Jakarta');
+    const nowJkt = DateTime.now().setZone('Asia/Jakarta').setLocale('id');
     const currentDateTime = {
         iso: nowJkt.toISO(),
-        formatted: nowJkt.toFormat('dd MMMM yyyy, HH:mm'),
+        formatted: nowJkt.toFormat('dd MMMM yyyy, HH:mm') + ' WIB',
         dayName: nowJkt.toFormat('cccc'),
         date: nowJkt.toFormat('yyyy-MM-dd'),
         time: nowJkt.toFormat('HH:mm')

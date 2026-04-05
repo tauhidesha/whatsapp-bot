@@ -61,13 +61,17 @@ const sendMessageTool = {
           where: { 
             OR: [
               { whatsappLid: target },
+              { whatsappLid: phone },
+              { phone: target },
               { phone: phone }
             ]
           },
-          select: { whatsappLid: true }
+          select: { whatsappLid: true, phone: true }
         });
         if (customer?.whatsappLid) {
           target = customer.whatsappLid;
+        } else if (customer?.phone && customer.phone.includes('@')) {
+          target = customer.phone;
         }
       } catch (e) {}
 
@@ -76,6 +80,15 @@ const sendMessageTool = {
           success: false,
           message: `Nomor tujuan tidak valid: ${destination}`,
         };
+      }
+
+      // Auto-fix WID suffix: WPPConnect requires @c.us or @lid
+      if (typeof target === 'string' && !target.includes('@')) {
+        let cleaned = target.replace(/\D/g, '');
+        if (cleaned.startsWith('0')) {
+          cleaned = '62' + cleaned.substring(1);
+        }
+        target = cleaned + '@c.us';
       }
 
       // Mark pesan agar onAnyMessage tidak trigger auto-snooze

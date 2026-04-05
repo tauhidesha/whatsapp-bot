@@ -83,20 +83,33 @@ const generateDocumentTool = {
         where: {
           OR: [
             { whatsappLid: identifier },
+            { phone: identifier },
+            { phoneReal: identifier },
             { phone: identifier.replace(/@c\.us$|@lid$/, '') },
             { phoneReal: identifier.replace(/@c\.us$|@lid$/, '') }
           ]
         },
-        select: { whatsappLid: true }
+        select: { whatsappLid: true, phone: true }
       });
       
       if (customer?.whatsappLid) {
         targetRecipient = customer.whatsappLid;
+      } else if (customer?.phone && customer.phone.includes('@')) {
+        targetRecipient = customer.phone;
       } else {
         targetRecipient = identifier;
       }
     } catch (err) {
       console.log(`[generateDocument] Identifier lookup failed: ${err.message}`);
+    }
+
+    // Auto-fix WID suffix: WPPConnect requires @c.us or @lid
+    if (targetRecipient && typeof targetRecipient === 'string' && !targetRecipient.includes('@')) {
+      let cleaned = targetRecipient.replace(/\D/g, '');
+      if (cleaned.startsWith('0')) {
+        cleaned = '62' + cleaned.substring(1);
+      }
+      targetRecipient = cleaned + '@c.us';
     }
     
     // Auto-Calculate Price if totalAmount is 0/missing, or enrich items with descriptions

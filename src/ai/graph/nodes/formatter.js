@@ -69,8 +69,8 @@ ${JSON.stringify(toolResult.combo)}`;
     }
 
     const dateInfo = state.metadata?.currentDateTime
-        ? `Tanggal Sekarang: ${state.metadata.currentDateTime.dayName}, ${state.metadata.currentDateTime.formatted}`
-        : `Tanggal Sekarang: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}`;
+        ? `Tanggal & Waktu Sekarang: ${state.metadata.currentDateTime.dayName}, ${state.metadata.currentDateTime.formatted} (Waktu Indonesia Barat)`
+        : `Tanggal & Waktu Sekarang: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB`;
 
     // Build context summary for the model
     const contextInfo = `
@@ -182,9 +182,28 @@ ${modeInstructions[replyMode] || modeInstructions.inform}
             })
         );
 
+        // Clean message history for copywriter model (strip out tools and tool calls)
+        const cleanMessages = messages
+            .filter(m => {
+                const type = m._getType();
+                if (type === 'system' || type === 'tool') return false;
+                if (type === 'ai') {
+                    // Filter out AI messages that are purely tool calls without visible text
+                    if (typeof m.content === 'string') return m.content.trim() !== '';
+                    if (Array.isArray(m.content)) return m.content.length > 0;
+                    return false;
+                }
+                return type === 'human';
+            })
+            .map(m => {
+                if (m._getType() === 'human') return new HumanMessage({ content: m.content });
+                return new AIMessage({ content: m.content });
+            })
+            .slice(-6);
+
         const response = await structuredModel.invoke([
             new SystemMessage(systemPrompt),
-            ...messages.slice(-6)
+            ...cleanMessages
         ]);
 
         console.log(`[FORMATTER_NODE] [${replyMode}] Thought: ${response.internal_thought}`);

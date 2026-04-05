@@ -240,7 +240,19 @@ async function runDailyFollowUp() {
     // Fetch active promo once per daily run
     const promoData = await getActivePromo();
 
-    // Process queue
+    // Prioritize Reminders FIRST so they run immediately at 9 AM
+    const { processCoatingReminders } = require('../../utils/coatingReminders.js');
+    const { sendBookingReminders } = require('../../utils/bookingReminders.js');
+    if (global.whatsappClient) {
+        try {
+            await processCoatingReminders(global.whatsappClient);
+            await sendBookingReminders(true); // Always check today's bookings
+        } catch (err) {
+            console.error('[Scheduler] Reminders hit an error:', err.message);
+        }
+    }
+
+    // Process follow-up queue
     let sent = 0;
     let skipped = 0;
     let errors = 0;
@@ -254,14 +266,11 @@ async function runDailyFollowUp() {
             console.error(`[Scheduler] Error processing ${customer.docId}:`, err.message);
             errors++;
         }
-        if (i < queue.length - 1) await delay(30000);
-    }
-
-    const { processCoatingReminders } = require('../../utils/coatingReminders.js');
-    const { sendBookingReminders } = require('../../utils/bookingReminders.js');
-    if (global.whatsappClient) {
-        await processCoatingReminders(global.whatsappClient);
-        await sendBookingReminders(true); // Always check today's bookings
+        
+        // Jeda 15 menit (15 * 60 * 1000 ms) di antara pengiriman agar terhindar dari spam list & WPPConnect timeout
+        if (i < queue.length - 1) {
+            await delay(15 * 60 * 1000);
+        }
     }
 
     console.log(`[Scheduler] Done — sent: ${sent}, skipped: ${skipped}, errors: ${errors}`);
@@ -330,14 +339,22 @@ function startFollowUpScheduler() {
         const hour = now.hour;
         const todayStr = now.toFormat('yyyy-MM-dd');
 
-        // Run daily at 9am (Local Studio Time)
+        // Execute only once a day at 9 AM
         if (hour === 9 && lastDailyRunDate !== todayStr) {
+            lastDailyRunDate = todayStr; // Mark immediately to prevent concurrent duplicates
+
+            // Skip run completely if it's Sunday (Luxon weekday 7 is Sunday)
+            if (now.weekday === 7) {
+                console.log(`[Scheduler] Hari Minggu, libur re-engagement / follow up.`);
+                return;
+            }
+
             try {
                 console.log(`[Scheduler] Starting daily follow up at ${now.toISO()} (Hour: ${hour}, Timezone: ${TIMEZONE})`);
                 await runDailyFollowUp();
-                lastDailyRunDate = todayStr; // Mark as run for today
             } catch (err) {
                 console.error('[Scheduler] Daily run failed:', err);
+                lastDailyRunDate = null; // allow retry if failed immediately
             }
         }
     }, intervalMs);
