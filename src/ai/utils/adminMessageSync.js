@@ -65,8 +65,24 @@ async function handleAdminHpMessage(msg) {
     if (!msg.fromMe) return;
     if (msg.from === 'status@broadcast') return;
 
-    const messageText = (msg.body || msg.caption || '').trim();
-    if (!messageText) return;
+    let messageText = '';
+    if (msg.type === 'chat' || msg.type === 'vcard' || msg.type === 'multi_vcard') {
+        messageText = msg.body || msg.caption || '';
+    } else {
+        // For media (image, document, etc), body often contains base64 string.
+        messageText = msg.caption || '';
+    }
+    messageText = messageText.trim();
+
+    // If there's no text (e.g. admin sent an image without caption),
+    // we still want to log it and trigger snooze, but we shouldn't save a huge base64 string.
+    if (!messageText) {
+        if (msg.type && msg.type !== 'chat') {
+            messageText = `[Sent a ${msg.type}]`;
+        } else {
+            return;
+        }
+    }
 
     const recipientNumber = msg.to;
     if (!recipientNumber) return;
