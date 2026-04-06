@@ -65,6 +65,9 @@ async function sendBookingReminders(force = false) {
             bookingTime: bookingTime,
             target_service: booking.serviceType || 'layanan studio',
             customerLabel: 'active'
+          },
+          metadata: {
+            lastMessageAt: booking.customer?.lastMessageAt || booking.bookingDate || new Date()
           }
         };
 
