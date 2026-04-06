@@ -111,7 +111,7 @@ module.exports = function generateInvoiceHTML(data) {
     <!-- Header -->
     <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:60px">
       <div>
-        <h1 class="font-headline" style="font-size:72px; font-weight:900; line-height:0.8; text-transform:uppercase; margin-bottom:16px">
+        <h1 class="font-headline" style="font-size:48px; font-weight:900; line-height:0.8; text-transform:uppercase; margin-bottom:16px">
           ${documentType === 'tanda_terima' ? 'Receipt' : documentType === 'bukti_bayar' ? 'Payment' : 'Invoice'}<br/>
           <span class="text-yellow">Repaint &<br/>Detailing</span>
         </h1>
