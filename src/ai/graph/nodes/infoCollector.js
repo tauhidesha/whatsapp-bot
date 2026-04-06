@@ -1,6 +1,7 @@
 const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
 const { SystemMessage, HumanMessage } = require('@langchain/core/messages');
 const studioMetadata = require('../../constants/studioMetadata');
+const { withRetry } = require('../utils/retry');
 
 const model = new ChatGoogleGenerativeAI({
     model: process.env.AI_MODEL || 'gemini-flash-lite-latest',
@@ -152,10 +153,10 @@ Output: {
         }));
         console.log(`[INFO_COLLECTOR_NODE] Vision Payload:`, JSON.stringify(visionDebug));
 
-        const response = await model.invoke([
+        const response = await withRetry(() => model.invoke([
             new SystemMessage(systemPrompt),
             new HumanMessage({ content: visionContent })
-        ]);
+        ]), { maxRetries: 3, baseDelayMs: 1500 });
         
 
         const cleanedContent = cleanJson(response.content);

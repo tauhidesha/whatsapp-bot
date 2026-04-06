@@ -10,11 +10,15 @@ const ZoyaState = Annotation.Root({
     messages: Annotation({
         reducer: (oldMessages, newMessages) => {
             // Gabungkan pesan lama dan baru
-            const combined = [...oldMessages];
+            let combined = [...oldMessages];
             if (Array.isArray(newMessages)) {
                 combined.push(...newMessages);
             } else {
                 combined.push(newMessages);
+            }
+            // Batasi jumlah pesan maksimal (20 terakhir) untuk menghemat DB memory (khususnya payload array image/base64)
+            if (combined.length > 20) {
+                combined = combined.slice(-20);
             }
             return combined;
         },

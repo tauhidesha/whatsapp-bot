@@ -2,6 +2,7 @@ const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
 const { SystemMessage, HumanMessage, AIMessage } = require('@langchain/core/messages');
 const { z } = require('zod');
 const studioMetadata = require('../../constants/studioMetadata');
+const { withRetry } = require('../utils/retry');
 
 const model = new ChatGoogleGenerativeAI({
     model: process.env.AI_MODEL || 'gemini-flash-lite-latest',
@@ -201,10 +202,10 @@ ${modeInstructions[replyMode] || modeInstructions.inform}
 
         const finalPrompt = `TRANSKIP PERCAKAPAN TERAKHIR:\n\n${transcript}\n\n(Tuliskan balasan AI selanjutnya sesuai arahan sistem)`;
 
-        const response = await structuredModel.invoke([
+        const response = await withRetry(() => structuredModel.invoke([
             new SystemMessage(systemPrompt),
             new HumanMessage(finalPrompt)
-        ]);
+        ]), { maxRetries: 3, baseDelayMs: 1500 });
 
         console.log(`[FORMATTER_NODE] [${replyMode}] Thought: ${response.internal_thought}`);
 
