@@ -5,13 +5,14 @@ module.exports = function generateInvoiceHTML(data) {
     documentType, customerName, motorDetails, items,
     finalTotal, amountPaid, paymentMethod, notes,
     recipientNumber, bookingDate, docNumber, now, detectedSize,
-    logoBase64, realPhone
+    logoBase64, realPhone, subtotal: subtotalParam, discount
   } = data;
 
   // Hitung values
+  const subtotal = subtotalParam || finalTotal;
+  const discountAmount = discount || 0;
   const paid = amountPaid || 0;
   const balance = finalTotal - paid;
-  const subtotal = finalTotal;
 
   // Clean recipient number - prefer realPhone (actual WA number) over @lid
   const displayPhone = realPhone
@@ -209,24 +210,6 @@ module.exports = function generateInvoiceHTML(data) {
   <div class="totals-section" style="display:grid; grid-template-columns:7fr 5fr; gap:32px; margin-top:40px">
     <!-- Notes & Payment Info -->
     <div>
-      ${notesList.length > 0 ? `
-      <div class="bg-darker border-yellow" style="padding:32px; margin-bottom:24px">
-        <p class="font-headline" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.15em; margin-bottom:16px">Catatan Teknis Layanan</p>
-        <div style="display:flex; flex-direction:column; gap:8px">
-          ${notesList.map(n => {
-            let icon = '●';
-            const lowerN = n.toLowerCase();
-            if (lowerN.includes('garansi')) icon = '✓';
-            else if (lowerN.includes('waktu') || lowerN.includes('jam') || lowerN.includes('hari')) icon = '⏱';
-            
-            return `
-            <div style="display:flex; gap:10px; align-items:flex-start">
-              <span style="color:#FFFF00; font-size:14px; margin-top:2px">${icon}</span>
-              <p class="text-muted" style="font-size:14px; line-height:1.5">${n}</p>
-            </div>`;
-          }).join('')}
-        </div>
-      </div>` : ''}
       <div style="padding:24px; border:1px solid #484831; background:#1c1b1b">
         <p class="text-yellow" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.15em; margin-bottom:16px">Informasi Pembayaran</p>
         <div style="display:flex; align-items:center; gap:16px">
@@ -251,6 +234,11 @@ module.exports = function generateInvoiceHTML(data) {
         <span style="font-size:16px">Rp${subtotal.toLocaleString('id-ID')}</span>
       </div>
 
+      ${discountAmount > 0 ? `
+      <div style="display:flex; justify-content:space-between">
+        <span class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em">Diskon</span>
+        <span style="font-size:16px; color:#ffb4ab">- Rp${discountAmount.toLocaleString('id-ID')}</span>
+      </div>` : ''}
       ${paid > 0 ? `
       <div style="display:flex; justify-content:space-between">
         <span class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em">DP / Uang Muka</span>
