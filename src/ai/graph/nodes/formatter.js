@@ -184,7 +184,10 @@ ${modeInstructions[replyMode] || modeInstructions.inform}
 
         // 3. Build a text transcript from message history to avoid Gemini strict conversational history issues
         const transcript = messages
-            .filter(m => m._getType() === 'human' || m._getType() === 'ai')
+            .filter(m => {
+                if (typeof m._getType === 'function') return m._getType() === 'human' || m._getType() === 'ai';
+                return false;
+            })
             .map(m => {
                 let text = '';
                 if (typeof m.content === 'string') text = m.content;
