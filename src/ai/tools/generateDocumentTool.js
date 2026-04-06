@@ -375,7 +375,23 @@ const generateDocumentTool = {
         // Small delay to ensure browser stability after generation
         await new Promise(resolve => setTimeout(resolve, 2000));
 
-        const fileCaption = `Berikut adalah ${title} untuk pesanan Anda.`;
+        let fileCaption = `Berikut adalah ${title} untuk pesanan Anda.`;
+        
+        switch(documentType) {
+          case 'tanda_terima':
+            fileCaption = `Halo Kak ${customerName}! Kendaraan sudah kami terima di boS Mat Studio. Berikut lampiran Tanda Terima-nya ya. 🏍️✨`;
+            break;
+          case 'invoice':
+            fileCaption = `Halo Kak ${customerName}, berikut rincian tagihan (Invoice) untuk treatment kendaraannya. Jika ada yang ingin ditanyakan, jangan ragu untuk balas pesan ini ya! 📋`;
+            break;
+          case 'bukti_bayar':
+            fileCaption = `Terima kasih banyak Kak ${customerName}! Pembayaran sudah kami konfirmasi. Berikut Bukti Pembayaran untuk pesanan Kakak. 🙏`;
+            break;
+          case 'garansi_repaint':
+          case 'garansi_coating':
+            fileCaption = `Treatment selesai! ✨ Berikut perlindungan ekstra berupa Dokumen ${title} resmi dari boS Mat Studio. Simpan baik-baik ya Kak ${customerName}! 🛡️`;
+            break;
+        }
         // Mark before sending so onAnyMessage doesn't treat it as admin-from-HP
         markBotMessage(targetRecipient, fileCaption);
         
