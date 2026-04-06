@@ -256,7 +256,11 @@ const createBookingTool = {
       const customer = existingCustomer
         ? await prisma.customer.update({
             where: { id: existingCustomer.id },
-            data: { phoneReal: normalizedPhone }
+            data: {
+              phoneReal: normalizedPhone,
+              // Sync name if different (prevents split identities like "Arul" vs "Rully")
+              ...(customerName && existingCustomer.name !== customerName ? { name: customerName } : {})
+            }
           })
         : await prisma.customer.create({
             data: {

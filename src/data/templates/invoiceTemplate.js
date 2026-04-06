@@ -237,7 +237,7 @@ module.exports = function generateInvoiceHTML(data) {
             </svg>
           </div>
           <div>
-            <p class="font-headline" style="font-size:18px; font-weight:700; text-transform:uppercase">Bank BCA: 1662515412</p>
+            <p class="font-headline" style="font-size:18px; font-weight:700; text-transform:uppercase">Blu BCA Digital: 0901 1180 1695</p>
             <p class="text-muted" style="font-size:13px; text-transform:uppercase">A/N Muhammad Tauhid Haryadesa</p>
           </div>
         </div>
