@@ -1,5 +1,7 @@
 # WhatsApp AI Chatbot
 
+> 🤖 **For AI Agents**: Read [ARCHITECTURE.md](./ARCHITECTURE.md) first to understand the project's state and architecture.
+
 WhatsApp AI Chatbot dengan LangChain dan Google Gemini. Arsitektur JavaScript yang konsisten dan siap deploy ke AWS.
 
 ## 🚀 Features
