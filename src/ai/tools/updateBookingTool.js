@@ -41,6 +41,7 @@ const UpdateBookingSchema = z.object({
     })
     .optional(),
   realPhone: z.string().optional(),
+  discount: z.number().optional(),
 });
 
 function formatDate(date) {
@@ -263,6 +264,15 @@ const updateBookingTool = {
       }
 
       if (parsed.totalAmount !== undefined) updateData.totalAmount = parsed.totalAmount;
+      if (parsed.discount !== undefined) updateData.discount = parsed.discount;
+      
+      // Calculate discount from subtotal if not explicitly provided
+      if (parsed.discount === undefined && parsed.totalAmount !== undefined) {
+        const currentSubtotal = parsed.subtotal || existing.subtotal || 0;
+        if (currentSubtotal > 0 && currentSubtotal > parsed.totalAmount) {
+          updateData.discount = currentSubtotal - parsed.totalAmount;
+        }
+      }
 
       if (Object.keys(updateData).length === 0) {
         return {

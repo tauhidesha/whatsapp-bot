@@ -50,7 +50,9 @@ const generateDocumentTool = {
           recipientNumber: { type: 'string', description: 'WAJIB: Nomor customer penerima dokumen. Format: 628xxx@c.us atau 176665158225970@lid' },
           bookingDate: { type: 'string', description: 'Tanggal booking (YYYY-MM-DD) untuk kalkulasi estimasi selesai.' },
           serviceType: { type: 'string', description: 'Layanan yang digaransikan. Pisahkan dengan § jika lebih dari satu. Contoh: "Full Body Repaint § Nano Ceramic Coating".' },
-          realPhone: { type: 'string', description: 'Nomor WhatsApp asli customer (human-readable).' }
+          realPhone: { type: 'string', description: 'Nomor WhatsApp asli customer (human-readable).' },
+          subtotal: { type: 'number', description: 'Total sebelum diskon. Jika kosong, akan dihitung dari jumlah item.' },
+          discount: { type: 'number', description: 'Jumlah diskon yang diberikan.' }
         },
         required: ['documentType', 'senderNumber', 'recipientNumber']
       }
@@ -70,7 +72,9 @@ const generateDocumentTool = {
       recipientNumber,
       bookingDate,
       serviceType = '-',
-      realPhone = ''
+      realPhone = '',
+      subtotal = 0,
+      discount = 0
     } = input;
 
     let targetRecipient = recipientNumber || senderNumber;
@@ -335,7 +339,7 @@ const generateDocumentTool = {
         items: finalItems, finalTotal, amountPaid,
         paymentMethod, notes, recipientNumber,
         bookingDate, docNumber: idSuffix, now, detectedSize,
-        logoBase64, realPhone
+        logoBase64, realPhone, subtotal: subtotal || 0, discount: discount || 0
       });
 
       const { getChromiumPath, DEFAULT_CHROME_ARGS } = require('../utils/browser');

@@ -88,6 +88,7 @@ model Booking {
   amountPaid         Float               @default(0)
   paymentStatus      String              @default("UNPAID")
   totalAmount        Float?
+  discount           Float?              @default(0)
   realPhone          String?
   customer           Customer            @relation(fields: [customerId], references: [id])
   vehicle            Vehicle?            @relation(fields: [vehicleId], references: [id])
@@ -113,62 +114,62 @@ model Transaction {
 }
 
 model CustomerContext {
-  id                  String    @id
-  phone               String    @unique
-  motorModel          String?
-  motorPlate          String?
-  motorYear           String?
-  motorColor          String?
-  motorCondition      String?
-  targetServices      String[]
-  serviceDetail       String?
-  paintType           String?
-  isBongkarTotal      Boolean?
-  budgetSignal        String?
-  detectedIntents     String[]
-  isChangingTopic     Boolean   @default(false)
-  saidExpensive       Boolean?
-  askedPrice          Boolean?
-  askedAvailability   Boolean?
-  sharedPhoto         Boolean?
-  preferredDay        String?
-  preferredTime       String?
-  locationHint        String?
-  quotedServices      Json?
-  quotedTotalNormal   Float?
-  quotedTotalBundling Float?
-  quotedAt            DateTime?
-  conversationStage   String?
-  lastAiAction        String?
-  upsellOffered       Boolean?
-  upsellAccepted      Boolean?
-  butuhBantuanAdmin   Boolean   @default(false)
-  conversationSummary String?
-  customerLabel       String?
-  labelConfidence     Float?
-  labelReason         String?
-  labelScores         Json?
-  followUpStrategy    String?
-  followUpCount       Int       @default(0)
+  id                   String    @id
+  phone                String    @unique
+  motorModel           String?
+  motorPlate           String?
+  motorYear            String?
+  motorColor           String?
+  motorCondition       String?
+  targetServices       String[]
+  serviceDetail        String?
+  budgetSignal         String?
+  detectedIntents      String[]
+  isChangingTopic      Boolean   @default(false)
+  saidExpensive        Boolean?
+  askedPrice           Boolean?
+  askedAvailability    Boolean?
+  sharedPhoto          Boolean?
+  preferredDay         String?
+  preferredTime        String?
+  locationHint         String?
+  quotedServices       Json?
+  quotedTotalNormal    Float?
+  quotedTotalBundling  Float?
+  quotedAt             DateTime?
+  conversationStage    String?
+  lastAiAction         String?
+  upsellOffered        Boolean?
+  upsellAccepted       Boolean?
+  butuhBantuanAdmin    Boolean   @default(false)
+  conversationSummary  String?
+  customerLabel        String?
+  labelConfidence      Float?
+  labelReason          String?
+  labelScores          Json?
+  followUpStrategy     String?
+  txCount              Int?
+  daysSinceLastChat    Int?
+  daysSinceLastTx      Int?
+  ghostedTimes         Int?
+  lastGhostCountedAt   DateTime?
+  followUpConverted    Boolean   @default(false)
+  lastFollowUpAt       DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  followUpCount        Int       @default(0)
   lastFollowUpStrategy String?
-  txCount             Int?
-  daysSinceLastChat   Int?
-  daysSinceLastTx     Int?
-  ghostedTimes        Int?
-  lastGhostCountedAt  DateTime?
-  followUpConverted   Boolean   @default(false)
-  lastFollowUpAt      DateTime?
+  explicitlyRejected   Boolean   @default(false)
+  lastCustomerReplyAt  DateTime?
   repliedAfterFollowup Boolean   @default(false)
-  explicitlyRejected  Boolean   @default(false)
-  lastCustomerReplyAt DateTime?
-  lastServiceAt       DateTime?
-  lastServiceType     String?
-  lastReviewAt        DateTime?
-  reviewFollowUpSent  Boolean   @default(false)
-  visualSummary       String?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  customer            Customer  @relation(fields: [phone], references: [phone])
+  visualSummary        String?
+  isBongkarTotal       Boolean?
+  paintType            String?
+  lastReviewAt         DateTime?
+  reviewFollowUpSent   Boolean   @default(false)
+  lastServiceAt        DateTime?
+  lastServiceType      String?
+  customer             Customer  @relation(fields: [phone], references: [phone])
 }
 
 model CoatingMaintenance {

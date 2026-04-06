@@ -99,6 +99,7 @@ const BookingArgsSchema = z.object({
   senderNumber: z.string().optional(),
   senderName: z.string().optional(),
   realPhone: z.string().optional(),
+  discount: z.number().optional(),
 });
 
 const createBookingTool = {
@@ -146,6 +147,9 @@ const createBookingTool = {
       if (!workingArgs.customerName && typeof workingArgs.senderName === 'string') {
         workingArgs.customerName = workingArgs.senderName;
       }
+      if (workingArgs.discount === undefined && workingArgs.totalAmount !== undefined && workingArgs.subtotal !== undefined) {
+        workingArgs.discount = workingArgs.subtotal - workingArgs.totalAmount;
+      }
 
       const parsed = BookingArgsSchema.parse(workingArgs);
       const {
@@ -164,6 +168,7 @@ const createBookingTool = {
         pickup,
         inspection,
         realPhone,
+        discount,
       } = parsed;
 
       const rawServices = serviceName.split(',').map(s => s.trim()).filter(Boolean);
@@ -432,6 +437,7 @@ const createBookingTool = {
           pickupService: pickupDetails?.requested || false,
           category: getServiceCategory(primaryServices[0]),
           realPhone: realPhone || null,
+          discount: discount || 0,
         }
       });
 

@@ -9,8 +9,8 @@ module.exports = function generateInvoiceHTML(data) {
   } = data;
 
   // Hitung values
-  const subtotal = subtotalParam || finalTotal;
   const discountAmount = discount || 0;
+  const subtotal = subtotalParam || (finalTotal + discountAmount);
   const paid = amountPaid || 0;
   const balance = finalTotal - paid;
 
@@ -248,7 +248,7 @@ module.exports = function generateInvoiceHTML(data) {
       <!-- Border separator -->
       <div style="border-top:1px solid #484831; padding-top:24px; margin-top:8px">
         <span class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em; display:block; margin-bottom:8px">Total Keseluruhan</span>
-        <span class="font-headline" style="font-size:36px; font-weight:900">Rp${subtotal.toLocaleString('id-ID')}</span>
+        <span class="font-headline" style="font-size:36px; font-weight:900">Rp${finalTotal.toLocaleString('id-ID')}</span>
       </div>
 
       <!-- Sisa Tagihan kuning — full bleed -->

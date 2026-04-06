@@ -2507,6 +2507,8 @@ app.post('/generate-invoice', requireAuth, async (req, res) => {
             paymentMethod,
             notes,
             serviceType,
+            subtotal,
+            discount,
         } = req.body;
 
         if (!customerName || !customerPhone) {
@@ -2569,6 +2571,8 @@ app.post('/generate-invoice', requireAuth, async (req, res) => {
             recipientNumber,
             realPhone: realPhone || '',
             serviceType: serviceType || items || '-',
+            subtotal: subtotal || 0,
+            discount: discount || 0,
         });
 
         if (result.success) {
@@ -2938,6 +2942,8 @@ app.get('/bookings', requireAuth, async (req, res) => {
                 bookingDateTime: b.bookingDate,
                 status: b.status.toLowerCase(),
                 subtotal: b.subtotal,
+                totalAmount: b.totalAmount || b.subtotal || 0,
+                discount: b.discount || 0,
                 downPayment: b.downPayment,
                 paymentMethod: b.paymentMethod,
                 homeService: b.homeService,
