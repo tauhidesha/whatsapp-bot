@@ -37,7 +37,7 @@ async function sendBookingReminders(force = false) {
         },
         reminderSent: false,
         status: {
-          notIn: ['CANCELLED', 'COMPLETED', 'IN_PROGRESS']
+          notIn: ['CANCELLED', 'COMPLETED', 'IN_PROGRESS', 'SUCCESS', 'PAID', 'DONE']
         }
       },
       include: {
