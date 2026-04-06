@@ -2509,6 +2509,7 @@ app.post('/generate-invoice', requireAuth, async (req, res) => {
             serviceType,
             subtotal,
             discount,
+            downPayment,
         } = req.body;
 
         if (!customerName || !customerPhone) {
@@ -2565,6 +2566,7 @@ app.post('/generate-invoice', requireAuth, async (req, res) => {
             items: items || '-',
             totalAmount: totalAmount || 0,
             amountPaid: amountPaid || 0,
+            downPayment: downPayment || 0,
             paymentMethod: paymentMethod || '-',
             notes: notes || '',
             senderNumber: adminSender,
