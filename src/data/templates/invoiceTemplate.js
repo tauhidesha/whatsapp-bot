@@ -147,7 +147,7 @@ module.exports = function generateInvoiceHTML(data) {
     </div>
 
     <!-- Customer & Studio -->
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1px; background:#484831; margin-bottom:60px">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1px; background:#484831; margin-bottom:1px">
       <div class="bg-dark" style="padding:28px">
         <p class="text-yellow" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.2em; margin-bottom:20px">Informasi Pelanggan</p>
         <p class="font-headline" style="font-size:24px; font-weight:700; text-transform:uppercase; margin-bottom:8px">${customerName}</p>
@@ -162,6 +162,32 @@ module.exports = function generateInvoiceHTML(data) {
         <p class="text-muted" style="font-size:14px; line-height:1.8">
           ${studioMetadata.location.address}<br/>
           WA: ${studioMetadata.contact.phone}
+        </p>
+      </div>
+    </div>
+
+    <!-- Status Banner Message -->
+    <div style="background:rgba(255,255,255,0.03); border:1px solid #484831; border-top:none; padding:24px 28px; margin-bottom:60px; display:flex; align-items:center; gap:20px">
+      <div style="background:#FFFF00; padding:12px; display:flex; align-items:center; justify-content:center">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          ${documentType === 'tanda_terima' 
+            ? '<path d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="#1d1d00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+            : documentType === 'bukti_bayar'
+            ? '<path d="M12 8V12L15 15M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="#1d1d00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+            : '<path d="M13 16H12V12H11M12 8H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="#1d1d00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+          }
+        </svg>
+      </div>
+      <div>
+        <p class="font-headline" style="font-size:16px; font-weight:700; text-transform:uppercase; margin-bottom:4px">
+          ${documentType === 'tanda_terima' ? 'KENDARAAN DITERIMA' : documentType === 'bukti_bayar' ? 'PEMBAYARAN DIVALIDASI' : 'RINGKASAN ESTIMASI'}
+        </p>
+        <p class="text-muted" style="font-size:13px; line-height:1.6">
+          ${documentType === 'tanda_terima' 
+            ? `Halo! Unit kendaraan Anda telah kami terima dengan aman di Studio. Tim teknis boS Mat akan segera memulai proses pengerjaan sesuai antrean.` 
+            : documentType === 'bukti_bayar'
+            ? `Terima kasih! Kami telah menerima pembayaran (DP/Pelunasan) Anda. Transaksi ini telah tercatat secara resmi dalam sistem riwayat layanan kami.`
+            : `Berikut adalah rincian layanan Repaint & Detailing untuk kendaraan Anda. Silakan hubungi admin jika ada detail yang ingin diubah sebelum pengerjaan.`}
         </p>
       </div>
     </div>
