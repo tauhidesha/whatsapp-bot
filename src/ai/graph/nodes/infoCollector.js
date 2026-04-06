@@ -1,7 +1,7 @@
 const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
 const { SystemMessage, HumanMessage } = require('@langchain/core/messages');
 const studioMetadata = require('../../constants/studioMetadata');
-const { withRetry } = require('../utils/retry');
+const { withRetry } = require('../../utils/retry');
 
 const model = new ChatGoogleGenerativeAI({
     model: process.env.AI_MODEL || 'gemini-flash-lite-latest',
