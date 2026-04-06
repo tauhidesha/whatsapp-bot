@@ -12,9 +12,11 @@ module.exports = function generateInvoiceHTML(data) {
   // Hitung values
   const discountAmount = discount || 0;
   const subtotal = subtotalParam || (finalTotal + discountAmount);
-  const paid = amountPaid || 0;
   const dp = downPayment || 0;
-  const balance = Math.max(0, subtotal - discountAmount - paid - dp);
+  const totalPaid = amountPaid || 0;
+  const rawPaid = Math.max(0, totalPaid - dp);
+  const balance = Math.max(0, Math.round(subtotal - discountAmount - totalPaid));
+
 
   // Clean recipient number - prefer realPhone (actual WA number) over @lid
   const displayPhone = realPhone
@@ -119,7 +121,7 @@ module.exports = function generateInvoiceHTML(data) {
         </h1>
         <div style="display:flex; gap:12px; margin-top:16px">
           <span style="background:#676700; color:#e6e67a; padding:4px 12px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em">
-            Status: ${(paid + dp) >= (subtotal - discountAmount) ? 'Lunas' : (paid + dp) > 0 ? 'DP' : 'Belum Bayar'}
+            Status: ${(totalPaid) >= (subtotal - discountAmount) ? 'Lunas' : (totalPaid) > 0 ? 'DP' : 'Belum Bayar'}
           </span>
         </div>
       </div>
@@ -246,10 +248,10 @@ module.exports = function generateInvoiceHTML(data) {
         <span class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em">Down Payment (DP)</span>
         <span style="font-size:16px; color:#ffb4ab">- Rp${dp.toLocaleString('id-ID')}</span>
       </div>` : ''}
-      ${paid > 0 ? `
+      ${rawPaid > 0 ? `
       <div style="display:flex; justify-content:space-between">
         <span class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em">Sudah Dibayar</span>
-        <span style="font-size:16px; color:#ffb4ab">- Rp${paid.toLocaleString('id-ID')}</span>
+        <span style="font-size:16px; color:#ffb4ab">- Rp${rawPaid.toLocaleString('id-ID')}</span>
       </div>` : ''}
 
       <!-- Border separator -->
