@@ -2503,13 +2503,13 @@ app.post('/generate-invoice', requireAuth, async (req, res) => {
             motorDetails,
             items,
             totalAmount,
-            amountPaid,
+            amountPaid: bodyAmountPaid,
             paymentMethod,
             notes,
             serviceType,
-            subtotal,
-            discount,
-            downPayment,
+            subtotal: bodySubtotal,
+            discount: bodyDiscount,
+            downPayment: bodyDownPayment,
         } = req.body;
 
         if (!customerName || !customerPhone) {
@@ -2518,10 +2518,11 @@ app.post('/generate-invoice', requireAuth, async (req, res) => {
 
         // Normalize customer phone to WA format - preserve @lid suffix if present
         let recipientNumber = customerPhone;
-        
-        // Check if customer has whatsappLid in database
+
+        // Fetch customer + latest booking dari DB sekaligus
         const prisma = require('./src/lib/prisma');
         const normalizedPhone = customerPhone.replace(/[^0-9]/g, '');
+        
         const customer = await prisma.customer.findFirst({
             where: {
                 OR: [
@@ -2532,19 +2533,52 @@ app.post('/generate-invoice', requireAuth, async (req, res) => {
             },
             select: { whatsappLid: true, phone: true }
         });
-        
+
+        // ── Auto-fetch payment data dari booking terbaru ──
+        let amountPaid = bodyAmountPaid || 0;
+        let downPayment = bodyDownPayment || 0;
+        let subtotal = bodySubtotal || 0;
+        let discount = bodyDiscount || 0;
+
+        if (amountPaid === 0 || downPayment === 0) {
+            try {
+                const latestBooking = await prisma.booking.findFirst({
+                    where: {
+                        OR: [
+                            { customerPhone: normalizedPhone },
+                            { customer: { phone: normalizedPhone } },
+                        ]
+                    },
+                    orderBy: { bookingDate: 'desc' },
+                    select: {
+                        amountPaid: true,
+                        downPayment: true,
+                        subtotal: true,
+                        discount: true,
+                        totalAmount: true,
+                    }
+                });
+
+                if (latestBooking) {
+                    if (amountPaid === 0) amountPaid = latestBooking.amountPaid || 0;
+                    if (downPayment === 0) downPayment = latestBooking.downPayment || 0;
+                    if (subtotal === 0) subtotal = latestBooking.subtotal || latestBooking.totalAmount || 0;
+                    if (discount === 0) discount = latestBooking.discount || 0;
+                    console.log(`[API] Auto-fetched payment data: amountPaid=${amountPaid}, downPayment=${downPayment}, subtotal=${subtotal}, discount=${discount}`);
+                }
+            } catch (dbErr) {
+                console.warn('[API] Failed to auto-fetch booking payment data:', dbErr.message);
+            }
+        }
+
         if (customer && customer.whatsappLid) {
-            // Use the stored LID format
             recipientNumber = customer.whatsappLid;
             console.log(`[API] Using stored whatsappLid: ${recipientNumber}`);
         } else if (recipientNumber.endsWith('@lid')) {
-            // Keep LID format as-is
             console.log(`[API] Using customer LID: ${recipientNumber}`);
         } else if (recipientNumber.endsWith('@c.us')) {
-            // Keep c.us format
             console.log(`[API] Using customer phone: ${recipientNumber}`);
         } else {
-            // Extract digits and add @c.us
             recipientNumber = recipientNumber.replace(/\D/g, '');
             if (recipientNumber.length > 0) {
                 recipientNumber = `${recipientNumber}@c.us`;
@@ -2552,7 +2586,6 @@ app.post('/generate-invoice', requireAuth, async (req, res) => {
             console.log(`[API] Formatted customer phone: ${recipientNumber}`);
         }
 
-        // Use admin number as senderNumber (for auth check)
         const adminNumber = process.env.BOSMAT_ADMIN_NUMBER || process.env.ADMIN_WHATSAPP_NUMBER || process.env.ADMIN_NUMBER || '628179481010';
         let adminSender = adminNumber.replace(/\D/g, '');
         if (!adminSender.endsWith('@c.us')) {
@@ -2565,16 +2598,16 @@ app.post('/generate-invoice', requireAuth, async (req, res) => {
             motorDetails: motorDetails || '-',
             items: items || '-',
             totalAmount: totalAmount || 0,
-            amountPaid: amountPaid || 0,
-            downPayment: downPayment || 0,
+            amountPaid,
+            downPayment,
             paymentMethod: paymentMethod || '-',
             notes: notes || '',
             senderNumber: adminSender,
             recipientNumber,
             realPhone: realPhone || '',
             serviceType: serviceType || items || '-',
-            subtotal: subtotal || 0,
-            discount: discount || 0,
+            subtotal,
+            discount,
         });
 
         if (result.success) {
