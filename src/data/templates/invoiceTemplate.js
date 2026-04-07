@@ -10,10 +10,11 @@ module.exports = function generateInvoiceHTML(data) {
   } = data;
 
   // Hitung values
-  const discountAmount = Number(discount) || 0;
-  const subtotal = Number(subtotalParam || finalTotal) || 0;
-  const dp = Number(downPayment) || 0;
-  const totalPaid = Number(amountPaid) || 0;
+  const discountAmount = discount || 0;
+  const subtotal = subtotalParam || (finalTotal + discountAmount);
+  const dp = downPayment || 0;
+  const totalPaid = amountPaid || 0;
+  const rawPaid = Math.max(0, totalPaid - dp);
   const balance = Math.max(0, Math.round(subtotal - discountAmount - totalPaid));
 
 
@@ -21,9 +22,9 @@ module.exports = function generateInvoiceHTML(data) {
   const displayPhone = realPhone
     ? realPhone.replace(/^62/, '0')
     : (recipientNumber || '-')
-        .replace('@c.us', '')
-        .replace('@lid', '')
-        .replace(/^62/, '0');
+      .replace('@c.us', '')
+      .replace('@lid', '')
+      .replace(/^62/, '0');
 
   // Parse items jadi array - Split by newline ONLY
   const itemsList = items.split('\n').map(i => i.trim()).filter(Boolean);
@@ -34,7 +35,7 @@ module.exports = function generateInvoiceHTML(data) {
     const headerRemoved = filteredNotes.replace(/^Layanan:\s*/i, '').trim();
     // Extract strictly the service names from the items list for comparison
     const itemsSummary = itemsList.map(i => i.split('||')[0].trim()).join(', ');
-    
+
     // If the entire note content is just a repeat of the items, we can hide it
     if (headerRemoved === itemsSummary) {
       filteredNotes = '';
@@ -44,10 +45,10 @@ module.exports = function generateInvoiceHTML(data) {
     }
   }
 
-  const notesList = (filteredNotes && filteredNotes !== '-') 
+  const notesList = (filteredNotes && filteredNotes !== '-')
     ? filteredNotes.split('\n')
-        .map(n => n.trim())
-        .filter(n => n && !n.match(/^Layanan:?$/i)) // Also filter out standalone header labels
+      .map(n => n.trim())
+      .filter(n => n && !n.match(/^Layanan:?$/i)) // Also filter out standalone header labels
     : [];
 
   return `<!DOCTYPE html>
@@ -115,15 +116,15 @@ module.exports = function generateInvoiceHTML(data) {
     <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:60px">
       <div>
         <h1 class="font-headline" style="font-size:48px; font-weight:900; line-height:0.8; text-transform:uppercase; margin-bottom:16px">
-          ${documentType === 'tanda_terima' ? 'Receipt' : 
-            documentType === 'bukti_bayar' ? 'Payment' : 
-            documentType === 'garansi_repaint' ? 'Warranty' :
-            documentType === 'garansi_coating' ? 'Warranty' :
+          ${documentType === 'tanda_terima' ? 'Receipt' :
+      documentType === 'bukti_bayar' ? 'Payment' :
+        documentType === 'garansi_repaint' ? 'Warranty' :
+          documentType === 'garansi_coating' ? 'Warranty' :
             'Invoice'}<br/>
           <span class="text-yellow">
             ${documentType === 'garansi_repaint' ? 'Official<br/>Repaint' :
-              documentType === 'garansi_coating' ? 'Official<br/>Coating' :
-              'Repaint &<br/>Detailing'}
+      documentType === 'garansi_coating' ? 'Official<br/>Coating' :
+        'Repaint &<br/>Detailing'}
           </span>
         </h1>
         <div style="display:flex; gap:12px; margin-top:16px">
@@ -140,7 +141,7 @@ module.exports = function generateInvoiceHTML(data) {
         </div>
         <div style="margin-top:16px">
           <p class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em">Tanggal Terbit</p>
-          <p style="font-size:16px; font-weight:500">${now.toLocaleDateString('id-ID', { day:'numeric', month:'long', year:'numeric' })}</p>
+          <p style="font-size:16px; font-weight:500">${now.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
         </div>
       </div>
     </div>
@@ -166,27 +167,27 @@ module.exports = function generateInvoiceHTML(data) {
     </div>
 
     <!-- Status Banner Message -->
-    <div style="background:rgba(255,255,255,0.03); border:1px solid #484831; border-top:none; padding:24px 28px; margin-bottom:60px; display:flex; align-items:center; gap:20px">
-      <div style="background:#FFFF00; padding:12px; display:flex; align-items:center; justify-content:center">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          ${documentType === 'tanda_terima' 
-            ? '<path d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="#1d1d00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
-            : documentType === 'bukti_bayar'
-            ? '<path d="M12 8V12L15 15M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="#1d1d00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
-            : '<path d="M13 16H12V12H11M12 8H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="#1d1d00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
-          }
+    <div style="background:rgba(255,255,0,0.02); border:1px solid rgba(255,255,0,0.15); border-left:4px solid #FFFF00; padding:24px 32px; margin:40px 0 60px 0; display:flex; align-items:center; gap:24px; border-radius:4px">
+      <div style="background:#FFFF00; min-width:48px; height:48px; border-radius:8px; display:flex; align-items:center; justify-content:center; box-shadow:0 0 20px rgba(255,255,0,0.2)">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          ${documentType === 'tanda_terima'
+      ? '<path d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="#1d1d00" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'
+      : documentType === 'bukti_bayar'
+        ? '<path d="M12 8V12L15 15M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="#1d1d00" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'
+        : '<path d="M13 16H12V12H11M12 8H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="#1d1d00" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'
+    }
         </svg>
       </div>
       <div>
-        <p class="font-headline" style="font-size:16px; font-weight:700; text-transform:uppercase; margin-bottom:4px">
+        <p class="font-headline" style="font-size:18px; font-weight:800; text-transform:uppercase; margin-bottom:6px; letter-spacing:0.05em; color:#FFFF00">
           ${documentType === 'tanda_terima' ? 'KENDARAAN DITERIMA' : documentType === 'bukti_bayar' ? 'PEMBAYARAN DIVALIDASI' : 'RINGKASAN ESTIMASI'}
         </p>
-        <p class="text-muted" style="font-size:13px; line-height:1.6">
-          ${documentType === 'tanda_terima' 
-            ? `Halo! Unit kendaraan <b>${motorDetails || '-'}</b> telah kami terima dengan aman di Studio untuk proses treatment. Terima kasih telah mempercayakan kendaraan Anda kepada kami.` 
-            : documentType === 'bukti_bayar'
-            ? `Terima kasih! Kami telah menerima pembayaran sebesar <b>Rp${(totalPaid).toLocaleString('id-ID')}</b> via <b>${paymentMethod || 'Transfer'}</b>. Status tagihan Anda telah diperbarui.`
-            : `Berikut adalah rincian estimasi biaya untuk layanan Repaint & Detailing kendaraan Anda. Jika ada perubahan atau tambahan, akan kami informasikan kembali.`}
+        <p style="font-size:14px; line-height:1.6; color:#e5e2e1; font-weight:400">
+          ${documentType === 'tanda_terima'
+      ? `Halo! Unit kendaraan <b>${motorDetails || '-'}</b> telah kami terima dengan aman di Studio untuk proses treatment. Terima kasih telah mempercayakan kendaraan Anda kepada kami.`
+      : documentType === 'bukti_bayar'
+        ? `Terima kasih! Kami telah menerima pembayaran sebesar <b class="text-yellow">Rp${(Number(amountPaid) || Number(downPayment) || 0).toLocaleString('id-ID')}</b> via <b>${paymentMethod || 'Transfer'}</b>. Status tagihan Anda telah diperbarui.`
+        : `Berikut adalah rincian estimasi biaya untuk layanan Repaint & Detailing kendaraan Anda. Jika ada perubahan atau tambahan, akan kami informasikan kembali.`}
         </p>
       </div>
     </div>
@@ -222,12 +223,12 @@ module.exports = function generateInvoiceHTML(data) {
             <td>
               <p class="font-headline" style="font-size:18px; font-weight:700; text-transform:uppercase">${cleanTitle}</p>
               ${itemDesc ? (
-                itemDesc.startsWith('Catatan Warna:') 
+              itemDesc.startsWith('Catatan Warna:')
                 ? `<div style="display:flex; align-items:center; gap:6px; margin-top:6px; padding:4px 10px; background:rgba(255,255,0,0.05); border-left:2px solid #FFFF00; width:fit-content">
                     <span style="font-size:10px; color:#FFFF00; font-weight:800; text-transform:uppercase; letter-spacing:0.1em">🎨 ${itemDesc}</span>
                    </div>`
                 : `<p class="text-muted" style="font-size:12px; line-height:1.4; margin-top:4px">${itemDesc}</p>`
-              ) : ''}
+            ) : ''}
             </td>
             <td style="text-align:center">
               <p class="font-headline" style="font-size:18px; font-weight:700">01</p>
@@ -281,10 +282,10 @@ module.exports = function generateInvoiceHTML(data) {
         <span class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em">Down Payment (DP)</span>
         <span style="font-size:16px; color:#ffb4ab">- Rp${dp.toLocaleString('id-ID')}</span>
       </div>` : ''}
-      ${(totalPaid - dp) > 0 ? `
+      ${rawPaid > 0 ? `
       <div style="display:flex; justify-content:space-between">
         <span class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em">Sudah Dibayar</span>
-        <span style="font-size:16px; color:#ffb4ab">- Rp${(totalPaid - dp).toLocaleString('id-ID')}</span>
+        <span style="font-size:16px; color:#ffb4ab">- Rp${rawPaid.toLocaleString('id-ID')}</span>
       </div>` : ''}
 
       <!-- Border separator -->
