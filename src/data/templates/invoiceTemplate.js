@@ -157,19 +157,24 @@ module.exports = function generateInvoiceHTML(data) {
     </div>
 
     <!-- Status Banner Message -->
-    <div style="background:rgba(255,255,0,0.03); border:1px solid rgba(255,255,0,0.15); border-left:4px solid #FFFF00; padding:14px 18px; margin:24px 0 36px 0; display:flex; align-items:flex-start; gap:12px; border-radius:3px">
-      <div style="background:#FFFF00; min-width:28px; width:28px; height:28px; flex-shrink:0; border-radius:3px; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:900; line-height:1; color:#000;">
-        ${documentType === 'tanda_terima' ? '✔' : documentType === 'bukti_bayar' ? '▣' : '!'}
+    <div style="margin-bottom:40px; padding:24px; background:rgba(255,255,0,0.03); border:1px solid rgba(255,255,0,0.15); display:flex; align-items:flex-start; gap:16px;">
+      <div style="background:#FFFF00; padding:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+        ${documentType === 'tanda_terima'
+      ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>'
+      : documentType === 'bukti_bayar'
+        ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>'
+        : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>'
+    }
       </div>
       <div>
-        <p class="font-headline" style="font-size:11px; font-weight:800; text-transform:uppercase; margin-bottom:4px; letter-spacing:0.1em; color:#FFFF00">
+        <p style="font-size:14px; font-weight:800; color:#FFFF00; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:4px;">
           ${documentType === 'tanda_terima' ? 'KENDARAAN DITERIMA' : documentType === 'bukti_bayar' ? 'PEMBAYARAN DIVALIDASI' : 'RINGKASAN ESTIMASI'}
         </p>
-        <p style="font-size:12px; line-height:1.6; color:#cac8aa; font-weight:400; margin:0">
+        <p style="font-size:13px; color:#cac8aa; line-height:1.6; margin:0; font-weight:400;">
           ${documentType === 'tanda_terima'
       ? `Halo! Unit kendaraan <b>${motorDetails || '-'}</b> telah kami terima dengan aman di Studio untuk proses treatment. Terima kasih telah mempercayakan kendaraan Anda kepada kami.`
       : documentType === 'bukti_bayar'
-        ? `Terima kasih! Kami telah menerima pembayaran sebesar <b class="text-yellow">Rp${(totalPaid || dp || 0).toLocaleString('id-ID')}</b> via <b>${paymentMethod || 'Transfer'}</b>. Status tagihan Anda telah diperbarui.`
+        ? `Terima kasih! Kami telah menerima pembayaran sebesar <b style="color:#FFFF00">Rp${(totalPaid || dp || 0).toLocaleString('id-ID')}</b> via <b>${paymentMethod || 'Transfer'}</b>. Status tagihan Anda telah diperbarui.`
         : `Berikut adalah rincian estimasi biaya untuk layanan Repaint & Detailing kendaraan Anda. Jika ada perubahan atau tambahan, akan kami informasikan kembali.`}
         </p>
       </div>
@@ -198,11 +203,17 @@ module.exports = function generateInvoiceHTML(data) {
           const parts = item.split('||');
           const cleanTitle = (parts[0] || '').trim().replace(/^(\d+\.|[-*•●])\s*/, '');
           const price = parseInt(parts[1]) || 0;
-          // Clean itemDesc: strip duplicate "Warna:" prefixes, keep only the last clean color name
+          // Clean itemDesc: strip ALL leading "Warna:" / "Catatan Warna:" prefixes, keep only the color name
           const rawDesc = (parts[2] || '').trim();
-          const itemDesc = rawDesc.startsWith('Catatan Warna:') || rawDesc.match(/^(Warna:\s*)+/i)
-            ? rawDesc.replace(/^(Warna:\s*)+/gi, 'Catatan Warna: ').replace(/^Catatan Warna:\s*(Catatan Warna:\s*)*/i, 'Catatan Warna: ')
-            : rawDesc;
+          let itemDesc = rawDesc;
+          if (rawDesc) {
+            // Strip any combo of "Catatan Warna:" and "Warna:" prefixes (case-insensitive, repeated)
+            const stripped = rawDesc.replace(/^(catatan\s+warna:\s*|warna:\s*)+/gi, '').trim();
+            // Re-wrap with clean "Catatan Warna:" prefix if there was any color-related prefix
+            if (stripped !== rawDesc || rawDesc.match(/^(catatan\s+warna:|warna:)/i)) {
+              itemDesc = `Catatan Warna: ${stripped}`;
+            }
+          }
           const priceStr = price > 0 ? `Rp${price.toLocaleString('id-ID')}` : '-';
 
           return `
