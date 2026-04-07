@@ -10,11 +10,10 @@ module.exports = function generateInvoiceHTML(data) {
   } = data;
 
   // Hitung values
-  const discountAmount = discount || 0;
-  const subtotal = subtotalParam || (finalTotal + discountAmount);
-  const dp = downPayment || 0;
-  const totalPaid = amountPaid || 0;
-  const rawPaid = Math.max(0, totalPaid - dp);
+  const discountAmount = Number(discount) || 0;
+  const subtotal = Number(subtotalParam || finalTotal) || 0;
+  const dp = Number(downPayment) || 0;
+  const totalPaid = Number(amountPaid) || 0;
   const balance = Math.max(0, Math.round(subtotal - discountAmount - totalPaid));
 
 
@@ -186,7 +185,7 @@ module.exports = function generateInvoiceHTML(data) {
           ${documentType === 'tanda_terima' 
             ? `Halo! Unit kendaraan <b>${motorDetails || '-'}</b> telah kami terima dengan aman di Studio untuk proses treatment. Terima kasih telah mempercayakan kendaraan Anda kepada kami.` 
             : documentType === 'bukti_bayar'
-            ? `Terima kasih! Kami telah menerima pembayaran sebesar <b>Rp${(Number(amountPaid) || Number(downPayment) || 0).toLocaleString('id-ID')}</b> via <b>${paymentMethod || 'Transfer'}</b>. Status tagihan Anda telah diperbarui.`
+            ? `Terima kasih! Kami telah menerima pembayaran sebesar <b>Rp${(totalPaid).toLocaleString('id-ID')}</b> via <b>${paymentMethod || 'Transfer'}</b>. Status tagihan Anda telah diperbarui.`
             : `Berikut adalah rincian estimasi biaya untuk layanan Repaint & Detailing kendaraan Anda. Jika ada perubahan atau tambahan, akan kami informasikan kembali.`}
         </p>
       </div>
@@ -282,10 +281,10 @@ module.exports = function generateInvoiceHTML(data) {
         <span class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em">Down Payment (DP)</span>
         <span style="font-size:16px; color:#ffb4ab">- Rp${dp.toLocaleString('id-ID')}</span>
       </div>` : ''}
-      ${rawPaid > 0 ? `
+      ${(totalPaid - dp) > 0 ? `
       <div style="display:flex; justify-content:space-between">
         <span class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em">Sudah Dibayar</span>
-        <span style="font-size:16px; color:#ffb4ab">- Rp${rawPaid.toLocaleString('id-ID')}</span>
+        <span style="font-size:16px; color:#ffb4ab">- Rp${(totalPaid - dp).toLocaleString('id-ID')}</span>
       </div>` : ''}
 
       <!-- Border separator -->
