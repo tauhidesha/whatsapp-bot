@@ -15,7 +15,7 @@ module.exports = function generateInvoiceHTML(data) {
   const subtotal = Number(subtotalParam) || (Number(finalTotal) + discountAmount);
   const dp = Number(downPayment) || 0;
   const totalPaid = Number(amountPaid) || 0;
-  
+
   // Sisa Tagihan = (Subtotal - Diskon) - Total yang sudah dibayar (termasuk DP jika ada)
   const balance = Math.max(0, Math.round(subtotal - discountAmount - totalPaid));
 
@@ -153,9 +153,9 @@ module.exports = function generateInvoiceHTML(data) {
     </div>
 
     <!-- Status Banner Message -->
-    <div style="background:rgba(255,255,0,0.03); border:1px solid rgba(255,255,0,0.15); border-left:4px solid #FFFF00; padding:24px; margin:40px 0 60px 0; display:flex; align-items:flex-start; gap:16px; border-radius:4px">
-      <div style="background:#FFFF00; min-width:40px; height:40px; border-radius:4px; display:flex; align-items:center; justify-content:center; box-shadow:0 0 15px rgba(255,255,0,0.15)">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <div style="background:rgba(255,255,0,0.03); border:1px solid rgba(255,255,0,0.15); border-left:4px solid #FFFF00; padding:14px 18px; margin:24px 0 36px 0; display:flex; align-items:flex-start; gap:12px; border-radius:3px">
+      <div style="background:#FFFF00; min-width:28px; height:28px; border-radius:3px; display:flex; align-items:center; justify-content:center; box-shadow:0 0 15px rgba(255,255,0,0.15)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           ${documentType === 'tanda_terima'
       ? '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>'
       : documentType === 'bukti_bayar'
@@ -165,10 +165,10 @@ module.exports = function generateInvoiceHTML(data) {
         </svg>
       </div>
       <div>
-        <p class="font-headline" style="font-size:14px; font-weight:800; text-transform:uppercase; margin-bottom:4px; letter-spacing:0.1em; color:#FFFF00">
+        <p class="font-headline" style="font-size:11px; font-weight:800; text-transform:uppercase; margin-bottom:4px; letter-spacing:0.1em; color:#FFFF00">
           ${documentType === 'tanda_terima' ? 'KENDARAAN DITERIMA' : documentType === 'bukti_bayar' ? 'PEMBAYARAN DIVALIDASI' : 'RINGKASAN ESTIMASI'}
         </p>
-        <p style="font-size:13px; line-height:1.6; color:#cac8aa; font-weight:400; margin:0">
+        <p style="font-size:12px; line-height:1.6; color:#cac8aa; font-weight:400; margin:0">
           ${documentType === 'tanda_terima'
       ? `Halo! Unit kendaraan <b>${motorDetails || '-'}</b> telah kami terima dengan aman di Studio untuk proses treatment. Terima kasih telah mempercayakan kendaraan Anda kepada kami.`
       : documentType === 'bukti_bayar'
@@ -231,11 +231,11 @@ module.exports = function generateInvoiceHTML(data) {
           <p class="font-headline" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.15em; margin-bottom:16px">Catatan Teknis Layanan</p>
           <div style="display:flex; flex-direction:column; gap:8px">
             ${notesList.map(n => {
-              let icon = '●';
-              if (n.toLowerCase().includes('garansi')) icon = '✓';
-              else if (n.toLowerCase().match(/waktu|jam|hari/)) icon = '⏱';
-              return `<div style="display:flex; gap:10px; align-items:flex-start"><span style="color:#FFFF00; font-size:14px; margin-top:2px">${icon}</span><p class="text-muted" style="font-size:14px; line-height:1.5">${n}</p></div>`;
-            }).join('')}
+          let icon = '●';
+          if (n.toLowerCase().includes('garansi')) icon = '✓';
+          else if (n.toLowerCase().match(/waktu|jam|hari/)) icon = '⏱';
+          return `<div style="display:flex; gap:10px; align-items:flex-start"><span style="color:#FFFF00; font-size:14px; margin-top:2px">${icon}</span><p class="text-muted" style="font-size:14px; line-height:1.5">${n}</p></div>`;
+        }).join('')}
           </div>
         </div>` : ''}
 
