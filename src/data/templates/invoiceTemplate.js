@@ -153,22 +153,22 @@ module.exports = function generateInvoiceHTML(data) {
     </div>
 
     <!-- Status Banner Message -->
-    <div style="background:rgba(255,255,0,0.02); border:1px solid rgba(255,255,0,0.15); border-left:4px solid #FFFF00; padding:24px 32px; margin:40px 0 60px 0; display:flex; align-items:center; gap:24px; border-radius:4px">
-      <div style="background:#FFFF00; min-width:48px; height:48px; border-radius:8px; display:flex; align-items:center; justify-content:center; box-shadow:0 0 20px rgba(255,255,0,0.2)">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <div style="background:rgba(255,255,0,0.03); border:1px solid rgba(255,255,0,0.15); border-left:4px solid #FFFF00; padding:24px; margin:40px 0 60px 0; display:flex; align-items:flex-start; gap:16px; border-radius:4px">
+      <div style="background:#FFFF00; min-width:40px; height:40px; border-radius:4px; display:flex; align-items:center; justify-content:center; box-shadow:0 0 15px rgba(255,255,0,0.15)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           ${documentType === 'tanda_terima'
-      ? '<path d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="#1d1d00" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'
+      ? '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>'
       : documentType === 'bukti_bayar'
-        ? '<path d="M12 8V12L15 15M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="#1d1d00" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'
-        : '<path d="M13 16H12V12H11M12 8H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="#1d1d00" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'
+        ? '<rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line><path d="M6 15H10"></path>'
+        : '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line>'
     }
         </svg>
       </div>
       <div>
-        <p class="font-headline" style="font-size:18px; font-weight:800; text-transform:uppercase; margin-bottom:6px; letter-spacing:0.05em; color:#FFFF00">
+        <p class="font-headline" style="font-size:14px; font-weight:800; text-transform:uppercase; margin-bottom:4px; letter-spacing:0.1em; color:#FFFF00">
           ${documentType === 'tanda_terima' ? 'KENDARAAN DITERIMA' : documentType === 'bukti_bayar' ? 'PEMBAYARAN DIVALIDASI' : 'RINGKASAN ESTIMASI'}
         </p>
-        <p style="font-size:14px; line-height:1.6; color:#e5e2e1; font-weight:400">
+        <p style="font-size:13px; line-height:1.6; color:#cac8aa; font-weight:400; margin:0">
           ${documentType === 'tanda_terima'
       ? `Halo! Unit kendaraan <b>${motorDetails || '-'}</b> telah kami terima dengan aman di Studio untuk proses treatment. Terima kasih telah mempercayakan kendaraan Anda kepada kami.`
       : documentType === 'bukti_bayar'
