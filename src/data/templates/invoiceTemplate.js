@@ -184,10 +184,10 @@ module.exports = function generateInvoiceHTML(data) {
         </p>
         <p class="text-muted" style="font-size:13px; line-height:1.6">
           ${documentType === 'tanda_terima' 
-            ? `Halo! Unit kendaraan Anda telah kami terima dengan aman di Studio. Tim teknis boS Mat akan segera memulai proses pengerjaan sesuai antrean.` 
+            ? `Halo! Unit kendaraan <b>${motorDetails || '-'}</b> telah kami terima dengan aman di Studio untuk proses treatment. Terima kasih telah mempercayakan kendaraan Anda kepada kami.` 
             : documentType === 'bukti_bayar'
-            ? `Terima kasih! Kami telah menerima pembayaran (DP/Pelunasan) Anda. Transaksi ini telah tercatat secara resmi dalam sistem riwayat layanan kami.`
-            : `Berikut adalah rincian layanan Repaint & Detailing untuk kendaraan Anda. Silakan hubungi admin jika ada detail yang ingin diubah sebelum pengerjaan.`}
+            ? `Terima kasih! Kami telah menerima pembayaran sebesar <b>Rp${(Number(amountPaid) || Number(downPayment) || 0).toLocaleString('id-ID')}</b> via <b>${paymentMethod || 'Transfer'}</b>. Status tagihan Anda telah diperbarui.`
+            : `Berikut adalah rincian estimasi biaya untuk layanan Repaint & Detailing kendaraan Anda. Jika ada perubahan atau tambahan, akan kami informasikan kembali.`}
         </p>
       </div>
     </div>
