@@ -85,11 +85,11 @@ const generateDocumentTool = {
     try {
       const { getIdentifier } = require('../utils/humanHandover.js');
       let intermediateTarget = getIdentifier(targetRecipient) || targetRecipient;
-      
+
       const prisma = require('../../lib/prisma');
       const phoneNoSuffix = intermediateTarget.replace(/@c\.us$|@lid$/, '');
       customerRecord = await prisma.customer.findFirst({
-        where: { 
+        where: {
           OR: [
             { whatsappLid: intermediateTarget },
             { whatsappLid: phoneNoSuffix },
@@ -119,7 +119,7 @@ const generateDocumentTool = {
       }
       targetRecipient = cleaned + '@c.us';
     }
-    
+
     // Auto-Calculate Price if totalAmount is 0/missing, or enrich items with descriptions
     let finalTotal = totalAmount;
     let finalItems = items;
@@ -151,7 +151,7 @@ const generateDocumentTool = {
           let name = '';
           let price = 0;
           let desc = '';
-          
+
           if (itemStr.includes('||')) {
             const parts = itemStr.split('||');
             name = (parts[0] || '').trim();
@@ -171,7 +171,7 @@ const generateDocumentTool = {
 
           // Precise Matching: Try exact match first
           let service = masterLayanan.find(s => s.name.toLowerCase() === name.toLowerCase());
-          
+
           // Fallback to fuzzy match: strict overlap ratio > 0.7
           if (!service && name.length > 8) {
             service = masterLayanan.find(s => {
@@ -191,7 +191,7 @@ const generateDocumentTool = {
                 if (variant) finalPrice = variant.price;
               }
             }
-            
+
             parsedItems.push({
               name: service.name,
               price: finalPrice,
@@ -231,7 +231,7 @@ const generateDocumentTool = {
     const now = new Date();
     const idSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
     const tempDir = path.resolve(__dirname, '../../../temp_docs');
-    
+
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });
     }
@@ -332,7 +332,7 @@ const generateDocumentTool = {
 
       // Load logo as base64 for Puppeteer stability
       const logoPath = path.resolve(process.cwd(), 'data/boS Mat (1000 x 500 px) (1).png');
-      const logoBase64 = fs.existsSync(logoPath) 
+      const logoBase64 = fs.existsSync(logoPath)
         ? `data:image/png;base64,${fs.readFileSync(logoPath).toString('base64')}`
         : '';
 
@@ -348,7 +348,7 @@ const generateDocumentTool = {
       const { getChromiumPath, DEFAULT_CHROME_ARGS } = require('../utils/browser');
       const executablePath = getChromiumPath();
 
-      const browser = await puppeteer.launch({ 
+      const browser = await puppeteer.launch({
         executablePath,
         args: DEFAULT_CHROME_ARGS,
         headless: 'new'
@@ -376,17 +376,19 @@ const generateDocumentTool = {
         await new Promise(resolve => setTimeout(resolve, 2000));
 
         let fileCaption = `Berikut adalah ${title} untuk pesanan Anda.`;
-        
-        switch(documentType) {
+
+        switch (documentType) {
           case 'tanda_terima':
             fileCaption = `Halo Kak ${customerName}! Kendaraan sudah kami terima di boS Mat Studio. Berikut lampiran Tanda Terima-nya ya. 🏍️✨`;
             break;
           case 'invoice':
             fileCaption = `Halo Kak ${customerName}, berikut rincian tagihan (Invoice) untuk treatment kendaraannya. Jika ada yang ingin ditanyakan, jangan ragu untuk balas pesan ini ya! 📋`;
             break;
-          case 'bukti_bayar':
-            fileCaption = `Terima kasih banyak Kak ${customerName}! Pembayaran sudah kami konfirmasi. Berikut Bukti Pembayaran untuk pesanan Kakak. 🙏`;
+          case 'bukti_bayar': {
+            const displayAmount = (amountPaid || downPayment || 0).toLocaleString('id-ID');
+            fileCaption = `*PEMBAYARAN DIVALIDASI* ✅\n\nHalo Kak ${customerName}! Kami telah menerima pembayaran sebesar *Rp${displayAmount}* via *${paymentMethod || 'Transfer'}*. Status tagihan Anda telah diperbarui.\n\nTerima kasih! 🙏`;
             break;
+          }
           case 'garansi_repaint':
           case 'garansi_coating':
             fileCaption = `Treatment selesai! ✨ Berikut perlindungan ekstra berupa Dokumen ${title} resmi dari boS Mat Studio. Simpan baik-baik ya Kak ${customerName}! 🛡️`;
@@ -394,7 +396,7 @@ const generateDocumentTool = {
         }
         // Mark before sending so onAnyMessage doesn't treat it as admin-from-HP
         markBotMessage(targetRecipient, fileCaption);
-        
+
         try {
           await global.whatsappClient.sendFile(
             targetRecipient,
@@ -419,14 +421,14 @@ const generateDocumentTool = {
               },
               select: { phone: true, whatsappLid: true }
             });
-            
+
             let fallbackTarget = null;
             if (targetRecipient.endsWith('@c.us') && customer?.whatsappLid) {
               fallbackTarget = customer.whatsappLid;
             } else if (targetRecipient.endsWith('@lid') && customer?.phone) {
               fallbackTarget = customer.phone.includes('@') ? customer.phone : `${customer.phone}@c.us`;
             }
-            
+
             // If DB didn't provide a DIFFERENT alternative, brute-force flip the suffix
             if (!fallbackTarget || fallbackTarget === targetRecipient) {
               const rawDigits = cleanPhone.replace(/\D/g, '');
