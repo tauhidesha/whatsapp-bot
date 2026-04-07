@@ -45,7 +45,11 @@ module.exports = function generateInvoiceHTML(data) {
   const notesList = (filteredNotes && filteredNotes !== '-')
     ? filteredNotes.split('\n')
       .map(n => n.trim())
-      .filter(n => n && !n.match(/^Layanan:?$/i))
+      .filter(n => n
+        && !n.match(/^Layanan:?$/i)
+        && !n.includes('||')              // filter raw item strings
+        && !n.match(/^[●•\-*]\s*.+\|\|/) // filter bullet + item format
+      )
     : [];
 
   return `<!DOCTYPE html>
@@ -154,15 +158,8 @@ module.exports = function generateInvoiceHTML(data) {
 
     <!-- Status Banner Message -->
     <div style="background:rgba(255,255,0,0.03); border:1px solid rgba(255,255,0,0.15); border-left:4px solid #FFFF00; padding:14px 18px; margin:24px 0 36px 0; display:flex; align-items:flex-start; gap:12px; border-radius:3px">
-      <div style="background:#FFFF00; min-width:28px; height:28px; border-radius:3px; display:flex; align-items:center; justify-content:center; box-shadow:0 0 15px rgba(255,255,0,0.15)">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          ${documentType === 'tanda_terima'
-      ? '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>'
-      : documentType === 'bukti_bayar'
-        ? '<rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line><path d="M6 15H10"></path>'
-        : '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line>'
-    }
-        </svg>
+      <div style="background:#FFFF00; min-width:28px; width:28px; height:28px; flex-shrink:0; border-radius:3px; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:900; line-height:1; color:#000;">
+        ${documentType === 'tanda_terima' ? '✔' : documentType === 'bukti_bayar' ? '▣' : '!'}
       </div>
       <div>
         <p class="font-headline" style="font-size:11px; font-weight:800; text-transform:uppercase; margin-bottom:4px; letter-spacing:0.1em; color:#FFFF00">
@@ -199,9 +196,13 @@ module.exports = function generateInvoiceHTML(data) {
       <tbody>
         ${itemsList.length > 0 ? itemsList.map(item => {
           const parts = item.split('||');
-          const cleanTitle = (parts[0] || '').trim().replace(/^(\d+\.|[-*•])\s*/, '');
+          const cleanTitle = (parts[0] || '').trim().replace(/^(\d+\.|[-*•●])\s*/, '');
           const price = parseInt(parts[1]) || 0;
-          const itemDesc = (parts[2] || '').trim();
+          // Clean itemDesc: strip duplicate "Warna:" prefixes, keep only the last clean color name
+          const rawDesc = (parts[2] || '').trim();
+          const itemDesc = rawDesc.startsWith('Catatan Warna:') || rawDesc.match(/^(Warna:\s*)+/i)
+            ? rawDesc.replace(/^(Warna:\s*)+/gi, 'Catatan Warna: ').replace(/^Catatan Warna:\s*(Catatan Warna:\s*)*/i, 'Catatan Warna: ')
+            : rawDesc;
           const priceStr = price > 0 ? `Rp${price.toLocaleString('id-ID')}` : '-';
 
           return `
