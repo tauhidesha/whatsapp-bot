@@ -6,6 +6,7 @@ const { generateFollowUpMessage, getDaysSince } = require('./messageGenerator.js
 const { shouldStop, handleStopAction } = require('./stopCondition.js');
 const { markBotMessage } = require('../../utils/adminMessageSync.js');
 const { getActivePromo } = require('../../utils/promoConfig');
+const { withRetry } = require('../../utils/retry');
 
 // ─── Helper: Save message to Prisma ────────────────────────────────────────
 
@@ -297,7 +298,7 @@ async function processFollowUp(customer, promoData = null) {
 
     markBotMessage(senderNumber, message);
     try {
-        await global.whatsappClient.sendText(senderNumber, message);
+        await withRetry(() => global.whatsappClient.sendText(senderNumber, message), { maxRetries: 3, baseDelayMs: 2000 });
     } catch (initialError) {
         if (initialError.message && initialError.message.includes('No LID')) {
             console.warn(`[Scheduler] Send failed with No LID for: ${senderNumber}`);
@@ -335,7 +336,7 @@ async function processFollowUp(customer, promoData = null) {
             if (fallbackTarget && fallbackTarget !== senderNumber) {
                 console.log(`[Scheduler] Retrying with fallback: ${fallbackTarget}`);
                 markBotMessage(fallbackTarget, message);
-                await global.whatsappClient.sendText(fallbackTarget, message);
+                await withRetry(() => global.whatsappClient.sendText(fallbackTarget, message), { maxRetries: 3, baseDelayMs: 2000 });
                 senderNumber = fallbackTarget;
             } else {
                 throw initialError;

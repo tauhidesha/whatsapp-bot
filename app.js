@@ -3382,7 +3382,8 @@ async function reconnectWhatsApp() {
 
 // WhatsApp connection keep-alive: periodic check untuk memastikan connection tetap aktif
 function startWhatsAppKeepAlive(client) {
-    const KEEP_ALIVE_INTERVAL_MS = parseInt(process.env.WHATSAPP_KEEP_ALIVE_INTERVAL_MS || '300000', 10); // Default 5 menit
+    const KEEP_ALIVE_INTERVAL_MS = parseInt(process.env.WHATSAPP_KEEP_ALIVE_INTERVAL_MS || '300000', 10);
+    const PING_TIMEOUT_MS = 15000; // 15 detik max untuk ping
 
     console.log(`💚 [WhatsApp Keep-Alive] Starting (interval: ${KEEP_ALIVE_INTERVAL_MS}ms)`);
 
@@ -3393,34 +3394,50 @@ function startWhatsAppKeepAlive(client) {
                 return;
             }
 
-            // Cek state connection
+            // Cek state dulu (ringan, tidak pakai CDP evaluate)
             if (client.getState) {
-                const state = await client.getState();
+                const statePromise = client.getState();
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('getState timeout')), PING_TIMEOUT_MS)
+                );
+                
+                const state = await Promise.race([statePromise, timeoutPromise]);
+                
                 if (state === 'UNPAIRED' || state === 'LOGOUT' || state === 'DISCONNECTED') {
                     console.warn(`⚠️ [WhatsApp Keep-Alive] State tidak sehat: ${state}, trigger reconnect...`);
                     clearInterval(keepAliveInterval);
                     await reconnectWhatsApp();
                     return;
                 }
+                
+                console.log(`💚 [WhatsApp Keep-Alive] Connection active (state: ${state})`);
+                return; // Cukup, tidak perlu getHostDevice
             }
 
-            // Ping sederhana: coba get profile picture atau check connection
+            // Fallback: getHostDevice dengan timeout
             if (client.getHostDevice) {
-                await client.getHostDevice();
+                const hostPromise = client.getHostDevice();
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('getHostDevice timeout')), PING_TIMEOUT_MS)
+                );
+                
+                await Promise.race([hostPromise, timeoutPromise]);
                 console.log('💚 [WhatsApp Keep-Alive] Connection active');
-            } else if (client.getConnectionState) {
-                const connState = await client.getConnectionState();
-                if (connState === 'close' || connState === 'close') {
-                    console.warn('⚠️ [WhatsApp Keep-Alive] Connection closed, trigger reconnect...');
-                    clearInterval(keepAliveInterval);
-                    await reconnectWhatsApp();
-                }
             }
 
         } catch (error) {
+            // Timeout dari CDP = WA sedang busy/syncing, JANGAN reconnect langsung
+            const isTimeout = error.message.includes('timeout') || 
+                              error.message.includes('protocolTimeout') ||
+                              error.message.includes('Runtime.callFunctionOn');
+            
+            if (isTimeout) {
+                console.warn(`⚠️ [WhatsApp Keep-Alive] Ping timeout (WA mungkin sedang sync), skip reconnect.`);
+                return; // Biarkan, coba lagi di interval berikutnya
+            }
+            
             console.warn(`⚠️ [WhatsApp Keep-Alive] Error: ${error.message}`);
-            // Jika error karena disconnected, trigger reconnect
-            if (error.message && (error.message.includes('not connected') || error.message.includes('closed'))) {
+            if (error.message.includes('not connected') || error.message.includes('closed')) {
                 console.warn('🔄 [WhatsApp Keep-Alive] Connection lost, trigger reconnect...');
                 clearInterval(keepAliveInterval);
                 await reconnectWhatsApp();
@@ -3428,14 +3445,8 @@ function startWhatsAppKeepAlive(client) {
         }
     }, KEEP_ALIVE_INTERVAL_MS);
 
-    // Cleanup saat shutdown
-    process.on('SIGINT', () => {
-        clearInterval(keepAliveInterval);
-    });
-
-    process.on('SIGTERM', () => {
-        clearInterval(keepAliveInterval);
-    });
+    process.on('SIGINT', () => clearInterval(keepAliveInterval));
+    process.on('SIGTERM', () => clearInterval(keepAliveInterval));
 }
 
 // Keep-alive mechanism: periodic ping ke health endpoint sendiri

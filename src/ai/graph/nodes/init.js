@@ -40,9 +40,20 @@ async function initNode(state) {
     }
 
     try {
-        // Cari pelanggan di database
+        if (!phoneReal) {
+            return {
+                isAdmin: isAdmin,
+                customer: {
+                    name: isAdmin ? 'Admin' : 'Guest',
+                    status: 'new'
+                },
+                metadata: { ...metadata, currentDateTime }
+            };
+        }
+
+        // Cari pelanggan di database - phoneReal pasti ada di sini
         const customer = await prisma.customer.findUnique({
-            where: { phone: phoneReal || senderNumber },
+            where: { phone: phoneReal },
             include: {
                 vehicles: true,
                 customerContext: true
