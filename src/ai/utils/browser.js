@@ -61,7 +61,7 @@ const DEFAULT_CHROME_ARGS = [
     '--disable-web-security',
     '--disable-site-isolation-trials',
     '--disable-webgl',
-    '--js-flags="--max-old-space-size=512"',
+    '--js-flags="--max-old-space-size=2048"',
     '--disk-cache-size=20000000',
     '--disable-breakpad',
     '--disable-hang-monitor',
