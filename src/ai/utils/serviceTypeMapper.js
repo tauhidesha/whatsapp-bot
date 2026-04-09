@@ -16,13 +16,14 @@ const SERVICE_TYPE_MAP = {
     'Cuci Komplit':             'detailing',
     'Poles Bodi Glossy':        'detailing',
     'Full Detailing Glossy':    'detailing',
+    'Cuci Premium':             'detailing', // Fallback for basic washing
 
     // Coating
     'Coating Motor Doff':       'coating',
     'Coating Motor Glossy':     'coating',
     'Complete Service Doff':    'coating',
     'Complete Service Glossy':  'coating',
-    'Maintenance Coating':      'coating', // Added per user feedback
+    'Maintenance Coating':      'coating',
     'Maintanance Coating':      'coating', // Handle typo
 };
 

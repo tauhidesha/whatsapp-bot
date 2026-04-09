@@ -72,7 +72,7 @@ const DOWNGRADE_RULES = [
     {
         from: 'existing_customer',
         to: 'churned',
-        condition: (ctx) => getDaysSince(ctx.lastTransactionAt) > 90,
+        condition: (ctx) => getDaysSince(ctx.lastServiceAt) > 90,
         reason: 'existing_customer tidak balik > 90 hari',
     },
 ];
@@ -102,7 +102,7 @@ function isEligible(context, metadata) {
     // Check wait days
     if (lastFollowUp) {
         const daysSinceLastFollowUp = Math.floor((now - lastFollowUp) / (1000 * 60 * 60 * 24));
-        if (daysSinceLastFollowUp < strategy.waitDays) return false;
+        if (daysSinceLastFollowUp < (strategy.intervalDays || strategy.waitDays)) return false;
     }
 
     // Check max follow-ups

@@ -59,8 +59,9 @@ async function syncBookingFinance(bookingId) {
 
         console.log(`[financeSync] Updated Booking ${bookingId}: Paid=${totalPaid}, Status=${paymentStatus}`);
 
-        // 5. Trigger Customer Sync as well
-        if (booking.customerId) {
+        // 5. Trigger Customer Sync only if booking is COMPLETED
+        // This prevents premature lastService update from Down Payments (DP)
+        if (booking.customerId \u0026\u0026 booking.status === 'COMPLETED') {
             await syncCustomer(booking.customerId);
         }
 

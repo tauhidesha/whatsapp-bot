@@ -23,18 +23,33 @@ async function syncCustomer(customerId) {
 
     const totalSpending = aggregateSpending._sum.amount || 0;
 
-    // 2. Find Last COMPLETED Booking
-    const lastBooking = await prisma.booking.findFirst({
-      where: {
-        customerId,
-        status: 'COMPLETED'
-      },
-      orderBy: {
-        bookingDate: 'desc'
-      }
-    });
+    // 2. Find Last COMPLETED Service Date
+    // Includes both Bookings and Standalone Income Transactions
+    const [lastBooking, lastIncomeTx] = await Promise.all([
+      prisma.booking.findFirst({
+        where: { customerId, status: 'COMPLETED' },
+        orderBy: { bookingDate: 'desc' }
+      }),
+      prisma.transaction.findFirst({
+        where: {
+          customerId,
+          type: { in: ['income', 'INCOME'] },
+          status: { in: ['PAID', 'SUCCESS'] },
+          bookingId: null // Standalone only
+        },
+        orderBy: { date: 'desc' }
+      })
+    ]);
 
-    const lastServiceAt = lastBooking ? lastBooking.bookingDate : null;
+    const bookingDate = lastBooking ? new Date(lastBooking.bookingDate) : null;
+    const incomeDate = lastIncomeTx ? new Date(lastIncomeTx.date) : null;
+    
+    let lastServiceAt = null;
+    if (bookingDate \u0026\u0026 incomeDate) {
+      lastServiceAt = bookingDate > incomeDate ? bookingDate : incomeDate;
+    } else {
+      lastServiceAt = bookingDate || incomeDate;
+    }
 
     // 3. Determine Status
     let newStatus = 'new';
