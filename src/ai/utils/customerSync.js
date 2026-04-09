@@ -45,7 +45,7 @@ async function syncCustomer(customerId) {
     const incomeDate = lastIncomeTx ? new Date(lastIncomeTx.date) : null;
     
     let lastServiceAt = null;
-    if (bookingDate \u0026\u0026 incomeDate) {
+    if (bookingDate && incomeDate) {
       lastServiceAt = bookingDate > incomeDate ? bookingDate : incomeDate;
     } else {
       lastServiceAt = bookingDate || incomeDate;

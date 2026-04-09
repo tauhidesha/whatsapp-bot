@@ -61,7 +61,7 @@ async function syncBookingFinance(bookingId) {
 
         // 5. Trigger Customer Sync only if booking is COMPLETED
         // This prevents premature lastService update from Down Payments (DP)
-        if (booking.customerId \u0026\u0026 booking.status === 'COMPLETED') {
+        if (booking.customerId && booking.status === 'COMPLETED') {
             await syncCustomer(booking.customerId);
         }
 
