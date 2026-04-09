@@ -37,6 +37,14 @@ function requireAuth(req, res, next) {
     return next();
   }
 
+  // ── Internal server-to-server calls (Next.js proxy routes) ──────────────
+  // Accept x-internal-secret header as an alternative to Firebase token.
+  const internalSecret = process.env.INTERNAL_API_SECRET;
+  if (internalSecret && req.headers['x-internal-secret'] === internalSecret) {
+    req.user = { uid: 'internal', email: 'internal@server', name: 'Internal' };
+    return next();
+  }
+
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({
@@ -67,6 +75,7 @@ function requireAuth(req, res, next) {
       });
     });
 }
+
 
 /**
  * Middleware: Allow only specific admin emails.
