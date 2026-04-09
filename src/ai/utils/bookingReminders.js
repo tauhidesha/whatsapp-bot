@@ -13,14 +13,16 @@ const TIMEZONE = process.env.APP_TIMEZONE || 'Asia/Jakarta';
 
 let reminderIntervalHandle = null;
 
-async function sendBookingReminders(force = false) {
-  if (!REMINDER_ENABLED) return;
+async function sendBookingReminders(force = false, dryRun = false) {
+  if (!REMINDER_ENABLED && !dryRun) return dryRun ? [] : undefined;
 
   const { generateFollowUpMessage } = require('../agents/followUpEngine/messageGenerator');
   const now = DateTime.now().setZone(TIMEZONE);
-  if (!force && (now.hour !== REMINDER_HOUR || now.minute >= REMINDER_WINDOW_MINUTES)) {
+  if (!force && !dryRun && (now.hour !== REMINDER_HOUR || now.minute >= REMINDER_WINDOW_MINUTES)) {
     return;
   }
+
+  const previewItems = []; // accumulate when dryRun=true
 
   // Find bookings for today (local time)
   const startOfDayLocal = now.startOf('day');
@@ -48,7 +50,7 @@ async function sendBookingReminders(force = false) {
       }
     });
 
-    if (bookings.length === 0) return;
+    if (bookings.length === 0) return dryRun ? [] : undefined;
 
     console.log(`[bookingReminders] Menemukan ${bookings.length} booking SQL untuk diingatkan oleh Zoya`);
 
@@ -78,6 +80,24 @@ async function sendBookingReminders(force = false) {
         });
 
         if (message) {
+          // ── DRY RUN: collect preview, skip send & DB update ─────────────
+          if (dryRun) {
+            previewItems.push({
+              docId: booking.id,
+              senderNumber: normalizedTarget,
+              name: booking.customerName || (booking.customer && booking.customer.name) || 'Kak',
+              customerLabel: null,
+              type: 'booking_reminder',
+              strategy: { angle: 'booking_reminder' },
+              generatedMessage: message,
+              // Extra context for UI warning display
+              bookingDate: booking.bookingDate,
+              bookingTime,
+            });
+            continue;
+          }
+          // ────────────────────────────────────────────────────────────────
+
           try {
             await sendTextDirect(global.whatsappClient, normalizedTarget, message);
           } catch (initialError) {
@@ -142,6 +162,8 @@ async function sendBookingReminders(force = false) {
   } catch (err) {
     console.error('[bookingReminders] SQL Error:', err.message);
   }
+
+  if (dryRun) return previewItems;
 }
 
 // startBookingReminderScheduler removed as it is now called by the central scheduler

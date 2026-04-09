@@ -3088,7 +3088,193 @@ app.patch('/bookings/:id/status', requireAuth, async (req, res) => {
     }
 });
 
+
+// ─── Follow-Up Queue Review Endpoints ────────────────────────────────────────
+
+/**
+ * GET /follow-up-queue
+ * Returns a dry-run preview of all outbound messages that would be sent by the
+ * 9 AM cron job — nurturing, review, rebooking, coating reminders, booking reminders.
+ * No messages are sent and no DB records are updated.
+ */
+app.get('/follow-up-queue', requireAuth, async (req, res) => {
+    try {
+        const { _buildDryRunQueue, isSchedulerBusy } = require('./src/ai/agents/followUpEngine/scheduler.js');
+
+        // ⚠️ Guard: block if the cron job is currently running to prevent double-send
+        if (isSchedulerBusy()) {
+            return res.status(409).json({
+                success: false,
+                error: 'Scheduler sedang berjalan (cronjob aktif). Tunggu beberapa menit dan coba lagi.',
+            });
+        }
+
+        const { processCoatingReminders } = require('./src/ai/utils/coatingReminders.js');
+        const { sendBookingReminders } = require('./src/ai/utils/bookingReminders.js');
+
+        // Run all three sources in parallel
+        const [nurtureItems, coatingItems, bookingItems] = await Promise.all([
+            _buildDryRunQueue(new Date(), null),
+            processCoatingReminders(null, true),
+            sendBookingReminders(true, true),
+        ]);
+
+        const queue = [
+            ...(nurtureItems || []),
+            ...(coatingItems || []),
+            ...(bookingItems || []),
+        ];
+
+        res.json({
+            success: true,
+            total: queue.length,
+            generatedAt: new Date().toISOString(),
+            queue,
+        });
+    } catch (err) {
+        console.error('[API] GET /follow-up-queue error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+/**
+ * POST /follow-up-queue/execute
+ * Receives the approved queue items and dispatches them.
+ * Body: { items: [{ docId, senderNumber, type, message, approved }], delayMs? }
+ */
+app.post('/follow-up-queue/execute', requireAuth, async (req, res) => {
+    try {
+        const { items = [], delayMs = parseInt(process.env.FOLLOW_UP_QUEUE_DELAY_MS || '0', 10) } = req.body;
+
+        if (!Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ success: false, error: 'items array is required and must not be empty' });
+        }
+
+        const approved = items.filter(item => item.approved === true);
+
+        if (approved.length === 0) {
+            return res.json({ success: true, sent: 0, message: 'No approved items to send.' });
+        }
+
+        if (!global.whatsappClient) {
+            return res.status(503).json({ success: false, error: 'WhatsApp client is not ready' });
+        }
+
+        const { sendTextDirect } = require('./src/ai/utils/whatsappSender.js');
+        const prisma = require('./src/lib/prisma.js');
+
+
+        const results = [];
+        const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+        for (const item of approved) {
+            const { docId, senderNumber, type, message } = item;
+
+            try {
+                if (type === 'coating_reminder') {
+                    // Send directly + update coatingMaintenance record
+                    await sendTextDirect(global.whatsappClient, senderNumber, message);
+                    // Update status — determine next status from current (we rely on docId = record.id)
+                    const record = await prisma.coatingMaintenance.findUnique({ where: { id: docId } });
+                    const nextStatus = record?.status === 'pending' ? 'reminded_h7'
+                        : record?.status === 'reminded_h7' ? 'reminded_h3'
+                            : 'reminded_h1';
+                    await prisma.coatingMaintenance.update({
+                        where: { id: docId },
+                        data: { status: nextStatus, reminderSent: true, reminderSentAt: new Date() }
+                    });
+
+                } else if (type === 'booking_reminder') {
+                    // Send directly + mark booking reminderSent
+                    await sendTextDirect(global.whatsappClient, senderNumber, message);
+                    await prisma.booking.update({
+                        where: { id: docId },
+                        data: { reminderSent: true, reminderSentAt: new Date() }
+                    });
+
+                } else {
+                    // nurturing / review / rebooking — send edited message directly, then update DB
+                    const { markBotMessage } = require('./src/ai/utils/adminMessageSync.js');
+
+                    markBotMessage(senderNumber, message);
+                    await sendTextDirect(global.whatsappClient, senderNumber, message);
+
+                    // Save to message history (non-critical)
+                    const cleanPhone = senderNumber.replace(/@c\.us$|@lid$/, '');
+                    const customer = await prisma.customer.findFirst({
+                        where: {
+                            OR: [
+                                { phone: cleanPhone },
+                                { phone: senderNumber },
+                                { whatsappLid: senderNumber },
+                            ]
+                        }
+                    });
+                    if (customer) {
+                        await prisma.directMessage.create({
+                            data: { customerId: customer.id, senderId: senderNumber, role: 'assistant', content: message }
+                        }).catch(() => {});
+                        await prisma.customer.update({
+                            where: { id: customer.id },
+                            data: { lastMessage: message, lastMessageAt: new Date() }
+                        }).catch(() => {});
+                    }
+
+                    // Update follow-up tracking on customerContext
+                    const updateData = {
+                        followUpCount: { increment: 1 },
+                        lastFollowUpAt: new Date(),
+                        lastFollowUpStrategy: type,
+                    };
+                    if (type === 'review') updateData.reviewFollowUpSent = true;
+                    await prisma.customerContext.update({
+                        where: { id: docId },
+                        data: updateData,
+                    }).catch(err => console.warn(`[QueueExecute] Context update failed for ${docId}:`, err.message));
+
+                }
+
+
+                results.push({ docId, senderNumber, type, status: 'sent' });
+                console.log(`[QueueExecute] Sent ${type} to ${senderNumber}`);
+
+            } catch (err) {
+                console.error(`[QueueExecute] Failed to send ${type} to ${senderNumber}:`, err.message);
+                results.push({ docId, senderNumber, type, status: 'error', error: err.message });
+            }
+
+            if (delayMs > 0) await sleep(delayMs);
+        }
+
+        const sentCount = results.filter(r => r.status === 'sent').length;
+        const errorCount = results.filter(r => r.status === 'error').length;
+
+        // Mark today as already run so the 9 AM cron job skips if admin already sent manually
+        if (sentCount > 0) {
+            const { setLastDailyRunDate } = require('./src/ai/agents/followUpEngine/scheduler.js');
+            const { DateTime } = require('luxon');
+            const todayStr = DateTime.now().setZone(process.env.APP_TIMEZONE || 'Asia/Jakarta').toFormat('yyyy-MM-dd');
+            setLastDailyRunDate(todayStr);
+            console.log(`[QueueExecute] Marked lastDailyRunDate=${todayStr} — cronjob will skip today.`);
+        }
+
+        res.json({
+            success: true,
+            sent: sentCount,
+            errors: errorCount,
+            total: approved.length,
+            results,
+        });
+    } catch (err) {
+        console.error('[API] POST /follow-up-queue/execute error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 // --- Server Startup ---
+
 server.listen(PORT, '0.0.0.0', async () => {
     console.log(`🚀 WhatsApp AI Chatbot listening on http://0.0.0.0:${PORT}`);
     

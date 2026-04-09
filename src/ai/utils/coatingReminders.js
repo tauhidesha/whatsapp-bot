@@ -8,10 +8,13 @@ const COATING_MAINTENANCE_MESSAGES = {
   h1: (name, vehicle) => `Panggilan terakhir untuk Kak ${name}! 🚨\n\nBesok adalah hari jatuh tempo *Coating Maintenance* untuk ${vehicle} Kakak.\n\nJika belum sempat ke ${studioMetadata.name} besok, Kakak tetap bisa booking jadwalnya hari ini agar hak maintenance-nya tidak hangus. Yuk balas pesan ini untuk reservasi!`,
 };
 
-async function processCoatingReminders(client) {
-  if (!client) return;
+async function processCoatingReminders(client, dryRun = false) {
+  if (!dryRun && !client) return dryRun ? [] : undefined;
+
   const { generateFollowUpMessage } = require('../agents/followUpEngine/messageGenerator');
-  console.log('[CoatingReminders] Starting daily SQL check...');
+  console.log(`[CoatingReminders] Starting daily SQL check... (dryRun=${dryRun})`);
+
+  const previewItems = []; // accumulate when dryRun=true
 
   try {
     const today = new Date();
@@ -25,7 +28,7 @@ async function processCoatingReminders(client) {
       
     if (records.length === 0) {
       console.log('[CoatingReminders] No pending maintenance reminders found in SQL.');
-      return;
+      return dryRun ? [] : undefined;
     }
 
     for (const record of records) {
@@ -79,6 +82,24 @@ async function processCoatingReminders(client) {
           });
 
           if (messageToSend) {
+            // ── DRY RUN: collect preview, skip send & DB update ──────────────
+            if (dryRun) {
+              previewItems.push({
+                docId: record.id,
+                senderNumber: phone,
+                name: record.customerName || 'Kak',
+                customerLabel: null,
+                type: 'coating_reminder',
+                strategy: { angle: strategyAngle },
+                generatedMessage: messageToSend,
+                // Extra context for UI warning display
+                maintenanceDate: record.maintenanceDate,
+                diffDays,
+              });
+              continue;
+            }
+            // ────────────────────────────────────────────────────────────────
+
             try {
               await sendTextDirect(client, phone, messageToSend);
             } catch (initialError) {
@@ -145,7 +166,11 @@ async function processCoatingReminders(client) {
   } catch (err) {
     console.error('[CoatingReminders] Error checking SQL reminders:', err);
   }
+
+  if (dryRun) return previewItems;
 }
+
+
 
 // initCoatingRemindersSchedule removed as it is now called by the main scheduler
 

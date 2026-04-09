@@ -122,7 +122,15 @@ function delay(ms) {
 
 async function runDailyFollowUp(dryRun = false, limit = null) {
     const now = new Date(); // Definisi di paling atas scope function
-    console.log('[Scheduler] Running daily follow-up check...');
+    console.log(`[Scheduler] Running daily follow-up check... (dryRun=${dryRun})`);
+
+    // ── DRY RUN: return preview queue without sending ─────────────────────────
+    // NOTE: reminders (coating/booking) are NOT included here; they are fetched
+    // separately by the queue-review endpoint via their own dryRun=true calls.
+    if (dryRun) {
+        return await _buildDryRunQueue(now, limit);
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     // 1. Scan semua customerContext dari Prisma
     const contexts = await prisma.customerContext.findMany({
@@ -130,7 +138,15 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
             customerLabel: { not: null }
         },
         include: {
-            customer: true
+            customer: {
+                include: {
+                    bookings: {
+                        where: {
+                            status: { notIn: ['DONE', 'CANCELLED'] }
+                        }
+                    }
+                }
+            }
         }
     });
 
@@ -183,7 +199,12 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
         // 4. Review eligibility (Post-Service 3 Days)
         let isReviewEligible = false;
         const lastService = customer.lastService ? new Date(customer.lastService) : null;
-        if (lastService && !context.reviewFollowUpSent) {
+        
+        // Skip review if customer has active/pending bookings
+        const activeBookings = customer.bookings || [];
+        const hasActiveBooking = activeBookings.length > 0;
+
+        if (lastService && !context.reviewFollowUpSent && !hasActiveBooking) {
             const daysSinceService = Math.floor((now - lastService) / (1000 * 60 * 60 * 24));
             if (daysSinceService >= 3 && daysSinceService <= 7) {
                 isReviewEligible = true;
@@ -394,10 +415,117 @@ async function processFollowUp(customer, promoData = null, dryRun = false) {
     await saveMessageToPrisma(senderNumber, message, 'ai');
 }
 
+// ─── Dry-Run Queue Builder ────────────────────────────────────────────────────
+// Shared by runDailyFollowUp(dryRun=true) and the queue-review HTTP endpoint.
+// Returns an array of preview items (no sends, no DB writes).
+
+async function _buildDryRunQueue(now = new Date(), limit = null) {
+    const contexts = await prisma.customerContext.findMany({
+        where: { customerLabel: { not: null } },
+        include: {
+            customer: {
+                include: {
+                    bookings: {
+                        where: { status: { notIn: ['DONE', 'CANCELLED'] } }
+                    }
+                }
+            }
+        }
+    });
+
+    const queue = [];
+    const promoData = await getActivePromo();
+
+    for (const context of contexts) {
+
+        const customer = context.customer;
+        if (!customer) continue;
+
+        const metadata = {
+            lastMessageAt: customer.lastMessageAt,
+            name: customer.name,
+            fullSenderId: customer.phone.includes('@') ? customer.phone : customer.phone + '@c.us'
+        };
+
+        const isNurtureEligible = isEligible(context, metadata);
+
+        let isReviewEligible = false;
+        const lastService = customer.lastService ? new Date(customer.lastService) : null;
+        const hasActiveBooking = (customer.bookings || []).length > 0;
+        if (lastService && !context.reviewFollowUpSent && !hasActiveBooking) {
+            const daysSinceService = Math.floor((now - lastService) / (1000 * 60 * 60 * 24));
+            if (daysSinceService >= 3 && daysSinceService <= 7) isReviewEligible = true;
+        }
+
+        let isRebookingEligible = false;
+        let rebookingAngle = null;
+        if (lastService && context.lastServiceType) {
+            const daysSinceService = Math.floor((now - lastService) / (1000 * 60 * 60 * 24));
+            const interval = REBOOKING_INTERVALS[context.lastServiceType];
+            if (interval && daysSinceService >= interval && daysSinceService <= interval + 3) {
+                const lastFup = context.lastFollowUpAt ? new Date(context.lastFollowUpAt) : null;
+                const daysSinceLastFup = lastFup ? Math.floor((now - lastFup) / (1000 * 60 * 60 * 24)) : 999;
+                if (daysSinceLastFup > 7) {
+                    isRebookingEligible = true;
+                    rebookingAngle = `rebooking_${context.lastServiceType}`;
+                }
+            }
+        }
+
+        const senderNumber = customer.phone.includes('@') ? customer.phone : customer.phone + '@c.us';
+        const name = customer.name || 'Mas';
+
+
+        let itemStrategy = null;
+        let itemType = null;
+        let queueItem = null;
+
+        if (isReviewEligible) {
+            itemStrategy = { ...STRATEGY_CONFIG[context.customerLabel], angle: 'review' };
+            itemType = 'review';
+            queueItem = { docId: context.id, senderNumber, name, context: { ...context, reviewMode: true }, metadata, strategy: itemStrategy };
+        } else if (isRebookingEligible) {
+            itemStrategy = { ...STRATEGY_CONFIG[context.customerLabel], angle: rebookingAngle };
+            itemType = 'rebooking';
+            queueItem = { docId: context.id, senderNumber, name, context: { ...context, rebookingMode: true }, metadata, strategy: itemStrategy };
+        } else if (isNurtureEligible) {
+            itemStrategy = STRATEGY_CONFIG[context.customerLabel];
+            itemType = 'nurturing';
+            queueItem = { docId: context.id, senderNumber, name, context, metadata, strategy: itemStrategy };
+        }
+
+        if (queueItem && itemStrategy) {
+            try {
+                const generatedMessage = await generateFollowUpMessage(queueItem, itemStrategy, promoData);
+                if (generatedMessage) {
+                    queue.push({
+                        docId: context.id,
+                        senderNumber,
+                        name,
+                        customerLabel: context.customerLabel || null,
+                        type: itemType,
+                        strategy: itemStrategy,
+                        generatedMessage,
+                    });
+                }
+            } catch (err) {
+                console.warn(`[Scheduler][DryRun] Failed to generate preview for ${context.id}:`, err.message);
+            }
+        }
+    }
+
+    if (limit && queue.length > limit) queue.splice(limit);
+
+    console.log(`[Scheduler][DryRun] Preview queue built: ${queue.length} items`);
+    return queue;
+}
+
 // ─── Cron Scheduler ──────────────────────────────────────────────────────────
+
 
 let schedulerHandle = null;
 let lastDailyRunDate = null; // Track last run date
+let schedulerBusy = false;  // True while the cron job is actively running
 
 const { DateTime } = require('luxon');
 const TIMEZONE = process.env.APP_TIMEZONE || 'Asia/Jakarta';
@@ -425,10 +553,13 @@ function startFollowUpScheduler() {
 
             try {
                 console.log(`[Scheduler] Starting daily follow up at ${now.toISO()} (Hour: ${hour}, Timezone: ${TIMEZONE})`);
+                schedulerBusy = true;
                 await runDailyFollowUp();
             } catch (err) {
                 console.error('[Scheduler] Daily run failed:', err);
                 lastDailyRunDate = null; // allow retry if failed immediately
+            } finally {
+                schedulerBusy = false;
             }
         }
     }, intervalMs);
@@ -450,7 +581,13 @@ function isSchedulerRunning() {
 
 module.exports = {
     runDailyFollowUp,
+    processFollowUp,
+    _buildDryRunQueue,
     startFollowUpScheduler,
     stopFollowUpScheduler,
     isSchedulerRunning,
+    /** True while the 9 AM cron job is actively running. Check before manual execute. */
+    isSchedulerBusy: () => schedulerBusy,
+    /** Mark today as already run — call after manual queue execute to skip the 9 AM cron. */
+    setLastDailyRunDate: (dateStr) => { lastDailyRunDate = dateStr; },
 };
