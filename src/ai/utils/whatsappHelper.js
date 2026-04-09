@@ -19,7 +19,7 @@ async function sendTextDirect(client, to, content) {
     
     // Bypass wppconnect's sendText yang double-evaluate (send + getMessageById)
     // Langsung pakai WPP.chat.sendTextMessage via page.evaluate
-    const { evaluateAndReturn } = require('@wppconnect-team/wppconnect/dist/lib/helpers');
+    const { evaluateAndReturn } = require('@wppconnect-team/wppconnect/dist/api/helpers');
     return evaluateAndReturn(
         client.page,
         ({ to, content }) => WPP.chat.sendTextMessage(to, content, { waitForAck: false }),
