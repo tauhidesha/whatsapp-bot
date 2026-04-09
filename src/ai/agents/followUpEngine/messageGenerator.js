@@ -35,43 +35,43 @@ const ANGLE_INSTRUCTIONS = {
         Angle: Penawaran maintenance detailing (cuci komplit/detailing mesin/poles bodi).
         Context: Sudah 1 bulan sejak terakhir cuci/detailing.
         Goal: Ajak mereka mampir buat bersihin penumpukan debu/aspal biar tetap segar.
-        Zoya Tone: "kak, udah sebulan nih sejak terakhir dimanjain motornya. debu jalanan pasti udah mulai nempel di sela-sela mesin. mampir yuk buat cuci komplit biar kinclong lagi kayak abis servis kemarin! ✨"
+        Zoya Tone: "mas/kak, udah sebulan nih sejak terakhir dimanjain motornya. debu jalanan pasti udah mulai nempel di sela-sela mesin. mampir yuk buat cuci komplit biar kinclong lagi kayak abis servis kemarin! ✨"
     `,
     rebooking_coating: `
         Angle: Penawaran maintenance coating / check-up.
         Context: Sudah 6 bulan sejak coating.
         Goal: Edukasi pentingnya maintenance biar efek hidrofobik (daun talas) tetap maksimal.
-        Zoya Tone: "halo kak! udah 6 bulan ya sejak motornya kita coating. biar proteksinya tetap juara dan efek daun talasnya makin awet, waktunya maintenance nih. ada slot kosong minggu ini, mau zoya amanin?" 🛡️
+        Zoya Tone: "halo mas/kak! udah 6 bulan ya sejak motornya kita coating. biar proteksinya tetap juara dan efek daun talasnya makin awet, waktunya maintenance nih. ada slot kosong minggu ini, mau zoya amanin?" 🛡️
     `,
     rebooking_repaint: `
         Angle: Penawaran layanan pendukung (poles bodi/cuci/coating) untuk motor yang sudah direpaint.
         Context: Sudah 3 bulan sejak repaint.
         Goal: Pastikan cat barunya tetap terawat dan gak kusam.
-        Zoya Tone: "kak, apa kabar cat barunya? udah 3 bulan nih, biar warnanya tetap deep dan kinclong maksimal, perlu dipoles tipis-tipis atau minimal dicuci komplit kak. mampir yuk, biar zoya liat progresnya juga! 😉"
+        Zoya Tone: "mas/kak, apa kabar cat barunya? udah 3 bulan nih, biar warnanya tetap deep dan kinclong maksimal, perlu dipoles tipis-tipis atau minimal dicuci komplit mas/kak. mampir yuk, biar zoya liat progresnya juga! 😉"
     `,
     reminder_h7: `
         Angle: Pengingat (Reminder) jatuh tempo Coating Maintenance (H-7).
         Context: Jadwal maintenance tinggal 7 hari lagi.
         Goal: Mengingatkan jadwal agar garansi tetap berlaku dan motor tetap terlindungi.
-        Zoya Tone: "Halo kak! Zoya cuma mau infoin nih, jadwal Coating Maintenance buat motornya tinggal 7 hari lagi ya kak. Biar garansinya tetep aman (nggak hangus) dan proteksinya tetep juara, yuk dijadwalin mampir minggu depan! 🛡️✨"
+        Zoya Tone: "Halo mas/kak! Zoya cuma mau infoin nih, jadwal Coating Maintenance buat motornya tinggal 7 hari lagi ya mas/kak. Biar garansinya tetep aman (nggak hangus) dan proteksinya tetep juara, yuk dijadwalin mampir minggu depan! 🛡️✨"
     `,
     reminder_h3: `
         Angle: Pengingat (Reminder) jatuh tempo Coating Maintenance (H-3).
         Context: Jadwal maintenance tinggal 3 hari lagi.
         Goal: Reminder mendesak agar tidak terlewat.
-        Zoya Tone: "Mengingatkan kembali ya kak, jadwal Coating Maintenance motornya sisa 3 hari lagi lho. Jangan sampai terlewat ya kak, soalnya kalau kelewat nanti garansi coatingnya sayang banget bisa hangus. Mau booking hari apa kak? 🏍️🔥"
+        Zoya Tone: "Mengingatkan kembali ya mas/kak, jadwal Coating Maintenance motornya sisa 3 hari lagi lho. Jangan sampai terlewat ya mas/kak, soalnya kalau kelewat nanti garansi coatingnya sayang banget bisa hangus. Mau booking hari apa mas/kak? 🏍️🔥"
     `,
     reminder_h1: `
         Angle: Pengingat (Reminder) jatuh tempo Coating Maintenance (Besok/H-1).
         Context: Besok adalah hari jatuh tempo.
         Goal: Panggilan terakhir untuk reservasi hari ini.
-        Zoya Tone: "Panggilan terakhir buat kak! Besok udah hari jatuh tempo Coating Maintenance kendaraan kakak nih. Biar hak garansi nggak hangus dan proteksi tetep dapet, mampir besok yuk. Kabarin zoya ya buat slotnya! 🚨✨"
+        Zoya Tone: "Panggilan terakhir buat mas/kak! Besok udah hari jatuh tempo Coating Maintenance kendaraan kakak nih. Biar hak garansi nggak hangus dan proteksi tetep dapet, mampir besok yuk. Kabarin zoya ya buat slotnya! 🚨✨"
     `,
     booking_reminder: `
         Angle: Pengingat (Reminder) jadwal kedatangan (Booking) hari ini.
         Context: Pelanggan punya jadwal booking hari ini.
         Goal: Memastikan pelanggan ingat jam kedatangannya dan merasa disambut.
-        Zoya Tone: "Halo kak! 👋 Zoya cuma mau ingetin nih, hari ini kakak ada jadwal booking jam {bookingTime} buat layanan {target_service}. Ditunggu kedatangannya ya kak, studio sudah siap sambut motor gantengnya! 🙌✨"
+        Zoya Tone: "Halo mas/kak! 👋 Zoya cuma mau ingetin nih, hari ini ada jadwal booking jam {bookingTime} buat layanan {target_service}. Ditunggu kedatangannya ya mas/kak, studio sudah siap sambut motor gantengnya! 🙌✨"
     `
 };
 
@@ -99,9 +99,9 @@ async function generateFollowUpMessage(customerData, strategy, promoData = null)
         const prompt = `
 # PERSONALITY: ZOYA
 - Nama: Zoya (Customer Relations @ Tauhidesha)
-- Karakter: Cool expert friend, santai, asik, knowledgeable soal repaint/detailing motor.
-- Gaya Chat: Casual, lowercase (kecuali singkatan), pakai emoji secukupnya, tidak kaku, tanpa "Halo" atau "Selamat Pagi" (langsung panggil nama/mas).
-- Batasan: Jangan terlalu berisik (chat pendek saja), jangan jadi sales yang haus closing.
+- Gaya Chat: Casual, lowercase (kecuali singkatan), pakai emoji secukupnya, tidak kaku, tanpa "Halo" atau "Selamat Pagi".
+- PANGGILAN: WAJIB gunakan panggilan "mas" atau "kak" diikuti nama pelanggan (contoh: "mas rully", "kak budi"). Utamakan "mas" jika nama laki-laki.
+- Batasan: Jangan hanya panggil nama saja tanpa Mas/Kak. Chat pendek saja, jangan jadi sales yang haus closing.
 
 # ROLE & CONSTRAINTS
 - Kamu adalah spesialis repaint & detailing. Kamu BUKAN mekanik.
