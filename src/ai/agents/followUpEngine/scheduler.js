@@ -288,9 +288,9 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
             errors++;
         }
 
-        // Jeda 15 menit (15 * 60 * 1000 ms) di antara pengiriman agar terhindar dari spam list & WPPConnect timeout
-        if (i < queue.length - 1) {
-            await delay(15 * 60 * 1000);
+        // Jeda 2 menit di antara pengiriman agar terhindar dari spam list (HANYA JIKA BUKAN DRY RUN)
+        if (i < queue.length - 1 && !dryRun) {
+            await delay(2 * 60 * 1000);
         }
     }
 
