@@ -1,5 +1,6 @@
 const prisma = require('../../lib/prisma.js');
 const { DateTime } = require('luxon');
+const { sendTextDirect } = require('./whatsappHelper');
 
 const BOSMAT_ADMIN_NUMBER = process.env.BOSMAT_ADMIN_NUMBER || process.env.ADMIN_WHATSAPP_NUMBER;
 const NOTIFY_BOOKING_CREATION = process.env.NOTIFY_BOOKING_CREATION !== 'true';
@@ -46,7 +47,7 @@ async function sendWhatsappNotification(message) {
   }
 
   try {
-    await client.sendText(target, message);
+    await sendTextDirect(client, target, message);
     console.log('[humanHandover] Notifikasi WA terkirim ke admin:', target);
 
     // --- Simpan ke SQL tabel DirectMessage ---

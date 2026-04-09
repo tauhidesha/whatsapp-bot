@@ -29,7 +29,17 @@ async function saveMessageToPrismaLocal(recipientNumber, messageText, senderType
 
     try {
         // Ensure customer exists before creating message (FK constraint)
-        let customer = await prisma.customer.findUnique({ where: { phone } });
+        const numericPhone = phone.replace(/@c\.us$|@lid$/, '').replace(/\D/g, '');
+        let customer = await prisma.customer.findFirst({
+            where: {
+                OR: [
+                    { phone: numericPhone },
+                    { phone: phone },
+                    { whatsappLid: phone }
+                ]
+            }
+        });
+
         if (!customer) {
             customer = await prisma.customer.create({
                 data: { phone, name: 'New Customer' }

@@ -1,5 +1,6 @@
 const prisma = require('../../lib/prisma.js');
 const studioMetadata = require('../constants/studioMetadata');
+const { sendTextDirect } = require('./whatsappHelper');
 
 const COATING_MAINTENANCE_MESSAGES = {
   h7: (name, vehicle) => `Halo Kak ${name},\n\nIni dari admin ${studioMetadata.name}. Sekedar mengingatkan bahwa jadwal *Coating Maintenance* untuk kendaraan ${vehicle} Kakak jatuh tempo dalam *7 hari* lagi.\n\nAgar kualitas coating tetap prima dan garansi tetap berlaku, yuk jadwalkan maintenance-nya sekarang. Kakak bisa balas pesan ini untuk booking jadwal ya!`,
@@ -79,7 +80,7 @@ async function processCoatingReminders(client) {
 
           if (messageToSend) {
             try {
-              await client.sendText(phone, messageToSend);
+              await sendTextDirect(client, phone, messageToSend);
             } catch (initialError) {
               if (initialError.message && initialError.message.includes('No LID')) {
                 console.warn(`[CoatingReminders] Send failed with No LID for: ${phone}`);
@@ -116,7 +117,7 @@ async function processCoatingReminders(client) {
 
                 if (fallbackTarget && fallbackTarget !== phone) {
                   console.log(`[CoatingReminders] Retrying with fallback: ${fallbackTarget}`);
-                  await client.sendText(fallbackTarget, messageToSend);
+                  await sendTextDirect(client, fallbackTarget, messageToSend);
                   phone = fallbackTarget;
                 } else {
                   throw initialError;

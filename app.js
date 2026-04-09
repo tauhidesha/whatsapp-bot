@@ -3149,8 +3149,8 @@ server.listen(PORT, '0.0.0.0', async () => {
             args: PUPPETEER_CHROME_ARGS,
             ignoreHTTPSErrors: true,
             defaultViewport: PUPPETEER_VIEWPORT,
-            timeout: 180000,
-            protocolTimeout: 360000,
+            timeout: 300000,
+            protocolTimeout: 600000,
         },
         headless: whatsappHeadless,
         logQR: false,
@@ -3305,8 +3305,8 @@ async function reconnectWhatsApp() {
             // Stealth mode untuk reconnect juga
             browserArgs: PUPPETEER_CHROME_ARGS,
             puppeteerOptions: {
-                timeout: 180000,
-                protocolTimeout: 360000,
+                timeout: 300000,
+                protocolTimeout: 600000,
                 args: PUPPETEER_CHROME_ARGS,
                 defaultViewport: PUPPETEER_VIEWPORT,
                 ignoreHTTPSErrors: true,

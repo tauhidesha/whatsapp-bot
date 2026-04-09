@@ -24,7 +24,7 @@ Setelah masuk ke server, gunakan command ini:
 
 ### Masuk ke folder project
 ```bash
-cd ~/whatsapp-bot
+cd ~/whatsapp-ai-chatbot
 ```
 
 ### Update kode dari GitHub

@@ -3,6 +3,7 @@ const { DateTime } = require('luxon');
 const prisma = require('../../lib/prisma.js');
 const { getIdentifier } = require('./humanHandover.js');
 const studioMetadata = require('../constants/studioMetadata');
+const { sendTextDirect } = require('./whatsappHelper');
 
 const REMINDER_ENABLED = process.env.BOOKING_REMINDER_ENABLED !== 'false';
 const REMINDER_HOUR = parseInt(process.env.BOOKING_REMINDER_HOUR || '8', 10);
@@ -78,7 +79,7 @@ async function sendBookingReminders(force = false) {
 
         if (message) {
           try {
-            await global.whatsappClient.sendText(normalizedTarget, message);
+            await sendTextDirect(global.whatsappClient, normalizedTarget, message);
           } catch (initialError) {
             if (initialError.message && initialError.message.includes('No LID')) {
               console.warn(`[bookingReminders] Send failed with No LID for: ${normalizedTarget}`);
@@ -115,7 +116,7 @@ async function sendBookingReminders(force = false) {
 
               if (fallbackTarget && fallbackTarget !== normalizedTarget) {
                 console.log(`[bookingReminders] Retrying with fallback: ${fallbackTarget}`);
-                await global.whatsappClient.sendText(fallbackTarget, message);
+                await sendTextDirect(global.whatsappClient, fallbackTarget, message);
                 normalizedTarget = fallbackTarget;
               } else {
                 throw initialError;

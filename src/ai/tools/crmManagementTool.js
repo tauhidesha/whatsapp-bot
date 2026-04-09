@@ -9,6 +9,7 @@ const {
 } = require('../../lib/whatsappLabelUtils.js');
 const { traceable } = require('../utils/langsmith.js');
 const { markBotMessage } = require('../utils/adminMessageSync.js');
+const { sendTextDirect } = require('../utils/whatsappHelper');
 
 /**
  * Tool CRM Komprehensif untuk AI Admin (Zoya) menggunakan PostgreSQL via Prisma.
@@ -260,7 +261,7 @@ async function handleExecuteFollowup() {
             markBotMessage(target, item.draft);
             
             try {
-                await client.sendText(target, item.draft);
+                await sendTextDirect(client, target, item.draft);
             } catch (initialError) {
                 if (initialError.message && initialError.message.includes('No LID')) {
                     console.warn(`[CRM] Send failed with No LID for: ${target}`);
@@ -294,11 +295,10 @@ async function handleExecuteFollowup() {
                         }
                         console.log(`[CRM] DB had no distinct alt, brute-force flip: ${fallbackTarget}`);
                     }
-
                     if (fallbackTarget && fallbackTarget !== target) {
                         console.log(`[CRM] Retrying with fallback: ${fallbackTarget}`);
                         markBotMessage(fallbackTarget, item.draft);
-                        await client.sendText(fallbackTarget, item.draft);
+                        await sendTextDirect(client, fallbackTarget, item.draft);
                     } else {
                         throw initialError;
                     }

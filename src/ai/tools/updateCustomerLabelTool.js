@@ -56,9 +56,16 @@ const updateCustomerLabelTool = {
       }
 
       // Get customer from Prisma
-      const normalizedPhone = docId.replace(/\D/g, '');
-      const customer = await prisma.customer.findUnique({
-        where: { phone: normalizedPhone }
+      // Get customer from Prisma with LID fallback support
+      const numericPhone = docId.replace(/@c\.us$|@lid$/, '').replace(/\D/g, '');
+      const customer = await prisma.customer.findFirst({
+        where: {
+          OR: [
+            { phone: numericPhone },
+            { phone: docId },
+            { whatsappLid: docId }
+          ]
+        }
       });
 
       if (!customer) {
@@ -67,16 +74,16 @@ const updateCustomerLabelTool = {
 
       // Get previous label from customerContext
       const customerContext = await prisma.customerContext.findUnique({
-        where: { id: normalizedPhone }
+        where: { id: customer.phone }
       });
       const prevLabelId = customerContext?.customerLabel || null;
 
-      // Update customerContext
+      // Update customerContext using the reliable customer.phone from DB
       await prisma.customerContext.upsert({
-        where: { id: normalizedPhone },
+        where: { id: customer.phone },
         create: {
-          id: normalizedPhone,
-          phone: normalizedPhone,
+          id: customer.phone,
+          phone: customer.phone,
           customerLabel: label,
           labelReason: reason || null,
         },

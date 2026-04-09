@@ -7,15 +7,29 @@ const { shouldStop, handleStopAction } = require('./stopCondition.js');
 const { markBotMessage } = require('../../utils/adminMessageSync.js');
 const { getActivePromo } = require('../../utils/promoConfig');
 const { withRetry } = require('../../utils/retry');
+const { sendTextDirect } = require('../../utils/whatsappHelper');
 
 // ─── Helper: Save message to Prisma ────────────────────────────────────────
 
 async function saveMessageToPrisma(senderNumber, message, senderType) {
-    const docId = (senderNumber || '').replace(/@c\.us$|@lid$/, '').replace(/\D/g, '');
-    if (!docId) return;
+    if (!senderNumber || !message) return;
 
-    const customer = await prisma.customer.findUnique({ where: { phone: docId } });
-    if (!customer) return;
+    // Fix: Use findFirst with OR to support both @c.us (digits) and @lid
+    const cleanPhone = (senderNumber || '').replace(/@c\.us$|@lid$/, '');
+    const customer = await prisma.customer.findFirst({
+        where: {
+            OR: [
+                { phone: cleanPhone },
+                { phone: senderNumber },
+                { whatsappLid: senderNumber },
+            ]
+        }
+    });
+
+    if (!customer) {
+        console.warn(`[Scheduler] saveMessageToPrisma: customer not found for ${senderNumber}`);
+        return;
+    }
 
     await prisma.directMessage.create({
         data: {
@@ -298,7 +312,7 @@ async function processFollowUp(customer, promoData = null) {
 
     markBotMessage(senderNumber, message);
     try {
-        await withRetry(() => global.whatsappClient.sendText(senderNumber, message), { maxRetries: 3, baseDelayMs: 2000 });
+        await withRetry(() => sendTextDirect(global.whatsappClient, senderNumber, message), { maxRetries: 3, baseDelayMs: 2000 });
     } catch (initialError) {
         if (initialError.message && initialError.message.includes('No LID')) {
             console.warn(`[Scheduler] Send failed with No LID for: ${senderNumber}`);
@@ -336,7 +350,7 @@ async function processFollowUp(customer, promoData = null) {
             if (fallbackTarget && fallbackTarget !== senderNumber) {
                 console.log(`[Scheduler] Retrying with fallback: ${fallbackTarget}`);
                 markBotMessage(fallbackTarget, message);
-                await withRetry(() => global.whatsappClient.sendText(fallbackTarget, message), { maxRetries: 3, baseDelayMs: 2000 });
+                await withRetry(() => sendTextDirect(global.whatsappClient, fallbackTarget, message), { maxRetries: 3, baseDelayMs: 2000 });
                 senderNumber = fallbackTarget;
             } else {
                 throw initialError;

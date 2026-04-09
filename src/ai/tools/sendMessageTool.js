@@ -3,6 +3,8 @@ const { z } = require('zod');
 const prisma = require('../../lib/prisma');
 const { isAdmin } = require('../utils/adminAuth.js');
 const { markBotMessage } = require('../utils/adminMessageSync.js');
+const { getIdentifier } = require('../utils/humanHandover.js');
+const { sendTextDirect } = require('../utils/whatsappHelper');
 
 const sendMessageSchema = z.object({
   destination: z.string().describe('Nomor tujuan (contoh: 08123456789)'),
@@ -94,7 +96,7 @@ const sendMessageTool = {
       // Mark pesan agar onAnyMessage tidak trigger auto-snooze
       markBotMessage(target, message);
       try {
-        await client.sendText(target, message);
+        await sendTextDirect(client, target, message);
       } catch (initialError) {
         if (initialError.message && initialError.message.includes('No LID')) {
           console.warn(`[sendMessageTool] Send failed with No LID for: ${target}`);
@@ -132,7 +134,7 @@ const sendMessageTool = {
           if (fallbackTarget && fallbackTarget !== target) {
             console.log(`[sendMessageTool] Retrying with fallback: ${fallbackTarget}`);
             markBotMessage(fallbackTarget, message);
-            await client.sendText(fallbackTarget, message);
+            await sendTextDirect(client, fallbackTarget, message);
             target = fallbackTarget;
           } else {
             throw initialError;
