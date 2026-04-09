@@ -81,8 +81,8 @@ const DOWNGRADE_RULES = [
 
 const REBOOKING_INTERVALS = {
     detailing: 30,  // 1 month
-    repaint:   90,  // 3 months
-    coating:   180, // 6 months
+    repaint: 90,  // 3 months
+    coating: 180, // 6 months
 };
 
 // ─── Eligibility Check ──────────────────────────────────────────────────────
@@ -120,7 +120,7 @@ function delay(ms) {
 
 // ─── Main Daily Run ──────────────────────────────────────────────────────────
 
-async function runDailyFollowUp() {
+async function runDailyFollowUp(dryRun = false, limit = null) {
     const now = new Date(); // Definisi di paling atas scope function
     console.log('[Scheduler] Running daily follow-up check...');
 
@@ -179,7 +179,7 @@ async function runDailyFollowUp() {
 
         // 3. Eligibility checks
         const isNurtureEligible = isEligible(context, metadata);
-        
+
         // 4. Review eligibility (Post-Service 3 Days)
         let isReviewEligible = false;
         const lastService = customer.lastService ? new Date(customer.lastService) : null;
@@ -196,13 +196,13 @@ async function runDailyFollowUp() {
         if (lastService && context.lastServiceType) {
             const daysSinceService = Math.floor((now - lastService) / (1000 * 60 * 60 * 24));
             const interval = REBOOKING_INTERVALS[context.lastServiceType];
-            
+
             // Trigger exactly on interval or within 3-day window after interval
             if (interval && daysSinceService >= interval && daysSinceService <= interval + 3) {
                 // Also check if we haven't sent a rebooking follow-up recently
                 const lastFup = context.lastFollowUpAt ? new Date(context.lastFollowUpAt) : null;
                 const daysSinceLastFup = lastFup ? Math.floor((now - lastFup) / (1000 * 60 * 60 * 24)) : 999;
-                
+
                 if (daysSinceLastFup > 7) { // Don't spam if they just got a different message
                     isRebookingEligible = true;
                     rebookingAngle = `rebooking_${context.lastServiceType}`;
@@ -252,6 +252,12 @@ async function runDailyFollowUp() {
         return { sent: 0, skipped: 0, errors: 0, downgrades: downgradeCount };
     }
 
+    // Apply limit if provided
+    if (limit && queue.length > limit) {
+        console.log(`[Scheduler] Limiting queue from ${queue.length} to ${limit} for testing.`);
+        queue.splice(limit);
+    }
+
     // Fetch active promo once per daily run
     const promoData = await getActivePromo();
 
@@ -275,13 +281,13 @@ async function runDailyFollowUp() {
     for (let i = 0; i < queue.length; i++) {
         const customer = queue[i];
         try {
-            await processFollowUp(customer, promoData);
+            await processFollowUp(customer, promoData, dryRun);
             sent++;
         } catch (err) {
             console.error(`[Scheduler] Error processing ${customer.docId}:`, err.message);
             errors++;
         }
-        
+
         // Jeda 15 menit (15 * 60 * 1000 ms) di antara pengiriman agar terhindar dari spam list & WPPConnect timeout
         if (i < queue.length - 1) {
             await delay(15 * 60 * 1000);
@@ -289,10 +295,10 @@ async function runDailyFollowUp() {
     }
 
     console.log(`[Scheduler] Done — sent: ${sent}, skipped: ${skipped}, errors: ${errors}`);
-    return { sent, skipped, errors, downgrades: downgradeCount };
+    return { sent, skipped, errors, downgrades: downgradeCount, dryRun };
 }
 
-async function processFollowUp(customer, promoData = null) {
+async function processFollowUp(customer, promoData = null, dryRun = false) {
     const { docId, context, strategy } = customer;
     let { senderNumber } = customer;
 
@@ -304,6 +310,11 @@ async function processFollowUp(customer, promoData = null) {
 
     const message = await generateFollowUpMessage(customer, strategy, promoData);
     if (!message) return;
+
+    if (dryRun) {
+        console.log(`[Scheduler][DryRun] Would send to ${docId}: "${message.substring(0, 50)}..."`);
+        return;
+    }
 
     if (!global.whatsappClient) {
         console.warn('[Scheduler] WhatsApp client not available');

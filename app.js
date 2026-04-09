@@ -2425,6 +2425,39 @@ app.get('/webhooks/meta', (req, res) => {
 
 app.use('/webhooks/meta', metaWebhookRouter);
 
+// --- Admin Utility Routes ---
+app.get('/trigger-scheduler-manual', async (req, res) => {
+    // Basic secret key check via query param for safety
+    const secret = req.query.secret;
+    if (secret !== 'zoya-trigger-2024') {
+        return res.status(401).send('Unauthorized. Please provide ?secret=...');
+    }
+
+    if (!global.whatsappClient) {
+        return res.status(500).send('WhatsApp client is not ready yet.');
+    }
+
+    try {
+        const { runDailyFollowUp } = require('./src/ai/agents/followUpEngine/scheduler.js');
+        const limit = req.query.limit ? parseInt(req.query.limit) : 5; // Default limit to 5 for safety
+        
+        console.log(`[Manual-Trigger] Triggering scheduler for ${limit} customers...`);
+        
+        // Run in background so request doesn't timeout
+        runDailyFollowUp(false, limit).catch(err => console.error('[Manual-Trigger] Error:', err));
+        
+        res.json({ 
+            status: 'success', 
+            message: 'Scheduler triggered in background',
+            limitApplied: limit,
+            note: 'Cek PM2 logs untuk melihat progres pengiriman.'
+        });
+    } catch (err) {
+        res.status(500).json({ status: 'error', message: err.message });
+    }
+});
+
+// --- Health Check ---
 app.get('/health', (req, res) => {
     const whatsappStatus = global.whatsappClient ? 'connected' : 'disconnected';
     res.json({
