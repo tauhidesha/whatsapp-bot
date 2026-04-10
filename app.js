@@ -3178,9 +3178,7 @@ app.patch('/bookings/:id/status', requireAuth, async (req, res) => {
 
 /**
  * GET /follow-up-queue
- * Returns a dry-run preview of all outbound messages that would be sent by the
- * 9 AM cron job — nurturing, review, rebooking, coating reminders, booking reminders.
- * No messages are sent and no DB records are updated.
+ * Returns a dry-run preview of all outbound messages.
  */
 app.get('/follow-up-queue', requireAuth, async (req, res) => {
     try {
@@ -3223,13 +3221,111 @@ app.get('/follow-up-queue', requireAuth, async (req, res) => {
 });
 
 /**
+ * GET /follow-up-queue/saved
+ * Returns the saved queue from KeyValueStore (if any).
+ * Used by UI on page load to auto-restore pre-9AM saved queue.
+ */
+app.get('/follow-up-queue/saved', requireAuth, async (req, res) => {
+    try {
+        const prisma = require('./src/lib/prisma.js');
+        const record = await prisma.keyValueStore.findUnique({
+            where: { collection_key: { collection: 'follow_up_queue', key: 'saved' } }
+        });
+
+        if (!record) {
+            return res.json({ success: true, exists: false, queue: [], delayMs: 300000, savedAt: null });
+        }
+
+        const data = record.value;
+        res.json({
+            success: true,
+            exists: true,
+            queue: data.queue || [],
+            delayMs: data.delayMs || 300000,
+            savedAt: record.updatedAt,
+        });
+    } catch (err) {
+        console.error('[API] GET /follow-up-queue/saved error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+/**
+ * POST /follow-up-queue/save
+ * Saves the current approved queue to KeyValueStore for execution at 9 AM.
+ * Body: { items: [...], delayMs: number }
+ */
+app.post('/follow-up-queue/save', requireAuth, async (req, res) => {
+    try {
+        const { items = [], delayMs = 300000 } = req.body;
+        const prisma = require('./src/lib/prisma.js');
+
+        await prisma.keyValueStore.upsert({
+            where: { collection_key: { collection: 'follow_up_queue', key: 'saved' } },
+            create: {
+                collection: 'follow_up_queue',
+                key: 'saved',
+                value: { queue: items, delayMs },
+            },
+            update: {
+                value: { queue: items, delayMs },
+            }
+        });
+
+        console.log(`[API] Saved follow-up queue: ${items.length} items, delay=${delayMs}ms`);
+        res.json({ success: true, saved: items.length });
+    } catch (err) {
+        console.error('[API] POST /follow-up-queue/save error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+/**
+ * DELETE /follow-up-queue/saved
+ * Clears the saved queue from KeyValueStore.
+ */
+app.delete('/follow-up-queue/saved', requireAuth, async (req, res) => {
+    try {
+        const prisma = require('./src/lib/prisma.js');
+        await prisma.keyValueStore.deleteMany({
+            where: { collection: 'follow_up_queue', key: 'saved' }
+        });
+        console.log('[API] Cleared saved follow-up queue');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[API] DELETE /follow-up-queue/saved error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ─── Execute Status (in-memory, per process) ─────────────────────────────────
+const _executeStatus = {
+    running: false,
+    total: 0,
+    sent: 0,
+    errors: 0,
+    current: null,   // { senderNumber, type }
+    startedAt: null,
+    finishedAt: null,
+    results: [],
+};
+
+/**
+ * GET /follow-up-queue/execute-status
+ * Returns current background execute progress.
+ */
+app.get('/follow-up-queue/execute-status', requireAuth, (req, res) => {
+    res.json({ success: true, ..._executeStatus });
+});
+
+/**
  * POST /follow-up-queue/execute
- * Receives the approved queue items and dispatches them.
+ * Fire-and-forget: responds 202 immediately, processes queue in background with delayMs between sends.
  * Body: { items: [{ docId, senderNumber, type, message, approved }], delayMs? }
  */
 app.post('/follow-up-queue/execute', requireAuth, async (req, res) => {
     try {
-        const { items = [], delayMs = parseInt(process.env.FOLLOW_UP_QUEUE_DELAY_MS || '0', 10) } = req.body;
+        const { items = [], delayMs = 300000 } = req.body; // default 5 menit
 
         if (!Array.isArray(items) || items.length === 0) {
             return res.status(400).json({ success: false, error: 'items array is required and must not be empty' });
@@ -3245,111 +3341,137 @@ app.post('/follow-up-queue/execute', requireAuth, async (req, res) => {
             return res.status(503).json({ success: false, error: 'WhatsApp client is not ready' });
         }
 
-        const { sendTextDirect } = require('./src/ai/utils/whatsappHelper.js');
-        const prisma = require('./src/lib/prisma.js');
-
-
-        const results = [];
-        const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-
-        for (const item of approved) {
-            const { docId, senderNumber, type, message } = item;
-
-            try {
-                if (type === 'coating_reminder') {
-                    // Send directly + update coatingMaintenance record
-                    await sendTextDirect(global.whatsappClient, senderNumber, message);
-                    // Update status — determine next status from current (we rely on docId = record.id)
-                    const record = await prisma.coatingMaintenance.findUnique({ where: { id: docId } });
-                    const nextStatus = record?.status === 'pending' ? 'reminded_h7'
-                        : record?.status === 'reminded_h7' ? 'reminded_h3'
-                            : 'reminded_h1';
-                    await prisma.coatingMaintenance.update({
-                        where: { id: docId },
-                        data: { status: nextStatus, reminderSent: true, reminderSentAt: new Date() }
-                    });
-
-                } else if (type === 'booking_reminder') {
-                    // Send directly + mark booking reminderSent
-                    await sendTextDirect(global.whatsappClient, senderNumber, message);
-                    await prisma.booking.update({
-                        where: { id: docId },
-                        data: { reminderSent: true, reminderSentAt: new Date() }
-                    });
-
-                } else {
-                    // nurturing / review / rebooking — send edited message directly, then update DB
-                    const { markBotMessage } = require('./src/ai/utils/adminMessageSync.js');
-
-                    markBotMessage(senderNumber, message);
-                    await sendTextDirect(global.whatsappClient, senderNumber, message);
-
-                    // Save to message history (non-critical)
-                    const cleanPhone = senderNumber.replace(/@c\.us$|@lid$/, '');
-                    const customer = await prisma.customer.findFirst({
-                        where: {
-                            OR: [
-                                { phone: cleanPhone },
-                                { phone: senderNumber },
-                                { whatsappLid: senderNumber },
-                            ]
-                        }
-                    });
-                    if (customer) {
-                        await prisma.directMessage.create({
-                            data: { customerId: customer.id, senderId: senderNumber, role: 'assistant', content: message }
-                        }).catch(() => {});
-                        await prisma.customer.update({
-                            where: { id: customer.id },
-                            data: { lastMessage: message, lastMessageAt: new Date() }
-                        }).catch(() => {});
-                    }
-
-                    // Update follow-up tracking on customerContext
-                    const updateData = {
-                        followUpCount: { increment: 1 },
-                        lastFollowUpAt: new Date(),
-                        lastFollowUpStrategy: type,
-                    };
-                    if (type === 'review') updateData.reviewFollowUpSent = true;
-                    await prisma.customerContext.update({
-                        where: { id: docId },
-                        data: updateData,
-                    }).catch(err => console.warn(`[QueueExecute] Context update failed for ${docId}:`, err.message));
-
-                }
-
-
-                results.push({ docId, senderNumber, type, status: 'sent' });
-                console.log(`[QueueExecute] Sent ${type} to ${senderNumber}`);
-
-            } catch (err) {
-                console.error(`[QueueExecute] Failed to send ${type} to ${senderNumber}:`, err.message);
-                results.push({ docId, senderNumber, type, status: 'error', error: err.message });
-            }
-
-            if (delayMs > 0) await sleep(delayMs);
+        if (_executeStatus.running) {
+            return res.status(409).json({
+                success: false,
+                error: `Pengiriman sedang berjalan (${_executeStatus.sent}/${_executeStatus.total} terkirim). Tunggu selesai.`
+            });
         }
 
-        const sentCount = results.filter(r => r.status === 'sent').length;
-        const errorCount = results.filter(r => r.status === 'error').length;
+        // Respond 202 immediately — do not await the background job
+        res.status(202).json({
+            success: true,
+            accepted: approved.length,
+            delayMs,
+            message: `${approved.length} pesan diantrekan. Cek status via /follow-up-queue/execute-status`,
+        });
 
-        // Mark today as already run so the 9 AM cron job skips if admin already sent manually
-        if (sentCount > 0) {
+        // ── Background execution ──────────────────────────────────────────────
+        const { sendTextDirect } = require('./src/ai/utils/whatsappHelper.js');
+        const prisma = require('./src/lib/prisma.js');
+        const { markBotMessage } = require('./src/ai/utils/adminMessageSync.js');
+        const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+        Object.assign(_executeStatus, {
+            running: true,
+            total: approved.length,
+            sent: 0,
+            errors: 0,
+            current: null,
+            startedAt: new Date().toISOString(),
+            finishedAt: null,
+            results: [],
+        });
+
+        (async () => {
+            for (const item of approved) {
+                const { docId, senderNumber, type, message } = item;
+                _executeStatus.current = { senderNumber, type };
+
+                try {
+                    if (type === 'coating_reminder') {
+                        await sendTextDirect(global.whatsappClient, senderNumber, message);
+                        const record = await prisma.coatingMaintenance.findUnique({ where: { id: docId } });
+                        const nextStatus = record?.status === 'pending' ? 'reminded_h7'
+                            : record?.status === 'reminded_h7' ? 'reminded_h3'
+                                : 'reminded_h1';
+                        await prisma.coatingMaintenance.update({
+                            where: { id: docId },
+                            data: { status: nextStatus, reminderSent: true, reminderSentAt: new Date() }
+                        });
+
+                    } else if (type === 'booking_reminder') {
+                        await sendTextDirect(global.whatsappClient, senderNumber, message);
+                        await prisma.booking.update({
+                            where: { id: docId },
+                            data: { reminderSent: true, reminderSentAt: new Date() }
+                        });
+
+                    } else {
+                        // nurturing / review / rebooking
+                        markBotMessage(senderNumber, message);
+                        await sendTextDirect(global.whatsappClient, senderNumber, message);
+
+                        const cleanPhone = senderNumber.replace(/@c\.us$|@lid$/, '');
+                        const customer = await prisma.customer.findFirst({
+                            where: {
+                                OR: [
+                                    { phone: cleanPhone },
+                                    { phone: senderNumber },
+                                    { whatsappLid: senderNumber },
+                                ]
+                            }
+                        });
+                        if (customer) {
+                            await prisma.directMessage.create({
+                                data: { customerId: customer.id, senderId: senderNumber, role: 'assistant', content: message }
+                            }).catch(() => {});
+                            await prisma.customer.update({
+                                where: { id: customer.id },
+                                data: { lastMessage: message, lastMessageAt: new Date() }
+                            }).catch(() => {});
+                        }
+
+                        const updateData = {
+                            followUpCount: { increment: 1 },
+                            lastFollowUpAt: new Date(),
+                            lastFollowUpStrategy: type,
+                        };
+                        if (type === 'review') updateData.reviewFollowUpSent = true;
+                        await prisma.customerContext.update({
+                            where: { id: docId },
+                            data: updateData,
+                        }).catch(err => console.warn(`[QueueExecute] Context update failed for ${docId}:`, err.message));
+                    }
+
+                    _executeStatus.sent++;
+                    _executeStatus.results.push({ docId, senderNumber, type, status: 'sent' });
+                    console.log(`[QueueExecute] Sent ${type} to ${senderNumber}`);
+
+                } catch (err) {
+                    console.error(`[QueueExecute] Failed to send ${type} to ${senderNumber}:`, err.message);
+                    _executeStatus.errors++;
+                    _executeStatus.results.push({ docId, senderNumber, type, status: 'error', error: err.message });
+                }
+
+                // Delay between messages (skip after last item)
+                if (item !== approved[approved.length - 1] && delayMs > 0) {
+                    console.log(`[QueueExecute] Waiting ${Math.round(delayMs / 60000)} menit before next message...`);
+                    await sleep(delayMs);
+                }
+            }
+
+            // Mark today as done → cronjob will skip
             const { setLastDailyRunDate } = require('./src/ai/agents/followUpEngine/scheduler.js');
             const { DateTime } = require('luxon');
             const todayStr = DateTime.now().setZone(process.env.APP_TIMEZONE || 'Asia/Jakarta').toFormat('yyyy-MM-dd');
             setLastDailyRunDate(todayStr);
-            console.log(`[QueueExecute] Marked lastDailyRunDate=${todayStr} — cronjob will skip today.`);
-        }
 
-        res.json({
-            success: true,
-            sent: sentCount,
-            errors: errorCount,
-            total: approved.length,
-            results,
+            // Clear saved queue after execute
+            await prisma.keyValueStore.deleteMany({
+                where: { collection: 'follow_up_queue', key: 'saved' }
+            }).catch(() => {});
+
+            _executeStatus.running = false;
+            _executeStatus.current = null;
+            _executeStatus.finishedAt = new Date().toISOString();
+            console.log(`[QueueExecute] Done — sent: ${_executeStatus.sent}, errors: ${_executeStatus.errors}`);
+        })().catch(err => {
+            console.error('[QueueExecute] Background job crashed:', err);
+            _executeStatus.running = false;
+            _executeStatus.finishedAt = new Date().toISOString();
         });
+
     } catch (err) {
         console.error('[API] POST /follow-up-queue/execute error:', err);
         res.status(500).json({ success: false, error: err.message });

@@ -554,7 +554,58 @@ function startFollowUpScheduler() {
             try {
                 console.log(`[Scheduler] Starting daily follow up at ${now.toISO()} (Hour: ${hour}, Timezone: ${TIMEZONE})`);
                 schedulerBusy = true;
-                await runDailyFollowUp();
+
+                // ── Check for admin-saved queue first ────────────────────────
+                const savedRecord = await prisma.keyValueStore.findUnique({
+                    where: { collection_key: { collection: 'follow_up_queue', key: 'saved' } }
+                }).catch(() => null);
+
+                if (savedRecord && savedRecord.value && Array.isArray(savedRecord.value.queue) && savedRecord.value.queue.length > 0) {
+                    const { queue: savedQueue, delayMs: savedDelayMs = 300000 } = savedRecord.value;
+                    console.log(`[Scheduler] Found saved queue from admin (${savedQueue.length} items, delay=${savedDelayMs}ms). Using it.`);
+
+                    const { sendTextDirect } = require('../../utils/whatsappHelper');
+                    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+                    let sent = 0, errors = 0;
+
+                    for (const item of savedQueue) {
+                        const { senderNumber, type, message, docId } = item;
+                        if (!item.approved) continue;
+                        try {
+                            if (type !== 'coating_reminder' && type !== 'booking_reminder') {
+                                markBotMessage(senderNumber, message);
+                            }
+                            await withRetry(() => sendTextDirect(global.whatsappClient, senderNumber, message), { maxRetries: 2, baseDelayMs: 2000 });
+                            sent++;
+                            console.log(`[Scheduler][Saved] ✅ Sent ${type} to ${senderNumber}`);
+
+                            // Update DB based on type (same as execute endpoint)
+                            if (type === 'coating_reminder') {
+                                const record = await prisma.coatingMaintenance.findUnique({ where: { id: docId } }).catch(() => null);
+                                const nextStatus = record?.status === 'pending' ? 'reminded_h7' : record?.status === 'reminded_h7' ? 'reminded_h3' : 'reminded_h1';
+                                await prisma.coatingMaintenance.update({ where: { id: docId }, data: { status: nextStatus, reminderSent: true, reminderSentAt: new Date() } }).catch(() => {});
+                            } else if (type === 'booking_reminder') {
+                                await prisma.booking.update({ where: { id: docId }, data: { reminderSent: true, reminderSentAt: new Date() } }).catch(() => {});
+                            } else {
+                                const updateData = { followUpCount: { increment: 1 }, lastFollowUpAt: new Date(), lastFollowUpStrategy: type };
+                                if (type === 'review') updateData.reviewFollowUpSent = true;
+                                await prisma.customerContext.update({ where: { id: docId }, data: updateData }).catch(() => {});
+                            }
+                        } catch (err) {
+                            errors++;
+                            console.error(`[Scheduler][Saved] Failed ${type} to ${senderNumber}:`, err.message);
+                        }
+
+                        if (item !== savedQueue[savedQueue.length - 1] && savedDelayMs > 0) await sleep(savedDelayMs);
+                    }
+
+                    // Clear saved queue after execute
+                    await prisma.keyValueStore.deleteMany({ where: { collection: 'follow_up_queue', key: 'saved' } }).catch(() => {});
+                    console.log(`[Scheduler][Saved] Done — sent: ${sent}, errors: ${errors}`);
+                } else {
+                    // No saved queue — generate and send fresh
+                    await runDailyFollowUp();
+                }
             } catch (err) {
                 console.error('[Scheduler] Daily run failed:', err);
                 lastDailyRunDate = null; // allow retry if failed immediately
@@ -563,6 +614,7 @@ function startFollowUpScheduler() {
             }
         }
     }, intervalMs);
+
 
     console.log(`[Scheduler] Follow-up scheduler started (Target: 09:00 ${TIMEZONE})`);
 }
