@@ -1805,9 +1805,21 @@ async function processBufferedMessages(senderNumber, client) {
             if (aiResponse) {
                 const targetNumber = toSenderNumberWithSuffix(senderNumber);
                 
+                // Ensure aiResponse is a string (handle LangGraph arrays/objects)
+                let responseText = '';
+                if (typeof aiResponse === 'string') {
+                    responseText = aiResponse;
+                } else if (Array.isArray(aiResponse)) {
+                    responseText = aiResponse.map(c => c.text || JSON.stringify(c)).join(' ');
+                } else {
+                    responseText = String(aiResponse);
+                }
+                
+                const finalReply = responseText.trim();
+                
                 // Send to WhatsApp IMMEDIATELY (no artificial delay)
-                markBotMessage(targetNumber, aiResponse.trim());
-                await client.sendText(targetNumber, aiResponse.trim());
+                markBotMessage(targetNumber, finalReply);
+                await client.sendText(targetNumber, finalReply);
                 console.log(`⚡ [PERF] Pipeline took ${Date.now() - pipelineStart}ms for ${senderNumber}`);
 
                 // Fire & Forget: Save history + metadata AFTER sending
