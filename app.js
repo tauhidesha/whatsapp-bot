@@ -3245,7 +3245,7 @@ app.post('/follow-up-queue/execute', requireAuth, async (req, res) => {
             return res.status(503).json({ success: false, error: 'WhatsApp client is not ready' });
         }
 
-        const { sendTextDirect } = require('./src/ai/utils/whatsappSender.js');
+        const { sendTextDirect } = require('./src/ai/utils/whatsappHelper.js');
         const prisma = require('./src/lib/prisma.js');
 
 
