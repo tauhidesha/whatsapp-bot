@@ -1810,9 +1810,13 @@ async function processBufferedMessages(senderNumber, client) {
                 if (typeof aiResponse === 'string') {
                     responseText = aiResponse;
                 } else if (Array.isArray(aiResponse)) {
-                    responseText = aiResponse.map(c => c.text || JSON.stringify(c)).join(' ');
+                    // Extract ONLY text blocks, ignore thinking/tool blocks for WhatsApp message
+                    responseText = aiResponse
+                        .map(c => typeof c === 'string' ? c : (c.text || ''))
+                        .filter(Boolean)
+                        .join('\n');
                 } else {
-                    responseText = String(aiResponse);
+                    responseText = String(aiResponse || '');
                 }
                 
                 const finalReply = responseText.trim();
@@ -2226,13 +2230,16 @@ async function saveMessageToPrisma(senderNumber, message, senderType) {
             }
         });
 
-        // Ensure message is a string for Prisma content/lastMessage fields
+        // Ensure message is a string (filter out thinking/JSON blocks)
         let messageText = '';
         if (typeof message === 'string') {
             messageText = message;
         } else if (Array.isArray(message)) {
-            // Join text blocks and skip/stringify other blocks
-            messageText = message.map(c => c.text || (typeof c === 'string' ? c : JSON.stringify(c))).join('\n');
+            // Only keep text content for DB/UI consistency
+            messageText = message
+                .map(c => typeof c === 'string' ? c : (c.text || ''))
+                .filter(Boolean)
+                .join('\n');
         } else {
             messageText = String(message || '');
         }
