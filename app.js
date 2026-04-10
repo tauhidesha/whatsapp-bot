@@ -2226,19 +2226,30 @@ async function saveMessageToPrisma(senderNumber, message, senderType) {
             }
         });
 
+        // Ensure message is a string for Prisma content/lastMessage fields
+        let messageText = '';
+        if (typeof message === 'string') {
+            messageText = message;
+        } else if (Array.isArray(message)) {
+            // Join text blocks and skip/stringify other blocks
+            messageText = message.map(c => c.text || (typeof c === 'string' ? c : JSON.stringify(c))).join('\n');
+        } else {
+            messageText = String(message || '');
+        }
+
         if (customer) {
             await prisma.directMessage.create({
                 data: {
                     customerId: customer.id,
                     senderId: senderNumber,
                     role: roleMap[senderType] || 'user',
-                    content: message,
+                    content: messageText,
                 }
             });
 
             // Update customer data
             const updateData = {
-                lastMessage: message,
+                lastMessage: messageText,
                 lastMessageAt: new Date(),
                 aiPaused: snoozeInfo.active || false,
                 aiPausedUntil: snoozeInfo.expiresAt ? new Date(snoozeInfo.expiresAt) : null,
