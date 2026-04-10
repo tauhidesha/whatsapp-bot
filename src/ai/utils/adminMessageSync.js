@@ -10,14 +10,24 @@ function markBotMessage(recipientNumber, text) {
     const key = `${recipientNumber}::${text.substring(0, 50)}`;
     BOT_SENT_CACHE.set(key, Date.now());
 
+    // Also mark with text-only key (fallback for LID mismatch)
+    const textKey = `msg::${text.substring(0, 80)}`;
+    BOT_SENT_CACHE.set(textKey, Date.now());
+
     setTimeout(() => {
         BOT_SENT_CACHE.delete(key);
+        BOT_SENT_CACHE.delete(textKey);
     }, BOT_SENT_TTL);
 }
 
 function isBotMessage(recipientNumber, text) {
+    // Check exact match first (same identifier)
     const key = `${recipientNumber}::${text.substring(0, 50)}`;
-    return BOT_SENT_CACHE.has(key);
+    if (BOT_SENT_CACHE.has(key)) return true;
+
+    // Fallback: check by text-only key (handles @c.us vs @lid mismatch)
+    const textKey = `msg::${text.substring(0, 80)}`;
+    return BOT_SENT_CACHE.has(textKey);
 }
 
 /**
