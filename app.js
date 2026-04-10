@@ -2203,16 +2203,16 @@ async function saveMessageToPrisma(senderNumber, message, senderType) {
             'admin': 'admin',
         };
 
-        // Try by phone first, then fallback to whatsappLid for @lid senders
-        let customer = await prisma.customer.findUnique({
-            where: { phone: docId }
+        // Lookup: whatsappLid first, then phone
+        const customer = await prisma.customer.findFirst({
+            where: {
+                OR: [
+                    { whatsappLid: senderNumber },  // LID lookup first
+                    { phone: docId },
+                    { phone: senderNumber },
+                ]
+            }
         });
-
-        if (!customer && isLid) {
-            customer = await prisma.customer.findFirst({
-                where: { whatsappLid: senderNumber }
-            });
-        }
 
         if (customer) {
             await prisma.directMessage.create({
@@ -2262,6 +2262,25 @@ async function saveSenderMeta(senderNumber, displayName, client = null) {
 
     const { docId, channel, isLid, originalId } = parseSenderIdentity(senderNumber);
     if (!docId) return;
+
+    // NEW: Jika @lid, cek apakah sudah ter-mapping ke customer existing
+    if (isLid) {
+        const existingByLid = await prisma.customer.findFirst({
+            where: { whatsappLid: senderNumber }
+        });
+        if (existingByLid) {
+            // Sudah ada mapping, update metadata saja tanpa buat customer baru
+            await prisma.customer.update({
+                where: { id: existingByLid.id },
+                data: {
+                    name: displayName || existingByLid.name,
+                    lastMessageAt: new Date(),
+                }
+            });
+            console.log(`[saveSenderMeta] LID ${senderNumber} matched existing customer ${existingByLid.phone}`);
+            return;
+        }
+    }
 
     let profilePicUrl = null;
     if (client && channel === 'whatsapp' && !isLid && !fetchedProfilePics.has(senderNumber)) {
@@ -2645,6 +2664,30 @@ app.post('/generate-invoice', requireAuth, async (req, res) => {
 
         if (result.success) {
             console.log(`[API] Invoice (${documentType}) sent to customer: ${recipientNumber}`);
+
+            // NEW: Fix 1 - Link LID to customer existing if applicable
+            if (recipientNumber.endsWith('@lid')) {
+                try {
+                    const cleanPhone = (customerPhone || '').replace(/\D/g, '');
+                    const updated = await prisma.customer.updateMany({
+                        where: {
+                            OR: [
+                                { phone: cleanPhone },
+                                { phone: `${cleanPhone}@c.us` },
+                                { phone: customerPhone }
+                            ],
+                            whatsappLid: null // Hanya update jika belum ada LID
+                        },
+                        data: { whatsappLid: recipientNumber }
+                    });
+                    if (updated.count > 0) {
+                        console.log(`[API] Linked LID ${recipientNumber} → ${customerPhone}`);
+                    }
+                } catch (e) {
+                    console.warn('[API] Failed to link LID:', e.message);
+                }
+            }
+
             return res.status(200).json({ success: true, message: result.message });
         } else {
             console.error(`[API] Document generation failed (${documentType}):`, result.message);
@@ -2696,6 +2739,30 @@ app.post('/send-message', requireAuth, async (req, res) => {
             try {
                 await global.whatsappClient.sendText(targetNumber, finalMessage);
                 console.log(`[API] Successfully sent WhatsApp message to ${targetNumber}`);
+
+                // NEW: Fix 1 - Link LID to customer if send was successful
+                if (targetNumber.endsWith('@lid')) {
+                    try {
+                        const prisma = require('./src/lib/prisma');
+                        const cleanPhone = (number || '').replace(/\D/g, '');
+                        const updated = await prisma.customer.updateMany({
+                            where: {
+                                OR: [
+                                    { phone: cleanPhone },
+                                    { phone: `${cleanPhone}@c.us` },
+                                    { phone: number }
+                                ],
+                                whatsappLid: null
+                            },
+                            data: { whatsappLid: targetNumber }
+                        });
+                        if (updated.count > 0) {
+                            console.log(`[API] Linked LID ${targetNumber} → ${number}`);
+                        }
+                    } catch (e) {
+                        console.warn('[API] Failed to link LID:', e.message);
+                    }
+                }
             } catch (sendError) {
                 // If error with resolved number, try with DB fallback
                 if (sendError.message && sendError.message.includes('No LID')) {
@@ -2739,6 +2806,24 @@ app.post('/send-message', requireAuth, async (req, res) => {
                             await global.whatsappClient.sendText(fallbackTarget, finalMessage);
                             targetNumber = fallbackTarget;
                             console.log(`[API] Success with fallback target`);
+
+                            // NEW: Fix 1 - Link LID to customer if fallback success
+                            if (targetNumber.endsWith('@lid')) {
+                                try {
+                                    const cleanPhone = (number || '').replace(/\D/g, '');
+                                    await prisma.customer.updateMany({
+                                        where: {
+                                            OR: [
+                                                { phone: cleanPhone },
+                                                { phone: `${cleanPhone}@c.us` },
+                                                { phone: number }
+                                            ],
+                                            whatsappLid: null
+                                        },
+                                        data: { whatsappLid: targetNumber }
+                                    });
+                                } catch (e) { /* ignore fallback link error */ }
+                            }
                         } catch (e2) {
                             throw sendError; // Throw original if fallback also fails
                         }

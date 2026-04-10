@@ -41,10 +41,22 @@ async function saveMessageToPrismaLocal(recipientNumber, messageText, senderType
         });
 
         if (!customer) {
-            customer = await prisma.customer.create({
-                data: { phone, name: 'New Customer' }
-            });
-            console.log(`[AdminSync] Created new customer for ${phone}`);
+            // NEW: Fix 4 - Jika @lid, cek apakah sudah ter-mapping ke customer existing
+            if (phone.endsWith('@lid')) {
+                customer = await prisma.customer.findFirst({
+                    where: { whatsappLid: phone }
+                });
+                if (customer) {
+                    console.log(`[AdminSync] LID ${phone} matched existing customer ${customer.phone}`);
+                }
+            }
+
+            if (!customer) {
+                customer = await prisma.customer.create({
+                    data: { phone, name: 'New Customer' }
+                });
+                console.log(`[AdminSync] Created new customer for ${phone}`);
+            }
         }
 
         await prisma.directMessage.create({
