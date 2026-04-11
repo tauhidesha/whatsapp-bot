@@ -1,13 +1,12 @@
-const { StateGraph, START, END } = require('@langchain/langgraph');
+const { StateGraph, START, END, MemorySaver } = require('@langchain/langgraph');
 const { ZoyaState } = require('./state');
 const { initNode } = require('./nodes/init');
 const { infoCollectorNode } = require('./nodes/infoCollector');
 const { toolExecutorNode } = require('./nodes/executor');
 const { formatterNode } = require('./nodes/formatter');
-const { PrismaCheckpointer } = require('./PrismaCheckpointer');
 const prisma = require('../../lib/prisma'); // Shared singleton
 
-const checkpointer = new PrismaCheckpointer(prisma);
+const checkpointer = new MemorySaver();
 
 const { adminNode, adminExecutorNode } = require('./nodes/admin');
 

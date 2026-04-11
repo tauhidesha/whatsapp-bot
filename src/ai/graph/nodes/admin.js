@@ -21,31 +21,37 @@ const studioMetadata = require('../../constants/studioMetadata');
 function sanitizeMessagesForGemini(messages) {
     let sanitized = [...messages];
 
+    // Helper to get message type reliably (handles plain JSON or LangChain objects)
+    const getMessageType = (msg) => {
+        if (typeof msg._getType === 'function') return msg._getType();
+        if (msg.type) return msg.type;
+        if (msg.tool_calls && msg.tool_calls.length > 0) return 'ai';
+        if (msg.tool_call_id) return 'tool';
+        return 'human';
+    };
+
     // --- Step 1: Trim from front until first HumanMessage ---
-    // Handles case where slice(-N) cuts off the paired AIMessage, leaving
-    // an orphaned ToolMessage or an AIMessage(tool_calls) at the start.
     while (sanitized.length > 0) {
         const first = sanitized[0];
-        const type = first._getType?.();
-        // Only HumanMessage or AIMessage(without tool_calls) are safe starts
+        const type = getMessageType(first);
         if (type === 'human') break;
         if (type === 'ai' && (!first.tool_calls || first.tool_calls.length === 0)) break;
         sanitized.shift();
     }
 
     // --- Step 2: Forward-pass — validate tool_call ↔ ToolMessage pairing ---
-    // If an AIMessage has tool_calls but the NEXT message is not a ToolMessage
-    // for all of them, strip the AIMessage (and any following ToolMessages) out.
     let i = 0;
     while (i < sanitized.length) {
         const msg = sanitized[i];
-        if (msg._getType?.() === 'ai' && msg.tool_calls?.length > 0) {
+        const type = getMessageType(msg);
+        
+        if (type === 'ai' && msg.tool_calls?.length > 0) {
             const expectedIds = new Set(msg.tool_calls.map(tc => tc.id));
             const foundIds = new Set();
 
             // Collect consecutive ToolMessages immediately after this AIMessage
             let j = i + 1;
-            while (j < sanitized.length && sanitized[j]._getType?.() === 'tool') {
+            while (j < sanitized.length && getMessageType(sanitized[j]) === 'tool') {
                 foundIds.add(sanitized[j].tool_call_id);
                 j++;
             }
@@ -53,11 +59,9 @@ function sanitizeMessagesForGemini(messages) {
             // If all tool_call_ids are matched → valid, skip over them
             const allMatched = [...expectedIds].every(id => foundIds.has(id));
             if (allMatched) {
-                i = j; // jump past all collected ToolMessages
+                i = j;
             } else {
-                // Broken pair: remove the AIMessage + any partial ToolMessages after it
                 sanitized.splice(i, j - i);
-                // Don't increment i; re-check from same position
             }
         } else {
             i++;
@@ -67,7 +71,8 @@ function sanitizeMessagesForGemini(messages) {
     // --- Step 3: Trailing guard — remove trailing AIMessage(tool_calls) with no ToolMessages ---
     while (sanitized.length > 0) {
         const last = sanitized[sanitized.length - 1];
-        if (last._getType?.() === 'ai' && last.tool_calls?.length > 0) {
+        const type = getMessageType(last);
+        if (type === 'ai' && last.tool_calls?.length > 0) {
             sanitized.pop();
         } else {
             break;
