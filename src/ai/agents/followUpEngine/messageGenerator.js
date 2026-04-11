@@ -75,14 +75,62 @@ const ANGLE_INSTRUCTIONS = {
     `
 };
 
-function getDaysSince(timestamp) {
-    if (!timestamp) return null;
-    const now = new Date();
-    const last = new Date(timestamp);
-    const diff = now - last;
-    return Math.floor(diff / (1000 * 60 * 60 * 24));
-}
+/**
+ * Clean AI response from common reasoning, preambles, or thought blocks.
+ * @param {string} text 
+ * @returns {string}
+ */
+function cleanAiResponse(text) {
+    if (!text) return '';
+    
+    // 1. Remove <thought>...</thought> blocks (Gemini 2.0 Thinking/CoT)
+    let cleaned = text.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
 
+    // 2. Remove common AI preambles (e.g., "Certainly!", "Here is a draft:")
+    const preambles = [
+        /^Certainly!.*$/gim,
+        /^Here is a.*$/gim,
+        /^Based on the customer data.*$/gim,
+        /^Try this message:.*$/gim,
+        /^Pesan follow-up:.*$/gim,
+        /^Draft pesan:.*$/gim
+    ];
+
+    preambles.forEach(p => {
+        cleaned = cleaned.replace(p, '');
+    });
+
+    // 3. Extract final message if AI still provides instructions/options
+    const paragraphs = cleaned.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+    if (paragraphs.length > 1) {
+        const lastParagraph = paragraphs[paragraphs.length - 1].trim();
+        // If last paragraph is short and doesn't look like instructions, it's likely the message
+        if (!lastParagraph.includes(':') && !lastParagraph.startsWith('*')) {
+            cleaned = lastParagraph;
+        }
+    }
+
+    // 4. Deduplication Logic (Special case for Gemini repeat)
+    const len = cleaned.length;
+    if (len > 20) {
+        const half = Math.floor(len / 2);
+        const p1 = cleaned.substring(0, half).trim();
+        const p2 = cleaned.substring(len - p1.length).trim();
+        
+        // Exact half repeat
+        if (p1 === p2) {
+            cleaned = p1;
+        } else {
+            // Check for "Message" "Message" or Message + " + Message
+            const parts = cleaned.split('"').filter(p => p.trim().length > 10);
+            if (parts.length > 1 && parts[0].trim() === parts[1].trim()) {
+                cleaned = parts[0].trim();
+            }
+        }
+    }
+
+    return cleaned.trim();
+}
 async function generateFollowUpMessage(customerData, strategy, promoData = null) {
     try {
         const { name, context, metadata } = customerData;
@@ -125,15 +173,19 @@ ${promoSection}
 # INSTRUKSI ANGLE
 ${ANGLE_INSTRUCTIONS[strategy.angle] || ANGLE_INSTRUCTIONS.standard}
 
-# TUGAS
-Buat 1 pesan chat personal sesuai karakter Zoya dan instruksi angle di atas. 
-Pesan harus sangat natural seolah diketik manual oleh manusia. 
-Maksimal 2-3 kalimat pendek.
+# TUGAS & OUTPUT (PENTING!)
+1. Buat 1 pesan chat personal sesuai karakter Zoya.
+2. Pesan harus sangat natural seolah diketik manual oleh manusia. 
+3. Maksimal 2-3 kalimat pendek.
+4. RESPOND HANYA DENGAN TEKS PESAN FINAL. JANGAN ADA PENJELASAN, PEMIKIRAN, ATAU TEKS LAINNYA.
 `;
 
         const result = await model.generateContent(prompt);
         const response = await result.response;
-        return response.text().trim();
+        const rawText = response.text();
+        
+        // Clean the response before returning
+        return cleanAiResponse(rawText);
 
     } catch (error) {
         console.error('[MessageGenerator] Error:', error);

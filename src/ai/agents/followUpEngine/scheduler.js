@@ -9,19 +9,79 @@ const { getActivePromo } = require('../../utils/promoConfig');
 const { withRetry } = require('../../utils/retry');
 const { sendTextDirect } = require('../../utils/whatsappHelper');
 
+/**
+ * Clean AI response from common reasoning, preambles, or thought blocks.
+ * @param {string} text 
+ * @returns {string}
+ */
+function cleanAiResponse(text) {
+    if (!text) return '';
+    if (typeof text !== 'string') return String(text);
+    
+    // 1. Remove <thought>...</thought> blocks (Gemini 2.0 Thinking/CoT)
+    let cleaned = text.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
+
+    // 2. Remove common AI preambles
+    const preambles = [
+        /^Certainly!.*$/gim,
+        /^Here is a.*$/gim,
+        /^Based on the customer data.*$/gim,
+        /^Try this message:.*$/gim,
+        /^Pesan follow-up:.*$/gim,
+        /^Draft pesan:.*$/gim
+    ];
+
+    preambles.forEach(p => {
+        cleaned = cleaned.replace(p, '');
+    });
+
+    // 3. Extract final message if AI still provides instructions/options
+    const paragraphs = cleaned.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+    if (paragraphs.length > 1) {
+        const lastParagraph = paragraphs[paragraphs.length - 1].trim();
+        if (!lastParagraph.includes(':') && !lastParagraph.startsWith('*')) {
+            cleaned = lastParagraph;
+        }
+    }
+
+    // 4. Deduplication Logic (Special case for Gemini repeat)
+    const len = cleaned.length;
+    if (len > 20) {
+        const half = Math.floor(len / 2);
+        const p1 = cleaned.substring(0, half).trim();
+        const p2 = cleaned.substring(len - p1.length).trim();
+        
+        // Exact half repeat
+        if (p1 === p2) {
+            cleaned = p1;
+        } else {
+            // Check for "Message" "Message" or Message + " + Message
+            const parts = cleaned.split('"').filter(p => p.trim().length > 10);
+            if (parts.length > 1 && parts[0].trim() === parts[1].trim()) {
+                cleaned = parts[0].trim();
+            }
+        }
+    }
+
+    return cleaned.trim();
+}
+
 // ─── Helper: Save message to Prisma ────────────────────────────────────────
 
 async function saveMessageToPrisma(senderNumber, message, senderType) {
     if (!senderNumber || !message) return;
 
-    // Fix: Use findFirst with OR to support both @c.us (digits) and @lid
-    const cleanPhone = (senderNumber || '').replace(/@c\.us$|@lid$/, '');
+    // Use unified identity parser to handle @lid and @c.us correctly
+    const { parseSenderIdentity } = require('../../../lib/utils');
+    const { docId, isLid } = parseSenderIdentity(senderNumber);
+    if (!docId) return;
+
     const customer = await prisma.customer.findFirst({
         where: {
             OR: [
-                { phone: cleanPhone },
-                { phone: senderNumber },
                 { whatsappLid: senderNumber },
+                { phone: docId },
+                { phone: senderNumber },
             ]
         }
     });
@@ -31,19 +91,21 @@ async function saveMessageToPrisma(senderNumber, message, senderType) {
         return;
     }
 
+    const messageText = cleanAiResponse(message);
+
     await prisma.directMessage.create({
         data: {
             customerId: customer.id,
             senderId: senderNumber,
             role: senderType === 'user' ? 'user' : (senderType === 'ai' ? 'assistant' : 'admin'),
-            content: message,
+            content: messageText,
         }
     });
 
     await prisma.customer.update({
         where: { id: customer.id },
         data: {
-            lastMessage: message,
+            lastMessage: messageText,
             lastMessageAt: new Date(),
         }
     });
@@ -555,14 +617,33 @@ function startFollowUpScheduler() {
                 console.log(`[Scheduler] Starting daily follow up at ${now.toISO()} (Hour: ${hour}, Timezone: ${TIMEZONE})`);
                 schedulerBusy = true;
 
-                // ── Check for admin-saved queue first ────────────────────────
+                // 1. Independent Reminders: Always run Booking & Coating reminders at 9 AM
+                try {
+                    console.log('[Scheduler] Running mandatory Booking and Coating reminders...');
+                    const { processCoatingReminders } = require('../../utils/coatingReminders.js');
+                    const { sendBookingReminders } = require('../../utils/bookingReminders.js');
+                    
+                    await Promise.all([
+                        processCoatingReminders(global.whatsappClient).catch(e => console.error('[Scheduler] Coating reminders error:', e)),
+                        sendBookingReminders(true).catch(e => console.error('[Scheduler] Booking reminders error:', e))
+                    ]);
+                } catch (remErr) {
+                    console.error('[Scheduler] Reminders execution block failed:', remErr);
+                }
+
+                // 2. Follow-Up Logic: Manual (Saved) vs Automatic (Fresh)
                 const savedRecord = await prisma.keyValueStore.findUnique({
                     where: { collection_key: { collection: 'follow_up_queue', key: 'saved' } }
                 }).catch(() => null);
 
-                if (savedRecord && savedRecord.value && Array.isArray(savedRecord.value.queue) && savedRecord.value.queue.length > 0) {
+                // Check if saved queue exists AND has at least one approved item
+                const hasApprovedItems = savedRecord?.value?.queue 
+                    ? savedRecord.value.queue.some(item => item.approved === true)
+                    : false;
+
+                if (hasApprovedItems) {
                     const { queue: savedQueue, delayMs: savedDelayMs = 300000 } = savedRecord.value;
-                    console.log(`[Scheduler] Found saved queue from admin (${savedQueue.length} items, delay=${savedDelayMs}ms). Using it.`);
+                    console.log(`[Scheduler] Found saved queue from admin with approved items (${savedQueue.length} total). Using it.`);
 
                     const { sendTextDirect } = require('../../utils/whatsappHelper');
                     const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -571,15 +652,26 @@ function startFollowUpScheduler() {
                     for (const item of savedQueue) {
                         const { senderNumber, type, message, docId } = item;
                         if (!item.approved) continue;
+                        
+                        // Sanitize message from potential reasoning/thinking blocks
+                        const cleanMsg = cleanAiResponse(message);
+                        if (!cleanMsg) {
+                            console.warn(`[Scheduler][Saved] Skip empty message for ${senderNumber}`);
+                            continue;
+                        }
+
                         try {
                             if (type !== 'coating_reminder' && type !== 'booking_reminder') {
-                                markBotMessage(senderNumber, message);
+                                markBotMessage(senderNumber, cleanMsg);
                             }
-                            await withRetry(() => sendTextDirect(global.whatsappClient, senderNumber, message), { maxRetries: 2, baseDelayMs: 2000 });
+                            await withRetry(() => sendTextDirect(global.whatsappClient, senderNumber, cleanMsg), { maxRetries: 2, baseDelayMs: 2000 });
                             sent++;
                             console.log(`[Scheduler][Saved] ✅ Sent ${type} to ${senderNumber}`);
 
-                            // Update DB based on type (same as execute endpoint)
+                            // Log to DB (Missing in previous version!)
+                            await saveMessageToPrisma(senderNumber, cleanMsg, 'ai').catch(err => console.error('[Scheduler][Saved] DB Log failed:', err));
+
+                            // Update DB based on type
                             if (type === 'coating_reminder') {
                                 const record = await prisma.coatingMaintenance.findUnique({ where: { id: docId } }).catch(() => null);
                                 const nextStatus = record?.status === 'pending' ? 'reminded_h7' : record?.status === 'reminded_h7' ? 'reminded_h3' : 'reminded_h1';
@@ -603,7 +695,8 @@ function startFollowUpScheduler() {
                     await prisma.keyValueStore.deleteMany({ where: { collection: 'follow_up_queue', key: 'saved' } }).catch(() => {});
                     console.log(`[Scheduler][Saved] Done — sent: ${sent}, errors: ${errors}`);
                 } else {
-                    // No saved queue — generate and send fresh
+                    // No approved items or no record — execute fresh daily run
+                    console.log('[Scheduler] No approved queue found. Running fresh daily follow-up scan.');
                     await runDailyFollowUp();
                 }
             } catch (err) {

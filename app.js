@@ -2240,6 +2240,9 @@ async function saveMessageToPrisma(senderNumber, message, senderType) {
                 .map(c => typeof c === 'string' ? c : (c.text || ''))
                 .filter(Boolean)
                 .join('\n');
+        } else if (typeof message === 'object' && message !== null) {
+            // New: Handle object-based messages (e.g. from structured AI output)
+            messageText = message.text || message.message || JSON.stringify(message);
         } else {
             messageText = String(message || '');
         }
@@ -2284,6 +2287,9 @@ async function saveMessageToPrisma(senderNumber, message, senderType) {
 async function saveMessageToFirestore(senderNumber, message, senderType) {
     return saveMessageToPrisma(senderNumber, message, senderType);
 }
+
+// Export functions for other modules (like scheduler.js)
+// Moved to the end of the file for unification (Line 4002+)
 
 const fetchedProfilePics = new Set(); // Keep track of numbers we already fetched DP for
 
@@ -3990,4 +3996,8 @@ process.on('SIGTERM', () => {
     process.exit(0);
 });
 
-module.exports = { getAIResponse };
+module.exports = { 
+    getAIResponse, 
+    saveMessageToPrisma, 
+    saveMessageToFirestore 
+};
