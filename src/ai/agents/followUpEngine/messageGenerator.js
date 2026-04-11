@@ -3,6 +3,19 @@
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
+/**
+ * Calculate days passed since a given date.
+ * @param {Date|string} date 
+ * @returns {number|null}
+ */
+function getDaysSince(date) {
+    if (!date) return null;
+    const now = new Date();
+    const past = new Date(date);
+    const diffTime = Math.abs(now - past);
+    return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+}
+
 // Strategy definitions (Angle instructions)
 const ANGLE_INSTRUCTIONS = {
     standard: `Tanyakan perkembangan motornya, apakah sudah sempat mampir atau ada yang bingung soal harga/warna. 
