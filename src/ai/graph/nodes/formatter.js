@@ -191,9 +191,11 @@ ${modeInstructions[replyMode] || modeInstructions.inform}
                 if (typeof m._getType === 'function') return m._getType() === 'human' || m._getType() === 'ai';
                 return false;
             })
+            .map(m => {
                 const text = extractTextFromContent(m.content);
                 if (!text.trim()) return null;
                 return `[${m._getType() === 'human' ? 'USER' : 'AI'}]: ${text.trim()}`;
+            })
             .filter(Boolean)
             .join('\n\n');
 
