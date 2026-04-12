@@ -204,10 +204,13 @@ ${modeInstructions[replyMode] || modeInstructions.inform}
 
         const finalPrompt = `TRANSKIP PERCAKAPAN TERAKHIR:\n\n${transcript}\n\n(Tuliskan balasan AI selanjutnya sesuai arahan sistem)`;
 
+        console.log(`[FORMATTER_NODE] Invoking model...`);
         const response = await withRetry(() => structuredModel.invoke([
             new SystemMessage(systemPrompt),
             new HumanMessage(finalPrompt)
         ]), { maxRetries: 3, baseDelayMs: 1500 });
+
+        console.log(`[FORMATTER_NODE] Response received: ${response ? 'OK' : 'NULL'}`);
 
         console.log(`[FORMATTER_NODE] Raw response:`, JSON.stringify(response)?.substring(0, 200));
 
