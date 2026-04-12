@@ -57,7 +57,7 @@ function sanitizeMessagesForGemini(messages) {
 
     // --- Step 0: Strip 'thinking' blocks (Gemini 2.5 leak) ---
     let sanitized = messages.map(msg => {
-        const isAI = (typeof msg._getType === 'function' ? msg._getType() === 'ai' : msg.type === 'ai');
+        const isAI = getMessageType(msg) === 'ai';
         if (isAI && Array.isArray(msg.content)) {
             const filtered = msg.content.filter(c => c.type !== 'thinking');
             if (filtered.length !== msg.content.length) {
