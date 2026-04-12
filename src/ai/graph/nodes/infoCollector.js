@@ -5,7 +5,7 @@ const { withRetry } = require('../../utils/retry');
 const { sanitizeMessagesForGemini, extractTextFromContent } = require('../utils/sanitizeMessages');
 
 const model = new ChatGoogleGenerativeAI({
-    model: 'gemini-flash-lite-latest',
+    model: 'gemini-2.5-flash-lite',
     maxOutputTokens: 2048,
     temperature: 0,
     responseMimeType: "application/json",
@@ -125,9 +125,9 @@ Output: {
 
     try {
         const visionContent = [
-            { 
-                type: 'text', 
-                text: `BERIKUT ADALAH KONTEKS PERCAKAPAN:\n\n${chatTranscript}\n\nPESAN TERAKHIR USER (Mungkin disertai gambar/foto):\n` 
+            {
+                type: 'text',
+                text: `BERIKUT ADALAH KONTEKS PERCAKAPAN:\n\n${chatTranscript}\n\nPESAN TERAKHIR USER (Mungkin disertai gambar/foto):\n`
             }
         ];
 
@@ -141,9 +141,9 @@ Output: {
         }
 
         // Log vision content types for debugging
-        const visionDebug = visionContent.map(c => ({ 
-            type: c.type, 
-            data_sample: (c.text || '').substring(0, 50) || (c.image_url ? c.image_url.substring(0, 50) + '...' : 'no_data') 
+        const visionDebug = visionContent.map(c => ({
+            type: c.type,
+            data_sample: (c.text || '').substring(0, 50) || (c.image_url ? c.image_url.substring(0, 50) + '...' : 'no_data')
         }));
         console.log(`[INFO_COLLECTOR_NODE] Vision Payload:`, JSON.stringify(visionDebug));
 
@@ -151,7 +151,7 @@ Output: {
             new SystemMessage(systemPrompt),
             new HumanMessage({ content: visionContent })
         ]), { maxRetries: 3, baseDelayMs: 1500 });
-        
+
 
         const rawResponse = extractTextFromContent(response.content);
         const cleanedContent = cleanJson(rawResponse);
@@ -167,7 +167,7 @@ Output: {
 
         if (prevIntent === 'BOOKING_SERVICE' && (isShortReply || containsBookingKeywords)) {
             const studioKeywords = /lokasi|alamat|dimana|buka|tutup|istirahat|jam berapa|kontak|wa|map|maps|koordinat/i.test(lastMessageText);
-            
+
             if (['OTHER', 'GREETING', 'GENERAL_INQUIRY'].includes(classifiedIntent)) {
                 if (classifiedIntent === 'GENERAL_INQUIRY' && studioKeywords) {
                     console.log(`[INFO_COLLECTOR_NODE] Keeping GENERAL_INQUIRY for studio info request.`);
@@ -206,13 +206,13 @@ Output: {
         const extractedServices = Array.isArray(extracted.service_types)
             ? extracted.service_types
             : (extracted.service_type ? [extracted.service_type] : []);
-        
+
         const GENERIC_PARENTS = ['repaint', 'detailing', 'coating', 'poles', 'cuci'];
-        
+
         for (const svc of extractedServices) {
             if (!svc) continue;
             const svcLower = svc.toLowerCase();
-            
+
             if (GENERIC_PARENTS.includes(svcLower)) {
                 const hasSpecific = ctx.serviceTypes.some(s => s.toLowerCase().includes(svcLower) && s.toLowerCase() !== svcLower);
                 if (hasSpecific) {
@@ -220,7 +220,7 @@ Output: {
                     continue;
                 }
             }
-            
+
             for (const parent of GENERIC_PARENTS) {
                 if (svcLower.includes(parent) && svcLower !== parent) {
                     const genericIdx = ctx.serviceTypes.findIndex(s => s.toLowerCase() === parent);
@@ -230,7 +230,7 @@ Output: {
                     }
                 }
             }
-            
+
             if (!ctx.serviceTypes.some(s => s.toLowerCase() === svcLower)) {
                 ctx.serviceTypes.push(svc);
             }
@@ -348,15 +348,15 @@ Output: {
     // Determine readiness for tool execution
     const hasGenericService = ctx.serviceTypes.some(s => ['repaint', 'detailing', 'coating'].includes(s.toLowerCase()));
     const isHumanHandoff = classifiedIntent === 'HUMAN_HANDOVER' || ctx.vehicleType === 'Mobil';
-    
+
     // Ready if:
     // 1. Human handoff
     // 2. Booking flow has enough data
     // 3. General inquiry (Location/Studio info)
-    const isReady = isHumanHandoff || 
-                   (classifiedIntent === 'GENERAL_INQUIRY' || studioKeywords) ||
-                   (classifiedIntent === 'BOOKING_SERVICE' && !!ctx.vehicleType && ctx.serviceTypes.length > 0 && !hasGenericService);
-                   
+    const isReady = isHumanHandoff ||
+        (classifiedIntent === 'GENERAL_INQUIRY' || studioKeywords) ||
+        (classifiedIntent === 'BOOKING_SERVICE' && !!ctx.vehicleType && ctx.serviceTypes.length > 0 && !hasGenericService);
+
     ctx.isReadyForTools = Boolean(isReady);
 
     // Determine reply mode
@@ -369,8 +369,8 @@ Output: {
     console.log(`[INFO_COLLECTOR_NODE] Ready: ${ctx.isReadyForTools} | Missing: ${missingQuestion || 'NONE'} | ${elapsed}ms`);
 
     // --- UPDATE METADATA ---
-    const newMetadata = { 
-        ...metadata, 
+    const newMetadata = {
+        ...metadata,
         prevIntent: classifiedIntent,
         replyMode,
         visualSummary: extracted.visual_summary || metadata.visualSummary || null
