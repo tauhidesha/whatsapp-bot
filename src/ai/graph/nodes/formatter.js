@@ -3,7 +3,7 @@ const { SystemMessage, HumanMessage, AIMessage } = require('@langchain/core/mess
 const { z } = require('zod');
 const studioMetadata = require('../../constants/studioMetadata');
 const { withRetry } = require('../../utils/retry');
-const { sanitizeMessagesForGemini, extractTextFromContent } = require('../utils/sanitizeMessages');
+const { sanitizeMessagesForGemini, extractTextFromContent, getMessageType } = require('../utils/sanitizeMessages');
 
 const model = new ChatGoogleGenerativeAI({
     model: process.env.AI_MODEL || 'gemini-flash-lite-latest',
@@ -188,13 +188,14 @@ ${modeInstructions[replyMode] || modeInstructions.inform}
         // 3. Build a text transcript from message history to avoid Gemini strict conversational history issues
         const transcript = sanitizedMessages
             .filter(m => {
-                if (typeof m._getType === 'function') return m._getType() === 'human' || m._getType() === 'ai';
-                return false;
+                const type = getMessageType(m);
+                return type === 'human' || type === 'ai';
             })
             .map(m => {
+                const type = getMessageType(m);
                 const text = extractTextFromContent(m.content);
                 if (!text.trim()) return null;
-                return `[${m._getType() === 'human' ? 'USER' : 'AI'}]: ${text.trim()}`;
+                return `[${type === 'human' ? 'USER' : 'AI'}]: ${text.trim()}`;
             })
             .filter(Boolean)
             .join('\n\n');

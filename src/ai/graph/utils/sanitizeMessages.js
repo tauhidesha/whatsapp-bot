@@ -1,6 +1,42 @@
 const { AIMessage } = require('@langchain/core/messages');
 
 /**
+ * Extracts the message type reliably, handling both LangChain class instances
+ * and plain objects restored from persistence.
+ *
+ * @param {Object} msg - The message object.
+ * @returns {string|null} - 'human', 'ai', 'tool', or null if unknown.
+ */
+function getMessageType(msg) {
+    if (!msg) return null;
+    
+    // 1. LangChain Class Method
+    if (typeof msg._getType === 'function') return msg._getType();
+    
+    // 2. Explicit type field (Standard fallback)
+    if (msg.type) {
+        if (msg.type === 'user') return 'human';
+        return msg.type;
+    }
+    
+    // 3. Structural detection
+    if (msg.tool_calls && msg.tool_calls.length > 0) return 'ai';
+    if (msg.tool_call_id) return 'tool';
+    
+    // 4. Persistence Fallback (LangChain ID array structure)
+    // [ "langchain_core", "messages", "HumanMessage" ]
+    if (msg.id && Array.isArray(msg.id) && msg.id.length >= 3) {
+        const className = msg.id[2];
+        if (className === 'HumanMessage') return 'human';
+        if (className === 'AIMessage') return 'ai';
+        if (className === 'ToolMessage') return 'tool';
+        if (className === 'SystemMessage') return 'system';
+    }
+    
+    return null;
+}
+
+/**
  * Sanitize message history for Gemini API compliance.
  *
  * Gemini enforces strict turn ordering:
@@ -35,15 +71,6 @@ function sanitizeMessagesForGemini(messages) {
         }
         return msg;
     });
-
-    // Helper to get message type reliably (handles plain JSON or LangChain objects)
-    const getMessageType = (msg) => {
-        if (typeof msg._getType === 'function') return msg._getType();
-        if (msg.type) return msg.type;
-        if (msg.tool_calls && msg.tool_calls.length > 0) return 'ai';
-        if (msg.tool_call_id) return 'tool';
-        return 'human';
-    };
 
     // --- Step 1: Trim from front until first HumanMessage ---
     while (sanitized.length > 0) {
@@ -129,5 +156,6 @@ function extractTextFromContent(content, joiner = '\n') {
 
 module.exports = { 
     sanitizeMessagesForGemini,
-    extractTextFromContent 
+    extractTextFromContent,
+    getMessageType
 };
