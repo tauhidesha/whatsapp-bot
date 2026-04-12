@@ -170,19 +170,21 @@ ${modeInstructions[replyMode] || modeInstructions.inform}
 - **Mobil Constraint**: Jika user tanya soal *repaint* atau *detailing mobil*, katakan bahwa Zoya perlu tanya/konfirmasi ke bos/admin dulu (karena ${studioMetadata.shortName} biasanya fokus ke motor). JANGAN langsung tolak, tapi bilang akan ditanyakan dulu.
 - **Studio Photo**: Jika \`toolResult\` mengandung \`studioPhoto\`, sebutkan dengan santai bahwa kamu sudah mengirimkan foto depan studio agar mas/kak tidak bingung carinya. 
 - Sapaan (\`greeting\`) hanya diberikan jika ini awal diskusi atau perpindahan topik yang butuh "lem" percakapan. Kosongkan jika sedang diskusi intens.
-- Selalu akhiri dengan Call-to-Action (CTA) yang jelas.`;
+- Selalu akhiri dengan Call-to-Action (CTA) yang jelas.
+174: 
+175: # OUTPUT FORMAT
+176: Kamu WAJIB membalas DALAM FORMAT JSON MURNI (tanpa markdown blocks, tanpa teks pembuka/penutup).
+177: Struktur JSON yang diwajibkan:
+178: {
+179:   "greeting": "sapaan pendek (max 5 kata) jika di awal/pindah topik, kosongkan jika diskusi intens",
+180:   "main_content": "isi pesan utama, gunakan double-newline antar paragraf",
+181:   "internal_thought": "analisis singkat pemilihan pesan"
+182: }`;
 
     console.log(`[FORMATTER_NODE] missingQ detected: "${missingQ}"`);
 
     try {
-        // Define Structured Output Schema
-        const structuredModel = model.withStructuredOutput(
-            z.object({
-                greeting: z.string().optional().describe("Sapaan BALASAN singkat (max 5 kata). JANGAN echo/ulangi kata-kata user. Misal user bilang 'selamat pagi' → balas 'pagi juga kak!' (BUKAN 'selamat pagi'). Wajib di pesan pertama, KOSONGKAN jika lanjutan diskusi."),
-                main_content: z.string().describe("Isi pesan utama. DILARANG KERAS memulai dengan sapaan/greeting apapun (itu sudah di field 'greeting'). Langsung ke konten. WAJIB gunakan double-newline (2x enter) antar paragraf/topik agar tidak padat."),
-                internal_thought: z.string().describe("Analisis singkat pemilihan pesan")
-            })
-        );
+        // --- Step 2: Build transcript ---
 
         // 3. Build a text transcript from message history to avoid Gemini strict conversational history issues
         const transcript = sanitizedMessages
@@ -204,21 +206,42 @@ ${modeInstructions[replyMode] || modeInstructions.inform}
 
         const finalPrompt = `TRANSKIP PERCAKAPAN TERAKHIR:\n\n${transcript}\n\n(Tuliskan balasan AI selanjutnya sesuai arahan sistem)`;
 
-        console.log(`[FORMATTER_NODE] Invoking model...`);
-        const response = await withRetry(() => structuredModel.invoke([
+        console.log(`[FORMATTER_NODE] Invoking model (manual parse mode)...`);
+        
+        // Timeout wrapper for safety
+        const invokePromise = withRetry(() => model.invoke([
             new SystemMessage(systemPrompt),
             new HumanMessage(finalPrompt)
         ]), { maxRetries: 3, baseDelayMs: 1500 });
 
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Formatter timeout after 30s')), 30000)
+        );
+
+        const response = await Promise.race([invokePromise, timeoutPromise]);
+        
         console.log(`[FORMATTER_NODE] Response received: ${response ? 'OK' : 'NULL'}`);
 
-        console.log(`[FORMATTER_NODE] Raw response:`, JSON.stringify(response)?.substring(0, 200));
+        // Handle manual JSON parsing
+        const rawText = extractTextFromContent(response.content);
+        console.log(`[FORMATTER_NODE] Raw response (first 100 char):`, rawText.substring(0, 100).replace(/\n/g, ' '));
 
-        console.log(`[FORMATTER_NODE] [${replyMode}] Thought: ${response.internal_thought}`);
+        let parsed = { greeting: '', main_content: rawText, internal_thought: 'manual_fallback' };
+        try {
+            // Clean markdown if model still provides it despite instructions
+            const cleaned = rawText.replace(/```json\n?|```/g, '').trim();
+            parsed = JSON.parse(cleaned);
+        } catch (e) {
+            console.warn(`[FORMATTER_NODE] JSON parse failed, falling back to raw text. Error: ${e.message}`);
+            // Fallback: If not JSON, use the raw text as main_content
+            parsed.main_content = rawText;
+        }
 
-        let finalReply = (response.greeting && response.greeting.trim())
-            ? response.greeting.trim() + "\n\n" + response.main_content
-            : response.main_content;
+        console.log(`[FORMATTER_NODE] [${replyMode}] Thought: ${parsed.internal_thought || 'N/A'}`);
+
+        let finalReply = (parsed.greeting && parsed.greeting.trim())
+            ? parsed.greeting.trim() + "\n\n" + parsed.main_content
+            : parsed.main_content;
 
         console.log(`[FORMATTER_NODE] Reply formulated: "${finalReply.substring(0, 50).replace(/\n/g, ' ')}..."`);
 
