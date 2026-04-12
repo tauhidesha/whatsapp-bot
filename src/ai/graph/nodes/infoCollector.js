@@ -2,6 +2,7 @@ const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
 const { SystemMessage, HumanMessage } = require('@langchain/core/messages');
 const studioMetadata = require('../../constants/studioMetadata');
 const { withRetry } = require('../../utils/retry');
+const { sanitizeMessagesForGemini } = require('../utils/sanitizeMessages');
 
 const model = new ChatGoogleGenerativeAI({
     model: process.env.AI_MODEL || 'gemini-flash-lite-latest',
@@ -30,9 +31,10 @@ function extractTextMessage(content) {
 async function infoCollectorNode(state) {
     console.log('--- [INFO_COLLECTOR_NODE] Starting (merged classifier+extractor) ---');
     const startTime = Date.now();
-    const { messages, context, metadata } = state;
+    const { context, metadata } = state;
+    const sanitizedMessages = sanitizeMessagesForGemini(state.messages);
     const prevIntent = state.intent;
-    const lastMessage = messages[messages.length - 1];
+    const lastMessage = sanitizedMessages[sanitizedMessages.length - 1];
     const lastMessageText = extractTextMessage(lastMessage.content);
 
     // Helper to clean JSON string from potential markdown code blocks
@@ -63,7 +65,7 @@ async function infoCollectorNode(state) {
     }
 
     // Build chat transcript (max 10 messages)
-    const chatTranscript = messages.slice(-10).map(m => {
+    const chatTranscript = sanitizedMessages.slice(-10).map(m => {
         const role = (m.type === 'human' || m.role === 'user') ? '[USER]' : '[AI]';
         return `${role}: ${extractTextMessage(m.content)}`;
     }).join('\n');
@@ -141,7 +143,9 @@ Output: {
 
         // Masukkan content pesan terakhir (bisa berupa Array [text, image_url] atau string)
         if (Array.isArray(lastMessage.content)) {
-            visionContent.push(...lastMessage.content);
+            // Filter out 'thinking' blocks to prevent Gemini API errors
+            const filteredContent = lastMessage.content.filter(c => c.type !== 'thinking');
+            visionContent.push(...filteredContent);
         } else {
             visionContent.push({ type: 'text', text: lastMessage.content || '[Tanpa Teks]' });
         }
