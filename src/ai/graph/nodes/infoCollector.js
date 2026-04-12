@@ -5,9 +5,10 @@ const { withRetry } = require('../../utils/retry');
 const { sanitizeMessagesForGemini, extractTextFromContent } = require('../utils/sanitizeMessages');
 
 const model = new ChatGoogleGenerativeAI({
-    model: process.env.AI_MODEL || 'gemini-flash-lite-latest',
+    model: 'gemini-flash-lite-latest',
     maxOutputTokens: 2048,
     temperature: 0,
+    responseMimeType: "application/json",
 });
 
 // extractTextMessage removed - now using extractTextFromContent from shared utility
