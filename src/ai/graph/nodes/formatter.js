@@ -3,7 +3,7 @@ const { SystemMessage, HumanMessage, AIMessage } = require('@langchain/core/mess
 const { z } = require('zod');
 const studioMetadata = require('../../constants/studioMetadata');
 const { withRetry } = require('../../utils/retry');
-const { sanitizeMessagesForGemini } = require('../utils/sanitizeMessages');
+const { sanitizeMessagesForGemini, extractTextFromContent } = require('../utils/sanitizeMessages');
 
 const model = new ChatGoogleGenerativeAI({
     model: process.env.AI_MODEL || 'gemini-flash-lite-latest',
@@ -191,14 +191,9 @@ ${modeInstructions[replyMode] || modeInstructions.inform}
                 if (typeof m._getType === 'function') return m._getType() === 'human' || m._getType() === 'ai';
                 return false;
             })
-            .map(m => {
-                let text = '';
-                if (typeof m.content === 'string') text = m.content;
-                else if (Array.isArray(m.content)) text = m.content.map(c => c.text || '').join('\n');
-                
+                const text = extractTextFromContent(m.content);
                 if (!text.trim()) return null;
                 return `[${m._getType() === 'human' ? 'USER' : 'AI'}]: ${text.trim()}`;
-            })
             .filter(Boolean)
             .join('\n\n');
 

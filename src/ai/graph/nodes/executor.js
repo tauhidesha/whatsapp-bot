@@ -1,17 +1,8 @@
 const { toolsByName } = require('../tools');
 const { getActivePromo } = require('../../utils/promoConfig');
+const { extractTextFromContent } = require('../utils/sanitizeMessages');
 
-/**
- * Mencegah error jika content berupa Array Object (fitur Vision LangGraph)
- */
-function extractTextMessage(content) {
-    if (!content) return '';
-    if (typeof content === 'string') return content;
-    if (Array.isArray(content)) {
-        return content.filter(c => c.type === 'text').map(c => c.text).join(' ');
-    }
-    return String(content);
-}
+// extractTextMessage removed - now using extractTextFromContent from shared utility
 
 /**
  * Node: toolExecutor
@@ -89,7 +80,7 @@ async function toolExecutorNode(state) {
                 const tool = toolsByName['triggerBosMatTool'];
                 if (tool) {
                     const lastUserMsgRecord = state.messages.slice().reverse().find(m => m.type === 'human' || m.role === 'user');
-                    const lastUserMsg = lastUserMsgRecord ? extractTextMessage(lastUserMsgRecord.content) : 'No text found';
+                    const lastUserMsg = lastUserMsgRecord ? extractTextFromContent(lastUserMsgRecord.content) : 'No text found';
                     
                     const handoffResult = await tool({
                         reason: isCar ? 'Tanya repaint/detailing Mobil (perlu konfirmasi bos)' : 'User minta bantuan admin/human handover',
@@ -130,7 +121,7 @@ async function toolExecutorNode(state) {
 
             // Cek Jam Buka/Studio Info (Selalu panggil jika intent GENERAL_INQUIRY atau ada keyword studio)
             const lastMsgRaw = state.messages[state.messages.length - 1].content;
-            const lastMsgContent = extractTextMessage(lastMsgRaw).toLowerCase();
+            const lastMsgContent = extractTextFromContent(lastMsgRaw).toLowerCase();
             const studioKeywords = /lokasi|alamat|dimana|buka|tutup|istirahat|jam berapa|kontak|wa|map|maps|koordinat/i.test(lastMsgContent);
             
             if (intent === 'GENERAL_INQUIRY' || studioKeywords) {

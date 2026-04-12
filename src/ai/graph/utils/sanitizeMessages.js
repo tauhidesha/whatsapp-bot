@@ -99,4 +99,35 @@ function sanitizeMessagesForGemini(messages) {
     return sanitized;
 }
 
-module.exports = { sanitizeMessagesForGemini };
+/**
+ * Extracts text content from a message, handling both string and block-based formats.
+ * Automatically filters out non-textual blocks such as 'thinking' and 'tool_use'.
+ *
+ * @param {string|Array} content - The message content to extract text from.
+ * @param {string} joiner - String to join multiple text blocks.
+ * @returns {string} - The extracted text content.
+ */
+function extractTextFromContent(content, joiner = '\n') {
+    if (!content) return '';
+    if (typeof content === 'string') return content;
+    
+    if (Array.isArray(content)) {
+        return content
+            .filter(item => item && item.type === 'text')
+            .map(item => item.text || '')
+            .filter(text => text !== '')
+            .join(joiner);
+    }
+    
+    // Handle cases where content might be a non-standard object (e.g. from ToolMessage)
+    if (typeof content === 'object') {
+        return content.text || JSON.stringify(content);
+    }
+    
+    return String(content);
+}
+
+module.exports = { 
+    sanitizeMessagesForGemini,
+    extractTextFromContent 
+};

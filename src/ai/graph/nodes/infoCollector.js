@@ -2,7 +2,7 @@ const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
 const { SystemMessage, HumanMessage } = require('@langchain/core/messages');
 const studioMetadata = require('../../constants/studioMetadata');
 const { withRetry } = require('../../utils/retry');
-const { sanitizeMessagesForGemini } = require('../utils/sanitizeMessages');
+const { sanitizeMessagesForGemini, extractTextFromContent } = require('../utils/sanitizeMessages');
 
 const model = new ChatGoogleGenerativeAI({
     model: process.env.AI_MODEL || 'gemini-flash-lite-latest',
@@ -11,17 +11,7 @@ const model = new ChatGoogleGenerativeAI({
     responseMimeType: "application/json",
 });
 
-/**
- * Mencegah error jika content berupa Array Object (fitur Vision LangGraph)
- */
-function extractTextMessage(content) {
-    if (!content) return '';
-    if (typeof content === 'string') return content;
-    if (Array.isArray(content)) {
-        return content.filter(c => c.type === 'text').map(c => c.text).join(' ');
-    }
-    return String(content);
-}
+// extractTextMessage removed - now using extractTextFromContent from shared utility
 
 /**
  * Node: infoCollector (MERGED with classifier)
@@ -35,7 +25,7 @@ async function infoCollectorNode(state) {
     const sanitizedMessages = sanitizeMessagesForGemini(state.messages);
     const prevIntent = state.intent;
     const lastMessage = sanitizedMessages[sanitizedMessages.length - 1];
-    const lastMessageText = extractTextMessage(lastMessage.content);
+    const lastMessageText = extractTextFromContent(lastMessage.content);
 
     // Helper to clean JSON string from potential markdown code blocks
     const cleanJson = (str) => {
@@ -67,7 +57,7 @@ async function infoCollectorNode(state) {
     // Build chat transcript (max 10 messages)
     const chatTranscript = sanitizedMessages.slice(-10).map(m => {
         const role = (m.type === 'human' || m.role === 'user') ? '[USER]' : '[AI]';
-        return `${role}: ${extractTextMessage(m.content)}`;
+        return `${role}: ${extractTextFromContent(m.content)}`;
     }).join('\n');
 
     const systemPrompt = `# ROLE
@@ -163,7 +153,8 @@ Output: {
         ]), { maxRetries: 3, baseDelayMs: 1500 });
         
 
-        const cleanedContent = cleanJson(response.content);
+        const rawResponse = extractTextFromContent(response.content);
+        const cleanedContent = cleanJson(rawResponse);
         extracted = JSON.parse(cleanedContent);
         console.log(`[INFO_COLLECTOR_NODE] Thread Analysis: ${extracted.internal_thought}`);
 

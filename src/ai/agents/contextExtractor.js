@@ -7,6 +7,7 @@ const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
 const { HumanMessage } = require('@langchain/core/messages');
 const { mergeAndSaveContext, getCustomerContext } = require('../utils/mergeCustomerContext.js');
 const { getLangSmithCallbacks } = require('../utils/langsmith.js');
+const { extractTextFromContent } = require('../graph/utils/sanitizeMessages');
 
 // Model ringan untuk extraction — cepat dan murah
 const EXTRACTOR_MODEL = 'gemini-flash-lite-latest';
@@ -185,11 +186,7 @@ async function extractAndSaveContext(userMessage, aiReply, senderNumber) {
             callbacks,
         });
 
-        const responseText = typeof response.content === 'string'
-            ? response.content
-            : (Array.isArray(response.content)
-                ? response.content.map(c => c.text || c).join('')
-                : String(response.content));
+        const responseText = extractTextFromContent(response.content);
 
         const extracted = parseExtractedJSON(responseText);
 
