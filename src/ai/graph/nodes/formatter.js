@@ -9,7 +9,6 @@ const model = new ChatGoogleGenerativeAI({
     model: process.env.AI_MODEL || 'gemini-flash-lite-latest',
     maxOutputTokens: 2048,
     temperature: 0,
-    responseMimeType: "application/json",
 });
 
 /**
@@ -200,12 +199,17 @@ ${modeInstructions[replyMode] || modeInstructions.inform}
             .filter(Boolean)
             .join('\n\n');
 
+        console.log(`[FORMATTER_NODE] replyMode: "${replyMode}", toolResult: ${JSON.stringify(toolResult)?.substring(0, 100)}`);
+        console.log(`[FORMATTER_NODE] transcript length: ${transcript?.length || 0}`);
+
         const finalPrompt = `TRANSKIP PERCAKAPAN TERAKHIR:\n\n${transcript}\n\n(Tuliskan balasan AI selanjutnya sesuai arahan sistem)`;
 
         const response = await withRetry(() => structuredModel.invoke([
             new SystemMessage(systemPrompt),
             new HumanMessage(finalPrompt)
         ]), { maxRetries: 3, baseDelayMs: 1500 });
+
+        console.log(`[FORMATTER_NODE] Raw response:`, JSON.stringify(response)?.substring(0, 200));
 
         console.log(`[FORMATTER_NODE] [${replyMode}] Thought: ${response.internal_thought}`);
 
