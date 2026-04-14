@@ -13,17 +13,7 @@ function getMessageType(msg) {
     // 1. LangChain Class Method
     if (typeof msg._getType === 'function') return msg._getType();
     
-    // 2. Explicit type field (Standard fallback)
-    if (msg.type) {
-        if (msg.type === 'user') return 'human';
-        return msg.type;
-    }
-    
-    // 3. Structural detection
-    if (msg.tool_calls && msg.tool_calls.length > 0) return 'ai';
-    if (msg.tool_call_id) return 'tool';
-    
-    // 4. Persistence Fallback (LangChain ID array structure)
+    // 2. Persistence Fallback (LangChain ID array structure)
     // [ "langchain_core", "messages", "HumanMessage" ]
     if (msg.id && Array.isArray(msg.id) && msg.id.length >= 3) {
         const className = msg.id[2];
@@ -32,6 +22,16 @@ function getMessageType(msg) {
         if (className === 'ToolMessage') return 'tool';
         if (className === 'SystemMessage') return 'system';
     }
+    
+    // 3. Explicit type field (Standard fallback, ignore serialization metadata)
+    if (msg.type && msg.type !== 'constructor') {
+        if (msg.type === 'user') return 'human';
+        return msg.type;
+    }
+    
+    // 4. Structural detection
+    if (msg.tool_calls && msg.tool_calls.length > 0) return 'ai';
+    if (msg.tool_call_id) return 'tool';
     
     return null;
 }
@@ -55,10 +55,22 @@ function getMessageType(msg) {
 function sanitizeMessagesForGemini(messages) {
     if (!messages || !Array.isArray(messages)) return [];
 
-    // --- Step 0: Strip 'thinking' blocks (Gemini 2.5 leak) ---
+    // --- Step 0: Normalize serialized LangChain messages & Strip 'thinking' blocks ---
     let sanitized = messages.map(msg => {
-        const isAI = getMessageType(msg) === 'ai';
-        if (isAI && Array.isArray(msg.content)) {
+        // Fix for LangChain serialized messages (e.g. from MemorySaver/Database) lacking direct .content
+        let safeMsg = msg;
+        if (safeMsg && safeMsg.kwargs && safeMsg.content === undefined) {
+            safeMsg = { 
+                ...safeMsg, 
+                content: safeMsg.kwargs.content,
+                tool_calls: safeMsg.tool_calls || safeMsg.kwargs.tool_calls,
+                tool_call_id: safeMsg.tool_call_id || safeMsg.kwargs.tool_call_id,
+                name: safeMsg.name || safeMsg.kwargs.name
+            };
+        }
+
+        const isAI = getMessageType(safeMsg) === 'ai';
+        if (isAI && Array.isArray(safeMsg.content)) {
             const filtered = msg.content.filter(c => c.type !== 'thinking');
             if (filtered.length !== msg.content.length) {
                 // Return a new instance with the same class but cleaned content

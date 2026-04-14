@@ -310,12 +310,22 @@ Output: {
                 break;
             }
             if (svc === 'detailing') {
-                missingQuestion = "Tanyakan fokus detailingnya (Hilangkan baret bodi, bersihkan mesin, atau cuci bongkar total)";
-                break;
+                if (ctx.detailingFocus || ctx.isBongkarTotal) {
+                    ctx.serviceTypes[i] = ctx.isBongkarTotal ? "Full Detailing" : `Detailing ${ctx.detailingFocus}`;
+                    continue; // Skip generic missing question since we auto-resolved it
+                } else {
+                    missingQuestion = "Tanyakan fokus detailingnya (Hilangkan baret bodi, bersihkan mesin, atau cuci bongkar total)";
+                    break;
+                }
             }
             if (svc === 'coating') {
-                missingQuestion = "Tanyakan jenis cat saat ini (Glossy atau Doff/Matte)";
-                break;
+                if (ctx.paintType) {
+                    ctx.serviceTypes[i] = `Coating Ceramic ${ctx.paintType}`;
+                    continue; // Skip generic missing question since we auto-resolved it
+                } else {
+                    missingQuestion = "Tanyakan jenis cat saat ini (Glossy atau Doff/Matte)";
+                    break;
+                }
             }
         }
 
@@ -327,7 +337,7 @@ Output: {
                     if (!ctx.paintType) { missingQuestion = "Cari tahu jenis cat motor (Glossy atau Doff)"; break; }
                     if (ctx.isBongkarTotal === null && svcLower.includes('coating')) { missingQuestion = "Tanyakan apakah mau proteksi bodi saja atau bongkar total (Complete Service)"; break; }
                 } else if (svcLower.includes('detailing') || svcLower.includes('poles') || svcLower.includes('cuci')) {
-                    if (!ctx.detailingFocus) { missingQuestion = "Tanyakan fokus pembersihan (Bodi, Mesin, atau Kolong)"; break; }
+                    if (!ctx.detailingFocus && !ctx.isBongkarTotal) { missingQuestion = "Tanyakan fokus pembersihan (Bodi, Mesin, atau Kolong)"; break; }
                     if (!ctx.paintType && (svcLower.includes('poles') || svcLower.includes('full detailing'))) { missingQuestion = "Pastikan jenis catnya Glossy atau Doff"; break; }
                 } else if (svcLower.includes('repaint')) {
                     if (svcLower.includes('halus') && !ctx.colorChoice) { missingQuestion = "Tanyakan rencana warna baru untuk bodi halusnya"; break; }

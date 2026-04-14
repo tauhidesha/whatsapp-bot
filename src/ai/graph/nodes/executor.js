@@ -120,7 +120,8 @@ async function toolExecutorNode(state) {
             }
 
             // Cek Jam Buka/Studio Info (Selalu panggil jika intent GENERAL_INQUIRY atau ada keyword studio)
-            const lastMsgRaw = state.messages[state.messages.length - 1].content;
+            const lastMsgNode = state.messages[state.messages.length - 1];
+            const lastMsgRaw = lastMsgNode.content || (lastMsgNode.kwargs && lastMsgNode.kwargs.content) || lastMsgNode;
             const lastMsgContent = extractTextFromContent(lastMsgRaw).toLowerCase();
             const studioKeywords = /lokasi|alamat|dimana|buka|tutup|istirahat|jam berapa|kontak|wa|map|maps|koordinat/i.test(lastMsgContent);
             
