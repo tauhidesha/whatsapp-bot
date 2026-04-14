@@ -55,8 +55,11 @@ function getMessageType(msg) {
 function sanitizeMessagesForGemini(messages) {
     if (!messages || !Array.isArray(messages)) return [];
 
+    // Batasi HANYA maksimal 10 pesan terakhir agar context lebih spesifik (Request Mas)
+    const recentMessages = messages.slice(-10);
+
     // --- Step 0: Normalize serialized LangChain messages & Strip 'thinking' blocks ---
-    let sanitized = messages.map(msg => {
+    let sanitized = recentMessages.map(msg => {
         // Fix for LangChain serialized messages (e.g. from MemorySaver/Database) lacking direct .content
         let safeMsg = msg;
         if (safeMsg && safeMsg.kwargs && safeMsg.content === undefined) {
