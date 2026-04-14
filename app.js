@@ -3458,16 +3458,24 @@ app.post('/follow-up-queue/execute', requireAuth, async (req, res) => {
                             }).catch(() => {});
                         }
 
-                        const updateData = {
-                            followUpCount: { increment: 1 },
-                            lastFollowUpAt: new Date(),
-                            lastFollowUpStrategy: type,
-                        };
-                        if (type === 'review') updateData.reviewFollowUpSent = true;
-                        await prisma.customerContext.update({
-                            where: { id: docId },
-                            data: updateData,
-                        }).catch(err => console.warn(`[QueueExecute] Context update failed for ${docId}:`, err.message));
+                        const ctx = await prisma.customerContext.findUnique({ where: { id: docId } }).catch(() => null);
+                        if (ctx) {
+                            const updateData = {
+                                followUpCount: (ctx.followUpCount || 0) + 1,
+                                lastFollowUpAt: new Date(),
+                                lastFollowUpStrategy: type,
+                            };
+                            if (type === 'review') updateData.reviewFollowUpSent = true;
+                            
+                            await prisma.customerContext.update({
+                                where: { id: docId },
+                                data: updateData,
+                            }).catch(err => console.warn(`[QueueExecute] Context update failed for ${docId}:`, err.message));
+                            
+                            console.log(`[QueueExecute] Context updated for ${docId} (followUpCount => ${updateData.followUpCount})`);
+                        } else {
+                            console.warn(`[QueueExecute] Warning: Context not found for ${docId}, followUpCount not updated.`);
+                        }
                     }
 
                     _executeStatus.sent++;

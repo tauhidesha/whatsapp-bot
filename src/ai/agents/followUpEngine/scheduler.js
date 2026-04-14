@@ -679,9 +679,15 @@ function startFollowUpScheduler() {
                             } else if (type === 'booking_reminder') {
                                 await prisma.booking.update({ where: { id: docId }, data: { reminderSent: true, reminderSentAt: new Date() } }).catch(() => {});
                             } else {
-                                const updateData = { followUpCount: { increment: 1 }, lastFollowUpAt: new Date(), lastFollowUpStrategy: type };
-                                if (type === 'review') updateData.reviewFollowUpSent = true;
-                                await prisma.customerContext.update({ where: { id: docId }, data: updateData }).catch(() => {});
+                                const ctx = await prisma.customerContext.findUnique({ where: { id: docId } }).catch(() => null);
+                                if (ctx) {
+                                    const updateData = { followUpCount: (ctx.followUpCount || 0) + 1, lastFollowUpAt: new Date(), lastFollowUpStrategy: type };
+                                    if (type === 'review') updateData.reviewFollowUpSent = true;
+                                    await prisma.customerContext.update({ where: { id: docId }, data: updateData }).catch(err => console.warn(`[Scheduler] Context update failed for ${docId}:`, err.message));
+                                    console.log(`[Scheduler] Context updated for ${docId} (followUpCount => ${updateData.followUpCount})`);
+                                } else {
+                                    console.warn(`[Scheduler] Warning: Context not found for ${docId}, followUpCount not updated.`);
+                                }
                             }
                         } catch (err) {
                             errors++;
