@@ -342,7 +342,7 @@ Output: {
                 } else if (svcLower.includes('repaint')) {
                     if (svcLower.includes('halus') && !ctx.colorChoice) { missingQuestion = "Tanyakan rencana warna baru untuk bodi halusnya"; break; }
                     if (svcLower.includes('velg') && !ctx.velgColorChoice) { missingQuestion = "Tanyakan pilihan warna untuk repaint velgnya"; break; }
-                    if (svcLower.includes('velg') && ctx.isPreviouslyPainted === null) { missingQuestion = "Tanyakan apakah velg masih cat ori pabrik atau sudah pernah repaint"; break; }
+                    if (svcLower.includes('velg') && ctx.isPreviouslyPainted === null) { missingQuestion = "Tanyakan apakah velg masih cat ori pabrik atau sudah pernah repaint (infokan senggol tipis kalau sudah bawaan repaint/cat numpuk biasanya ada tambahan biaya ngerok)"; break; }
                 }
             }
         }
