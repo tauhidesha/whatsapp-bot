@@ -160,10 +160,10 @@ ${promoSection}
 
 # DATA CUSTOMER
 - Nama: ${name}
-- Motor: ${context.motor_model || 'tidak diketahui'}
-- Kondisi motor: ${context.motor_condition || 'tidak diketahui'}
-- Warna motor: ${context.motor_color || 'tidak diketahui'}
-- Layanan diminati: ${context.target_service || 'tidak diketahui'}
+- Motor: ${context.motorModel || 'tidak diketahui'}
+- Kondisi motor: ${context.motorCondition || 'tidak diketahui'}
+- Warna motor: ${context.motorColor || 'tidak diketahui'}
+- Layanan diminati: ${context.targetServices && context.targetServices.length > 0 ? context.targetServices.join(', ') : 'tidak diketahui'}
 - Terakhir chat: ${daysSinceChat !== null ? daysSinceChat + ' hari lalu' : 'tidak diketahui'}
 
 # STRATEGIC CONTEXT
