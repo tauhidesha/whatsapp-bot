@@ -16,8 +16,8 @@ module.exports = function generateInvoiceHTML(data) {
   const dp = Number(downPayment) || 0;
   const totalPaid = Number(amountPaid) || 0;
 
-  // Sisa Tagihan = (Subtotal - Diskon) - Total yang sudah dibayar (termasuk DP jika ada)
-  const balance = Math.max(0, Math.round(subtotal - discountAmount - totalPaid));
+  // Sisa Tagihan = (Subtotal - Diskon) - DP - Bayar Hari Ini
+  const balance = Math.max(0, Math.round(subtotal - discountAmount - dp - totalPaid));
 
   // Clean recipient number - prefer realPhone (actual WA number) over @lid
   const displayPhone = realPhone
@@ -275,10 +275,15 @@ module.exports = function generateInvoiceHTML(data) {
           <span class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em">Diskon</span>
           <span style="font-size:16px; color:#ffb4ab">- Rp${discountAmount.toLocaleString('id-ID')}</span>
         </div>` : ''}
+        ${dp > 0 ? `
+        <div style="display:flex; justify-content:space-between">
+          <span class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em">Down Payment (DP)</span>
+          <span style="font-size:16px; color:#ffb4ab">- Rp${dp.toLocaleString('id-ID')}</span>
+        </div>` : ''}
         ${totalPaid > 0 ? `
         <div style="display:flex; justify-content:space-between">
-          <span class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em">Total Bayar</span>
-          <span style="font-size:16px; color:#ffb4ab">Rp${totalPaid.toLocaleString('id-ID')}</span>
+          <span class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em">${documentType === 'bukti_bayar' ? 'Bayar Hari Ini' : 'Total Bayar'}</span>
+          <span style="font-size:16px; color:#85ff7a">Rp${totalPaid.toLocaleString('id-ID')}</span>
         </div>` : ''}
         
         <div style="border-top:1px solid #484831; padding-top:24px; margin-top:8px">
