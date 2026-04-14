@@ -126,9 +126,8 @@ ${modeInstructions[replyMode] || modeInstructions.inform}
 
 # PENTING (HARGA & DATA):
 1. Hasil Teknis/Tool WAJIB jadi dasar info harga. Jika kosong, JANGAN beri harga spesifik.
-2. WAJIB infokan tambahan biaya buat ngerok cat lama jika user mau "Repaint Velg".
-3. Ada biaya tambahan untuk warna khusus/tertentu.
-4. Gunakan format rincian berikut jika ada breakdown biaya:
+2. Ada biaya tambahan untuk warna khusus/tertentu.
+3. Gunakan format rincian berikut jika ada breakdown biaya:
    [kalimat pengantar...]
    • [layanan]: rp...
    ✅ total: rp...
