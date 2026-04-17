@@ -1,0 +1,1 @@
+const { PrismaClient } = require("@prisma/client");const prisma = new PrismaClient();async function test() { const c = await prisma.customerContext.findFirst(); console.log(c); await prisma.customerContext.update({ where: { id: c.id }, data: { followUpCount: { increment: 1 }, lastFollowUpAt: new Date() }}).then(()=>console.log("Success")).catch(console.error); } test();

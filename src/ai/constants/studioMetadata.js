@@ -5,13 +5,13 @@
  */
 
 const studioMetadata = {
-  name: 'Bosmat Repaint Detailing Motor',
+  name: 'Bosmat x Garasi 54',
   shortName: 'Bosmat',
   location: {
-    address: 'Bukit Cengkeh 1, Jl. Medan No.B3/2, Kota Depok, Jawa Barat 16451',
-    landmark: 'Dekat perempatan pertama setelah gapura Bukit Cengkeh 1',
-    googleMaps: 'https://maps.app.goo.gl/JrH7TxyfPtGxBjW19',
-    directions: 'Dari gapura Bukit Cengkeh 1 lurus sedikit, di perempatan pertama belok kanan. Rumah pertama cat hijau pagar hitam (dekat portal). Kalau portal ditutup, bisa masuk dari Jl. Padang atau Jl. Bengkulu. Langsung ketok atau panggil orang di dalam saja.',
+    address: 'Jl. Raden Sanim No.99, Tanah Baru, Kecamatan Beji, Kota Depok, Jawa Barat 16426',
+    landmark: 'Dekat Sekolah Tunas Iblam',
+    googleMaps: 'https://maps.app.goo.gl/m71ihhee1q9XVveu5',
+    directions: 'Langsung menuju Jl. Raden Sanim No.99, Tanah Baru. Patokannya dekat dengan Sekolah Tunas Iblam.',
   },
   contact: {
     phone: '0895401527556',
@@ -23,9 +23,9 @@ const studioMetadata = {
     selasa: '08.00–17.00',
     rabu: '08.00–17.00',
     kamis: '08.00–17.00',
-    jumat: 'Tutup',
+    jumat: '08.00–17.00',
     sabtu: '08.00–17.00',
-    minggu: '08.00–17.00',
+    minggu: 'Libur',
   },
   bookingPolicy: {
     description: 'Sangat disarankan booking slot terlebih dahulu agar pengerjaan terjadwal dengan aman.',

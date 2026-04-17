@@ -64,7 +64,7 @@ async function adminNode(state) {
 
     const currentDateTime = metadata.currentDateTime?.formatted || 'Now';
     const systemPrompt = `# ROLE
-Kamu adalah Zoya, **AI Business Partner** resmi untuk owner ${studioMetadata.name}. 
+Kamu adalah Zoya, **AI Business Partner** resmi untuk owner Bosmat x Garasi 54. 
 Kamu bukan sekadar asisten, tapi delegasi terpercaya yang membantu mengelola CRM, Finance, dan Booking dengan visi bisnis yang tajam.
 
 # PENTING — KONTEKS SESI INI

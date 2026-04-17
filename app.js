@@ -320,7 +320,7 @@ console.log(`🤖 [STARTUP] Active AI model: ${ACTIVE_AI_MODEL}`);
 console.log(`🖼️ [STARTUP] Vision analysis target models: ${[ACTIVE_VISION_MODEL, FALLBACK_VISION_MODEL].filter(Boolean).join(', ')}`);
 
 const SYSTEM_PROMPT = `[Role]
-Kamu adalah Zoya, asisten Customer Service dan Konsultan Otomotif AI untuk Bosmat Repainting & Detailing Studio. Gaya bicaramu sangat ramah, asik, luwes, selayaknya teman ngobrol, dan tidak kaku. 
+Kamu adalah Zoya, asisten Customer Service dan Konsultan Otomotif AI untuk Bosmat x Garasi 54. Gaya bicaramu sangat ramah, asik, luwes, selayaknya teman ngobrol, dan tidak kaku. 
 
 [Sapaan Penting]
 - Gunakan kata ganti "aku" atau "saya" untuk menyebut diri sendiri. JANGAN menyebut namamu sendiri (seperti "Zoya bantu cek ya") karena itu terasa kaku.
@@ -463,7 +463,7 @@ Assistant: (Pakai scanFollowUpCandidates) "Bos, ini daftar target jemput bola ha
 </output_format>`;
 
 const ADMIN_MESSAGE_REWRITE_ENABLED = process.env.ADMIN_MESSAGE_REWRITE === 'false' ? false : true;
-const ADMIN_MESSAGE_REWRITE_STYLE_PROMPT = `Kamu adalah Zoya, asisten Bosmat yang ramah dan profesional.Tugasmu adalah menulis ulang pesan admin berikut agar gaya bahasa konsisten dengan gaya Zoya:
+const ADMIN_MESSAGE_REWRITE_STYLE_PROMPT = `Kamu adalah Zoya, asisten Bosmat x Garasi 54 yang ramah dan profesional.Tugasmu adalah menulis ulang pesan admin berikut agar gaya bahasa konsisten dengan gaya Zoya:
 - Gunakan bahasa Indonesia santai namun sopan.
 - Panggil pelanggan dengan "mas" atau "mbak" jika relevan.
 - Pertahankan maksud dan janji yang sudah dibuat admin, jangan menambah atau mengubah fakta.
@@ -778,7 +778,7 @@ async function analyzeMediaWithGemini(mediaBuffer, mimeType, caption = '', sende
     const mediaTypeLabel = isVideo ? 'Video' : 'Foto';
 
     const systemPrompt = [
-        'Anda adalah Zoya, asisten Bosmat Repainting and Detailing Studio.',
+        'Anda adalah Zoya, asisten Bosmat x Garasi 54.',
         `Tugas: Analisis ${mediaTypeLabel} motor pengguna secara akurat.`,
         '',
         'Fokus analisis:',
@@ -1884,9 +1884,64 @@ async function processBufferedMetaMessages(normalizedSenderId, queue) {
             return;
         }
 
-        // Invoke AI (which now uses LangGraph)
-        const aiResult = await getAIResponse(combinedMessage, displayName, normalizedSenderId);
-        const aiResponse = aiResult.content;
+        // Invoke AI (using LangGraph)
+        console.log(`[LangGraph] Invoking ZoyaAgent for ${normalizedSenderId} (Meta)...`);
+        
+        const { HumanMessage } = require('@langchain/core/messages');
+        
+        const messageContent = [];
+        if (combinedMessage) {
+            messageContent.push({ type: 'text', text: combinedMessage });
+        } else {
+            messageContent.push({ type: 'text', text: '[Pesan Kosong]' });
+        }
+
+        const input = {
+            messages: [new HumanMessage({ content: messageContent })],
+            metadata: {
+                phoneReal: normalizedSenderId,
+                senderName: displayName,
+                mediaItems: [],
+                isAdmin: false
+            }
+        };
+
+        const result = await zoyaAgent.invoke(input, {
+            configurable: { thread_id: normalizedSenderId }
+        });
+
+        const lastMessage = result.messages[result.messages.length - 1];
+        let aiResponseRaw = lastMessage ? lastMessage.content : null;
+
+        // Handle HUMAN_HANDOVER
+        if (result.intent === 'HUMAN_HANDOVER') {
+            console.log(`🚨 [LangGraph] Escalation detected for ${normalizedSenderId}. Triggering Human Handover.`);
+            await setSnoozeMode(normalizedSenderId, 60, { reason: 'eskalasi_otomatis' });
+            
+            await syncGraphStateToCRM(normalizedSenderId, result).catch(() => {});
+            await triggerBosMatTool.implementation({
+                senderNumber: normalizedSenderId,
+                reason: 'User meminta bantuan admin atau terdeteksi emosi tinggi (via Meta).',
+                customerQuestion: combinedMessage
+            });
+            
+            aiResponseRaw = aiResponseRaw || "Wah, pertanyaan Kakak cukup teknis nih. Zoya panggilin Admin dulu ya biar dibantu langsung! 🙏";
+        }
+
+        let aiResponse = '';
+        if (aiResponseRaw) {
+            if (typeof aiResponseRaw === 'string') {
+                aiResponse = aiResponseRaw;
+            } else if (Array.isArray(aiResponseRaw)) {
+                aiResponse = aiResponseRaw
+                    .map(c => typeof c === 'string' ? c : (c.text || ''))
+                    .filter(Boolean)
+                    .join('\n');
+            } else {
+                aiResponse = String(aiResponseRaw || '');
+            }
+            aiResponse = aiResponse.trim();
+        }
 
         if (aiResponse) {
             const { sendMetaMessage } = require('./src/server/metaClient.js');

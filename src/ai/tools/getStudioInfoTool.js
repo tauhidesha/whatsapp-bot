@@ -24,7 +24,7 @@ async function implementation(input) {
 
     switch (infoType) {
       case 'location':
-        response = `📍 *Lokasi Bosmat Repainting & Detailing Studio:*
+        response = `📍 *Lokasi Bosmat x Garasi 54 Studio:*
 
 ${studioInfo.location.address}
 ${studioInfo.location.landmark}
@@ -36,7 +36,7 @@ Ancer-ancer: ${studioInfo.location.directions}
 ⚠️ *Penting:* ${studioInfo.bookingPolicy.description}`;
         break;
       case 'hours':
-        response = `🕒 *Jam Operasional Bosmat Studio:*
+        response = `🕒 *Jam Operasional Bosmat x Garasi 54 Studio:*
 
 • Senin-Kamis: ${studioInfo.hours.senin}
 • Jumat: ${studioInfo.hours.jumat}
@@ -45,7 +45,7 @@ Ancer-ancer: ${studioInfo.location.directions}
 ⚠️ *Penting:* ${studioInfo.bookingPolicy.description}`;
         break;
       case 'contact':
-        response = `📞 *Kontak Bosmat Studio:*
+        response = `📞 *Kontak Bosmat x Garasi 54 Studio:*
 
 Telepon/WhatsApp: ${studioInfo.contact.phone}
 
@@ -54,7 +54,7 @@ Telepon/WhatsApp: ${studioInfo.contact.phone}
 ⚠️ *Penting:* ${studioInfo.bookingPolicy.description}`;
         break;
       case 'booking_policy':
-        response = `📋 *Kebijakan Kunjungan Bosmat Studio:*
+        response = `📋 *Kebijakan Kunjungan Bosmat x Garasi 54 Studio:*
 
 ⚠️ *${studioInfo.bookingPolicy.description.toUpperCase()}*
 
@@ -68,7 +68,7 @@ Kontak booking: ${studioInfo.contact.phone}`;
         break;
       case 'all':
       default:
-        response = `🏢 *Info Lengkap Bosmat Repainting & Detailing Studio*
+        response = `🏢 *Info Lengkap Bosmat x Garasi 54 Studio*
 
 📍 *Alamat:*
 ${studioInfo.location.address}
