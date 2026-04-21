@@ -96,13 +96,14 @@ Ekstrak data ke dalam format JSON dengan field berikut:
 11. **visual_summary**: Deskripsi singkat apa yang terlihat di gambar.
 
 # INTENT RULES
-- JIKA user hanya menyapa (Halo, P, Assalamualaikum), WAJIB intent = "GREETING".
-- JIKA user menjawab pertanyaan AI tentang motor/layanan, intent = "BOOKING_SERVICE".
+- JIKA user hanya menyapa (Halo, P, Assalamualaikum) TANPA konteks apa-apa, WAJIB intent = "GREETING".
+- JIKA pesan user mengutip postingan Instagram (mengandung teks template IG, link instagram.com) lalu menyapa "Halo! Bisakah saya mendapatkan info selengkapnya", MAKA intent WAJIB = "CONSULTATION" atau "BOOKING_SERVICE". JANGAN pilih "GREETING".
 
 # EXTRACTION STRATEGY
+- **Ad/IG Traffic**: Pesan dari IG Boost memuat teks postingan asli (misal: "Kalau Vario 160 dikasih warna Mazda Red..."). JANGAN otomatis anggap Vario 160 adalah motor user dan Mazda Red adalah warna yang pasti diinginkan (kecuali user menegaskan). Alih-alih, masukkan konteks postingan IG ini ke dalam field \`visual_summary\` (misal: "User merespons dari postingan IG tentang Repaint Vario 160 Mazda Red"). Kosongkan \`motor_model\` jika belum jelas motor user apa.
 - **Bodi Halus vs Kasar**: Jika user sebut "bodi kasar", masukkan ke \`detailing_focus\`.
 - **Warna**: Bedakan dengan teliti antara warna bodi dan warna velg.
-- **Visual Summary**: Wajib isi field "visual_summary" dengan deskripsi singkat (1-2 kalimat) tentang apa yang kamu lihat dalam foto.
+- **Visual Summary**: Wajib isi field "visual_summary" dengan deskripsi IG BoostATAU gambar yang kamu lihat. Ini akan jadi bekal Zoya untuk nyambung ngobrol!
 - **Negative Constraint**: JANGAN menebak data yang tidak ada. Jika ragu, berikan \`null\`.
 - **Context Awareness**: Gunakan riwayat untuk melengkapi data yang sebelumnya sudah disebutkan.
 
@@ -117,6 +118,16 @@ Output: {
   "detailing_focus": "Bodi Halus",
   "color_choice": "Merah",
   "visual_summary": "Foto menampakkan Yamaha Nmax warna merah glossy standar dengan bodi yang masih cukup mulus."
+}
+
+User: "Bosmad Detailing Studio Kalau Vario 160 dikasih warna Mazda Red... https://instagram.com/... Halo! Bisakah saya mendapatkan info selengkapnya tentang ini?"
+Output: {
+  "intent": "CONSULTATION",
+  "internal_thought": "User datang dari IG link tentang Vario 160 warna Mazda Red. Perlu menyapa dan mencari tahu tipe motor aslinya.",
+  "motor_model": null,
+  "service_types": ["Repaint"],
+  "color_choice": null,
+  "visual_summary": "Konteks: User datang dari tautan/iklan Instagram tentang Repaint Vario 160 warna Mazda Red."
 }`;
 
     // --- SINGLE LLM CALL: classify + extract ---
