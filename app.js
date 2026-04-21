@@ -2036,6 +2036,39 @@ function start(client) {
         const isVideo = msg.type === 'video' || msg.type === 'tv';
         const isLocation = msg.type === 'location';
 
+        // --- CAPTURE IG AD / QUOTED CONTEXT ---
+        // When user clicks an IG Boost ad and sends a message via WhatsApp,
+        // the ad context (post text, link) appears in quotedMsg/title/description
+        // but msg.body only contains the user's typed text (e.g. "Halo! Bisakah saya...")
+        const quotedParts = [];
+        
+        // WPPConnect: quoted message body
+        if (msg.quotedMsg?.body) {
+            quotedParts.push(msg.quotedMsg.body);
+        } else if (msg.quotedMsgObj?.body) {
+            quotedParts.push(msg.quotedMsgObj.body);
+        }
+        
+        // WPPConnect: link preview / external ad context
+        if (msg.title) quotedParts.push(msg.title);
+        if (msg.description) quotedParts.push(msg.description);
+        if (msg.matchedText) quotedParts.push(msg.matchedText);
+        
+        // Also check for ctwa_context (Click-to-WhatsApp Ad context)
+        if (msg.ctwaContext?.sourceUrl) {
+            quotedParts.push(`[Ad Link: ${msg.ctwaContext.sourceUrl}]`);
+        }
+        if (msg.ctwaContext?.displayText) {
+            quotedParts.push(msg.ctwaContext.displayText);
+        }
+        
+        if (quotedParts.length > 0) {
+            const quotedContext = [...new Set(quotedParts)].join('\n');
+            console.log(`[BUFFER] 📢 IG/Ad context detected for ${senderName}: "${quotedContext.substring(0, 100)}..."`);
+            // Prepend quoted context so the AI knows what the user is referring to
+            messageContent = `[Konteks Iklan/Postingan yang dikutip user]\n${quotedContext}\n\n[Pesan User]\n${messageContent}`;
+        }
+
         if (!messageContent && !isMedia && !isLocation) return;
 
         // Log different types of messages
@@ -2046,7 +2079,7 @@ function start(client) {
         } else if (isMedia) {
             console.log(`[BUFFER] 📎 Media received from ${senderName}. Type: ${msg.type}`);
         } else {
-            console.log(`[BUFFER] 💬 Text received from ${senderName}: "${messageContent}"`);
+            console.log(`[BUFFER] 💬 Text received from ${senderName}: "${messageContent.substring(0, 120)}"`);
         }
 
         // Save sender metadata
