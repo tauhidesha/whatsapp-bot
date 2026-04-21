@@ -38,9 +38,8 @@ Ancer-ancer: ${studioInfo.location.directions}
       case 'hours':
         response = `🕒 *Jam Operasional Bosmat x Garasi 54 Studio:*
 
-• Senin-Kamis: ${studioInfo.hours.senin}
-• Jumat: ${studioInfo.hours.jumat}
-• Sabtu-Minggu: ${studioInfo.hours.sabtu}
+• Senin-Sabtu: ${studioInfo.hours.senin}
+• Minggu: ${studioInfo.hours.minggu}
 
 ⚠️ *Penting:* ${studioInfo.bookingPolicy.description}`;
         break;
@@ -80,9 +79,8 @@ Ancer-ancer: ${studioInfo.location.directions}
 Telepon/WhatsApp: ${studioInfo.contact.phone}
 
 🕒 *Jam Operasional:*
-• Senin-Kamis: ${studioInfo.hours.senin}
-• Jumat: ${studioInfo.hours.jumat}
-• Sabtu-Minggu: ${studioInfo.hours.sabtu}
+• Senin-Sabtu: ${studioInfo.hours.senin}
+• Minggu: ${studioInfo.hours.minggu}
 
 ⚠️ *PENTING - Kebijakan Kunjungan:*
 ${studioInfo.bookingPolicy.description.toUpperCase()}

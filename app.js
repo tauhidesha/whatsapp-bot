@@ -2040,21 +2040,22 @@ function start(client) {
         // When user clicks an IG Boost ad and sends a message via WhatsApp,
         // the ad context (post text, link) appears in quotedMsg/title/description
         // but msg.body only contains the user's typed text (e.g. "Halo! Bisakah saya...")
+        // IMPORTANT: Filter out bot's own replies — when user uses WA "reply" feature,
+        // quotedMsg contains the bot's previous message, NOT ad context.
         const quotedParts = [];
         
-        // WPPConnect: quoted message body
-        if (msg.quotedMsg?.body) {
-            quotedParts.push(msg.quotedMsg.body);
-        } else if (msg.quotedMsgObj?.body) {
-            quotedParts.push(msg.quotedMsgObj.body);
+        // WPPConnect: quoted message body — only if NOT from bot itself
+        const quotedMsg = msg.quotedMsg || msg.quotedMsgObj;
+        if (quotedMsg?.body && !quotedMsg.fromMe) {
+            quotedParts.push(quotedMsg.body);
         }
         
-        // WPPConnect: link preview / external ad context
+        // WPPConnect: link preview / external ad context (these are never bot replies)
         if (msg.title) quotedParts.push(msg.title);
         if (msg.description) quotedParts.push(msg.description);
         if (msg.matchedText) quotedParts.push(msg.matchedText);
         
-        // Also check for ctwa_context (Click-to-WhatsApp Ad context)
+        // Click-to-WhatsApp Ad context (ctwa) — definitive IG ad indicator
         if (msg.ctwaContext?.sourceUrl) {
             quotedParts.push(`[Ad Link: ${msg.ctwaContext.sourceUrl}]`);
         }
@@ -2065,7 +2066,6 @@ function start(client) {
         if (quotedParts.length > 0) {
             const quotedContext = [...new Set(quotedParts)].join('\n');
             console.log(`[BUFFER] 📢 IG/Ad context detected for ${senderName}: "${quotedContext.substring(0, 100)}..."`);
-            // Prepend quoted context so the AI knows what the user is referring to
             messageContent = `[Konteks Iklan/Postingan yang dikutip user]\n${quotedContext}\n\n[Pesan User]\n${messageContent}`;
         }
 

@@ -18,7 +18,16 @@ async function toolExecutorNode(state) {
     try {
         if (intent === 'GENERAL_INQUIRY' || intent === 'BOOKING_SERVICE') {
             // Cek harga jika sudah ada layanan & motor
-            if (context.serviceTypes?.length > 0 && context.vehicleType) {
+            // GUARD: Pada GENERAL_INQUIRY, jangan lookup harga kecuali user eksplisit tanya harga
+            // Ini mencegah Zoya kasih harga saat user cuma tanya lokasi/jam buka
+            const lastMsgForPrice = state.messages[state.messages.length - 1];
+            const lastMsgTextForPrice = extractTextFromContent(
+                lastMsgForPrice?.content || lastMsgForPrice?.kwargs?.content || ''
+            ).toLowerCase();
+            const userAskedPrice = /harga|biaya|tarif|berapa|price|cost|estimasi|ongkos|bayar/i.test(lastMsgTextForPrice);
+            const shouldLookupPrice = intent === 'BOOKING_SERVICE' || userAskedPrice;
+            
+            if (shouldLookupPrice && context.serviceTypes?.length > 0 && context.vehicleType) {
                 console.log(`[executorNode] Executing getServiceDetails for ${context.vehicleType} and [${context.serviceTypes.join(', ')}]...`);
                 const tool = toolsByName['getServiceDetails'];
                 if (tool) {
