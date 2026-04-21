@@ -48,10 +48,20 @@ async function toolExecutorNode(state) {
                     if (context.serviceTypes.length >= 2) {
                         const promo = await getActivePromo();
                         if (promo && promo.comboDiscount > 0 && context.serviceTypes.length >= promo.comboMinServices) {
-                            // Calculate total from results
+                            // Deduplicate results by service_id to prevent double-counting
+                            // (e.g. "Detailing Bodi Halus,Bodi Kasar" can match "Repaint Bodi Halus" again)
                             const results = toolResult?.results || [];
+                            const seen = new Set();
+                            const uniqueResults = results.filter(r => {
+                                if (r.service_id && seen.has(r.service_id)) return false;
+                                if (r.service_id) seen.add(r.service_id);
+                                return true;
+                            });
+                            // Replace results array with deduplicated version
+                            toolResult.results = uniqueResults;
+                            
                             let totalPrice = 0;
-                            for (const r of results) {
+                            for (const r of uniqueResults) {
                                 if (r.final_price) totalPrice += r.final_price;
                                 else if (r.price) totalPrice += r.price;
                                 // For multiple_candidates (generic category), sum the first candidate
