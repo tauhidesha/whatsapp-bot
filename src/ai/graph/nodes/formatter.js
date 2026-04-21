@@ -104,7 +104,7 @@ Kamu punya kemampuan untuk melihat foto/video yang dikirim user untuk memberikan
   Alamat: ${studioMetadata.location.address}
   Landmark: ${studioMetadata.location.landmark}
   Google Maps: ${studioMetadata.location.googleMaps}
-  Jam Buka: Senin-Kamis & Sabtu-Minggu (${studioMetadata.hours.senin}), Jumat (Tutup).
+  Jam Buka: Senin-Sabtu (${studioMetadata.hours.senin}), Minggu (${studioMetadata.hours.minggu}).
 - Data Motor & Layanan (Hasil Ekstraksi):
 ${contextInfo}
 - Hasil Teknis/Tool:
