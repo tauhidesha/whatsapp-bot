@@ -59,30 +59,32 @@ async function generateMockupImage(motorModel, bodyColor, velgColor) {
   }
 
   // Lazy-load to prevent crash if @google/genai is not installed
-  const { GoogleGenAI, Modality } = require('@google/genai');
+  const { GoogleGenAI } = require('@google/genai');
 
   const client = new GoogleGenAI({ apiKey });
   const prompt = buildMockupPrompt(motorModel, bodyColor, velgColor);
   console.log(`[generateColorMockup] Prompt: ${prompt}`);
 
-  const response = await client.models.generateContent({
-    model: 'gemini-2.5-flash-preview-image-generation',
-    contents: prompt,
+  // Imagen 4 uses generateImages() API, NOT generateContent()
+  const response = await client.models.generateImages({
+    model: 'imagen-4.0-generate-001',
+    prompt: prompt,
     config: {
-      responseModalities: [Modality.IMAGE, Modality.TEXT],
+      numberOfImages: 1,
+      aspectRatio: '3:4',
+      includeRaiReason: true,
     },
   });
 
-  // Extract image from response parts
-  const parts = response?.candidates?.[0]?.content?.parts || [];
-  const imagePart = parts.find(p => p.inlineData?.data);
-
-  if (!imagePart) {
-    throw new Error('[generateColorMockup] Gemini tidak mengembalikan gambar.');
+  // Extract image from Imagen response
+  const images = response?.generatedImages || [];
+  if (images.length === 0 || !images[0]?.image?.imageBytes) {
+    const raiReason = images[0]?.raiFilteredReason;
+    throw new Error(`[generateColorMockup] Imagen tidak mengembalikan gambar.${raiReason ? ` RAI: ${raiReason}` : ''}`);
   }
 
-  const { data: base64Data, mimeType } = imagePart.inlineData;
-  const ext = mimeType?.includes('png') ? 'png' : 'jpg';
+  const base64Data = images[0].image.imageBytes;
+  const ext = 'png';
 
   // Save to temp file for WA sending
   const tempDir = path.join(os.tmpdir(), 'zoya-mockups');
