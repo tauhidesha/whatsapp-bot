@@ -74,15 +74,16 @@ ${JSON.stringify(toolResult.combo)}`;
         ? `Tanggal & Waktu Sekarang: ${state.metadata.currentDateTime.dayName}, ${state.metadata.currentDateTime.formatted} (Waktu Indonesia Barat)`
         : `Tanggal & Waktu Sekarang: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB`;
 
-    // Build context summary for the model
+    // Only show color fields relevant to selected services
+    const hasBodiRepaint = context.serviceTypes?.some(s => s.toLowerCase().includes('repaint') && s.toLowerCase().includes('halus'));
+    const hasVelgRepaint = context.serviceTypes?.some(s => s.toLowerCase().includes('repaint') && s.toLowerCase().includes('velg'));
+
     const contextInfo = `
 ${dateInfo}
 - Motor: ${context.vehicleType || 'Belum diketahui'}
 - Layanan yang dipilih: ${context.serviceTypes?.join(', ') || 'Belum ada'}
 - Detail/Fokus: ${context.detailingFocus || 'General'}
-- Bongkar Total: ${context.isBongkarTotal ? 'Ya' : 'Tidak'}
-- Warna Body: ${context.colorChoice || 'Belum ditentukan'}
-- Warna Velg: ${context.velgColorChoice || 'Belum ditentukan'}
+- Bongkar Total: ${context.isBongkarTotal ? 'Ya' : 'Tidak'}${hasBodiRepaint ? `\n- Warna Body: ${context.colorChoice || 'Belum ditentukan'}` : ''}${hasVelgRepaint ? `\n- Warna Velg: ${context.velgColorChoice || 'Belum ditentukan'}` : ''}
 `.trim();
 
 
