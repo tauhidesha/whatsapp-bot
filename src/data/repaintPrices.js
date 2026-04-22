@@ -130,7 +130,7 @@ const VELG_PRICE_MAP = {
 
 // ─── TAMBAHAN WARNA SPESIAL ───
 const warnaSpesial = [
-    { type: "Candy Colors", aliases: ["candy", "candy red", "candy blue", "candy tone"], surcharge: 125000 },
+    { type: "Candy Colors", aliases: ["candy", "candy red", "candy blue", "candy tone", "merah mazda", "mazda red", "candy merah", "red candy", "candy green", "candy orange", "candy purple"], surcharge: 125000 },
     { type: "Stabilo (Fluo)", aliases: ["stabilo", "fluo", "fluorescent"], surcharge: 170000 },
     { type: "Two-Tone / Polish", aliases: ["twotone", "polished", "velg polish"], surcharge: 210000 },
     { type: "Bunglon", aliases: ["cameleon", "chameleon"], surcharge: 300000 },

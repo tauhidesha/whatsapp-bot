@@ -167,16 +167,21 @@ async function main() {
           });
           console.log(`[SURCHARGE] Created ${w.type} (+${w.surcharge})`);
           surchargesUpserted++;
-      } else if (existing.amount !== w.surcharge) {
-          await prisma.surcharge.update({
-              where: { id: existing.id },
-              data: {
-                  amount: w.surcharge,
-                  aliases: w.aliases
-              }
-          });
-          console.log(`[SURCHARGE] Updated ${w.type} (+${w.surcharge})`);
-          surchargesUpserted++;
+      } else {
+          // Always update amount and aliases to stay in sync with seed data
+          const aliasesChanged = JSON.stringify(existing.aliases?.sort()) !== JSON.stringify(w.aliases.sort());
+          const amountChanged = existing.amount !== w.surcharge;
+          if (amountChanged || aliasesChanged) {
+              await prisma.surcharge.update({
+                  where: { id: existing.id },
+                  data: {
+                      amount: w.surcharge,
+                      aliases: w.aliases
+                  }
+              });
+              console.log(`[SURCHARGE] Updated ${w.type} (amount=${amountChanged ? w.surcharge : 'same'}, aliases=${aliasesChanged ? 'updated' : 'same'})`);
+              surchargesUpserted++;
+          }
       }
   }
 
