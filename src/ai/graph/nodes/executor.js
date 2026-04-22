@@ -91,6 +91,44 @@ async function toolExecutorNode(state) {
                     console.log(`[executorNode] Tool Result Success: ${toolResult ? 'Yes' : 'No'}`);
                 }
             }
+
+            // --- COLOR MOCKUP GENERATION ---
+            // Generate AI mockup only when ALL required colors are filled
+            const serviceTypes = context.serviceTypes || [];
+            const wantsBodi = serviceTypes.some(s => s.toLowerCase().includes('repaint') && s.toLowerCase().includes('halus'));
+            const wantsVelg = serviceTypes.some(s => s.toLowerCase().includes('repaint') && s.toLowerCase().includes('velg'));
+            const bodiReady = !wantsBodi || !!context.colorChoice;
+            const velgReady = !wantsVelg || !!context.velgColorChoice;
+            const allColorsReady = (wantsBodi || wantsVelg) && bodiReady && velgReady;
+            const notYetGenerated = !context.mockupGenerated;
+
+            if (allColorsReady && notYetGenerated && context.vehicleType) {
+                console.log(`[executorNode] 🎨 All colors ready! Generating mockup...`);
+                console.log(`[executorNode]   Motor: ${context.vehicleType} | Body: ${context.colorChoice || '-'} | Velg: ${context.velgColorChoice || '-'}`);
+                const mockupTool = toolsByName['generateColorMockup'];
+                if (mockupTool) {
+                    try {
+                        const mockupResult = await mockupTool({
+                            motorModel: context.vehicleType,
+                            bodyColor: context.colorChoice || undefined,
+                            velgColor: context.velgColorChoice || undefined,
+                            senderNumber: state.metadata?.phoneReal || '',
+                        });
+
+                        if (!toolResult) toolResult = { mockup: mockupResult };
+                        else toolResult.mockup = mockupResult;
+
+                        // Set flag to prevent re-generation on subsequent turns
+                        if (mockupResult.success) {
+                            context.mockupGenerated = true;
+                        }
+                        console.log(`[executorNode] 🎨 Mockup result: ${mockupResult.success ? '✅' : '❌'}`);
+                    } catch (mockupErr) {
+                        console.error(`[executorNode] 🎨 Mockup generation failed:`, mockupErr.message);
+                        // Non-fatal — don't break the flow, just skip mockup
+                    }
+                }
+            }
             
             // --- AUTOMATED HUMAN HANDOVER / BOSMAT TRIGGER ---
             const isCar = context.vehicleType === 'Mobil';
@@ -182,6 +220,7 @@ async function toolExecutorNode(state) {
         }
 
         return {
+            context: context,
             metadata: {
                 ...state.metadata,
                 toolResult: toolResult,

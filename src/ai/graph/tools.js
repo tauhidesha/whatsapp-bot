@@ -20,6 +20,7 @@ const { updateCustomerContextTool } = require('../tools/updateCustomerContextToo
 const { triggerBosMatTool } = require('../tools/triggerBosMatTool.js');
 const { sendStudioPhotoTool } = require('../tools/sendStudioPhotoTool.js');
 const { calculateHomeServiceFeeTool } = require('../tools/calculateHomeServiceFeeTool.js');
+const { generateColorMockupTool } = require('../tools/generateColorMockupTool.js');
 
 /**
  * Daftar tool yang akan digunakan oleh LangGraph.
@@ -45,7 +46,8 @@ const zoyaTools = [
     updateCustomerContextTool,
     triggerBosMatTool,
     sendStudioPhotoTool,
-    calculateHomeServiceFeeTool
+    calculateHomeServiceFeeTool,
+    generateColorMockupTool
 ];
 
 // Mapping nama ke implementasi (untuk manual call jika diperlukan)

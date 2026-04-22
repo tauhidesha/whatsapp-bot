@@ -52,6 +52,7 @@ const ZoyaState = Annotation.Root({
             bookingDate: null, // 'YYYY-MM-DD' or natural language 'besok'
             bookingTime: null, // 'HH:mm' or natural language 'jam 2'
             comboOffered: false, // Track apakah promo combo sudah ditawarkan
+            mockupGenerated: false, // Track apakah mockup warna sudah digenerate
             missingQuestions: [], // Daftar pertanyaan yang harus diajukan Zoya
             isReadyForTools: false
         })
