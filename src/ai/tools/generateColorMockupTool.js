@@ -53,7 +53,7 @@ function buildMockupPrompt(motorModel, bodyColor, velgColor) {
  * Returns { success, tempPath, caption } or throws on failure.
  */
 async function generateMockupImage(motorModel, bodyColor, velgColor) {
-  const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+  const apiKey = process.env.IMAGEN_API_KEY || process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error('[generateColorMockup] GOOGLE_API_KEY tidak ditemukan.');
   }
