@@ -93,17 +93,19 @@ async function toolExecutorNode(state) {
             }
 
             // --- COLOR MOCKUP GENERATION ---
-            // Generate AI mockup only when ALL required colors are filled
+            // Generate AI mockup only when ALL required colors are filled (max 3 per session)
+            const MAX_MOCKUPS = 3;
             const serviceTypes = context.serviceTypes || [];
             const wantsBodi = serviceTypes.some(s => s.toLowerCase().includes('repaint') && s.toLowerCase().includes('halus'));
             const wantsVelg = serviceTypes.some(s => s.toLowerCase().includes('repaint') && s.toLowerCase().includes('velg'));
             const bodiReady = !wantsBodi || !!context.colorChoice;
             const velgReady = !wantsVelg || !!context.velgColorChoice;
             const allColorsReady = (wantsBodi || wantsVelg) && bodiReady && velgReady;
-            const notYetGenerated = !context.mockupGenerated;
+            const mockupCount = typeof context.mockupGenerated === 'number' ? context.mockupGenerated : 0;
+            const canGenerate = mockupCount < MAX_MOCKUPS;
 
-            if (allColorsReady && notYetGenerated && context.vehicleType) {
-                console.log(`[executorNode] 🎨 All colors ready! Generating mockup...`);
+            if (allColorsReady && canGenerate && context.vehicleType) {
+                console.log(`[executorNode] 🎨 All colors ready! Generating mockup (${mockupCount + 1}/${MAX_MOCKUPS})...`);
                 console.log(`[executorNode]   Motor: ${context.vehicleType} | Body: ${context.colorChoice || '-'} | Velg: ${context.velgColorChoice || '-'}`);
                 const mockupTool = toolsByName['generateColorMockup'];
                 if (mockupTool) {
@@ -118,16 +120,21 @@ async function toolExecutorNode(state) {
                         if (!toolResult) toolResult = { mockup: mockupResult };
                         else toolResult.mockup = mockupResult;
 
-                        // Set flag to prevent re-generation on subsequent turns
+                        // Increment counter on success
                         if (mockupResult.success) {
-                            context.mockupGenerated = true;
+                            context.mockupGenerated = mockupCount + 1;
                         }
-                        console.log(`[executorNode] 🎨 Mockup result: ${mockupResult.success ? '✅' : '❌'}`);
+                        console.log(`[executorNode] 🎨 Mockup result: ${mockupResult.success ? '✅' : '❌'} (${context.mockupGenerated}/${MAX_MOCKUPS})`);
                     } catch (mockupErr) {
                         console.error(`[executorNode] 🎨 Mockup generation failed:`, mockupErr.message);
                         // Non-fatal — don't break the flow, just skip mockup
                     }
                 }
+            } else if (allColorsReady && !canGenerate && context.vehicleType) {
+                // Limit reached — inform formatter
+                console.log(`[executorNode] 🎨 Mockup limit reached (${mockupCount}/${MAX_MOCKUPS}). Skipping.`);
+                if (!toolResult) toolResult = { mockup: { success: false, limit_reached: true, count: mockupCount, max: MAX_MOCKUPS } };
+                else toolResult.mockup = { success: false, limit_reached: true, count: mockupCount, max: MAX_MOCKUPS };
             }
             
             // --- AUTOMATED HUMAN HANDOVER / BOSMAT TRIGGER ---
