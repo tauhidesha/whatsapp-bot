@@ -1,8 +1,8 @@
 // File: src/ai/tools/generateColorMockupTool.js
 // Generate AI color mockup of a motorcycle using Gemini image generation.
 // Sends the generated image to the customer via WhatsApp.
+// NOTE: @google/genai is lazy-loaded to prevent app crash if not installed.
 
-const { GoogleGenAI, Modality } = require('@google/genai');
 const { z } = require('zod');
 const { markBotMessage } = require('../utils/adminMessageSync.js');
 const path = require('path');
@@ -57,6 +57,9 @@ async function generateMockupImage(motorModel, bodyColor, velgColor) {
   if (!apiKey) {
     throw new Error('[generateColorMockup] GOOGLE_API_KEY tidak ditemukan.');
   }
+
+  // Lazy-load to prevent crash if @google/genai is not installed
+  const { GoogleGenAI, Modality } = require('@google/genai');
 
   const client = new GoogleGenAI({ apiKey });
   const prompt = buildMockupPrompt(motorModel, bodyColor, velgColor);
