@@ -289,6 +289,16 @@ Output: {
             }
         }
 
+        // --- AUTO-RESOLVE: Repaint + generic "Detailing" → "Cuci Komplit" ---
+        // Business rule: kalau motor sudah di-repaint (dibongkar), detailing yang paling masuk akal 
+        // adalah "Cuci Komplit" (bongkar cuci total) bukan detailing individu
+        const hasRepaint = ctx.serviceTypes.some(s => s.toLowerCase().includes('repaint'));
+        const genericDetailingIdx = ctx.serviceTypes.findIndex(s => s.toLowerCase() === 'detailing');
+        if (hasRepaint && genericDetailingIdx !== -1) {
+            ctx.serviceTypes[genericDetailingIdx] = 'Cuci Komplit';
+            console.log(`[INFO_COLLECTOR_NODE] Auto-resolved "Detailing" → "Cuci Komplit" (motor sudah dibongkar untuk repaint)`);
+        }
+
     } catch (error) {
         console.error('[INFO_COLLECTOR_NODE] Extraction failed:', error.message);
         const elapsed = Date.now() - startTime;
@@ -312,7 +322,7 @@ Output: {
         missingQuestion = "Tanyakan tipe motor user (contoh: Nmax, Scoopy, Vario)";
     } else if (needsMotorModel && ctx.serviceTypes.length === 0) {
         missingQuestion = "Tanyakan rencana layanan yang diinginkan (Repaint, Coating, atau Detailing)";
-    } else if (classifiedIntent === 'BOOKING_SERVICE') {
+    } else if (classifiedIntent === 'BOOKING_SERVICE' || (classifiedIntent === 'GENERAL_INQUIRY' && ctx.vehicleType && ctx.serviceTypes.length > 0)) {
         // Resolve generic service names first
         for (let i = 0; i < ctx.serviceTypes.length; i++) {
             const svc = ctx.serviceTypes[i].toLowerCase();
