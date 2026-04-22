@@ -66,7 +66,7 @@ async function generateMockupImage(motorModel, bodyColor, velgColor) {
   console.log(`[generateColorMockup] Prompt: ${prompt}`);
 
   const response = await client.models.generateContent({
-    model: 'gemini-2.5-flash-image',
+    model: 'imagen-4.0-fast-generate-001',
     contents: prompt,
     config: {
       responseModalities: [Modality.IMAGE, Modality.TEXT],
