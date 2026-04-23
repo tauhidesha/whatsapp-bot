@@ -16,8 +16,17 @@ module.exports = function generateInvoiceHTML(data) {
   const dp = Number(downPayment) || 0;
   const totalPaid = Number(amountPaid) || 0;
 
-  // Sisa Tagihan = (Subtotal - Diskon) - DP - Bayar Hari Ini
-  const balance = Math.max(0, Math.round(subtotal - discountAmount - dp - totalPaid));
+  // Prevent double-counting: if dp and amountPaid are the same value,
+  // they refer to the same payment (AI filled both fields with the same number).
+  // Only add them when they are genuinely different amounts.
+  const actualTotalPaid = (dp > 0 && totalPaid > 0 && dp === totalPaid)
+    ? dp           // same value → count once
+    : dp + totalPaid; // different → DP + additional payment
+
+  // Total setelah diskon
+  const grandTotal = subtotal - discountAmount;
+  // Sisa Tagihan = Total Keseluruhan - Total yang sudah dibayar
+  const balance = Math.max(0, Math.round(grandTotal - actualTotalPaid));
 
   // Clean recipient number - prefer realPhone (actual WA number) over @lid
   const displayPhone = realPhone
@@ -119,7 +128,7 @@ module.exports = function generateInvoiceHTML(data) {
         </h1>
         <div style="display:flex; gap:12px; margin-top:16px">
           <span style="background:#676700; color:#e6e67a; padding:4px 12px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em">
-            Status: ${(totalPaid) >= (subtotal - discountAmount) ? 'Lunas' : (totalPaid) > 0 ? 'DP' : 'Belum Bayar'}
+            Status: ${actualTotalPaid >= grandTotal ? 'Lunas' : actualTotalPaid > 0 ? 'DP' : 'Belum Bayar'}
           </span>
         </div>
       </div>
@@ -280,7 +289,7 @@ module.exports = function generateInvoiceHTML(data) {
           <span class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em">Down Payment (DP)</span>
           <span style="font-size:16px; color:#ffb4ab">- Rp${dp.toLocaleString('id-ID')}</span>
         </div>` : ''}
-        ${totalPaid > 0 ? `
+        ${totalPaid > 0 && !(dp > 0 && dp === totalPaid) ? `
         <div style="display:flex; justify-content:space-between">
           <span class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em">${documentType === 'bukti_bayar' ? 'Bayar Hari Ini' : 'Total Bayar'}</span>
           <span style="font-size:16px; color:#85ff7a">Rp${totalPaid.toLocaleString('id-ID')}</span>
@@ -288,7 +297,7 @@ module.exports = function generateInvoiceHTML(data) {
         
         <div style="border-top:1px solid #484831; padding-top:24px; margin-top:8px">
           <span class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em; display:block; margin-bottom:8px">Total Keseluruhan</span>
-          <span class="font-headline" style="font-size:36px; font-weight:900">Rp${(subtotal - discountAmount).toLocaleString('id-ID')}</span>
+          <span class="font-headline" style="font-size:36px; font-weight:900">Rp${grandTotal.toLocaleString('id-ID')}</span>
         </div>
 
         <div style="background:#FFFF00; padding:20px 24px; margin:0 -40px -40px; display:flex; justify-content:space-between; align-items:center">
