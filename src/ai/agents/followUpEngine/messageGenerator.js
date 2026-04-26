@@ -136,6 +136,14 @@ async function generateFollowUpMessage(customerData, strategy, promoData = null)
         const followUpCount = context.followUpCount || 0;
         const lastFollowUpStrategy = context.lastFollowUpStrategy || 'tidak ada';
 
+        let activeAngle = 'standard';
+        if (strategy.angles && strategy.angles.length > 0) {
+            // Rotasi angle berdasarkan urutan follow up (0, 1, 2, dst)
+            activeAngle = strategy.angles[Math.min(followUpCount, strategy.angles.length - 1)];
+        } else if (strategy.angle) {
+            activeAngle = strategy.angle; // Fallback jika config lama belum terupdate
+        }
+
         const promoSection = promoData && promoData.promoText 
             ? `# PROMO AKTIF SAAT INI\n- Info Promo: ${promoData.promoText}\n`
             : '';
@@ -184,7 +192,7 @@ ${followUpCount > 0 ? '- INSTRUKSI: Ini bukan follow up pertama. JANGAN gunakan 
 - Boleh mulai dengan pertanyaan ringan atau mention sesuatu yang relevan dengan hobi motor.
 
 # INSTRUKSI ANGLE
-${ANGLE_INSTRUCTIONS[strategy.angle] || ANGLE_INSTRUCTIONS.standard}
+${ANGLE_INSTRUCTIONS[activeAngle] || ANGLE_INSTRUCTIONS.standard}
 
 # TUGAS & OUTPUT (PENTING!)
 1. Buat 1 pesan chat personal sesuai karakter Zoya.
@@ -202,7 +210,7 @@ ${ANGLE_INSTRUCTIONS[strategy.angle] || ANGLE_INSTRUCTIONS.standard}
         const callbacks = getLangSmithCallbacks('FollowUpEngine', {
             metadata: {
                 customerName: name,
-                strategy: strategy.angle,
+                strategy: activeAngle,
                 followUpCount: followUpCount + 1
             },
             tags: ['follow-up']

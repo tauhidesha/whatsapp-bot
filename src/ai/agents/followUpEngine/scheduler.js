@@ -336,7 +336,7 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
                 name: customer.name || 'Mas',
                 context,
                 metadata,
-                strategy: STRATEGY_CONFIG[context.customerLabel],
+                strategy: { ...STRATEGY_CONFIG[context.customerLabel] },
             });
         }
     }
@@ -468,10 +468,13 @@ async function processFollowUp(customer, promoData = null, dryRun = false) {
     }
     console.log(`[Scheduler] ✅ Sent to ${docId}: "${message.substring(0, 50)}..."`);
 
+    const followUpCount = context.followUpCount || 0;
+    const activeAngle = strategy.angles ? strategy.angles[Math.min(followUpCount, strategy.angles.length - 1)] : (strategy.angle || 'standard');
+
     const updateData = {
-        followUpCount: (context.followUpCount || 0) + 1,
+        followUpCount: followUpCount + 1,
         lastFollowUpAt: new Date(),
-        lastFollowUpStrategy: strategy.angle,
+        lastFollowUpStrategy: activeAngle,
     };
 
     if (context.reviewMode) {
@@ -575,12 +578,15 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
             itemType = 'rebooking';
             queueItem = { docId: context.id, senderNumber, name, context: { ...context, rebookingMode: true }, metadata, strategy: itemStrategy };
         } else if (isNurtureEligible) {
-            itemStrategy = STRATEGY_CONFIG[context.customerLabel];
+            itemStrategy = { ...STRATEGY_CONFIG[context.customerLabel] };
             itemType = 'nurturing';
             queueItem = { docId: context.id, senderNumber, name, context, metadata, strategy: itemStrategy };
         }
 
         if (queueItem && itemStrategy) {
+            const currentCount = context.followUpCount || 0;
+            itemStrategy.angle = itemStrategy.angles ? itemStrategy.angles[Math.min(currentCount, itemStrategy.angles.length - 1)] : (itemStrategy.angle || 'standard');
+            
             try {
                 const generatedMessage = await generateFollowUpMessage(queueItem, itemStrategy, promoData);
                 if (generatedMessage) {
