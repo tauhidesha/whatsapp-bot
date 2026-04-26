@@ -166,14 +166,22 @@ ${promoSection}
 - Layanan diminati: ${context.targetServices && context.targetServices.length > 0 ? context.targetServices.join(', ') : 'tidak diketahui'}
 - Terakhir chat: ${daysSinceChat !== null ? daysSinceChat + ' hari lalu' : 'tidak diketahui'}
 
+# HISTORY CHAT TERAKHIR (5 Pesan Terakhir)
+${metadata.chatHistory ? metadata.chatHistory : '(Belum ada riwayat chat)'}
+
 # STRATEGIC CONTEXT
 - Follow-up Ke: ${followUpCount + 1}
 - Strategi Sebelumnya: ${lastFollowUpStrategy}
 ${followUpCount > 0 ? '- INSTRUKSI: Ini bukan follow up pertama. JANGAN gunakan pembukaan standar. Coba pendekatan yang lebih personal atau spesifik ke detail motornya.' : ''}
+- INSTRUKSI KONTEKS WAKTU: Terakhir ngobrol ${daysSinceChat !== null ? daysSinceChat + ' hari' : 'beberapa waktu'} yang lalu. WAJIB sesuaikan gaya sapaan dengan durasi ini agar terasa natural!
+  - Jika 1-3 hari lalu: Lanjutkan obrolan seakan baru kemarin (contoh: "ngelanjutin obrolan kemaren nih...", "gimana mas jadi merapat?").
+  - Jika 4-14 hari lalu: Sapa santai karena udah agak lama (contoh: "halo mas, lama ga ngobrol, gimana kabar motornya?", "sibuk touring ya mas?").
+  - Jika >14 hari lalu: Sapaan hangat karena udah lama banget hilang (contoh: "halo mas, zoya ngecek aja nih siapa tau kemaren kelupaan bales...").
 
 # ANTI-TEMPLATE RULES
+- DILARANG KERAS mengulang kalimat sapaan yang sama terus-menerus. JANGAN selalu bilang "gimana kabarnya" di awal.
 - DILARANG mulai dengan "gimana perkembangan motornya" atau "udah sempat mampir" jika sudah pernah follow up sebelumnya.
-- Variasikan pembukaan setiap kali; jangan pakai pola yang sama dengan pesan sebelumnya.
+- Variasikan pembukaan setiap kali; gunakan kreativitasmu untuk langsung masuk ke topik dengan nyeleneh atau lucu.
 - Referensikan detail motor (model/warna) atau layanan yang diminati agar terasa personal.
 - Boleh mulai dengan pertanyaan ringan atau mention sesuatu yang relevan dengan hobi motor.
 

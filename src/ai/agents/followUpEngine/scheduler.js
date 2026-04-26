@@ -165,6 +165,9 @@ function isEligible(context, metadata) {
     if (lastFollowUp) {
         const daysSinceLastFollowUp = Math.floor((now - lastFollowUp) / (1000 * 60 * 60 * 24));
         if (daysSinceLastFollowUp < (strategy.intervalDays || strategy.waitDays)) return false;
+    } else {
+        const daysSinceLastMessage = Math.floor((now - lastMessage) / (1000 * 60 * 60 * 24));
+        if (daysSinceLastMessage < strategy.waitDays) return false;
     }
 
     // Check max follow-ups
@@ -206,6 +209,10 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
                         where: {
                             status: { notIn: ['DONE', 'CANCELLED'] }
                         }
+                    },
+                    messages: {
+                        orderBy: { createdAt: 'desc' },
+                        take: 5
                     }
                 }
             }
@@ -226,11 +233,17 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
         // Skip jika tidak ada customer
         if (!customer) continue;
 
-        // Ambil metadata dari customer
+        const chatHistory = (customer.messages || [])
+            .slice()
+            .reverse()
+            .map(m => `${m.role === 'user' ? 'Customer' : 'Zoya'}: ${m.content}`)
+            .join('\n');
+
         const metadata = {
             lastMessageAt: customer.lastMessageAt,
             name: customer.name,
-            fullSenderId: customer.phone.includes('@') ? customer.phone : customer.phone + '@c.us'
+            fullSenderId: customer.phone.includes('@') ? customer.phone : customer.phone + '@c.us',
+            chatHistory
         };
 
         // 2. Label downgrade check
@@ -489,6 +502,10 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
                 include: {
                     bookings: {
                         where: { status: { notIn: ['DONE', 'CANCELLED'] } }
+                    },
+                    messages: {
+                        orderBy: { createdAt: 'desc' },
+                        take: 5
                     }
                 }
             }
@@ -503,10 +520,17 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
         const customer = context.customer;
         if (!customer) continue;
 
+        const chatHistory = (customer.messages || [])
+            .slice()
+            .reverse()
+            .map(m => `${m.role === 'user' ? 'Customer' : 'Zoya'}: ${m.content}`)
+            .join('\n');
+
         const metadata = {
             lastMessageAt: customer.lastMessageAt,
             name: customer.name,
-            fullSenderId: customer.phone.includes('@') ? customer.phone : customer.phone + '@c.us'
+            fullSenderId: customer.phone.includes('@') ? customer.phone : customer.phone + '@c.us',
+            chatHistory
         };
 
         const isNurtureEligible = isEligible(context, metadata);
