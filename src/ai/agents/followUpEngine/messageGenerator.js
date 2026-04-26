@@ -1,7 +1,8 @@
 // File: src/ai/agents/followUpEngine/messageGenerator.js
 // Logic for generating follow-up messages based on customer context and AI personality.
 
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
+const { getLangSmithCallbacks } = require('../../utils/langsmith');
 
 /**
  * Calculate days passed since a given date.
@@ -131,9 +132,6 @@ async function generateFollowUpMessage(customerData, strategy, promoData = null)
         const { name, context, metadata } = customerData;
         const daysSinceChat = getDaysSince(metadata.lastMessageAt);
         const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const modelName = 'gemini-2.5-flash-lite';
-        const model = genAI.getGenerativeModel({ model: modelName });
 
         const followUpCount = context.followUpCount || 0;
         const lastFollowUpStrategy = context.lastFollowUpStrategy || 'tidak ada';
@@ -195,9 +193,23 @@ ${ANGLE_INSTRUCTIONS[strategy.angle] || ANGLE_INSTRUCTIONS.standard}
 4. RESPOND HANYA DENGAN TEKS PESAN FINAL. JANGAN ADA PENJELASAN ATAU DRAFT.
 `;
 
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const rawText = response.text();
+        const model = new ChatGoogleGenerativeAI({
+            modelName: 'gemini-2.5-flash-lite',
+            apiKey: apiKey,
+            temperature: 0.7,
+        });
+
+        const callbacks = getLangSmithCallbacks('FollowUpEngine', {
+            metadata: {
+                customerName: name,
+                strategy: strategy.angle,
+                followUpCount: followUpCount + 1
+            },
+            tags: ['follow-up']
+        });
+
+        const response = await model.invoke(prompt, { callbacks });
+        const rawText = response.content;
         
         // Clean the response before returning
         return cleanAiResponse(rawText);
