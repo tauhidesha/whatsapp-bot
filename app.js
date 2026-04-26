@@ -1642,8 +1642,8 @@ async function processBufferedMessages(senderNumber, client) {
     // Cek status AI (Snooze/Handover) sekali lagi sebelum memproses
     const { normalizedAddress } = parseSenderIdentity(senderNumber);
     if (await isSnoozeActive(normalizedAddress)) {
-        console.log(`[DEBOUNCED] AI skipped for ${senderNumber} (handover active). Saving message only.`);
-        if (prisma) await saveMessageToPrisma(senderNumber, combinedMessage, 'user');
+        console.log(`[DEBOUNCED] AI skipped for ${senderNumber} (handover active). Message already saved.`);
+        // User message was already saved instantly in client.onMessage
         return;
     }
 
@@ -1680,7 +1680,6 @@ async function processBufferedMessages(senderNumber, client) {
                 markBotMessage(targetNumber, auditResponse);
                 await client.sendText(targetNumber, auditResponse);
                 if (prisma) {
-                    await saveMessageToPrisma(senderNumber, combinedMessage, 'user');
                     await saveMessageToPrisma(senderNumber, auditResponse, 'ai');
                 }
                 await client.stopTyping(senderNumber);
@@ -1694,7 +1693,6 @@ async function processBufferedMessages(senderNumber, client) {
                 markBotMessage(targetNumber, auditResponse);
                 await client.sendText(targetNumber, auditResponse);
                 if (prisma) {
-                    await saveMessageToPrisma(senderNumber, combinedMessage, 'user');
                     await saveMessageToPrisma(senderNumber, auditResponse, 'ai');
                 }
                 await client.stopTyping(senderNumber);
@@ -1711,7 +1709,6 @@ async function processBufferedMessages(senderNumber, client) {
                     markBotMessage(targetNumber, auditResponse);
                     await client.sendText(targetNumber, auditResponse);
                     if (prisma) {
-                        await saveMessageToPrisma(senderNumber, combinedMessage, 'user');
                         await saveMessageToPrisma(senderNumber, auditResponse, 'ai');
                     }
                     await client.stopTyping(senderNumber);
@@ -1794,7 +1791,6 @@ async function processBufferedMessages(senderNumber, client) {
                 await client.sendText(targetNumber, finalReply);
                 
                 if (prisma) {
-                    await saveMessageToPrisma(senderNumber, combinedMessage, isAdmin ? 'admin' : 'user');
                     await saveMessageToPrisma(senderNumber, finalReply, 'ai');
                 }
                 await client.stopTyping(senderNumber);
@@ -1829,7 +1825,6 @@ async function processBufferedMessages(senderNumber, client) {
                 // Fire & Forget: Save history + metadata AFTER sending
                 if (prisma) {
                     Promise.all([
-                        saveMessageToPrisma(senderNumber, combinedMessage, isAdmin ? 'admin' : 'user'),
                         saveMessageToPrisma(senderNumber, aiResponse, 'ai')
                     ]).catch(err => console.warn('[SaveMessage] Failed:', err.message));
                 }
@@ -2204,18 +2199,25 @@ function start(client) {
             messageEntry.location = locationContext;
         }
 
-        entry.messages.push(messageEntry);
-        pendingMessages.set(senderNumber, entry);
-
-        // Cek apakah pengirim adalah admin untuk bypass buffer time
+        // --- INSTANT SAVE ---
         const adminNumbers = [
             process.env.BOSMAT_ADMIN_NUMBER,
             process.env.ADMIN_WHATSAPP_NUMBER
         ].filter(Boolean);
-
+        
         /* normalize replaced by normalizePhone in mergeCustomerContext.js */
         const senderNormalized = normalizePhone(senderNumber);
         const isAdmin = adminNumbers.some(num => normalizePhone(num) === senderNormalized);
+
+        if (prisma) {
+            const userRole = isAdmin ? 'admin' : 'user';
+            // Fire & forget to save incoming message instantly so UI is updated realtime
+            saveMessageToPrisma(senderNumber, messageEntry.content, userRole).catch(err => console.warn('[InstantSave] Failed:', err.message));
+        }
+        // --------------------
+
+        entry.messages.push(messageEntry);
+        pendingMessages.set(senderNumber, entry);
 
         if (isAdmin) {
             console.log(`[BUFFER] ⚡ Admin detected (${senderNumber}), skipping debounce buffer.`);
