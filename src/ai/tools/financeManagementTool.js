@@ -118,21 +118,29 @@ const addTransactionTool = {
 
       const txDate = parsed.date ? new Date(parsed.date) : new Date();
 
-      const tx = await prisma.transaction.create({
-        data: {
-          type: parsed.type === 'income' ? 'INCOME' : 'EXPENSE',
-          status: 'SUCCESS',
-          amount: parsed.amount,
-          category: parsed.category,
-          description: parsed.description,
-          paymentMethod: parsed.paymentMethod,
-          paymentDate: txDate,
-          customerName: parsed.customerName,
-          customerId: linkedPhone,
-          bookingId: parsed.bookingId || null,
-          createdBy: parsed.senderNumber
-        }
-      });
+      const isIncome = parsed.type === 'income';
+
+      const createData = {
+        type: isIncome ? 'INCOME' : 'EXPENSE',
+        status: 'SUCCESS',
+        amount: parsed.amount,
+        category: parsed.category,
+        description: parsed.description,
+        paymentMethod: parsed.paymentMethod,
+        paymentDate: txDate,
+      };
+
+      // Link booking via relation (optional)
+      if (parsed.bookingId) {
+        createData.booking = { connect: { id: parsed.bookingId } };
+      }
+
+      // Link customer only for INCOME (expense never links to customer)
+      if (isIncome && linkedPhone) {
+        createData.customer = { connect: { id: linkedPhone } };
+      }
+
+      const tx = await prisma.transaction.create({ data: createData });
 
       // SYNC statistics
       if (parsed.bookingId) {
