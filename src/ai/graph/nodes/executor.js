@@ -92,6 +92,28 @@ async function toolExecutorNode(state) {
                 }
             }
 
+            // --- FIX B: Auto-handover if pricing data not found ---
+            if (shouldLookupPrice && context.serviceTypes?.length > 0) {
+                const results = toolResult?.results || [];
+                const hasUsableResult = results.length > 0 && results.some(r => !r.error && r.status !== 'not_found');
+                if (!hasUsableResult) {
+                    console.log(`[executorNode] ⚠️ No pricing data found for [${context.serviceTypes.join(', ')}] + ${context.vehicleType}. Auto-triggering handover...`);
+                    const handoverTool = toolsByName['triggerBosMatTool'];
+                    if (handoverTool) {
+                        const lastUserMsgRecord = state.messages.slice().reverse().find(m => m.type === 'human' || m.role === 'user');
+                        const lastUserMsg = lastUserMsgRecord ? extractTextFromContent(lastUserMsgRecord.content) : 'No text found';
+                        const handoffResult = await handoverTool({
+                            reason: `Harga layanan [${context.serviceTypes.join(', ')}] untuk ${context.vehicleType} tidak ditemukan di database. Perlu konfirmasi manual.`,
+                            customerQuestion: lastUserMsg,
+                            senderNumber: state.metadata?.phoneReal || ''
+                        });
+                        if (!toolResult) toolResult = { handoff: handoffResult };
+                        else toolResult.handoff = handoffResult;
+                        toolResult.autoHandoverReason = 'no_pricing_data';
+                    }
+                }
+            }
+
             // --- COLOR MOCKUP GENERATION ---
             // Generate AI mockup only when ALL required colors are filled (max 3 per session)
             const MAX_MOCKUPS = 3;
@@ -137,30 +159,7 @@ async function toolExecutorNode(state) {
                 else toolResult.mockup = { success: false, limit_reached: true, count: mockupCount, max: MAX_MOCKUPS };
             }
             
-            // --- AUTOMATED HUMAN HANDOVER / BOSMAT TRIGGER ---
-            const isCar = context.vehicleType === 'Mobil';
-            if (intent === 'HUMAN_HANDOVER' || isCar) {
-                console.log(`[executorNode] Triggering HUMAN HANDOVER (Reason: ${isCar ? 'Car Inquiry' : 'User Request'})...`);
-                const tool = toolsByName['triggerBosMatTool'];
-                if (tool) {
-                    const lastUserMsgRecord = state.messages.slice().reverse().find(m => m.type === 'human' || m.role === 'user');
-                    const lastUserMsg = lastUserMsgRecord ? extractTextFromContent(lastUserMsgRecord.content) : 'No text found';
-                    
-                    const handoffResult = await tool({
-                        reason: isCar ? 'Tanya repaint/detailing Mobil (perlu konfirmasi bos)' : 'User minta bantuan admin/human handover',
-                        customerQuestion: lastUserMsg,
-                        senderNumber: state.metadata?.phoneReal || ''
-                    });
 
-                    // Merge into toolResult
-                    if (!toolResult) {
-                        toolResult = { handoff: handoffResult };
-                    } else {
-                        toolResult.handoff = handoffResult;
-                    }
-                    console.log(`[executorNode] Handover Success: ${handoffResult.success}`);
-                }
-            }
 
             // Cek Booking Availability jika ada tanggal/jam
             if (context.bookingDate) {
@@ -217,6 +216,25 @@ async function toolExecutorNode(state) {
                         else toolResult.studioPhoto = photoResult;
                     }
                 }
+            }
+        }
+
+        // --- FIX A: Standalone HUMAN_HANDOVER trigger (works for ANY intent) ---
+        const isCar = context.vehicleType === 'Mobil';
+        if ((intent === 'HUMAN_HANDOVER' || isCar) && !toolResult?.handoff) {
+            console.log(`[executorNode] Triggering HUMAN HANDOVER (Reason: ${isCar ? 'Car Inquiry' : 'User Request'})...`);
+            const handoverTool = toolsByName['triggerBosMatTool'];
+            if (handoverTool) {
+                const lastUserMsgRecord = state.messages.slice().reverse().find(m => m.type === 'human' || m.role === 'user');
+                const lastUserMsg = lastUserMsgRecord ? extractTextFromContent(lastUserMsgRecord.content) : 'No text found';
+                const handoffResult = await handoverTool({
+                    reason: isCar ? 'Tanya repaint/detailing Mobil (perlu konfirmasi bos)' : 'User minta bantuan admin/human handover',
+                    customerQuestion: lastUserMsg,
+                    senderNumber: state.metadata?.phoneReal || ''
+                });
+                if (!toolResult) toolResult = { handoff: handoffResult };
+                else toolResult.handoff = handoffResult;
+                console.log(`[executorNode] Handover Success: ${handoffResult.success}`);
             }
         }
 

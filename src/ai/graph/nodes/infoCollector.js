@@ -192,6 +192,21 @@ Output: {
         // Validate intent
         const validIntents = ['GREETING', 'CONSULTATION', 'BOOKING_SERVICE', 'GENERAL_INQUIRY', 'HUMAN_HANDOVER', 'OTHER'];
         if (!validIntents.includes(classifiedIntent)) classifiedIntent = 'GENERAL_INQUIRY';
+
+        // --- FIX C: Complaint/dispute detection → auto-handover ---
+        const complaintPattern = /mahal\s*banget|kecewa|jelek|nggak\s*sesuai|komplain|complaint|rugi|penipuan|nipu|refund|uang\s*kembali|balikin\s*uang|protes|tidak\s*puas|mengecewakan/i;
+        if (complaintPattern.test(lastMessageText) && classifiedIntent !== 'HUMAN_HANDOVER') {
+            console.log(`[INFO_COLLECTOR_NODE] ⚠️ Complaint detected → overriding to HUMAN_HANDOVER`);
+            classifiedIntent = 'HUMAN_HANDOVER';
+        }
+
+        // --- FIX D: Out-of-scope service detection → auto-handover ---
+        const outOfScopePattern = /\b(ppf|wrapping|wrap|airbrush|custom\s*grafis|cutting\s*sticker|stiker\s*custom|decal|sandblast|chrome|hydrodip|karbon|carbon\s*wrap)\b/i;
+        if (outOfScopePattern.test(lastMessageText) && classifiedIntent !== 'HUMAN_HANDOVER') {
+            console.log(`[INFO_COLLECTOR_NODE] ⚠️ Out-of-scope service detected → overriding to HUMAN_HANDOVER`);
+            classifiedIntent = 'HUMAN_HANDOVER';
+        }
+
         console.log(`[INFO_COLLECTOR_NODE] Intent: ${classifiedIntent} (Prev: ${prevIntent})`);
 
         // --- SKIP EXTRACTION for non-relevant intents ---
