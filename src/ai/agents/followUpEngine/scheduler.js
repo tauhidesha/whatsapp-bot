@@ -281,7 +281,10 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
 
         if (lastService && !context.reviewFollowUpSent && !hasActiveBooking) {
             const daysSinceService = Math.floor((now - lastService) / (1000 * 60 * 60 * 24));
-            if (daysSinceService >= 3 && daysSinceService <= 7) {
+            // Wider window (3-30 days) for customers who NEVER received a review (backfill catch-up)
+            // Standard window (3-7 days) for repeat reviews after subsequent services
+            const maxDays = context.lastReviewAt ? 7 : 30;
+            if (daysSinceService >= 3 && daysSinceService <= maxDays) {
                 isReviewEligible = true;
             }
         }
@@ -543,7 +546,8 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
         const hasActiveBooking = (customer.bookings || []).length > 0;
         if (lastService && !context.reviewFollowUpSent && !hasActiveBooking) {
             const daysSinceService = Math.floor((now - lastService) / (1000 * 60 * 60 * 24));
-            if (daysSinceService >= 3 && daysSinceService <= 7) isReviewEligible = true;
+            const maxDays = context.lastReviewAt ? 7 : 30;
+            if (daysSinceService >= 3 && daysSinceService <= maxDays) isReviewEligible = true;
         }
 
         let isRebookingEligible = false;
