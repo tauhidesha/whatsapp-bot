@@ -1774,18 +1774,14 @@ async function processBufferedMessages(senderNumber, client) {
 
 
             // Handle HUMAN_HANDOVER intent
+            // NOTE: triggerBosMatTool + setSnoozeMode already executed by executor node.
+            // We only need to send the AI response and sync CRM here — no double-fire.
             if (result.intent === 'HUMAN_HANDOVER') {
-                console.log(`🚨 [LangGraph] Escalation detected for ${senderNumber}. Triggering Human Handover.`);
-                await setSnoozeMode(senderNumber, 60, { reason: 'eskalasi_otomatis' });
+                console.log(`🚨 [LangGraph] Escalation handled by executor. Sending response for ${senderNumber}.`);
                 // Ensure CRM reflects latest state before handover
                 if (!isAdmin) await syncGraphStateToCRM(senderNumber, result).catch(() => {});
-                await triggerBosMatTool.implementation({
-                    senderNumber: senderNumber,
-                    reason: 'User meminta bantuan admin atau terdeteksi emosi tinggi.',
-                    customerQuestion: combinedMessage
-                });
                 
-                const finalReply = aiResponse || "Wah, pertanyaan Mas/Kak cukup teknis nih. Zoya panggilin Admin dulu ya biar dibantu langsung! 🙏";
+                const finalReply = aiResponse || "wah, pertanyaan mas/kak cukup teknis nih. zoya panggilin admin dulu ya biar dibantu langsung! 🙏";
                 const targetNumber = toSenderNumberWithSuffix(senderNumber);
                 markBotMessage(targetNumber, finalReply);
                 await client.sendText(targetNumber, finalReply);
@@ -1909,18 +1905,12 @@ async function processBufferedMetaMessages(normalizedSenderId, queue) {
         let aiResponseRaw = lastMessage ? lastMessage.content : null;
 
         // Handle HUMAN_HANDOVER
+        // NOTE: triggerBosMatTool + setSnoozeMode already executed by executor node — no double-fire.
         if (result.intent === 'HUMAN_HANDOVER') {
-            console.log(`🚨 [LangGraph] Escalation detected for ${normalizedSenderId}. Triggering Human Handover.`);
-            await setSnoozeMode(normalizedSenderId, 60, { reason: 'eskalasi_otomatis' });
-            
+            console.log(`🚨 [LangGraph] Escalation handled by executor for ${normalizedSenderId} (Meta).`);
             await syncGraphStateToCRM(normalizedSenderId, result).catch(() => {});
-            await triggerBosMatTool.implementation({
-                senderNumber: normalizedSenderId,
-                reason: 'User meminta bantuan admin atau terdeteksi emosi tinggi (via Meta).',
-                customerQuestion: combinedMessage
-            });
             
-            aiResponseRaw = aiResponseRaw || "Wah, pertanyaan Kakak cukup teknis nih. Zoya panggilin Admin dulu ya biar dibantu langsung! 🙏";
+            aiResponseRaw = aiResponseRaw || "wah, pertanyaan kakak cukup teknis nih. zoya panggilin admin dulu ya biar dibantu langsung! 🙏";
         }
 
         let aiResponse = '';
