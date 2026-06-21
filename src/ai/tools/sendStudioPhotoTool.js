@@ -1,5 +1,5 @@
 // File: src/ai/tools/sendStudioPhotoTool.js
-// Mengirim foto eksterior Bosmat (lokasi di Jl. Raden Sanim No.99, Tanah Baru, Kecamatan Beji, Kota Depok, Jawa Barat 16426) ke pelanggan melalui WhatsApp.
+// Mengirim foto eksterior Bosmat (lokasi di Jl. Medan B3/2 Tugu Kecamatan Cimanggis Kota Depok) ke pelanggan melalui WhatsApp.
 
 const path = require('path');
 const fs = require('fs');
@@ -15,8 +15,8 @@ const sendStudioPhotoSchema = z.object({
 });
 
 const DEFAULT_CAPTION = `${studioMetadata.name}, ${studioMetadata.location.address}. Mohon kabari sebelum tiba agar tim siap menyambut.`;
-const STUDIO_PHOTO_PATH = path.resolve(__dirname, '../../../data/bosmat-garasi-54.png');
-const STUDIO_PHOTO_FILENAME = 'bosmat-garasi-54.png';
+const STUDIO_PHOTO_PATH = path.resolve(__dirname, '../../../data/bosmat.png');
+const STUDIO_PHOTO_FILENAME = 'bosmat.png';
 const SUPPORTED_META_CHANNELS = new Set(['instagram', 'messenger']);
 
 function parseRecipientIdentity(rawValue) {

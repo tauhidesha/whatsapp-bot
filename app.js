@@ -321,7 +321,7 @@ console.log(`🤖 [STARTUP] Active AI model: ${ACTIVE_AI_MODEL}`);
 console.log(`🖼️ [STARTUP] Vision analysis target models: ${[ACTIVE_VISION_MODEL, FALLBACK_VISION_MODEL].filter(Boolean).join(', ')}`);
 
 const SYSTEM_PROMPT = `[Role]
-Kamu adalah Zoya, asisten Customer Service dan Konsultan Otomotif AI untuk Bosmat x Garasi 54. Gaya bicaramu sangat ramah, asik, luwes, selayaknya teman ngobrol, dan tidak kaku. 
+Kamu adalah Zoya, asisten Customer Service dan Konsultan Otomotif AI untuk Bosmat Repaint and Detailing. Gaya bicaramu sangat ramah, asik, luwes, selayaknya teman ngobrol, dan tidak kaku. 
 
 [Sapaan Penting]
 - Gunakan kata ganti "aku" atau "saya" untuk menyebut diri sendiri. JANGAN menyebut namamu sendiri (seperti "Zoya bantu cek ya") karena itu terasa kaku.
@@ -464,7 +464,7 @@ Assistant: (Pakai scanFollowUpCandidates) "Bos, ini daftar target jemput bola ha
 </output_format>`;
 
 const ADMIN_MESSAGE_REWRITE_ENABLED = process.env.ADMIN_MESSAGE_REWRITE === 'false' ? false : true;
-const ADMIN_MESSAGE_REWRITE_STYLE_PROMPT = `Kamu adalah Zoya, asisten Bosmat x Garasi 54 yang ramah dan profesional.Tugasmu adalah menulis ulang pesan admin berikut agar gaya bahasa konsisten dengan gaya Zoya:
+const ADMIN_MESSAGE_REWRITE_STYLE_PROMPT = `Kamu adalah Zoya, asisten Bosmat Repaint and Detailing yang ramah dan profesional.Tugasmu adalah menulis ulang pesan admin berikut agar gaya bahasa konsisten dengan gaya Zoya:
 - Gunakan bahasa Indonesia santai namun sopan.
 - Panggil pelanggan dengan "mas" atau "mbak" jika relevan.
 - Pertahankan maksud dan janji yang sudah dibuat admin, jangan menambah atau mengubah fakta.
@@ -779,7 +779,7 @@ async function analyzeMediaWithGemini(mediaBuffer, mimeType, caption = '', sende
     const mediaTypeLabel = isVideo ? 'Video' : 'Foto';
 
     const systemPrompt = [
-        'Anda adalah Zoya, asisten Bosmat x Garasi 54.',
+        'Anda adalah Zoya, asisten Bosmat Repaint and Detailing.',
         `Tugas: Analisis ${mediaTypeLabel} motor pengguna secara akurat.`,
         '',
         'Fokus analisis:',

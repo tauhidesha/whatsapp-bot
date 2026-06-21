@@ -33,10 +33,10 @@ const masterLayanan = [
     usesModelPricing: true,
   },
   {
-    name: "Repaint Cover CVT / Arm",
+    name: "Repaint Part Satuan",
     category: "repaint",
-    summary: "Segarkan tampilan area mesin dan arm motormu dengan pengecatan ulang.",
-    description: "Pengecatan ulang bagian cover CVT atau swing arm. Harga sama untuk kebanyakan motor.",
+    summary: "Cat ulang part kecil satuan: CVT, Arm, Bottom Shock Depan, atau Behel.",
+    description: "Pengecatan ulang per bagian kecil motor. Harga flat Rp150.000 per part, berlaku untuk: Cover CVT, Swing Arm, Bottom Shock Depan, Behel. Harga belum termasuk bongkar pasang jika diperlukan.",
     price: 150000,
     estimatedDuration: "480"
   },
