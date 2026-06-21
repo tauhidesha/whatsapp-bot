@@ -7,7 +7,8 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { DateTime } = require('luxon');
-const wppconnect = require('@wppconnect-team/wppconnect');
+const { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, makeCacheableSignalKeyStore } = require('@whiskeysockets/baileys');
+const pino = require('pino');
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
@@ -1946,24 +1947,56 @@ async function processBufferedMetaMessages(normalizedSenderId, queue) {
 // --- WhatsApp Event Handlers ---
 function start(client) {
     // 🛡️ ENHANCED SAFEGUARD FOR UI INTERACTIONS
-    // Many @lid identifiers are now standard for WA Business.
-    // We wrap these methods to prevent library-level crashes while attempting to interact.
     const wrapSafe = (originalMethod) => async (to, ...args) => {
         try {
-            return await originalMethod(to, ...args);
+            if (originalMethod) return await originalMethod(to, ...args);
         } catch (e) {
             if (to?.toString().endsWith('@lid')) {
-                // Silently log and ignore failures for @lid to prevent cascading crashes
                 console.warn(`[Safeguard] UI Interaction Failed for @lid (${to}): ${e.message}`);
             } else {
-                throw e; // Rethrow for normal @c.us numbers
+                throw e; 
             }
         }
     };
 
-    client.sendSeen = wrapSafe(client.sendSeen.bind(client));
-    client.startTyping = wrapSafe(client.startTyping.bind(client));
-    client.stopTyping = wrapSafe(client.stopTyping.bind(client));
+    // Polyfill for Baileys
+    client.sendSeen = wrapSafe(async (to) => {
+        // Usually handled automatically or via readMessages elsewhere
+    });
+    client.startTyping = wrapSafe(async (to) => {
+        await client.sendPresenceUpdate('composing', to);
+    });
+    client.stopTyping = wrapSafe(async (to) => {
+        await client.sendPresenceUpdate('paused', to);
+    });
+    client.sendText = wrapSafe(async (to, text) => {
+        return await client.sendMessage(to, { text: text });
+    });
+    client.sendFile = wrapSafe(async (to, dataUri, filename, caption) => {
+        // Parse data uri: data:image/jpeg;base64,...
+        const match = dataUri.match(/^data:(.*?);base64,(.*)$/);
+        if (!match) throw new Error('Invalid data URI format');
+        const mimetype = match[1];
+        const buffer = Buffer.from(match[2], 'base64');
+        const isImage = mimetype.startsWith('image/');
+        const isVideo = mimetype.startsWith('video/');
+        
+        let msgPayload = { mimetype, fileName: filename };
+        if (isImage) {
+            msgPayload.image = buffer;
+            if (caption) msgPayload.caption = caption;
+        } else if (isVideo) {
+            msgPayload.video = buffer;
+            if (caption) msgPayload.caption = caption;
+        } else {
+            msgPayload.document = buffer;
+            if (caption) msgPayload.caption = caption;
+        }
+        return await client.sendMessage(to, msgPayload);
+    });
+    client.close = () => {
+        if (client.ws) client.ws.close();
+    };
 
     // Background Schedulers (Nurturing & Follow-up)
     const { startFollowUpScheduler } = require('./src/ai/agents/followUpEngine/index');
@@ -1974,18 +2007,83 @@ function start(client) {
     });
     client.__debounceQueue = debounceQueue;
 
-    // --- META DEBOUNCE QUEUE ALREADY INITIALIZED AT TOP LEVEL ---
+    // Baileys Message Event
+    client.ev.on('messages.upsert', async ({ messages, type }) => {
+        if (type !== 'notify') return;
 
-    client.onAnyMessage(async (msg) => {
-        await handleAdminHpMessage(msg);
-    });
+        for (const rawMsg of messages) {
+            if (!rawMsg.message) continue;
 
-    client.onMessage(async (msg) => {
-        if (msg.from === 'status@broadcast' || msg.fromMe) {
-            return;
-        }
+            // Map Baileys msg to WPPConnect msg format
+            const senderJid = rawMsg.key.remoteJid;
+            const fromMe = rawMsg.key.fromMe;
+            
+            let msgType = 'chat';
+            let body = rawMsg.message?.conversation || rawMsg.message?.extendedTextMessage?.text || '';
+            let caption = '';
+            let lat, lng, loc, address;
+            
+            if (rawMsg.message?.imageMessage) {
+                msgType = 'image';
+                caption = rawMsg.message.imageMessage.caption || '';
+            } else if (rawMsg.message?.videoMessage) {
+                msgType = 'video';
+                caption = rawMsg.message.videoMessage.caption || '';
+            } else if (rawMsg.message?.documentMessage) {
+                msgType = 'document';
+            } else if (rawMsg.message?.locationMessage) {
+                msgType = 'location';
+                lat = rawMsg.message.locationMessage.degreesLatitude;
+                lng = rawMsg.message.locationMessage.degreesLongitude;
+                loc = rawMsg.message.locationMessage.name;
+                address = rawMsg.message.locationMessage.address;
+            } else if (rawMsg.message?.templateButtonReplyMessage) {
+                msgType = 'chat';
+            }
 
-        let senderNumber = msg.from;
+            let quotedMsgObj = null;
+            if (rawMsg.message?.extendedTextMessage?.contextInfo?.quotedMessage) {
+                const quoted = rawMsg.message.extendedTextMessage.contextInfo.quotedMessage;
+                quotedMsgObj = {
+                    body: quoted.conversation || quoted.extendedTextMessage?.text || quoted.imageMessage?.caption || '',
+                    fromMe: rawMsg.message.extendedTextMessage.contextInfo.participant === client.user?.id
+                };
+            }
+
+            const contextInfo = rawMsg.message?.extendedTextMessage?.contextInfo || rawMsg.message?.imageMessage?.contextInfo || rawMsg.message?.videoMessage?.contextInfo;
+            
+            const msg = {
+                from: senderJid,
+                to: fromMe ? senderJid : 'me',
+                fromMe: fromMe,
+                type: msgType,
+                body: body || caption,
+                caption: caption,
+                isMedia: ['image', 'video', 'document'].includes(msgType),
+                lat: lat,
+                lng: lng,
+                loc: loc,
+                address: address,
+                sender: {
+                    pushname: rawMsg.pushName || senderJid,
+                    name: rawMsg.pushName || senderJid,
+                    pnJid: senderJid
+                },
+                quotedMsgObj: quotedMsgObj,
+                ctwaContext: contextInfo?.externalAdReply ? {
+                    sourceUrl: contextInfo.externalAdReply.sourceUrl,
+                    displayText: contextInfo.externalAdReply.title || contextInfo.externalAdReply.body
+                } : null,
+                _raw: rawMsg // Save raw message for media decryption
+            };
+
+            await handleAdminHpMessage(msg);
+
+            if (msg.from === 'status@broadcast' || msg.fromMe) {
+                continue;
+            }
+
+            let senderNumber = msg.from;
         let originalLid = senderNumber.endsWith('@lid') ? senderNumber : null;
         let realPhoneFallback = '';
 
@@ -2162,7 +2260,9 @@ function start(client) {
 
             try {
                 console.log(`[MULTIMODAL] 🔄 Mengunduh media (${isImage ? 'Image' : 'Video'}) dari ${senderName}...`);
-                const mediaBuffer = await client.decryptFile(msg);
+                const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+                const pino = require('pino');
+                const mediaBuffer = await downloadMediaMessage(msg._raw, 'buffer', { }, { logger: pino({ level: 'silent' }) });
                 console.log(`[MULTIMODAL] ✅ Media terunduh (${mediaBuffer.length} bytes)`);
 
                 // Store media info for multimodal processing
@@ -2215,70 +2315,22 @@ function start(client) {
         } else {
             debounceQueue.schedule(senderNumber, messageEntry);
         }
-    });
+        } // End of for (const rawMsg of messages)
+    }); // End of client.ev.on('messages.upsert')
 
     // --- Handle Incoming Calls ---
-    client.onIncomingCall(async (call) => {
-        console.log(`[CALL] Panggilan masuk dari ${call.peerJid}`);
-        try {
-            // Zoya tidak bisa angkat telepon, kirim pesan otomatis yang ramah
-            const message = "Waduh, maaf ya Mas, Zoya nggak bisa angkat telepon 😅.\n\nKetik aja pertanyaannya di sini, nanti Zoya bantu jawab kok! 👇";
-            markBotMessage(call.peerJid, message);
-            await client.sendText(call.peerJid, message);
-        } catch (e) {
-            console.error('[CALL] Error handling incoming call:', e);
-        }
-    });
-
-    client.onStateChange(async (state) => {
-        console.log('📱 [WhatsApp] State changed:', state);
-
-        if (state.includes('CONFLICT')) {
-            console.log('⚠️ [WhatsApp] Conflict detected, using current session...');
-            try {
-                await client.useHere();
-                console.log('✅ [WhatsApp] Conflict resolved');
-            } catch (e) {
-                console.error('❌ [WhatsApp] Failed to resolve conflict:', e.message);
+    client.ev.on('call', async (calls) => {
+        for (const call of calls) {
+            if (call.status === 'offer') {
+                console.log(`[CALL] Panggilan masuk dari ${call.from}`);
+                try {
+                    const message = "Waduh, maaf ya Mas, Zoya nggak bisa angkat telepon 😅.\n\nKetik aja pertanyaannya di sini, nanti Zoya bantu jawab kok! 👇";
+                    markBotMessage(call.from, message);
+                    await client.sendMessage(call.from, { text: message });
+                } catch (e) {
+                    console.error('[CALL] Error handling incoming call:', e);
+                }
             }
-        }
-
-        // Handle SYNCING state - jangan trigger reconnect saat masih syncing
-        if (state.includes('SYNCING')) {
-            console.log('⏳ [WhatsApp] Syncing connection... (TUNGGU, jangan logout dari mobile!)');
-            // Jangan trigger reconnect saat masih syncing, biarkan proses selesai
-            return;
-        }
-
-        if (state.includes('UNPAIRED') || state.includes('LOGOUT')) {
-            console.error('❌ [WhatsApp] Logged out / Unpaired detected!');
-            console.warn('⚠️ [WhatsApp] Kemungkinan penyebab:');
-            console.warn('   1. WhatsApp logout dari mobile device');
-            console.warn('   2. WhatsApp Multi-Device tidak aktif');
-            console.warn('   3. Session expired atau invalid');
-            console.warn('   4. WhatsApp Web di-unlink dari mobile');
-            console.log('🔄 [WhatsApp] Attempting to reconnect in 15 seconds...');
-
-            // Set flag untuk trigger reconnect
-            global.whatsappClient = null;
-
-            // Reconnect setelah delay lebih lama untuk pastikan state sudah stabil
-            setTimeout(async () => {
-                await reconnectWhatsApp();
-            }, 15000);
-        }
-
-        if (state.includes('DISCONNECTED') || state.includes('disconnectedMobile')) {
-            console.warn('⚠️ [WhatsApp] Disconnected / disconnectedMobile detected');
-            console.warn('💡 [WhatsApp] INSTRUKSI PENTING:');
-            console.warn('   1. Buka WhatsApp di HP Anda');
-            console.warn('   2. Settings → Linked Devices');
-            console.warn('   3. Pastikan "Multi-device beta" atau "Link a Device" AKTIF');
-            console.warn('   4. JANGAN logout dari WhatsApp di HP saat bot running');
-            console.log('🔄 [WhatsApp] Attempting to reconnect in 10 seconds...');
-            setTimeout(async () => {
-                await reconnectWhatsApp();
-            }, 10000);
         }
     });
 }
@@ -2401,8 +2453,7 @@ async function saveSenderMeta(senderNumber, displayName, client = null) {
     let profilePicUrl = null;
     if (client && channel === 'whatsapp' && !isLid && !fetchedProfilePics.has(senderNumber)) {
         try {
-            const picResult = await client.getProfilePicFromServer(senderNumber);
-            // Extract URL string from the object returned by WhatsApp
+            const picResult = await client.profilePictureUrl(senderNumber, 'image');
             if (typeof picResult === 'string') {
                 profilePicUrl = picResult;
             } else if (picResult && typeof picResult === 'object') {
@@ -3618,386 +3669,53 @@ server.listen(PORT, '0.0.0.0', async () => {
     console.log(`🧠 Memory Config: Max ${MEMORY_CONFIG.maxMessages} messages, ${MEMORY_CONFIG.maxAgeHours}h retention`);
     console.log(`🖥️  Chromium launch args: ${PUPPETEER_CHROME_ARGS.join(' ')}`);
     console.log(`🖥️  Chromium viewport: ${PUPPETEER_VIEWPORT.width}x${PUPPETEER_VIEWPORT.height}`);
-
-    const sessionName = process.env.WHATSAPP_SESSION || 'ai-chatbot';
-    const sessionDataPath = './tokens';
-
-    await cleanupChromiumProfileLocks(sessionName, sessionDataPath).catch((error) => {
-        console.warn('[Browser] Failed to clean up Chromium profile locks:', error.message);
-    });
-
-    // Initialize WhatsApp connection
-    // ⚠️ PENTING: Set autoClose ke false secara eksplisit untuk production
-    const whatsappAutoClose = process.env.WHATSAPP_AUTO_CLOSE !== 'false'; // Default false jika tidak di-set
-    const whatsappHeadless = process.env.WHATSAPP_HEADLESS !== 'false'; // Default true (headless) agar jalan di Railway/Docker
-
-    // Force false untuk production (jika env tidak di-set atau bukan 'true', maka false)
-    const shouldAutoClose = process.env.WHATSAPP_AUTO_CLOSE === 'true';
-
-    console.log(`🔧 WhatsApp Config: AUTO_CLOSE=${shouldAutoClose} (env: "${process.env.WHATSAPP_AUTO_CLOSE}"), HEADLESS=${whatsappHeadless}`);
-
-    console.log(`🔧 Puppeteer Config: Headless=${whatsappHeadless}, Executable=${process.env.PUPPETEER_EXECUTABLE_PATH || 'System Default'}`);
-
-    wppconnect.create({
-        session: sessionName,
-        // 🛠️ FIX: Set User Agent di awal config agar lolos deteksi saat loading/syncing
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-        authTimeout: 300000, // Perpanjang ke 5 menit untuk VPS
-        blockCrashLogs: true,
-        disableGoogleAnalytics: true,
-        catchQR: (base64Qr, asciiQR, attempt, urlCode) => {
-            console.log('📱 WhatsApp QR Code (Small Mode):');
-            if (urlCode) {
-                qrcode.generate(urlCode, { small: true });
-                console.log('\n🎫 Pairing Code (Raw):', urlCode);
-                console.log('💡 Jika QR terpotong, copy kode di atas ke https://www.the-qrcode-generator.com/');
-                console.log('💡 Jika scan gagal, coba perbesar terminal atau copy kode di atas.');
-            } else {
-                console.log(asciiQR);
-            }
-        },
-        statusFind: (statusSession, session) => {
-            console.log('📱 WhatsApp Status:', statusSession, 'Session:', session);
-            if (statusSession === 'isLogged') {
-                console.log('✅ WhatsApp sudah login, tidak perlu QR code');
-            } else if (statusSession === 'notLogged') {
-                console.log('⚠️ WhatsApp belum login, menunggu QR code...');
-            } else if (statusSession === 'qrReadSuccess') {
-                console.log('✅ QR code berhasil di-scan!');
-            } else if (statusSession === 'autocloseCalled') {
-                console.error('❌ ERROR: Auto close dipanggil! Pastikan WHATSAPP_AUTO_CLOSE=false');
-                console.error('⚠️ Mencoba reconnect...');
-                // Jangan throw error, biarkan retry
-            } else if (statusSession === 'disconnectedMobile' || statusSession.includes('disconnectedMobile')) {
-                console.error('❌ [WhatsApp] Session Unpaired - WhatsApp terdeteksi login di mobile device');
-                console.error('⚠️ [WhatsApp] ============================================');
-                console.error('⚠️ [WhatsApp] MASALAH: WhatsApp Web di-unpair oleh mobile');
-                console.error('⚠️ [WhatsApp] ============================================');
-                console.warn('💡 [WhatsApp] SOLUSI (WAJIB DILAKUKAN):');
-                console.warn('   1. Buka WhatsApp di HP Anda');
-                console.warn('   2. Masuk ke: Settings → Linked Devices');
-                console.warn('   3. Pastikan "Multi-device beta" atau "Link a Device" AKTIF');
-                console.warn('   4. Jika belum aktif, AKTIFKAN sekarang');
-                console.warn('   5. JANGAN logout dari WhatsApp di HP saat bot running');
-                console.warn('   6. Bot akan auto-reconnect, scan QR code yang muncul');
-                console.warn('💡 [WhatsApp] Setelah Multi-Device aktif, bot tidak akan unpair lagi');
-                // Trigger reconnect setelah delay lebih lama
-                setTimeout(async () => {
-                    if (global.whatsappClient) {
-                        global.whatsappClient = null;
-                        await reconnectWhatsApp();
-                    }
-                }, 15000);
-            } else if (statusSession === 'SYNCING' || statusSession.includes('SYNCING')) {
-                console.log('⏳ [WhatsApp] Syncing connection... (TUNGGU, jangan logout dari mobile!)');
-                console.log('⏳ [WhatsApp] State: SYNCING - Proses normal, tunggu selesai...');
-            }
-        },
-        puppeteerOptions: {
-            userDataDir: sessionDataPath,
-            executablePath: CHROMIUM_PATH,
-            args: PUPPETEER_CHROME_ARGS,
-            ignoreHTTPSErrors: true,
-            defaultViewport: PUPPETEER_VIEWPORT,
-            timeout: 300000,
-            protocolTimeout: 600000,
-        },
-        headless: whatsappHeadless,
-        logQR: false,
-        autoClose: shouldAutoClose ? 60000 : 0, // 0 to disable auto close
-        disableWelcome: true, // Disable welcome message
-        sessionDataPath,
-    })
-        .then(async (client) => {
-            global.whatsappClient = client;
-
-            // Inject stealth mode setelah client ready
-            try {
-                if (client.page) {
-                    const page = client.page;
-                    // Bypass webdriver detection
-                    await page.evaluateOnNewDocument(() => {
-                        // Override navigator.webdriver
-                        Object.defineProperty(navigator, 'webdriver', {
-                            get: () => false,
-                        });
-
-                        // Override chrome object
-                        window.chrome = {
-                            runtime: {},
-                            loadTimes: function () { },
-                            csi: function () { },
-                            app: {}
-                        };
-
-                        // Override permissions
-                        const originalQuery = window.navigator.permissions.query;
-                        window.navigator.permissions.query = (parameters) => (
-                            parameters.name === 'notifications' ?
-                                Promise.resolve({ state: Notification.permission }) :
-                                originalQuery(parameters)
-                        );
-
-                        // Override plugins
-                        Object.defineProperty(navigator, 'plugins', {
-                            get: () => [1, 2, 3, 4, 5],
-                        });
-
-                        // Override languages
-                        Object.defineProperty(navigator, 'languages', {
-                            get: () => ['en-US', 'en'],
-                        });
-                    });
-
-                    // Set realistic user agent
-                    await page.setUserAgent(
-                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'
-                    );
-
-                    console.log('🕵️ [Stealth] Anti-detection scripts injected successfully');
-                }
-            } catch (stealthError) {
-                console.warn('[Stealth] Failed to inject anti-detection (non-critical):', stealthError.message);
-            }
-
-            start(client);
-            console.log('✅ WhatsApp client initialized successfully!');
-
-            if (process.env.RUN_ADMIN_BACKFILL === 'true') {
-                console.log('🔄 [Backfill] Starting admin message backfill...');
-                backfillAdminMessages(client)
-                    .then(() => console.log('✅ [Backfill] Admin message backfill complete'))
-                    .catch(err => console.error('❌ [Backfill] Backfill failed:', err.message))
-                    .finally(() => {
-                        console.log('💡 [Backfill] Set RUN_ADMIN_BACKFILL=false to disable');
-                    });
-            }
-
-            if (process.env.RUN_PROFILE_PIC_BACKFILL === 'true') {
-                console.log('🖼️  [Backfill] Starting profile picture backfill...');
-                backfillProfilePics(client)
-                    .then(() => console.log('✅ [Backfill] Profile picture backfill complete'))
-                    .catch(err => console.error('❌ [Backfill] Profile pic backfill failed:', err.message))
-                    .finally(() => {
-                        console.log('💡 [Backfill] Set RUN_PROFILE_PIC_BACKFILL=false to disable');
-                    });
-            }
-
-            // Start keep-alive mechanism untuk mencegah server idle timeout
-            startKeepAlive();
-
-            // Start WhatsApp connection keep-alive
-            startWhatsAppKeepAlive(client);
-        })
-        .catch((error) => {
-            console.error('❌ WhatsApp initialization error:', error);
-            // Tetap start keep-alive meskipun WhatsApp belum connect
-            startKeepAlive();
-
-            // Retry connection setelah delay
-            setTimeout(async () => {
-                await reconnectWhatsApp();
-            }, 30000);
-        });
 });
 
-// Reconnect WhatsApp function
-async function reconnectWhatsApp() {
-    if (global.whatsappReconnecting) {
-        console.log('⏳ [WhatsApp] Reconnection already in progress, skipping...');
-        return;
-    }
+async function connectToWhatsApp() {
+    console.log('🤖 [STARTUP] Initializing Baileys WhatsApp Connection...');
+    const { state, saveCreds } = await useMultiFileAuthState('./auth_info_baileys');
+    const { version, isLatest } = await fetchLatestBaileysVersion();
+    console.log(`using WA v${version.join('.')}, isLatest: ${isLatest}`);
 
-    global.whatsappReconnecting = true;
-    console.log('🔄 [WhatsApp] Starting reconnection process...');
-
-    try {
-        const sessionName = process.env.WHATSAPP_SESSION || 'ai-chatbot';
-        const sessionDataPath = './tokens';
-        const whatsappHeadless = process.env.WHATSAPP_HEADLESS === 'true';
-        const shouldAutoClose = process.env.WHATSAPP_AUTO_CLOSE === 'true';
-
-        // Cleanup old client jika ada
-        if (global.whatsappClient) {
-            try {
-                await global.whatsappClient.close();
-            } catch (e) {
-                console.warn('[WhatsApp] Error closing old client:', e.message);
-            }
-            global.whatsappClient = null;
+    const client = makeWASocket({
+        version,
+        logger: pino({ level: 'silent' }),
+        printQRInTerminal: true,
+        auth: {
+            creds: state.creds,
+            keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "fatal" }).child({ level: "fatal" })),
+        },
+        generateHighQualityLinkPreview: true,
+        getMessage: async (key) => {
+            return { conversation: 'hello' }
         }
+    });
 
-        // Cleanup locks
-        await cleanupChromiumProfileLocks(sessionName, sessionDataPath).catch((error) => {
-            console.warn('[Browser] Failed to clean up Chromium profile locks:', error.message);
-        });
+    client.ev.on('creds.update', saveCreds);
 
-        // Recreate connection
-        console.log(`🔄 [WhatsApp] Reconnecting...`);
-
-        const client = await wppconnect.create({
-            session: sessionName,
-            // 🛠️ FIX: Terapkan config yang sama saat reconnect
-            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-            authTimeout: 120000,
-            blockCrashLogs: true,
-            catchQR: (base64Qr, asciiQR, attempt, urlCode) => {
-                console.log('📱 [WhatsApp] QR Code (Reconnect):');
-                if (urlCode) {
-                    qrcode.generate(urlCode, { small: true });
-                    console.log('\n🎫 Pairing Code (Raw):', urlCode);
-                } else {
-                    console.log(asciiQR);
-                }
-                console.log('💡 [WhatsApp] SCAN QR CODE INI dengan WhatsApp di HP Anda');
-                console.log('💡 [WhatsApp] Pastikan Multi-Device sudah aktif sebelum scan!');
-            },
-            // Stealth mode untuk reconnect juga
-            browserArgs: PUPPETEER_CHROME_ARGS,
-            puppeteerOptions: {
-                timeout: 300000,
-                protocolTimeout: 600000,
-                args: PUPPETEER_CHROME_ARGS,
-                defaultViewport: PUPPETEER_VIEWPORT,
-                ignoreHTTPSErrors: true,
-                headless: whatsappHeadless,
-                executablePath: CHROMIUM_PATH,
-            },
-            onLoadingScreen: async (page) => {
-                try {
-                    await page.evaluateOnNewDocument(() => {
-                        Object.defineProperty(navigator, 'webdriver', { get: () => false });
-                        window.chrome = { runtime: {}, loadTimes: function () { }, csi: function () { }, app: {} };
-                    });
-                    await page.setUserAgent(
-                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                    );
-                } catch (e) {
-                    console.warn('[Stealth] Reconnect injection failed:', e.message);
-                }
-            },
-            statusFind: (statusSession, session) => {
-                console.log('📱 [WhatsApp] Status (Reconnect):', statusSession);
-                if (statusSession === 'disconnectedMobile' || statusSession.includes('disconnectedMobile')) {
-                    console.error('❌ [WhatsApp] Masih terdeteksi disconnectedMobile');
-                    console.error('⚠️ [WhatsApp] INSTRUKSI: Aktifkan Multi-Device di HP SEBELUM scan QR!');
-                } else if (statusSession === 'isLogged') {
-                    console.log('✅ [WhatsApp] Reconnected successfully!');
-                } else if (statusSession === 'qrReadSuccess') {
-                    console.log('✅ [WhatsApp] QR code scanned! Connecting...');
-                }
-            },
-            headless: whatsappHeadless,
-            logQR: true,
-            autoClose: shouldAutoClose,
-            disableWelcome: true,
-            sessionDataPath,
-        });
-
-        global.whatsappClient = client;
-
-        // Inject stealth mode untuk reconnect juga
-        try {
-            if (client.page) {
-                const page = client.page;
-                await page.evaluateOnNewDocument(() => {
-                    Object.defineProperty(navigator, 'webdriver', { get: () => false });
-                    window.chrome = { runtime: {}, loadTimes: function () { }, csi: function () { }, app: {} };
-                });
-                await page.setUserAgent(
-                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'
-                );
-                console.log('🕵️ [Stealth] Anti-detection injected on reconnect');
+    client.ev.on('connection.update', (update) => {
+        const { connection, lastDisconnect } = update;
+        if(connection === 'close') {
+            const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
+            console.log('connection closed due to ', lastDisconnect.error, ', reconnecting ', shouldReconnect);
+            // reconnect if not logged out
+            if(shouldReconnect) {
+                setTimeout(connectToWhatsApp, 5000);
             }
-        } catch (stealthError) {
-            console.warn('[Stealth] Reconnect injection failed (non-critical):', stealthError.message);
+        } else if(connection === 'open') {
+            console.log('opened connection');
+            global.whatsappClient = client;
+            
+            // start functionality after connect
+            start(client);
+            startKeepAlive();
         }
-
-        start(client);
-        startWhatsAppKeepAlive(client);
-        console.log('✅ [WhatsApp] Reconnected successfully!');
-
-    } catch (error) {
-        console.error('❌ [WhatsApp] Reconnection failed:', error.message);
-        console.log('🔄 [WhatsApp] Will retry in 60 seconds...');
-        setTimeout(async () => {
-            global.whatsappReconnecting = false;
-            await reconnectWhatsApp();
-        }, 60000);
-        return;
-    }
-
-    global.whatsappReconnecting = false;
+    });
 }
 
-// WhatsApp connection keep-alive: periodic check untuk memastikan connection tetap aktif
-function startWhatsAppKeepAlive(client) {
-    const KEEP_ALIVE_INTERVAL_MS = parseInt(process.env.WHATSAPP_KEEP_ALIVE_INTERVAL_MS || '300000', 10);
-    const PING_TIMEOUT_MS = 15000; // 15 detik max untuk ping
+connectToWhatsApp().catch(err => console.log("unexpected error: " + err));
 
-    console.log(`💚 [WhatsApp Keep-Alive] Starting (interval: ${KEEP_ALIVE_INTERVAL_MS}ms)`);
 
-    const keepAliveInterval = setInterval(async () => {
-        try {
-            if (!global.whatsappClient || !client) {
-                console.warn('⚠️ [WhatsApp Keep-Alive] Client tidak tersedia, skip ping');
-                return;
-            }
-
-            // Cek state dulu (ringan, tidak pakai CDP evaluate)
-            if (client.getState) {
-                const statePromise = client.getState();
-                const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error('getState timeout')), PING_TIMEOUT_MS)
-                );
-                
-                const state = await Promise.race([statePromise, timeoutPromise]);
-                
-                if (state === 'UNPAIRED' || state === 'LOGOUT' || state === 'DISCONNECTED') {
-                    console.warn(`⚠️ [WhatsApp Keep-Alive] State tidak sehat: ${state}, trigger reconnect...`);
-                    clearInterval(keepAliveInterval);
-                    await reconnectWhatsApp();
-                    return;
-                }
-                
-                console.log(`💚 [WhatsApp Keep-Alive] Connection active (state: ${state})`);
-                return; // Cukup, tidak perlu getHostDevice
-            }
-
-            // Fallback: getHostDevice dengan timeout
-            if (client.getHostDevice) {
-                const hostPromise = client.getHostDevice();
-                const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error('getHostDevice timeout')), PING_TIMEOUT_MS)
-                );
-                
-                await Promise.race([hostPromise, timeoutPromise]);
-                console.log('💚 [WhatsApp Keep-Alive] Connection active');
-            }
-
-        } catch (error) {
-            // Timeout dari CDP = WA sedang busy/syncing, JANGAN reconnect langsung
-            const isTimeout = error.message.includes('timeout') || 
-                              error.message.includes('protocolTimeout') ||
-                              error.message.includes('Runtime.callFunctionOn');
-            
-            if (isTimeout) {
-                console.warn(`⚠️ [WhatsApp Keep-Alive] Ping timeout (WA mungkin sedang sync), skip reconnect.`);
-                return; // Biarkan, coba lagi di interval berikutnya
-            }
-            
-            console.warn(`⚠️ [WhatsApp Keep-Alive] Error: ${error.message}`);
-            if (error.message.includes('not connected') || error.message.includes('closed')) {
-                console.warn('🔄 [WhatsApp Keep-Alive] Connection lost, trigger reconnect...');
-                clearInterval(keepAliveInterval);
-                await reconnectWhatsApp();
-            }
-        }
-    }, KEEP_ALIVE_INTERVAL_MS);
-
-    process.on('SIGINT', () => clearInterval(keepAliveInterval));
-    process.on('SIGTERM', () => clearInterval(keepAliveInterval));
-}
 
 // Keep-alive mechanism: periodic ping ke health endpoint sendiri
 // Mencegah server idle timeout saat tidak ada aktivitas

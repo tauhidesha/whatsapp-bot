@@ -112,13 +112,13 @@ async function sendMockupViaWA(senderNumber, tempPath, caption) {
   }
 
   const client = global.whatsappClient;
-  if (!client || typeof client.sendImage !== 'function') {
+  if (!client || typeof client.sendMessage !== 'function') {
     throw new Error('[generateColorMockup] WhatsApp client belum siap.');
   }
 
   const filename = path.basename(tempPath);
   markBotMessage(recipientId, caption);
-  await client.sendImage(recipientId, tempPath, filename, caption);
+  await client.sendMessage(recipientId, { image: { url: tempPath }, caption: caption });
 
   // Cleanup temp file after sending
   try { fs.unlinkSync(tempPath); } catch (_) { /* ignore */ }

@@ -398,11 +398,14 @@ const generateDocumentTool = {
         markBotMessage(targetRecipient, fileCaption);
 
         try {
-          await global.whatsappClient.sendFile(
+          await global.whatsappClient.sendMessage(
             targetRecipient,
-            filePath,
-            `${title}_${customerName}.pdf`,
-            fileCaption
+            {
+              document: { url: filePath },
+              mimetype: 'application/pdf',
+              fileName: `${title}_${customerName}.pdf`,
+              caption: fileCaption
+            }
           );
         } catch (initialError) {
           // FALLBACK LOGIC: If sending to LID or @c.us fails, try the alternative
@@ -443,11 +446,14 @@ const generateDocumentTool = {
             if (fallbackTarget && fallbackTarget !== targetRecipient) {
               console.log(`[generateDocument] Retrying with fallback: ${fallbackTarget}`);
               markBotMessage(fallbackTarget, fileCaption);
-              await global.whatsappClient.sendFile(
+              await global.whatsappClient.sendMessage(
                 fallbackTarget,
-                filePath,
-                `${title}_${customerName}.pdf`,
-                fileCaption
+                {
+                  document: { url: filePath },
+                  mimetype: 'application/pdf',
+                  fileName: `${title}_${customerName}.pdf`,
+                  caption: fileCaption
+                }
               );
               // Update targetRecipient for the return success message
               targetRecipient = fallbackTarget;

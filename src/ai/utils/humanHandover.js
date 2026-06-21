@@ -41,7 +41,7 @@ async function sendWhatsappNotification(message) {
   }
 
   const client = global.whatsappClient;
-  if (!client || typeof client.sendText !== 'function') {
+  if (!client || typeof client.sendMessage !== 'function') {
     console.warn('[humanHandover] whatsappClient belum tersedia. Notifikasi WA tidak dikirim.');
     return;
   }

@@ -79,7 +79,7 @@ async function implementation(input = {}) {
 
   if (identity.channel === 'whatsapp') {
     const client = global.whatsappClient;
-    if (!client || typeof client.sendImage !== 'function') {
+    if (!client || typeof client.sendMessage !== 'function') {
       throw new Error('[sendStudioPhoto] WhatsApp client belum siap.');
     }
 
@@ -88,7 +88,7 @@ async function implementation(input = {}) {
 
     // Mark before sending so onAnyMessage doesn't treat it as admin-from-HP
     markBotMessage(recipient, caption);
-    await client.sendImage(recipient, STUDIO_PHOTO_PATH, STUDIO_PHOTO_FILENAME, caption);
+    await client.sendMessage(recipient, { image: { url: STUDIO_PHOTO_PATH }, caption: caption });
 
     return {
       success: true,
