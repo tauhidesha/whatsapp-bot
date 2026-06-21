@@ -77,10 +77,6 @@ const MEMORY_CONFIG = {
     maxAgeHours: parseInt(process.env.MEMORY_MAX_AGE_HOURS) || 24,
 };
 
-// Centralized Browser Config
-const CHROMIUM_PATH = browserUtils.getChromiumPath();
-const PUPPETEER_CHROME_ARGS = browserUtils.DEFAULT_CHROME_ARGS;
-const PUPPETEER_VIEWPORT = { width: 1280, height: 800 };
 
 const app = express();
 const server = http.createServer(app);
@@ -3667,8 +3663,7 @@ server.listen(PORT, '0.0.0.0', async () => {
     console.log(`🖼️  Vision Model: ${ACTIVE_VISION_MODEL}`);
     console.log(`⏱️  Debounce Delay: ${DEBOUNCE_DELAY_MS}ms`);
     console.log(`🧠 Memory Config: Max ${MEMORY_CONFIG.maxMessages} messages, ${MEMORY_CONFIG.maxAgeHours}h retention`);
-    console.log(`🖥️  Chromium launch args: ${PUPPETEER_CHROME_ARGS.join(' ')}`);
-    console.log(`🖥️  Chromium viewport: ${PUPPETEER_VIEWPORT.width}x${PUPPETEER_VIEWPORT.height}`);
+
 });
 
 async function connectToWhatsApp() {
