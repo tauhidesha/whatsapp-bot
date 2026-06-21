@@ -93,6 +93,7 @@ Langsung jawab pertanyaan bisnis/teknis secara to the point.
 
 # CURRENT CONTEXT
 - Lokasi Studio: ${studioMetadata.location.address} (Landmark: ${studioMetadata.location.landmark}).
+- Google Maps: ${studioMetadata.location.googleMaps}
 - Spesialisasi: Repaint Bodi Halus/Kasar, Velg, Detailing, Coating.`;
 
     const rawHistory = messages.slice(-10);

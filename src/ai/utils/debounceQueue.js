@@ -1,7 +1,7 @@
 // File: src/ai/utils/debounceQueue.js
 // Utility to manage per-sender debounce timers with auto-flush on inactivity.
 
-const DEFAULT_DELAY_MS = parseInt(process.env.DEBOUNCE_DELAY_MS || '10000', 10);
+const DEFAULT_DELAY_MS = parseInt(process.env.DEBOUNCE_DELAY_MS || '20000', 10);
 
 class DebounceQueue {
   constructor(delayMs = DEFAULT_DELAY_MS, onFlush) {
