@@ -558,6 +558,41 @@ async function processSingleService(parsedServiceName, input, promoText) {
         };
     }
 
+    // 1.5. Intercept "Repaint Bodi Halus" tanpa paket spesifik → tampilkan semua paket
+    const isBodiHalusGeneric = (
+        queryLower.includes('bodi halus') || queryLower.includes('body halus') || queryLower === 'repaint bodi halus'
+    ) && !queryLower.includes('paket');
+
+    if (isBodiHalusGeneric && motorModel) {
+        const packages = await lookupRepaintPackagePrices(motorModel);
+        if (packages.length > 0) {
+            const { finalSize } = await resolveSizeForService({ service: { category: 'repaint' }, sizeArg: sizeFromArgs, motorModel });
+            const results = [];
+            for (const pkg of packages) {
+                const { finalPrice, breakdownText } = await applyAllSurcharges(pkg.price, pkg.service_name, finalSize, motorModel, extraContext);
+                results.push({
+                    name: pkg.service_name,
+                    price: finalPrice,
+                    price_formatted: `Rp${finalPrice.toLocaleString('id-ID')}${breakdownText}`,
+                    note: pkg.note,
+                    badge: pkg.badge,
+                    summary: pkg.summary,
+                });
+            }
+            return {
+                success: true,
+                multiple_candidates: true,
+                category: 'repaint',
+                subcategory: 'bodi_halus',
+                motor_model: motorModel,
+                motor_size: finalSize,
+                candidates: results,
+                promo_active: !!promoText,
+                message: `Ada 4 pilihan paket Repaint Bodi Halus untuk ${motorModel}. Berikut estimasi harganya dari paket tertinggi:`
+            };
+        }
+    }
+
     // 2. Specific Service Query
     const allServices = await prisma.service.findMany({ include: { prices: true } });
     const candidates = allServices
