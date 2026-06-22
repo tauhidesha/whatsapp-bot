@@ -114,10 +114,14 @@ const generateDocumentTool = {
     // Auto-fix WID suffix: ONLY if missing '@'
     if (targetRecipient && typeof targetRecipient === 'string' && !targetRecipient.includes('@')) {
       let cleaned = targetRecipient.replace(/\D/g, '');
-      if (cleaned.startsWith('0')) {
-        cleaned = '62' + cleaned.substring(1);
+      if (cleaned.length >= 14 && ['1', '2'].includes(cleaned[0])) {
+        targetRecipient = cleaned + '@lid';
+      } else {
+        if (cleaned.startsWith('0')) {
+          cleaned = '62' + cleaned.substring(1);
+        }
+        targetRecipient = cleaned + '@c.us';
       }
-      targetRecipient = cleaned + '@c.us';
     }
 
     // Auto-Calculate Price if totalAmount is 0/missing, or enrich items with descriptions

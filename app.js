@@ -2224,7 +2224,9 @@ app.post('/generate-invoice', requireAuth, async (req, res) => {
             console.log(`[API] Using customer phone: ${recipientNumber}`);
         } else {
             recipientNumber = recipientNumber.replace(/\D/g, '');
-            if (recipientNumber.length > 0) {
+            if (recipientNumber.length >= 14 && ['1', '2'].includes(recipientNumber[0])) {
+                recipientNumber = `${recipientNumber}@lid`;
+            } else if (recipientNumber.length > 0) {
                 recipientNumber = `${recipientNumber}@c.us`;
             }
             console.log(`[API] Formatted customer phone: ${recipientNumber}`);
