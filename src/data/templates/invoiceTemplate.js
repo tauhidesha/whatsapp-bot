@@ -122,6 +122,7 @@ module.exports = function generateInvoiceHTML(data) {
     <!-- Header -->
     <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:30px">
       <div>
+        <img src="${logoBase64}" style="height:50px; margin-bottom:20px; display:block;"/>
         <h1 class="font-headline" style="font-size:38px; font-weight:900; line-height:0.8; text-transform:uppercase; margin-bottom:12px">
           ${documentType === 'tanda_terima' ? 'Receipt' : documentType === 'bukti_bayar' ? 'Payment' : 'Invoice'}<br/>
           <span class="text-yellow">Repaint &<br/>Detailing</span>
@@ -133,7 +134,6 @@ module.exports = function generateInvoiceHTML(data) {
         </div>
       </div>
       <div style="text-align:right">
-        <img src="${logoBase64}" style="height:60px; margin-bottom:24px"/>
         <div>
           <p class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em">Nomor Dokumen</p>
           <p class="font-headline text-yellow" style="font-size:28px; font-weight:700">#BS-${docNumber || 'PREVIEW'}</p>
