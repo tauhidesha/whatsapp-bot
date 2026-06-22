@@ -133,7 +133,7 @@ module.exports = function generateInvoiceHTML(data) {
         </div>
       </div>
       <div style="text-align:right">
-        <img src="${logoBase64}" style="height:60px; margin-bottom:12px"/>
+        <img src="${logoBase64}" style="height:75px; margin-bottom:12px"/>
         <div>
           <p class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em">Nomor Dokumen</p>
           <p class="font-headline text-yellow" style="font-size:28px; font-weight:700">#BS-${docNumber || 'PREVIEW'}</p>
