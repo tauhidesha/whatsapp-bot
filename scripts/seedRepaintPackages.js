@@ -143,13 +143,7 @@ function findModelId(item, modelLookup) {
 }
 
 function buildSummary(pkg) {
-    const summaries = {
-        ekonomis: 'Repaint bodi halus harga dasar. Cocok untuk motor harian dan ganti warna budget.',
-        standar:  'Repaint bodi halus dengan Clear HS untuk gloss lebih tinggi dan hasil lebih tahan baret.',
-        basic:    'Repaint bodi halus dengan polishing & orange peel removal untuk finish mirror look.',
-        premium:  'Repaint bodi halus level tertinggi: extra lapisan clear, depth warna dalam, durability maksimal.',
-    };
-    return summaries[pkg.id] || pkg.description;
+    return pkg.description;
 }
 
 function buildDescription(pkg) {
@@ -168,13 +162,9 @@ function buildDescription(pkg) {
 }
 
 function buildNote(pkg) {
-    const extras = {
-        ekonomis: null,
-        standar:  'Harga dasar +20%. Clear HS memberikan daya tahan lebih baik dari Clear MS.',
-        basic:    'Harga dasar +40%. Termasuk proses polishing setelah curing untuk menghilangkan orange peel.',
-        premium:  'Harga dasar +60%. Lapisan cat dan clear lebih tebal untuk depth warna dan durability terbaik.',
-    };
-    return extras[pkg.id] || null;
+    if (pkg.multiplier === 1.0) return null;
+    const percentage = Math.round((pkg.multiplier - 1) * 100);
+    return `Harga dasar +${percentage}%. ${pkg.description}`;
 }
 
 // ─── Run ────────────────────────────────────────────────────────────
