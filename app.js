@@ -1207,7 +1207,7 @@ async function processBufferedMessages(senderNumber, client) {
                 // Ensure CRM reflects latest state before handover
                 if (!isAdmin) await syncGraphStateToCRM(senderNumber, result).catch(() => { });
 
-                const finalReply = aiResponse || "wah, pertanyaan mas/kak cukup teknis nih. zoya panggilin admin dulu ya biar dibantu langsung! 🙏";
+                const finalReply = aiResponse || "wah, pertanyaan mas/kak cukup teknis nih. aku panggilin admin dulu ya biar dibantu langsung! 🙏";
                 const targetNumber = toSenderNumberWithSuffix(senderNumber);
                 markBotMessage(targetNumber, finalReply);
                 await client.sendText(targetNumber, finalReply);
@@ -1336,7 +1336,7 @@ async function processBufferedMetaMessages(normalizedSenderId, queue) {
             console.log(`🚨 [LangGraph] Escalation handled by executor for ${normalizedSenderId} (Meta).`);
             await syncGraphStateToCRM(normalizedSenderId, result).catch(() => { });
 
-            aiResponseRaw = aiResponseRaw || "wah, pertanyaan kakak cukup teknis nih. zoya panggilin admin dulu ya biar dibantu langsung! 🙏";
+            aiResponseRaw = aiResponseRaw || "wah, pertanyaan kakak cukup teknis nih. aku panggilin admin dulu ya biar dibantu langsung! 🙏";
         }
 
         let aiResponse = '';

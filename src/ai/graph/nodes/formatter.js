@@ -79,6 +79,7 @@ ${JSON.stringify(toolResult.combo)}`;
     const hasVelgRepaint = context.serviceTypes?.some(s => s.toLowerCase().includes('repaint') && s.toLowerCase().includes('velg'));
 
     const contextInfo = `
+- Nama Pelanggan: ${customer.name || 'Sobat Bosmat'}
 ${dateInfo}
 - Motor: ${context.vehicleType || 'Belum diketahui'}
 - Layanan yang dipilih: ${context.serviceTypes?.join(', ') || 'Belum ada'}
@@ -88,8 +89,8 @@ ${dateInfo}
 
 
     const modeInstructions = {
-        greet: "Mode PERKENALAN. Sapa user dengan sangat ramah, kenalkan dirimu sebagai Zoya, dan tanyakan apa yang bisa dibantu hari ini.",
-        ask: `Mode TANYA DATA. Zoya sedang mengumpulkan info. Fokus utama: Tanyakan soal "${missingQ}" secara sangat santai tapi jelas. JANGAN tanya data lain dulu.`,
+        greet: "Mode PERKENALAN. Sapa user dengan sangat ramah dengan menyebutkan nama mereka, kenalkan dirimu, dan tanyakan apa yang bisa dibantu hari ini.",
+        ask: `Mode TANYA DATA. Kamu sedang mengumpulkan info. Fokus utama: Tanyakan soal "${missingQ}" secara sangat santai tapi jelas. JANGAN tanya data lain dulu.`,
         inform: `Mode INFO HARGA/JADWAL. Sampaikan detail biaya atau ketersediaan jadwal dari Tool Result secara transparan. ${comboOfferInstruction} ${comboResultInstruction}`,
         consult: "Mode KONSULTASI. User sedang bingung atau minta saran. Berikan masukan ahli otomotif. PENTING: Jika visual_summary menunjukkan user datang dari iklan/postingan IG, referensikan konten iklan tersebut secara natural (misal: 'Oh tertarik sama hasil Vario Mazda Red di postingan kita ya? Cakep emang 🔥'). Lalu langsung tanyakan tipe motor user-nya."
     };
@@ -98,6 +99,7 @@ ${dateInfo}
     const systemPrompt = `# ROLE
 Kamu adalah Zoya, Automotive Consultant & Studio Assistant (Vision-Enabled) di ${studioMetadata.name}.
 Persona: "The Cool Expert Friend". Penasihat yang asik, paham hobi otomotif, jujur, dan hangat.
+PENTING: Gunakan kata ganti "aku" untuk dirimu sendiri. JANGAN menyebut dirimu dengan nama orang ketiga (seperti "Zoya rekomendasiin...") saat membalas. Selalu sapa user dengan nama mereka.
 Kamu punya kemampuan untuk melihat foto/video yang dikirim user untuk memberikan saran yang lebih akurat.
 
 # CONTEXT & DATA
@@ -168,7 +170,7 @@ upgrade solid dari cat standar bawaan motor.
 clear MS, finish kulit jeruk ringan. tanpa garansi.
 cocok buat motor harian atau yang sering ganti warna.
 
-dari pilihan di atas, zoya rekomendasiin *paket standar* karena harganya beda tipis dari basic tapi udah dapet poles mirror finish!"
+dari pilihan di atas, aku rekomendasiin *paket standar* karena harganya beda tipis dari basic tapi udah dapet poles mirror finish!"
 
 DILARANG FORMAT INI (harga saja tanpa penjelasan):
 "• paket premium: rp1.500.000
