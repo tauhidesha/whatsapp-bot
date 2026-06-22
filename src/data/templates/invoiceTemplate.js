@@ -122,18 +122,18 @@ module.exports = function generateInvoiceHTML(data) {
     <!-- Header -->
     <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:60px">
       <div>
-        <h1 class="font-headline" style="font-size:48px; font-weight:900; line-height:0.8; text-transform:uppercase; margin-bottom:16px">
+        <h1 class="font-headline" style="font-size:56px; font-weight:900; line-height:0.8; text-transform:uppercase; margin-bottom:16px">
           ${documentType === 'tanda_terima' ? 'Receipt' : documentType === 'bukti_bayar' ? 'Payment' : 'Invoice'}<br/>
           <span class="text-yellow">Repaint &<br/>Detailing</span>
         </h1>
-        <div style="display:flex; gap:12px; margin-top:16px">
-          <span style="background:#676700; color:#e6e67a; padding:4px 12px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em">
+        <div style="display:flex; gap:12px; margin-top:20px">
+          <span style="background:#676700; color:#e6e67a; padding:6px 14px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em">
             Status: ${actualTotalPaid >= grandTotal ? 'Lunas' : actualTotalPaid > 0 ? 'DP' : 'Belum Bayar'}
           </span>
         </div>
       </div>
       <div style="text-align:right">
-        <img src="${logoBase64}" style="height:60px; margin-bottom:24px"/>
+        <img src="${logoBase64}" style="height:60px; margin-bottom:12px"/>
         <div>
           <p class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em">Nomor Dokumen</p>
           <p class="font-headline text-yellow" style="font-size:28px; font-weight:700">#BS-${docNumber || 'PREVIEW'}</p>
