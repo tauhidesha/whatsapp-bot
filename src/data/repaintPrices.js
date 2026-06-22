@@ -148,6 +148,76 @@ const syaratKetentuan = [
     "Biaya Remover Velg (bekas cat/jamur) +50rb s/d 100rb.",
 ];
 
+// ─── PAKET REPAINT BODI HALUS ───
+// Multiplier diterapkan di atas harga base per model.
+// Urutan presentasi ke customer: Premium → Basic → Standar → Ekonomis (anchoring).
+const repaintBodiHalusPackages = [
+    {
+        id: "premium",
+        name: "Paket Premium",
+        multiplier: 1.6,
+        displayOrder: 1, // tampil pertama (anchor mahal)
+        badge: null,
+        spec: [
+            "Basecoat PU",
+            "Clear HS",
+            "Orange peel removal",
+            "Tambahan lapisan clear",
+            "Lapisan cat lebih tebal",
+            "Depth warna lebih dalam",
+            "Durability lebih tinggi",
+        ],
+        targetCustomer: "Kolektor, motor restorasi, hasil maksimal",
+        description: "Level tertinggi. Cat berlapis extra clear untuk depth warna yang dalam dan ketahanan jangka panjang.",
+    },
+    {
+        id: "basic",
+        name: "Paket Basic",
+        multiplier: 1.4,
+        displayOrder: 2,
+        badge: null,
+        spec: [
+            "Basecoat PU",
+            "Clear HS",
+            "Polishing setelah curing",
+            "Orange peel removal",
+            "Finish mirror look",
+        ],
+        targetCustomer: "Enthusiast, motor kontes, tampilan maksimal",
+        description: "Finish mirror look. Setelah curing, bodi dipoles untuk menghilangkan orange peel.",
+    },
+    {
+        id: "standar",
+        name: "Paket Standar",
+        multiplier: 1.2,
+        displayOrder: 3,
+        badge: "⭐ Paling Banyak Dipilih",
+        spec: [
+            "Basecoat PU",
+            "Clear HS",
+            "Gloss lebih tinggi dari paket Ekonomis",
+            "Lebih tahan baret",
+            "Finish kulit jeruk ringan seperti pabrikan",
+        ],
+        targetCustomer: "Daily premium, ingin hasil lebih kinclong, upgrade dari cat standar pabrik",
+        description: "Sweet spot antara kualitas dan harga. Clear HS bikin gloss lebih tinggi dan tahan baret.",
+    },
+    {
+        id: "ekonomis",
+        name: "Paket Ekonomis",
+        multiplier: 1.0,
+        displayOrder: 4, // tampil terakhir (anchor murah)
+        badge: null,
+        spec: [
+            "Basecoat PU",
+            "Clear MS",
+            "Finish kulit jeruk ringan seperti pabrikan",
+        ],
+        targetCustomer: "Motor harian, ganti warna budget, pelajar, sering ganti warna",
+        description: "Harga dasar repaint bodi halus. Cocok untuk yang prioritaskan budget.",
+    },
+];
+
 module.exports = {
     repaintBodiHalus,
     repaintBodiKasar,
@@ -155,4 +225,5 @@ module.exports = {
     warnaSpesial,
     syaratKetentuan,
     VELG_PRICE_MAP,
+    repaintBodiHalusPackages,
 };

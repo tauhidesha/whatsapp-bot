@@ -232,6 +232,54 @@ async function lookupRepaintPrice(motorModel, subcategory, motorSize) {
   return null;
 }
 
+/**
+ * Fetch semua 4 paket Repaint Bodi Halus untuk motor tertentu.
+ * Return dalam urutan displayOrder: Premium → Basic → Standar → Ekonomis.
+ */
+async function lookupRepaintPackagePrices(motorModel) {
+  if (!motorModel) return [];
+
+  const motorData = await lookupMotorSizeFromData(motorModel);
+  if (!motorData) return [];
+
+  // Query semua service dengan subcategory prefix 'bodi_halus_paket'
+  const packageServices = await prisma.service.findMany({
+    where: { subcategory: { startsWith: 'bodi_halus_paket' } },
+    include: { prices: true },
+    orderBy: { name: 'asc' }
+  });
+
+  if (packageServices.length === 0) return [];
+
+  // Define display order (Premium first = anchor)
+  const ORDER = ['bodi_halus_paket_premium', 'bodi_halus_paket_basic', 'bodi_halus_paket_standar', 'bodi_halus_paket_ekonomis'];
+  const BADGES = {
+    'bodi_halus_paket_standar': '⭐ Paling Banyak Dipilih',
+  };
+
+  const results = [];
+  for (const subcategory of ORDER) {
+    const svc = packageServices.find(s => s.subcategory === subcategory);
+    if (!svc) continue;
+
+    const priceEntry = svc.prices.find(p => p.vehicleModelId === motorData.id);
+    if (!priceEntry) continue;
+
+    results.push({
+      service_id: svc.id,
+      service_name: svc.name,
+      summary: svc.summary,
+      note: svc.note,
+      price: priceEntry.price,
+      price_formatted: `Rp${priceEntry.price.toLocaleString('id-ID')}`,
+      badge: BADGES[subcategory] || null,
+      subcategory,
+    });
+  }
+
+  return results;
+}
+
 function formatRepaintPriceResult(lookup) {
   if (!lookup || !lookup.found) return null;
 
@@ -436,12 +484,42 @@ async function processSingleService(parsedServiceName, input, promoText) {
         const results = [];
         const { finalSize } = await resolveSizeForService({ service: { category: 'repaint' }, sizeArg: sizeFromArgs, motorModel });
 
-        const subs = ['bodi_halus', 'bodi_kasar', 'velg'];
+        // Repaint Bodi Halus: tampilkan paket (Premium → Basic → Standar → Ekonomis)
+        const packages = await lookupRepaintPackagePrices(motorModel);
+        if (packages.length > 0) {
+            for (const pkg of packages) {
+                const { finalPrice, breakdownText } = await applyAllSurcharges(pkg.price, pkg.service_name, finalSize, motorModel, extraContext);
+                results.push({
+                    name: pkg.service_name,
+                    price: finalPrice,
+                    price_formatted: `Rp${finalPrice.toLocaleString('id-ID')}${breakdownText}`,
+                    note: pkg.note,
+                    badge: pkg.badge,
+                    summary: pkg.summary,
+                });
+            }
+        } else {
+            // Fallback ke base price kalau paket belum di-seed
+            const lookup = await lookupRepaintPrice(motorModel, 'bodi_halus', finalSize);
+            const info = formatRepaintPriceResult(lookup);
+            if (info && info.price) {
+                const { finalPrice, breakdownText } = await applyAllSurcharges(info.price, 'Repaint Bodi Halus', finalSize, motorModel, extraContext);
+                results.push({
+                    name: 'Repaint Bodi Halus',
+                    price: finalPrice,
+                    price_formatted: `Rp${finalPrice.toLocaleString('id-ID')}${breakdownText}`,
+                    note: info.note
+                });
+            }
+        }
+
+        // Tambah Bodi Kasar & Velg
+        const subs = ['bodi_kasar', 'velg'];
         for (const sub of subs) {
             const lookup = await lookupRepaintPrice(motorModel, sub, finalSize);
             const info = formatRepaintPriceResult(lookup);
             if (info && info.price) {
-                const sName = sub === 'bodi_halus' ? 'Repaint Bodi Halus' : (sub === 'bodi_kasar' ? 'Repaint Bodi Kasar' : 'Repaint Velg');
+                const sName = sub === 'bodi_kasar' ? 'Repaint Bodi Kasar' : 'Repaint Velg';
                 const { finalPrice, breakdownText } = await applyAllSurcharges(info.price, sName, finalSize, motorModel, extraContext);
 
                 results.push({
@@ -592,7 +670,7 @@ const getServiceDetailsTool = {
           service_name: {
             type: "array",
             items: { type: "string" },
-            description: "Array nama layanan spesifik (contoh: ['Repaint Bodi Halus']). WAJIB pilih dari: 'Repaint Bodi Halus', 'Repaint Bodi Kasar', 'Repaint Velg', 'Repaint Cover CVT', 'Spot Repair', 'Detailing Mesin', 'Cuci Komplit', 'Poles Bodi Glossy', 'Full Detailing Glossy', 'Coating Doff', 'Coating Glossy', 'Complete Service Doff', 'Complete Service Glossy'. JANGAN isi dengan kategori umum seperti 'repaint'."
+            description: "Array nama layanan spesifik. WAJIB pilih dari: 'Repaint Bodi Halus - Paket Premium', 'Repaint Bodi Halus - Paket Basic', 'Repaint Bodi Halus - Paket Standar', 'Repaint Bodi Halus - Paket Ekonomis', 'Repaint Bodi Kasar', 'Repaint Velg', 'Repaint Cover CVT', 'Spot Repair', 'Detailing Mesin', 'Cuci Komplit', 'Poles Bodi Glossy', 'Full Detailing Glossy', 'Coating Doff', 'Coating Glossy', 'Complete Service Doff', 'Complete Service Glossy'. Gunakan 'repaint' (tanpa paket) hanya untuk tampilkan semua pilihan paket ke customer. JANGAN gunakan 'Repaint Bodi Halus' (tanpa paket) untuk booking."
           },
           motor_model: {
             type: "string",

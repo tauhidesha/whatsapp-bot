@@ -86,9 +86,21 @@ async function findService(targetService) {
     }
 
     // Fallback keywords — HANYA jika sangat spesifik
-    // Jangan paksa pilih layanan untuk kategori umum (detailing, coating)
-    // biarkan AI bertanya dulu user mau paket apa
     if (norm.includes('repaint') && (norm.includes('halus') || norm.includes('full'))) {
+        // Cek dulu apakah ada paket spesifik yang diminta
+        const packageKeywords = [
+            { keywords: ['premium'], subcategory: 'bodi_halus_paket_premium' },
+            { keywords: ['basic'], subcategory: 'bodi_halus_paket_basic' },
+            { keywords: ['standar', 'standard'], subcategory: 'bodi_halus_paket_standar' },
+            { keywords: ['ekonomis', 'ekonomi'], subcategory: 'bodi_halus_paket_ekonomis' },
+        ];
+        for (const { keywords, subcategory } of packageKeywords) {
+            if (keywords.some(k => norm.includes(k))) {
+                const svc = allServices.find(s => s.subcategory === subcategory);
+                if (svc) return { service: svc, isAmbiguous: false };
+            }
+        }
+        // Fallback ke base bodi_halus
         return { service: allServices.find(s => s.subcategory === 'bodi_halus') || null, isAmbiguous: false };
     }
     if (norm.includes('repaint') && norm.includes('kasar')) {
@@ -131,7 +143,7 @@ async function getSpecificPriceContext(motorModel, targetServicesStr, extraConte
         let serviceSurcharge = 0;
         let serviceBreakdown = "";
 
-        // 1. Model-based (Repaint Bodi Halus / Velg specific)
+        // 1. Model-based (Repaint Bodi Halus / Velg specific, termasuk paket)
         if (service.usesModelPricing && motor) {
             const priceEntry = await prisma.servicePrice.findFirst({
                 where: { serviceId: service.id, vehicleModelId: motor.id }
