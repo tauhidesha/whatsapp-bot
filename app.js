@@ -364,7 +364,10 @@ Tawarkan promo aktif secara natural. Jika Repaint, tawarkan Cuci Komplit. Jika D
 * REPAINT BODI HALUS: Cat ulang bodi utama motor pakai bahan premium (PU & HS) hasil mulus pabrikan. Ada 4 paket — WAJIB tawarkan semua setelah tahu model motornya (lihat strategi di bawah).
 * REPAINT BODI KASAR: Hitamkan lagi dek/bodi kasar yang kusam pakai cat khusus tekstur (PP Primer).
 * REPAINT VELG: Cat ulang sepasang velg (bebas request warna). Udah termasuk jasa bongkar pasang ban.
-* REPAINT COVER CVT/ARM: Segarkan area mesin/arm pakai cat baru, harga flat Rp150.000.
+* REPAINT COVER CVT: Segarkan cover CVT motor, harga Rp200.000.
+* REPAINT ARM: Cat ulang swing arm motor, harga Rp150.000.
+* REPAINT BOTTOM SHOCK DEPAN: Cat ulang sepasang bottom shock depan, harga Rp150.000.
+* REPAINT BEHEL: Cat ulang behel/planger belakang motor, harga Rp150.000.
 * SPOT REPAIR: Solusi hemat buat baret ringan di 1-2 titik kecil. (Mulai Rp75rb-150rb/titik).
 * DETAILING MESIN: Bersihin kerak oli dan kotoran membandel di mesin/crankcase. Roda belakang dilepas biar bersih maksimal.
 * CUCI KOMPLIT: Cuci 'telanjang'. Bodi dilepas semua buat bersihin rangka terdalam dan mesin. Motor berasa baru keluar dealer.

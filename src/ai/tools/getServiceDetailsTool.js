@@ -705,7 +705,7 @@ const getServiceDetailsTool = {
           service_name: {
             type: "array",
             items: { type: "string" },
-            description: "Array nama layanan spesifik. WAJIB pilih dari: 'Repaint Bodi Halus - Paket Premium', 'Repaint Bodi Halus - Paket Basic', 'Repaint Bodi Halus - Paket Standar', 'Repaint Bodi Halus - Paket Ekonomis', 'Repaint Bodi Kasar', 'Repaint Velg', 'Repaint Cover CVT', 'Spot Repair', 'Detailing Mesin', 'Cuci Komplit', 'Poles Bodi Glossy', 'Full Detailing Glossy', 'Coating Doff', 'Coating Glossy', 'Complete Service Doff', 'Complete Service Glossy'. Gunakan 'repaint' (tanpa paket) hanya untuk tampilkan semua pilihan paket ke customer. JANGAN gunakan 'Repaint Bodi Halus' (tanpa paket) untuk booking."
+            description: "Array nama layanan spesifik. WAJIB pilih dari: 'Repaint Bodi Halus - Paket Premium', 'Repaint Bodi Halus - Paket Basic', 'Repaint Bodi Halus - Paket Standar', 'Repaint Bodi Halus - Paket Ekonomis', 'Repaint Bodi Kasar', 'Repaint Velg', 'Repaint Cover CVT', 'Repaint Arm', 'Repaint Bottom Shock Depan', 'Repaint Behel', 'Spot Repair', 'Detailing Mesin', 'Cuci Komplit', 'Poles Bodi Glossy', 'Full Detailing Glossy', 'Coating Doff', 'Coating Glossy', 'Complete Service Doff', 'Complete Service Glossy'. Gunakan 'repaint' (tanpa paket) hanya untuk tampilkan semua pilihan paket ke customer. JANGAN gunakan 'Repaint Bodi Halus' (tanpa paket) untuk booking."
           },
           motor_model: {
             type: "string",

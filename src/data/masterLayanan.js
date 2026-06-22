@@ -159,6 +159,38 @@ const masterLayanan = [
     price: 0,
     estimatedDuration: "480",
     note: "Harga mulai dari Rp75.000 - Rp150.000 per spot (tergantung warna & kondisi)."
+  },
+  {
+    name: "Repaint Cover CVT",
+    category: "repaint",
+    summary: "Cat ulang cover CVT motor agar kembali bersih dan segar.",
+    description: "Pengecatan ulang cover CVT motor. Estimasi pengerjaan: 1-2 hari kerja.",
+    price: 200000,
+    estimatedDuration: "480"
+  },
+  {
+    name: "Repaint Arm",
+    category: "repaint",
+    summary: "Cat ulang swing arm motor agar terbebas dari kusam dan karat.",
+    description: "Pengecatan ulang swing arm motor. Estimasi pengerjaan: 1-2 hari kerja.",
+    price: 150000,
+    estimatedDuration: "480"
+  },
+  {
+    name: "Repaint Bottom Shock Depan",
+    category: "repaint",
+    summary: "Cat ulang bottom shock depan (sepasang) agar kaki-kaki kembali mulus.",
+    description: "Pengecatan ulang sepasang bottom shock depan motor. Estimasi pengerjaan: 1-2 hari kerja.",
+    price: 150000,
+    estimatedDuration: "480"
+  },
+  {
+    name: "Repaint Behel",
+    category: "repaint",
+    summary: "Cat ulang behel/planger belakang motor.",
+    description: "Pengecatan ulang behel/planger belakang motor. Estimasi pengerjaan: 1-2 hari kerja.",
+    price: 150000,
+    estimatedDuration: "480"
   }
 ];
 
