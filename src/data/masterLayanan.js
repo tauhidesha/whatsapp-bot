@@ -158,7 +158,7 @@ const masterLayanan = [
     description: "Pengecatan ulang hanya pada bagian yang lecet atau baret (tidak satu panel penuh). Sangat efisien untuk perbaikan kecil agar tampilan motor kembali rapi tanpa harus cat full. Harga bervariasi tergantung warna dan tingkat kerusakan.\n\nEstimasi pengerjaan: 1–2 hari kerja.",
     price: 0,
     estimatedDuration: "480",
-    note: "Harga mulai dari Rp75.000 - Rp150.000 per spot (tergantung warna & kondisi)."
+    note: "Harga mulai dari Rp150.000 - Rp250.000 per panel (tergantung warna & kondisi)."
   },
   {
     name: "Repaint Cover CVT",
