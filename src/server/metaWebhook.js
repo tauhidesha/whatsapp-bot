@@ -32,7 +32,7 @@ function registerProcessedMessage(messageId) {
 
 function createMetaWebhookRouter(deps = {}) {
     const {
-        getAIResponse,
+        zoyaAgent,
         saveMessageToFirestore,
         saveSenderMeta,
         debounceQueue,
@@ -196,18 +196,35 @@ function createMetaWebhookRouter(deps = {}) {
         }
 
         // Direct AI Processing (For Admins or if no debounceQueue)
-        if (text && typeof getAIResponse === 'function') {
+        if (text && zoyaAgent && typeof zoyaAgent.invoke === 'function') {
             try {
-                const aiResult = await getAIResponse(text, displayName, normalizedSenderId);
-                const aiResponse = aiResult.content;
+                const { HumanMessage } = require('@langchain/core/messages');
+                const input = {
+                    messages: [new HumanMessage({ content: text })],
+                    metadata: {
+                        phoneReal: normalizedSenderId,
+                        senderName: displayName,
+                        isAdmin: isAdmin
+                    }
+                };
+                
+                const aiResult = await zoyaAgent.invoke(input, {
+                    configurable: { thread_id: normalizedSenderId }
+                });
+                
+                const lastMessage = aiResult.messages[aiResult.messages.length - 1];
+                const aiResponse = lastMessage ? lastMessage.content : null;
+                
                 log('AI response ready for outbound delivery (Direct)', { channel, senderId });
-                await sendMetaMessage(channel, senderId, aiResponse, logger);
+                if (aiResponse) {
+                    await sendMetaMessage(channel, senderId, aiResponse, logger);
 
-                if (typeof saveMessageToFirestore === 'function' && aiResponse) {
-                    try {
-                        await saveMessageToFirestore(normalizedSenderId, aiResponse, 'ai');
-                    } catch (error) {
-                        log('Failed to persist AI response', error);
+                    if (typeof saveMessageToFirestore === 'function') {
+                        try {
+                            await saveMessageToFirestore(normalizedSenderId, aiResponse, 'ai');
+                        } catch (error) {
+                            log('Failed to persist AI response', error);
+                        }
                     }
                 }
             } catch (error) {
