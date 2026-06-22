@@ -252,7 +252,7 @@ async function lookupRepaintPackagePrices(motorModel) {
   if (packageServices.length === 0) return [];
 
   // Define display order (Premium first = anchor)
-  const ORDER = ['bodi_halus_paket_premium', 'bodi_halus_paket_basic', 'bodi_halus_paket_standar', 'bodi_halus_paket_ekonomis'];
+  const ORDER = ['bodi_halus_paket_premium', 'bodi_halus_paket_standar', 'bodi_halus_paket_basic', 'bodi_halus_paket_ekonomis'];
   const BADGES = {
     'bodi_halus_paket_standar': '⭐ Paling Banyak Dipilih',
   };
