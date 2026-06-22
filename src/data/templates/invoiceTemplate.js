@@ -74,6 +74,7 @@ module.exports = function generateInvoiceHTML(data) {
       background: #131313;
       color: #e5e2e1;
       font-family: 'Manrope', sans-serif;
+      font-weight: 500;
       padding: 0;
       width: 794px; /* A4 width in px at 96dpi */
       margin: 0 auto;
