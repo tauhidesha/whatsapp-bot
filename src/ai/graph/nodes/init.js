@@ -34,7 +34,7 @@ async function initNode(state) {
         console.log('[INIT_NODE] No phoneReal, using default Stranger.');
         return { 
             isAdmin: false,
-            customer: { name: 'Stranger' },
+            customer: { name: metadata?.senderName || 'Stranger' },
             metadata: { ...metadata, currentDateTime }
         };
     }
@@ -44,7 +44,7 @@ async function initNode(state) {
             return {
                 isAdmin: isAdmin,
                 customer: {
-                    name: isAdmin ? 'Admin' : 'Guest',
+                    name: isAdmin ? 'Admin' : (metadata?.senderName || 'Guest'),
                     status: 'new'
                 },
                 metadata: { ...metadata, currentDateTime }
@@ -64,7 +64,7 @@ async function initNode(state) {
             return {
                 isAdmin: isAdmin,
                 customer: {
-                    name: isAdmin ? 'Admin' : 'Guest',
+                    name: isAdmin ? 'Admin' : (metadata?.senderName || 'Guest'),
                     status: 'new'
                 },
                 metadata: { ...metadata, currentDateTime }
@@ -78,7 +78,7 @@ async function initNode(state) {
             isAdmin: isAdmin,
             customer: {
                 id: customer.id,
-                name: customer.name || (isAdmin ? 'Admin' : `Sobat ${studioMetadata.shortName}`),
+                name: customer.name || (isAdmin ? 'Admin' : (metadata?.senderName || `Sobat ${studioMetadata.shortName}`)),
                 phone: customer.phone,
                 status: customer.status,
                 vehicles: customer.vehicles.map(v => ({
@@ -110,7 +110,7 @@ async function initNode(state) {
         console.error('[initNode] Error loading customer:', error);
         return { 
             isAdmin: isAdmin,
-            customer: { name: `Sobat ${studioMetadata.shortName}` },
+            customer: { name: metadata?.senderName || `Sobat ${studioMetadata.shortName}` },
             metadata: { ...metadata, currentDateTime }
         };
     }
