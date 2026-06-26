@@ -426,8 +426,11 @@ async function processSingleService(parsedServiceName, input, promoText) {
             const focusRaw = extraContext.detailingFocus;
             const focusStr = typeof focusRaw === 'string' ? focusRaw : (Array.isArray(focusRaw) ? focusRaw.join(' ') : String(focusRaw));
             const focus = focusStr.toLowerCase();
+            const serviceLower = serviceName.toLowerCase();
+            
             for (const part of addOnParts) {
-                if (focus.includes(part)) {
+                // Jangan charge add-on part jika layanannya sendiri adalah part tersebut (misal: "Repaint Arm")
+                if (focus.includes(part) && !serviceLower.includes(part)) {
                     const surcharge = guessingPricingPerSize(guess, 'Add-on Part');
                     if (surcharge > 0) {
                         finalPrice += surcharge;
