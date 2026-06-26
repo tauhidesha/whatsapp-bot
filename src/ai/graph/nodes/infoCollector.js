@@ -86,10 +86,10 @@ Ekstrak data ke dalam format JSON dengan field berikut:
 1. **intent**: Satu keyword intent dari daftar di atas (UPPERCASE).
 2. **internal_thought**: (Chain-of-Thought) Analisis singkat: Apa yang user mau? Apa yang kamu lihat di foto? Data apa yang baru didapat?
 3. **motor_model**: Jenis motor (Nmax, Scoopy, dll). Jika user menyebut *Mobil*, masukkan "Mobil".
-4. **service_types**: Array layanan (Repaint, Detailing, Coating, Cuci).
+4. **service_types**: Array layanan. Kategori UMUM: "Repaint", "Coating". Untuk Detailing, USAHAKAN pilih nama spesifik jika konteksnya jelas: "Full Detailing" (paket lengkap restorasi), "Detailing Mesin" (bersihin mesin), "Cuci Komplit" (bongkar cuci total), atau "Poles Bodi" (hilangkan baret/kusam). Jika user hanya bilang "detailing" tanpa detail lebih lanjut, boleh tulis "Detailing" saja.
 5. **paint_type**: Jenis cat (Glossy / Doff).
 6. **is_bongkar_total**: (Boolean/null) Jika user sebut "bongkar total" atau "bongkar mesin".
-7. **detailing_focus**: Fokus area (Bodi Halus, Bodi Kasar, Velg, Mesin).
+7. **detailing_focus**: Fokus area. Untuk REPAINT: "Bodi Halus", "Bodi Kasar", "Velg", "CVT". Untuk DETAILING: "Poles Bodi", "Mesin", "Full Bongkar". JANGAN gunakan "Bodi Halus"/"Bodi Kasar" untuk konteks Detailing (itu istilah Repaint).
 8. **color_choice**: Warna bodi yang diinginkan.
 9. **velg_color_choice**: Warna velg (SERINGKALI berbeda dengan bodi).
 10. **is_previously_painted**: (Boolean/null) Jika motor/velg sudah pernah dicat ulang (terlihat di foto atau disebut user).
@@ -101,7 +101,7 @@ Ekstrak data ke dalam format JSON dengan field berikut:
 
 # EXTRACTION STRATEGY
 - **Ad/IG Traffic**: Pesan dari IG Boost memuat teks postingan asli (misal: "Kalau Vario 160 dikasih warna Mazda Red..."). JANGAN otomatis anggap Vario 160 adalah motor user dan Mazda Red adalah warna yang pasti diinginkan (kecuali user menegaskan). Alih-alih, masukkan konteks postingan IG ini ke dalam field \`visual_summary\` (misal: "User merespons dari postingan IG tentang Repaint Vario 160 Mazda Red"). Kosongkan \`motor_model\` jika belum jelas motor user apa.
-- **Bodi Halus vs Kasar**: Jika user sebut "bodi kasar", masukkan ke \`detailing_focus\`.
+- **Bodi Halus vs Kasar**: "Bodi Halus"/"Bodi Kasar" HANYA untuk konteks REPAINT di \`detailing_focus\`. Untuk Detailing, gunakan "Poles Bodi", "Mesin", atau "Full Bongkar".
 - **Warna**: Bedakan dengan teliti antara warna bodi dan warna velg.
 - **Visual Summary**: Wajib isi field "visual_summary" dengan deskripsi IG BoostATAU gambar yang kamu lihat. Ini akan jadi bekal Zoya untuk nyambung ngobrol!
 - **Negative Constraint**: JANGAN menebak data yang tidak ada. Jika ragu, berikan \`null\`.
@@ -346,9 +346,28 @@ Output: {
                 break;
             }
             if (svc === 'detailing') {
-                if (ctx.detailingFocus || ctx.isBongkarTotal) {
-                    ctx.serviceTypes[i] = ctx.isBongkarTotal ? "Full Detailing" : `Detailing ${ctx.detailingFocus}`;
-                    continue; // Skip generic missing question since we auto-resolved it
+                if (ctx.isBongkarTotal) {
+                    ctx.serviceTypes[i] = "Cuci Komplit";
+                    console.log(`[INFO_COLLECTOR_NODE] Resolved generic "Detailing" → "Cuci Komplit" (bongkar total)`);
+                    continue;
+                }
+                if (ctx.detailingFocus) {
+                    const dfLower = (typeof ctx.detailingFocus === 'string' ? ctx.detailingFocus : String(ctx.detailingFocus)).toLowerCase();
+                    if (dfLower.includes('mesin')) {
+                        ctx.serviceTypes[i] = "Detailing Mesin";
+                    } else if (dfLower.includes('full') || dfLower.includes('detailing')) {
+                        ctx.serviceTypes[i] = "Full Detailing Glossy";
+                    } else if (dfLower.includes('bongkar') || dfLower.includes('komplit') || dfLower.includes('cuci')) {
+                        ctx.serviceTypes[i] = "Cuci Komplit";
+                    } else if (dfLower.includes('poles') || dfLower.includes('baret') || dfLower.includes('kusam') || dfLower.includes('kilap')) {
+                        ctx.serviceTypes[i] = "Poles Bodi Glossy";
+                    } else {
+                        // Can't resolve — keep asking
+                        missingQuestion = "Tanyakan fokus detailingnya (Hilangkan baret bodi, bersihkan mesin, atau cuci bongkar total)";
+                        break;
+                    }
+                    console.log(`[INFO_COLLECTOR_NODE] Resolved generic "Detailing" → "${ctx.serviceTypes[i]}" from focus="${ctx.detailingFocus}"`);
+                    continue;
                 } else {
                     missingQuestion = "Tanyakan fokus detailingnya (Hilangkan baret bodi, bersihkan mesin, atau cuci bongkar total)";
                     break;
@@ -373,7 +392,8 @@ Output: {
                     if (!ctx.paintType) { missingQuestion = "Cari tahu jenis cat motor (Glossy atau Doff)"; break; }
                     if (ctx.isBongkarTotal === null && svcLower.includes('coating')) { missingQuestion = "Tanyakan apakah mau proteksi bodi saja atau bongkar total (Complete Service)"; break; }
                 } else if (svcLower.includes('detailing') || svcLower.includes('poles') || svcLower.includes('cuci')) {
-                    if (!ctx.detailingFocus && !ctx.isBongkarTotal) { missingQuestion = "Tanyakan fokus pembersihan (Bodi, Mesin, atau Kolong)"; break; }
+                    const isAlreadySpecific = /full detailing|cuci komplit|detailing mesin|poles bodi/i.test(svcLower);
+                    if (!isAlreadySpecific && !ctx.detailingFocus && !ctx.isBongkarTotal) { missingQuestion = "Tanyakan fokus pembersihan (Bodi, Mesin, atau Kolong)"; break; }
                     if (!ctx.paintType && (svcLower.includes('poles') || svcLower.includes('full detailing'))) { missingQuestion = "Pastikan jenis catnya Glossy atau Doff"; break; }
                 } else if (svcLower.includes('repaint')) {
                     if (svcLower.includes('halus') && !ctx.colorChoice) { missingQuestion = "Tanyakan rencana warna baru untuk bodi halusnya"; break; }
