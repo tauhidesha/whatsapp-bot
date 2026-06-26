@@ -300,6 +300,15 @@ Output: {
             if (focus.includes('cvt')) {
                 resolvedServices.push('Repaint CVT');
             }
+            if (focus.includes('arm') || focus.includes('swing arm')) {
+                resolvedServices.push('Repaint Arm');
+            }
+            if (focus.includes('shock') || focus.includes('bottom') || focus.includes('sok')) {
+                resolvedServices.push('Repaint Bottom Shock Depan');
+            }
+            if (focus.includes('behel') || focus.includes('planger')) {
+                resolvedServices.push('Repaint Behel');
+            }
 
             if (resolvedServices.length > 0) {
                 ctx.serviceTypes.splice(genericRepaintIdx, 1, ...resolvedServices);
