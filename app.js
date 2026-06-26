@@ -1202,8 +1202,18 @@ async function processBufferedMessages(senderNumber, client) {
             // Handle HUMAN_HANDOVER intent
             // NOTE: triggerBosMatTool + setSnoozeMode already executed by executor node.
             // We only need to send the AI response and sync CRM here — no double-fire.
-            if (result.intent === 'HUMAN_HANDOVER') {
-                console.log(`🚨 [LangGraph] Escalation handled by executor. Sending response for ${senderNumber}.`);
+            if (result.intent === 'HUMAN_HANDOVER' || result.context?.pendingHandover) {
+                console.log(`🚨 [LangGraph] Escalation handled. Sending response for ${senderNumber}.`);
+                
+                // Jika formatter memutuskan handover secara mandiri (karena tidak tertangkap classifier)
+                if (result.context?.pendingHandover && result.intent !== 'HUMAN_HANDOVER') {
+                    const { setSnoozeMode, notifyBosMat } = require('./src/ai/utils/humanHandover');
+                    await setSnoozeMode(senderNumber);
+                    const lastUserMsgRecord = input.messages[0];
+                    const lastUserMsg = lastUserMsgRecord ? extractTextFromContent(lastUserMsgRecord.content) : combinedMessage;
+                    await notifyBosMat(senderNumber, lastUserMsg, "AI secara mandiri memutuskan untuk handover ke Bosmat.");
+                }
+
                 // Ensure CRM reflects latest state before handover
                 if (!isAdmin) await syncGraphStateToCRM(senderNumber, result).catch(() => { });
 
@@ -1332,8 +1342,15 @@ async function processBufferedMetaMessages(normalizedSenderId, queue) {
 
         // Handle HUMAN_HANDOVER
         // NOTE: triggerBosMatTool + setSnoozeMode already executed by executor node — no double-fire.
-        if (result.intent === 'HUMAN_HANDOVER') {
-            console.log(`🚨 [LangGraph] Escalation handled by executor for ${normalizedSenderId} (Meta).`);
+        if (result.intent === 'HUMAN_HANDOVER' || result.context?.pendingHandover) {
+            console.log(`🚨 [LangGraph] Escalation handled for ${normalizedSenderId} (Meta).`);
+            
+            if (result.context?.pendingHandover && result.intent !== 'HUMAN_HANDOVER') {
+                const { setSnoozeMode, notifyBosMat } = require('./src/ai/utils/humanHandover');
+                await setSnoozeMode(normalizedSenderId);
+                await notifyBosMat(normalizedSenderId, combinedMessage, "AI secara mandiri memutuskan untuk handover ke Bosmat.");
+            }
+
             await syncGraphStateToCRM(normalizedSenderId, result).catch(() => { });
 
             aiResponseRaw = aiResponseRaw || "wah, pertanyaan kakak cukup teknis nih. aku panggilin admin dulu ya biar dibantu langsung! 🙏";

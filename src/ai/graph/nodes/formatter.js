@@ -214,14 +214,24 @@ Jika toolResult mengandung \`handoff\` (human handover sudah di-trigger):
 - Jika handover karena user request: \"oke kak, aku sudah hubungi bosmat ya. nanti dibalas langsung sama beliau 🙏\"
 - JANGAN lanjut kasih info/harga setelah handover. Cukup sampaikan bahwa sudah diteruskan.
 
-175: # OUTPUT FORMAT
-176: Kamu WAJIB membalas DALAM FORMAT JSON MURNI (tanpa markdown blocks, tanpa teks pembuka/penutup).
-177: Struktur JSON yang diwajibkan:
-178: {
-179:   "greeting": "sapaan pendek (max 5 kata) jika di awal/pindah topik, kosongkan jika diskusi intens",
-180:   "main_content": "isi pesan utama, gunakan double-newline antar paragraf",
-181:   "internal_thought": "analisis singkat pemilihan pesan"
-182: }`;
+# OUTPUT FORMAT
+Kamu WAJIB membalas DALAM FORMAT JSON MURNI (tanpa markdown blocks, tanpa teks pembuka/penutup).
+Struktur JSON yang diwajibkan:
+{
+  "greeting": "sapaan pendek (max 5 kata) jika di awal/pindah topik, kosongkan jika diskusi intens",
+  "main_content": "isi pesan utama, gunakan double-newline antar paragraf",
+  "internal_thought": "analisis singkat pemilihan pesan",
+  "trigger_handover": true/false // WAJIB set true HANYA JIKA kamu bilang akan menanyakan/konsultasi/cek ke bosmat atau admin
+}
+
+\`\`\`json
+{
+  "greeting": "halo kak!",
+  "main_content": "untuk warna custom itu aku tanyain dulu ke bosmat ya kak biar pasti 🙏",
+  "internal_thought": "Warna custom tidak ada di database, perlu konfirmasi bosmat.",
+  "trigger_handover": true
+}
+\`\`\``;
 
     console.log(`[FORMATTER_NODE] missingQ detected: "${missingQ}"`);
 
@@ -268,7 +278,7 @@ Jika toolResult mengandung \`handoff\` (human handover sudah di-trigger):
         const rawText = extractTextFromContent(response.content);
         console.log(`[FORMATTER_NODE] Raw response (first 100 char):`, rawText.substring(0, 100).replace(/\n/g, ' '));
 
-        let parsed = { greeting: '', main_content: rawText, internal_thought: 'manual_fallback' };
+        let parsed = { greeting: '', main_content: rawText, internal_thought: 'manual_fallback', trigger_handover: false };
         try {
             // Clean markdown if model still provides it despite instructions
             const cleaned = rawText.replace(/```json\n?|```/g, '').trim();
@@ -291,6 +301,11 @@ Jika toolResult mengandung \`handoff\` (human handover sudah di-trigger):
         const contextUpdate = {};
         if (replyMode === 'inform' && comboPromo && context.serviceTypes?.length === 1) {
             contextUpdate.comboOffered = true;
+        }
+
+        if (parsed.trigger_handover) {
+            contextUpdate.pendingHandover = true;
+            console.log(`[FORMATTER_NODE] 🚨 LLM explicitly requested handover via trigger_handover flag.`);
         }
 
         return {
