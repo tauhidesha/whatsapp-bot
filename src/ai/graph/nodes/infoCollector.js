@@ -93,7 +93,9 @@ Ekstrak data ke dalam format JSON dengan field berikut:
 8. **color_choice**: Warna bodi yang diinginkan.
 9. **velg_color_choice**: Warna velg (SERINGKALI berbeda dengan bodi).
 10. **is_previously_painted**: (Boolean/null) Jika motor/velg sudah pernah dicat ulang (terlihat di foto atau disebut user).
-11. **visual_summary**: Deskripsi singkat apa yang terlihat di gambar.
+11. **booking_date**: (String/null) Ekstrak tanggal/hari booking JIKA user secara eksplisit menyebutkannya (misal: "besok", "lusa", "tanggal 15", "senin depan", "hari ini").
+12. **booking_time**: (String/null) Ekstrak waktu/jam booking JIKA user menyebutkannya (misal: "siang", "sore", "jam 10", "pagi").
+13. **visual_summary**: Deskripsi singkat apa yang terlihat di gambar.
 
 # INTENT RULES
 - JIKA user hanya menyapa (Halo, P, Assalamualaikum) TANPA konteks apa-apa, WAJIB intent = "GREETING".
@@ -227,6 +229,8 @@ Output: {
 
         // --- ENTITY EXTRACTION ---
         if (extracted.motor_model) ctx.vehicleType = extracted.motor_model;
+        if (extracted.booking_date) ctx.bookingDate = extracted.booking_date;
+        if (extracted.booking_time) ctx.bookingTime = extracted.booking_time;
 
         // Smart merge serviceTypes with dedup
         const extractedServices = Array.isArray(extracted.service_types)
