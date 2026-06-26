@@ -420,27 +420,6 @@ async function processSingleService(parsedServiceName, input, promoText) {
             console.log(`[applyAllSurcharges] Disassembly fee applied: ${bongkarFee}`);
         }
 
-        // 5. Specific Add-ons (CVT, Behel, Arm, Shock)
-        const addOnParts = ['cvt', 'behel', 'arm', 'shock'];
-        if (extraContext.detailingFocus) {
-            const focusRaw = extraContext.detailingFocus;
-            const focusStr = typeof focusRaw === 'string' ? focusRaw : (Array.isArray(focusRaw) ? focusRaw.join(' ') : String(focusRaw));
-            const focus = focusStr.toLowerCase();
-            const serviceLower = serviceName.toLowerCase();
-            
-            for (const part of addOnParts) {
-                // Jangan charge add-on part jika layanannya sendiri adalah part tersebut (misal: "Repaint Arm")
-                if (focus.includes(part) && !serviceLower.includes(part)) {
-                    const surcharge = guessingPricingPerSize(guess, 'Add-on Part');
-                    if (surcharge > 0) {
-                        finalPrice += surcharge;
-                        breakdown.push(`+Rp${surcharge.toLocaleString('id-ID')} (Add-on ${part.toUpperCase()})`);
-                        console.log(`[applyAllSurcharges] Add-on surcharge applied for ${part}: ${surcharge}`);
-                    }
-                }
-            }
-        }
-
         let breakdownText = '';
         if (breakdown.length > 0) {
             breakdownText = ` (Rincian: Harga Dasar Rp${basePrice.toLocaleString('id-ID')}, ${breakdown.join(', ')})`;
