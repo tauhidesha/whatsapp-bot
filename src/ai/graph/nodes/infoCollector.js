@@ -430,11 +430,11 @@ Output: {
 
     // Ready if:
     // 1. Human handoff
-    // 2. Booking flow has enough data
+    // 2. Booking flow has enough data AND no missing questions
     // 3. General inquiry (Location/Studio info)
     const isReady = isHumanHandoff ||
         (classifiedIntent === 'GENERAL_INQUIRY' || studioKeywords) ||
-        (classifiedIntent === 'BOOKING_SERVICE' && !!ctx.vehicleType && ctx.serviceTypes.length > 0 && !hasGenericService);
+        (classifiedIntent === 'BOOKING_SERVICE' && !!ctx.vehicleType && ctx.serviceTypes.length > 0 && !hasGenericService && ctx.missingQuestions.length === 0);
 
     ctx.isReadyForTools = Boolean(isReady);
 
