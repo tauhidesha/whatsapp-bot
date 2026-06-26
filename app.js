@@ -1209,9 +1209,7 @@ async function processBufferedMessages(senderNumber, client) {
                 if (result.context?.pendingHandover && result.intent !== 'HUMAN_HANDOVER') {
                     const { setSnoozeMode, notifyBosMat } = require('./src/ai/utils/humanHandover');
                     await setSnoozeMode(senderNumber);
-                    const lastUserMsgRecord = input.messages[0];
-                    const lastUserMsg = lastUserMsgRecord ? extractTextFromContent(lastUserMsgRecord.content) : combinedMessage;
-                    await notifyBosMat(senderNumber, lastUserMsg, "AI secara mandiri memutuskan untuk handover ke Bosmat.");
+                    await notifyBosMat(senderNumber, combinedMessage, "AI secara mandiri memutuskan untuk handover ke Bosmat.");
                 }
 
                 // Ensure CRM reflects latest state before handover
