@@ -13,8 +13,8 @@ const { parseSenderIdentity } = require('../../lib/utils');
 function normalizePhone(senderNumber) {
     if (!senderNumber) return null;
     // Use centralized identity parsing to ensure consistency with DB (including suffixes)
-    const { docId } = parseSenderIdentity(senderNumber);
-    return docId;
+    const { numericId } = parseSenderIdentity(senderNumber);
+    return numericId;
 }
 
 
