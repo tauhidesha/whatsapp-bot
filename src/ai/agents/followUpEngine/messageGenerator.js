@@ -66,8 +66,8 @@ const ANGLE_INSTRUCTIONS = {
         Goal: Panggilan terakhir untuk reservasi hari ini/besok agar hak garansi aman.
     `,
     booking_reminder: `
-        Angle: Pengingat jadwal kedatangan (Booking) hari ini.
-        Goal: Memastikan pelanggan ingat jam kedatangannya dan merasa disambut di studio. Cantumkan jam booking dan layanannya.
+        Angle: Pengingat jadwal kedatangan (Booking) BESOK (H-1).
+        Goal: Memastikan pelanggan ingat tanggal dan jam kedatangannya besok dan merasa disambut di studio. Cantumkan tanggal, jam booking, dan layanannya.
     `
 };
 
@@ -169,8 +169,10 @@ ${promoSection}
 - Motor: ${context.motorModel || 'tidak diketahui'}
 - Kondisi motor: ${context.motorCondition || 'tidak diketahui'}
 - Warna motor: ${context.motorColor || 'tidak diketahui'}
-- Layanan diminati: ${context.targetServices && context.targetServices.length > 0 ? context.targetServices.join(', ') : 'tidak diketahui'}
+- Layanan diminati: ${context.targetServices && context.targetServices.length > 0 ? context.targetServices.join(', ') : (context.target_service || 'tidak diketahui')}
 - Terakhir chat: ${daysSinceChat !== null ? daysSinceChat + ' hari lalu' : 'tidak diketahui'}
+${context.bookingDate ? `- Tanggal Booking: ${context.bookingDate}` : ''}
+${context.bookingTime ? `- Jam Booking: ${context.bookingTime}` : ''}
 
 # HISTORY CHAT TERAKHIR (5 Pesan Terakhir)
 ${metadata.chatHistory ? metadata.chatHistory : '(Belum ada riwayat chat)'}

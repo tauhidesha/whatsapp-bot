@@ -24,19 +24,20 @@ async function sendBookingReminders(force = false, dryRun = false) {
 
   const previewItems = []; // accumulate when dryRun=true
 
-  // Find bookings for today (local time)
-  const startOfDayLocal = now.startOf('day');
-  const endOfDayLocal = now.endOf('day');
+  // Find bookings for TOMORROW (H-1 reminder: sent 1 day before booking date)
+  const tomorrow = now.plus({ days: 1 });
+  const startOfTomorrowLocal = tomorrow.startOf('day');
+  const endOfTomorrowLocal = tomorrow.endOf('day');
 
-  const startOfDayUTC = startOfDayLocal.toJSDate();
-  const endOfDayUTC = endOfDayLocal.toJSDate();
+  const startOfTomorrowUTC = startOfTomorrowLocal.toJSDate();
+  const endOfTomorrowUTC = endOfTomorrowLocal.toJSDate();
 
   try {
     const bookings = await prisma.booking.findMany({
       where: {
         bookingDate: {
-          gte: startOfDayUTC,
-          lte: endOfDayUTC
+          gte: startOfTomorrowUTC,
+          lte: endOfTomorrowUTC
         },
         reminderSent: false,
         status: {
@@ -52,19 +53,22 @@ async function sendBookingReminders(force = false, dryRun = false) {
 
     if (bookings.length === 0) return dryRun ? [] : undefined;
 
-    console.log(`[bookingReminders] Menemukan ${bookings.length} booking SQL untuk diingatkan oleh Zoya`);
+    console.log(`[bookingReminders] Menemukan ${bookings.length} booking BESOK untuk diingatkan (H-1) oleh Zoya`);
 
     for (const booking of bookings) {
       const target = booking.customerPhone || (booking.customer && booking.customer.phone);
       let normalizedTarget = getIdentifier(target);
       if (!normalizedTarget) continue;
 
-      const bookingTime = DateTime.fromJSDate(booking.bookingDate).setZone(TIMEZONE).toFormat('HH:mm');
+      const bookingDt = DateTime.fromJSDate(booking.bookingDate).setZone(TIMEZONE);
+      const bookingTime = bookingDt.toFormat('HH:mm');
+      const bookingDateFormatted = bookingDt.setLocale('id').toFormat('cccc, d LLLL yyyy'); // e.g. "Senin, 30 Juni 2025"
       
       try {
         const customerData = {
           name: booking.customerName || (booking.customer && booking.customer.name) || 'Kak',
           context: {
+            bookingDate: bookingDateFormatted,
             bookingTime: bookingTime,
             target_service: booking.serviceType || 'layanan studio',
             customerLabel: 'active'

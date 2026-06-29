@@ -233,6 +233,10 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
         // Skip jika tidak ada customer
         if (!customer) continue;
 
+        // Check active booking status (PENDING/CONFIRMED/IN_PROGRESS)
+        const activeBookings = customer.bookings || [];
+        const hasActiveBooking = activeBookings.length > 0;
+
         const chatHistory = (customer.messages || [])
             .slice()
             .reverse()
@@ -268,18 +272,15 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
             }
         }
 
-        // 3. Eligibility checks
-        const isNurtureEligible = isEligible(context, metadata);
+        // 3. Nurturing eligibility — BLOCKED if customer has active booking
+        const isNurtureEligible = hasActiveBooking ? false : isEligible(context, metadata);
 
         // 4. Review eligibility (Post-Service 3 Days)
+        // Review is for COMPLETED services (lastService), NOT blocked by new active bookings
         let isReviewEligible = false;
         const lastService = customer.lastService ? new Date(customer.lastService) : null;
-        
-        // Skip review if customer has active/pending bookings
-        const activeBookings = customer.bookings || [];
-        const hasActiveBooking = activeBookings.length > 0;
 
-        if (lastService && !context.reviewFollowUpSent && !hasActiveBooking) {
+        if (lastService && !context.reviewFollowUpSent) {
             const daysSinceService = Math.floor((now - lastService) / (1000 * 60 * 60 * 24));
             // Wider window (3-30 days) for customers who NEVER received a review (backfill catch-up)
             // Standard window (3-7 days) for repeat reviews after subsequent services
@@ -289,10 +290,10 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
             }
         }
 
-        // 5. Rebooking eligibility (Maintenance Reminders)
+        // 5. Rebooking eligibility — BLOCKED if customer has active booking (already rebooked!)
         let isRebookingEligible = false;
         let rebookingAngle = null;
-        if (lastService && context.lastServiceType) {
+        if (!hasActiveBooking && lastService && context.lastServiceType) {
             const daysSinceService = Math.floor((now - lastService) / (1000 * 60 * 60 * 24));
             const interval = REBOOKING_INTERVALS[context.lastServiceType];
 
@@ -312,7 +313,7 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
         const senderNumber = customer.phone.includes('@') ? customer.phone : customer.phone + '@c.us';
 
         if (isReviewEligible) {
-            // Priority 1: Review
+            // Priority 1: Review (for completed services — allowed even with new active booking)
             queue.unshift({
                 docId,
                 senderNumber,
@@ -322,7 +323,7 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
                 strategy: { ...STRATEGY_CONFIG[context.customerLabel], angle: 'review' },
             });
         } else if (isRebookingEligible) {
-            // Priority 2: Rebooking
+            // Priority 2: Rebooking (blocked if has active booking)
             queue.splice(queue.findIndex(item => !item.context.reviewMode), 0, {
                 docId,
                 senderNumber,
@@ -332,7 +333,7 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
                 strategy: { ...STRATEGY_CONFIG[context.customerLabel], angle: rebookingAngle },
             });
         } else if (isNurtureEligible) {
-            // Priority 3: Nurturing
+            // Priority 3: Nurturing (blocked if has active booking)
             queue.push({
                 docId,
                 senderNumber,
@@ -526,6 +527,9 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
         const customer = context.customer;
         if (!customer) continue;
 
+        // Check active booking status (PENDING/CONFIRMED/IN_PROGRESS)
+        const hasActiveBooking = (customer.bookings || []).length > 0;
+
         const chatHistory = (customer.messages || [])
             .slice()
             .reverse()
@@ -539,20 +543,22 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
             chatHistory
         };
 
-        const isNurtureEligible = isEligible(context, metadata);
+        // Nurturing — BLOCKED if customer has active booking
+        const isNurtureEligible = hasActiveBooking ? false : isEligible(context, metadata);
 
+        // Review — for COMPLETED services, NOT blocked by new active bookings
         let isReviewEligible = false;
         const lastService = customer.lastService ? new Date(customer.lastService) : null;
-        const hasActiveBooking = (customer.bookings || []).length > 0;
-        if (lastService && !context.reviewFollowUpSent && !hasActiveBooking) {
+        if (lastService && !context.reviewFollowUpSent) {
             const daysSinceService = Math.floor((now - lastService) / (1000 * 60 * 60 * 24));
             const maxDays = context.lastReviewAt ? 7 : 30;
             if (daysSinceService >= 3 && daysSinceService <= maxDays) isReviewEligible = true;
         }
 
+        // Rebooking — BLOCKED if customer has active booking (already rebooked!)
         let isRebookingEligible = false;
         let rebookingAngle = null;
-        if (lastService && context.lastServiceType) {
+        if (!hasActiveBooking && lastService && context.lastServiceType) {
             const daysSinceService = Math.floor((now - lastService) / (1000 * 60 * 60 * 24));
             const interval = REBOOKING_INTERVALS[context.lastServiceType];
             if (interval && daysSinceService >= interval && daysSinceService <= interval + 3) {
