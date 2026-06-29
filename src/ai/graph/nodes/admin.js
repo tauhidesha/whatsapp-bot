@@ -38,6 +38,7 @@ async function adminNode(state) {
         'getStudioInfo',
         'sendStudioPhoto',
         'getCurrentDateTime'
+        ,'updatePromoOfTheMonth'
     ];
 
     // Filter tool definition untuk binding ke LLM
