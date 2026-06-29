@@ -606,7 +606,18 @@ async function processSingleService(parsedServiceName, input, promoText) {
     let basePrice = 0;
     if (service.usesModelPricing) {
         const lookup = await lookupRepaintPrice(motorModel, service.subcategory, finalSize);
-        if (lookup) basePrice = lookup.price;
+        if (lookup) {
+            basePrice = lookup.price;
+        } else {
+            // Fallback for packages and other specific model-priced services
+            const motorData = await lookupMotorSizeFromData(motorModel);
+            if (motorData) {
+                const priceEntry = await prisma.servicePrice.findFirst({
+                    where: { serviceId: service.id, vehicleModelId: motorData.id }
+                });
+                if (priceEntry) basePrice = priceEntry.price;
+            }
+        }
     } else {
         const priceEntry = service.prices.find(p => p.size === finalSize) || service.prices.find(p => !p.size && !p.vehicleModelId);
         basePrice = priceEntry?.price || 0;
