@@ -3170,7 +3170,17 @@ async function connectToWhatsApp() {
     client.ev.on('creds.update', saveCreds);
 
     client.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect } = update;
+        const { connection, lastDisconnect, qr } = update;
+        
+        if (qr) {
+            console.log('\n=========================================');
+            console.log('📱 SCAN THIS QR CODE DARI WHATSAPP:');
+            qrcode.generate(qr, { small: true });
+            console.log('\nAtau copy Raw QR String ini ke QR Generator online:');
+            console.log(qr);
+            console.log('=========================================\n');
+        }
+
         if (connection === 'close') {
             const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
             console.log('connection closed due to ', lastDisconnect.error, ', reconnecting ', shouldReconnect);
