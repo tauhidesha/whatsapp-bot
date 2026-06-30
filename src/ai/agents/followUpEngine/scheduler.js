@@ -601,15 +601,22 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
             const currentCount = context.followUpCount || 0;
             itemStrategy.angle = itemStrategy.angles ? itemStrategy.angles[Math.min(currentCount, itemStrategy.angles.length - 1)] : (itemStrategy.angle || 'standard');
             
-            queue.push({
-                docId: context.id,
-                senderNumber,
-                name,
-                customerLabel: context.customerLabel || null,
-                type: itemType,
-                strategy: itemStrategy,
-                generatedMessage: `[PREVIEW] Pesan akan di-generate oleh AI secara dinamis dengan angle: ${itemStrategy.angle} saat jadwal pengiriman tiba.`,
-            });
+            try {
+                const generatedMessage = await generateFollowUpMessage(queueItem, itemStrategy, promoData);
+                if (generatedMessage) {
+                    queue.push({
+                        docId: context.id,
+                        senderNumber,
+                        name,
+                        customerLabel: context.customerLabel || null,
+                        type: itemType,
+                        strategy: itemStrategy,
+                        generatedMessage,
+                    });
+                }
+            } catch (err) {
+                console.warn(`[Scheduler][DryRun] Failed to generate preview for ${context.id}:`, err.message);
+            }
         }
     }
 
