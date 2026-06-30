@@ -16,7 +16,16 @@ async function sendTextDirect(client, to, content) {
         throw new Error('WhatsApp client not available');
     }
     
-    return await client.sendMessage(to, { text: content });
+    console.log(`[Baileys] Attempting to send message to: ${to}`);
+    try {
+        const result = await client.sendMessage(to, { text: content });
+        // Hanya log status dasar agar tidak terlalu panjang di console
+        console.log(`[Baileys] Successfully sent message to ${to}. Status: ${result?.status || 'SENT'}`);
+        return result;
+    } catch (err) {
+        console.error(`[Baileys] ERROR sending message to ${to}:`, err.message || err);
+        throw err;
+    }
 }
 
 module.exports = {
