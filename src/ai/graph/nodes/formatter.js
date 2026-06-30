@@ -53,13 +53,14 @@ async function formatterNode(state) {
     // Build combo offer text for formatter
     let comboOfferInstruction = '';
     if (replyMode === 'inform' && comboPromo && context.serviceTypes?.length === 1 && !context.comboOffered) {
-        const pct = Math.round(comboPromo.comboDiscount * 100);
         comboOfferInstruction = `
-PROMOSI COMBO (WAJIB ditawarkan secara natural di akhir pesan):
-Setelah kasih estimasi harga, tawarkan dengan santai: lagi ada promo diskon ${pct}% kalau ambil 2 layanan sekaligus.
-Sarankan spesifik: "${upsellSuggestion || 'Detailing/Coating'}".
-Contoh natural: "Oh iya, lagi ada promo nih! Kalau sekalian ${upsellSuggestion || 'Detailing'}, dapet diskon ${pct}% dari total. Lumayan banget kan? 😄"
-JANGAN bilang ini "promo combo". Sampaikan secara conversational.`;
+PROMOSI / UPSELL (WAJIB ditawarkan secara natural di akhir pesan):
+Setelah memberikan estimasi harga, rayu pelanggan secara santai untuk mengambil layanan tambahan: "${upsellSuggestion || 'Detailing/Coating'}".
+Jelaskan keuntungannya berdasarkan promo aktif ini:
+"${comboPromo.promoText || 'Diskon spesial untuk pengambilan lebih dari 1 layanan'}"
+
+Contoh gaya bahasa: "Oh iya kak, kebetulan kita lagi ada promo (sebutkan keuntungan dari teks promo di atas). Kalau kakak mau sekalian ambil ${upsellSuggestion || 'Detailing'}, nanti bisa langsung dapet promonya lho! Mau?"
+PENTING: Jangan kaku. Sampaikan secara conversational layaknya ngobrol biasa.`;
     }
 
     // Pass combo data without hardcoding visual display rules
