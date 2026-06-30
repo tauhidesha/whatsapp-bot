@@ -204,7 +204,7 @@ ${ANGLE_INSTRUCTIONS[activeAngle] || ANGLE_INSTRUCTIONS.standard}
 `;
 
         const model = new ChatGoogleGenerativeAI({
-            model: 'gemini-2.5-flash-lite',
+            model: 'gemini-flash-lite-latest',
             apiKey: apiKey,
             temperature: 0.7,
         });
