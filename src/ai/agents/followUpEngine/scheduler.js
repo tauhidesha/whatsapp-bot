@@ -310,7 +310,9 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
             }
         }
 
-        const senderNumber = customer.phone.includes('@') ? customer.phone : customer.phone + '@c.us';
+        const senderNumber = customer.phone.includes('@') 
+            ? customer.phone 
+            : (customer.phone.startsWith('62') ? customer.phone + '@c.us' : customer.phone + '@lid');
 
         if (isReviewEligible) {
             // Priority 1: Review (for completed services — allowed even with new active booking)
@@ -571,7 +573,9 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
             }
         }
 
-        const senderNumber = customer.phone.includes('@') ? customer.phone : customer.phone + '@c.us';
+        const senderNumber = customer.phone.includes('@') 
+            ? customer.phone 
+            : (customer.phone.startsWith('62') ? customer.phone + '@c.us' : customer.phone + '@lid');
         const name = customer.name || 'Mas';
 
 
