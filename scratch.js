@@ -1,35 +1,6 @@
-const { sanitizeMessagesForGemini, getMessageType, extractTextFromContent } = require('./src/ai/graph/utils/sanitizeMessages');
-
-const mockMessages = [
-    {
-        id: ["langchain_core", "messages", "HumanMessage"],
-        kwargs: { content: "Pesan lama 1" },
-        lc: 1, type: "constructor"
-    },
-    {
-        id: ["langchain_core", "messages", "AIMessage"],
-        kwargs: { content: "Balasan AI lama" },
-        lc: 1, type: "constructor"
-    },
-    {
-        id: ["langchain_core", "messages", "HumanMessage"],
-        kwargs: { content: "[USER]: Full detaling glosy udh smua kan ya" },
-        lc: 1, type: "constructor"
-    }
-];
-
-const sanitized = sanitizeMessagesForGemini(mockMessages);
-console.log("Sanitized length:", sanitized.length);
-
-const transcript = sanitized
-    .filter(m => getMessageType(m) === 'human' || getMessageType(m) === 'ai')
-    .map(m => {
-        const type = getMessageType(m);
-        const text = extractTextFromContent(m.content);
-        if (!text.trim()) return null;
-        return `[${type === 'human' ? 'USER' : 'AI'}]: ${text.trim()}`;
-    })
-    .filter(Boolean)
-    .join('\n\n');
-
-console.log("Transcript:\n", transcript);
+const { execSync } = require('child_process');
+const fs = require('fs');
+let code = fs.readFileSync('scripts/backfillContextPrisma.js', 'utf8');
+code = code.replace('async function processCustomers(dryRun = false) {', 'async function processCustomers(dryRun = false) {\n    const targetPhone = process.argv.includes("--phone") ? process.argv[process.argv.indexOf("--phone") + 1] : null;');
+code = code.replace('orderBy: { updatedAt: \'desc\' }', 'orderBy: { updatedAt: \'desc\' }, where: targetPhone ? { phone: targetPhone } : undefined');
+fs.writeFileSync('scripts/backfillContextPrisma.js', code);

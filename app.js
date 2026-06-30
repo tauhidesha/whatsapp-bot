@@ -18,6 +18,15 @@ const { requireAuth } = require('./src/middleware/auth.js');
 const prisma = require('./src/lib/prisma');
 const qrcode = require('qrcode-terminal');
 const fetch = require('node-fetch');
+const webpush = require('web-push');
+
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+    webpush.setVapidDetails(
+        'mailto:admin@example.com',
+        process.env.VAPID_PUBLIC_KEY,
+        process.env.VAPID_PRIVATE_KEY
+    );
+}
 const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
 const { HumanMessage, SystemMessage, ToolMessage, AIMessage } = require('@langchain/core/messages');
 const { getServiceDetailsTool } = require('./src/ai/tools/getServiceDetailsTool.js');
@@ -1820,14 +1829,48 @@ async function saveMessageToPrisma(senderNumber, message, senderType) {
         }
 
         if (customer) {
+            const msgRole = roleMap[senderType] || 'user';
             await prisma.directMessage.create({
                 data: {
                     customerId: customer.id,
                     senderId: senderNumber,
-                    role: roleMap[senderType] || 'user',
+                    role: msgRole,
                     content: messageText,
                 }
             });
+
+            // Send Web Push Notification to Admins if it's from a user
+            if (msgRole === 'user' && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+                try {
+                    const subscriptions = await prisma.pushSubscription.findMany();
+                    const payload = JSON.stringify({
+                        title: customer.name || senderNumber,
+                        body: messageText,
+                        url: '/conversations'
+                    });
+                    
+                    const pushPromises = subscriptions.map(sub => {
+                        const pushSub = {
+                            endpoint: sub.endpoint,
+                            keys: {
+                                p256dh: sub.p256dh,
+                                auth: sub.auth
+                            }
+                        };
+                        return webpush.sendNotification(pushSub, payload).catch(err => {
+                            if (err.statusCode === 404 || err.statusCode === 410) {
+                                // Subscription has expired or is no longer valid
+                                return prisma.pushSubscription.delete({ where: { id: sub.id } });
+                            } else {
+                                console.error('Push notification error:', err);
+                            }
+                        });
+                    });
+                    await Promise.all(pushPromises);
+                } catch (pushErr) {
+                    console.error('Error in sending web push:', pushErr);
+                }
+            }
 
             // Update customer data
             const updateData = {
