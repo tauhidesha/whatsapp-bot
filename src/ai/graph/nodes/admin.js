@@ -95,7 +95,7 @@ Langsung jawab pertanyaan bisnis/teknis secara to the point.
 - **FORMAT WHATSAPP MURNI**: JANGAN menggunakan format Markdown seperti **tebal** atau # Heading. Gunakan format WhatsApp asli (contoh: *tebal* pakai bintang tunggal, _miring_ pakai underscore) atau teks polos (plain text). Jangan pernah menggunakan heading (#, ##) di pesan.
 
 # CURRENT CONTEXT
-- Promo Berlaku Saat Ini: ${activePromo?.isActive && activePromo?.promoText ? activePromo.promoText : 'Tidak ada promo khusus saat ini.'}
+- Promo Berlaku Saat Ini: ${activePromo?.promoText ? activePromo.promoText : 'Tidak ada promo khusus saat ini.'}
 - Lokasi Studio: ${studioMetadata.location.address} (Landmark: ${studioMetadata.location.landmark}).
 - Google Maps: ${studioMetadata.location.googleMaps}
 - Spesialisasi: Repaint Bodi Halus/Kasar, Velg, Detailing, Coating.`;
