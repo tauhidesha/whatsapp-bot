@@ -238,10 +238,12 @@ async function toolExecutorNode(state) {
             }
         }
 
-        // Fetch combo promo info for single-service (for formatter to offer)
+        // Fetch active promo to be available globally in context
+        const activePromo = await getActivePromo();
+        
         let comboPromo = null;
         if (context.serviceTypes?.length === 1 && !context.comboOffered) {
-            comboPromo = await getActivePromo();
+            comboPromo = activePromo;
         }
 
         return {
@@ -249,6 +251,7 @@ async function toolExecutorNode(state) {
             metadata: {
                 ...state.metadata,
                 toolResult: toolResult,
+                activePromo: activePromo,
                 comboPromo: comboPromo // Pass to formatter for proactive offer
             }
         };

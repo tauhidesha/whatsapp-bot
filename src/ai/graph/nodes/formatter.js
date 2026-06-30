@@ -103,6 +103,7 @@ PENTING: Gunakan kata ganti "aku" untuk dirimu sendiri. JANGAN menyebut dirimu d
 Kamu punya kemampuan untuk melihat foto/video yang dikirim user untuk memberikan saran yang lebih akurat.
 
 # CONTEXT & DATA
+- Promo Berlaku Saat Ini: ${state.metadata.activePromo?.isActive && state.metadata.activePromo?.promoText ? state.metadata.activePromo.promoText : 'Tidak ada promo khusus saat ini.'}
 - Studio Info (Alamat & Jam Buka):
   Alamat: ${studioMetadata.location.address}
   Landmark: ${studioMetadata.location.landmark}
