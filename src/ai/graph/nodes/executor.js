@@ -26,7 +26,10 @@ async function toolExecutorNode(state) {
                 lastMsgForPrice?.content || lastMsgForPrice?.kwargs?.content || ''
             ).toLowerCase();
             const userAskedPrice = /harga|biaya|tarif|berapa|price|cost|estimasi|ongkos|bayar/i.test(lastMsgTextForPrice);
-            const shouldLookupPrice = intent === 'BOOKING_SERVICE' || userAskedPrice;
+            const shouldLookupPrice = 
+                state.metadata?.flow === 'pricing' || 
+                intent === 'BOOKING_SERVICE' || 
+                userAskedPrice;
             
             if (shouldLookupPrice && context.serviceTypes?.length > 0 && context.vehicleType) {
                 console.log(`[executorNode] Executing getServiceDetails for ${context.vehicleType} and [${context.serviceTypes.join(', ')}]...`);

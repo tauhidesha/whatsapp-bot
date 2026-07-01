@@ -211,10 +211,25 @@ Wajib menghasilkan skema JSON murni dengan properti: intent, internal_thought, m
         replyMode = 'consult';
     }
 
+    // Track conversation flow (pricing vs general) to preserve context
+    const userAskedPrice = /harga|biaya|tarif|berapa|price|cost|estimasi|ongkos|bayar/i.test(lastMessageText);
+    let currentFlow = metadata?.flow || 'general';
+    if (userAskedPrice || classifiedIntent === 'BOOKING_SERVICE') {
+        currentFlow = 'pricing';
+    } else if (classifiedIntent === 'GREETING') {
+        currentFlow = 'general';
+    }
+
     return {
         intent: classifiedIntent,
         context: ctx,
-        metadata: { ...metadata, prevIntent: classifiedIntent, replyMode, visualSummary: extracted.visual_summary || null }
+        metadata: { 
+            ...metadata, 
+            prevIntent: classifiedIntent, 
+            replyMode, 
+            flow: currentFlow,
+            visualSummary: extracted.visual_summary || null 
+        }
     };
 }
 
