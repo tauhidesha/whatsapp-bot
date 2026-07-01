@@ -29,6 +29,7 @@ async function toolExecutorNode(state) {
             const shouldLookupPrice = 
                 state.metadata?.flow === 'pricing' || 
                 intent === 'BOOKING_SERVICE' || 
+                intent === 'CONSULTATION' ||
                 userAskedPrice;
             
             if (shouldLookupPrice && context.serviceTypes?.length > 0 && context.vehicleType) {
