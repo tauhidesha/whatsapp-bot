@@ -134,6 +134,9 @@ Wajib menghasilkan skema JSON murni dengan properti: intent, internal_thought, m
             
             const focusStr = [
                 Array.isArray(ctx.detailingFocus) ? ctx.detailingFocus.join(' ') : ctx.detailingFocus,
+                ctx.visualSummary,
+                ctx.serviceDetail,
+                chatTranscript,
                 lastMessageText
             ]
             .filter(Boolean)
