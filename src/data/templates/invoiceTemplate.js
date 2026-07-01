@@ -64,7 +64,8 @@ module.exports = function generateInvoiceHTML(data) {
   return `<div class="invoice-container" style="background: #131313; color: #e5e2e1; font-family: 'Manrope', sans-serif; font-weight: 600; width: 100%; min-height: 297mm; margin: 0; -webkit-print-color-adjust: exact;">
   <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@100..900&family=Manrope:wght@200..800&display=swap" rel="stylesheet"/>
   <style>
-    html, body { margin: 0; padding: 0; width: 100%; min-height: 297mm; background: #131313; -webkit-print-color-adjust: exact; }
+    html, body { margin: 0; padding: 0; width: 100%; min-height: 297mm; background: #131313 !important; -webkit-print-color-adjust: exact; }
+    html::before { content: ''; position: fixed; top: -6px; left: -6px; right: -6px; bottom: -6px; background: #131313; z-index: -1; }
     .invoice-container * { margin: 0; padding: 0; box-sizing: border-box; color: inherit; }
     @page { margin: 0; size: A4; }
     .margin-top, .margin-bottom {
