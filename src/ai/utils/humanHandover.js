@@ -271,7 +271,7 @@ async function clearSnoozeMode(senderNumber) {
   const phone = identifier.replace(/@c\.us$|@lid$/, '');
   
   try {
-    await prisma.handoverSnooze.delete({ where: { id: identifier } }).catch(() => {});
+    await prisma.handoverSnooze.deleteMany({ where: { id: identifier } });
     
     // Sync to Customer table
     try {
