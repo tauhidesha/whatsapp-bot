@@ -11,7 +11,9 @@ const { extractTextFromContent } = require('../utils/sanitizeMessages');
  */
 async function toolExecutorNode(state) {
     console.log('--- [EXECUTOR_NODE] Starting ---');
-    const { intent, context, customer } = state;
+    const { intent, customer } = state;
+    const context = state.context || {};
+    const contextUpdate = { ...context };
     
     let toolResult = null;
 
@@ -31,18 +33,24 @@ async function toolExecutorNode(state) {
                 console.log(`[executorNode] Executing getServiceDetails for ${context.vehicleType} and [${context.serviceTypes.join(', ')}]...`);
                 const tool = toolsByName['getServiceDetails'];
                 if (tool) {
-                    toolResult = await tool({
-                        service_name: context.serviceTypes,
-                        motor_model: context.vehicleType,
-                        extraContext: {
-                            paintType: context.paintType,
-                            isBongkarTotal: context.isBongkarTotal,
-                            detailingFocus: context.detailingFocus,
-                            colorChoice: context.colorChoice,
-                            velgColorChoice: context.velgColorChoice,
-                            isPreviouslyPainted: context.isPreviouslyPainted
-                        }
-                    });
+                    try {
+                        toolResult = await tool({
+                            service_name: context.serviceTypes,
+                            motor_model: context.vehicleType,
+                            extraContext: {
+                                paintType: context.paintType,
+                                isBongkarTotal: context.isBongkarTotal,
+                                detailingFocus: context.detailingFocus,
+                                colorChoice: context.colorChoice,
+                                velgColorChoice: context.velgColorChoice,
+                                isPreviouslyPainted: context.isPreviouslyPainted
+                            }
+                        });
+                    } catch (err) {
+                        console.error('[executorNode] getServiceDetails failed:', err.message);
+                        if (!toolResult) toolResult = {};
+                        toolResult.pricingError = err.message;
+                    }
 
                     // Fetch & apply combo discount if multiple services
                     if (context.serviceTypes.length >= 2) {
@@ -60,32 +68,56 @@ async function toolExecutorNode(state) {
                             // Replace results array with deduplicated version
                             toolResult.results = uniqueResults;
                             
-                            let totalPrice = 0;
-                            for (const r of uniqueResults) {
-                                if (r.final_price) totalPrice += r.final_price;
-                                else if (r.price) totalPrice += r.price;
-                                // For multiple_candidates (generic category), sum the first candidate
-                                else if (r.candidates?.length > 0 && r.candidates[0].price) {
-                                    totalPrice += r.candidates[0].price;
-                                }
-                            }
+                            const getPrice = (r) => r.final_price || r.price || r.candidates?.[0]?.price || 0;
+                            const eligiblePattern = new RegExp(promo.discountEligiblePattern || 'bodi halus', 'i');
+                            
+                            let totalBefore = 0;
+                            let totalAfter = 0;
+                            const breakdown = uniqueResults.map(r => {
+                                const price = getPrice(r);
+                                totalBefore += price;
+                                const isEligible = eligiblePattern.test(r.name || '');
+                                const discountAmount = isEligible ? Math.round(price * promo.comboDiscount) : 0;
+                                const finalPrice = price - discountAmount;
+                                totalAfter += finalPrice;
+                                return {
+                                    name: r.name,
+                                    originalPrice: price,
+                                    discountPercent: isEligible ? promo.comboDiscount * 100 : 0,
+                                    discountAmount,
+                                    finalPrice,
+                                };
+                            });
 
-                            if (totalPrice > 0) {
-                                const discountAmount = Math.round(totalPrice * promo.comboDiscount);
+                            const anyDiscounted = breakdown.some(b => b.discountAmount > 0);
+                            if (anyDiscounted) {
                                 toolResult.combo = {
                                     applied: true,
-                                    discount_percent: promo.comboDiscount * 100,
-                                    discount_amount: discountAmount,
-                                    discount_formatted: `Rp${discountAmount.toLocaleString('id-ID')}`,
-                                    total_before: totalPrice,
-                                    total_before_formatted: `Rp${totalPrice.toLocaleString('id-ID')}`,
-                                    total_after: totalPrice - discountAmount,
-                                    total_after_formatted: `Rp${(totalPrice - discountAmount).toLocaleString('id-ID')}`,
                                     promo_text: promo.promoText,
+                                    trigger_reason: `Ambil ${context.serviceTypes.length} layanan sekaligus`,
+                                    breakdown,
+                                    total_before: totalBefore,
+                                    total_before_formatted: `Rp${totalBefore.toLocaleString('id-ID')}`,
+                                    total_after: totalAfter,
+                                    total_after_formatted: `Rp${totalAfter.toLocaleString('id-ID')}`,
                                 };
-                                console.log(`[executorNode] Combo discount applied: ${promo.comboDiscount * 100}% off Rp${totalPrice.toLocaleString('id-ID')} = Rp${(totalPrice - discountAmount).toLocaleString('id-ID')}`);
+                                console.log(`[executorNode] Combo discount applied.`);
                             }
                         }
+                    }
+
+                    // --- FIX BUG-3: pricingMode determination ---
+                    function isChoosingPaketTier(results) {
+                        const groups = {};
+                        for (const r of results) {
+                            const base = (r.name || '').replace(/\s*-\s*Paket\s+(Premium|Standar|Basic|Ekonomis)/i, '').trim();
+                            (groups[base] ||= []).push(r);
+                        }
+                        // True HANYA kalau ada kategori dengan >1 kandidat (user belum milih)
+                        return Object.values(groups).some(g => g.length > 1);
+                    }
+                    if (toolResult?.results) {
+                        toolResult.pricingMode = isChoosingPaketTier(toolResult.results) ? 'choosing_tier' : 'finalized';
                     }
 
                     console.log(`[executorNode] Tool Result Success: ${toolResult ? 'Yes' : 'No'}`);
@@ -144,7 +176,7 @@ async function toolExecutorNode(state) {
 
                         // Increment counter on success
                         if (mockupResult.success) {
-                            context.mockupGenerated = mockupCount + 1;
+                            contextUpdate.mockupGenerated = mockupCount + 1;
                         }
                         console.log(`[executorNode] 🎨 Mockup result: ${mockupResult.success ? '✅' : '❌'} (${context.mockupGenerated}/${MAX_MOCKUPS})`);
                     } catch (mockupErr) {
@@ -174,11 +206,8 @@ async function toolExecutorNode(state) {
                     });
 
                     // Merge into toolResult or set if toolResult was null
-                    if (!toolResult) {
-                        toolResult = availResult;
-                    } else {
-                        toolResult.availability = availResult;
-                    }
+                    if (!toolResult) toolResult = {};
+                    toolResult.availability = availResult;
                 }
             }
 
@@ -192,14 +221,8 @@ async function toolExecutorNode(state) {
                 const tool = toolsByName['getStudioInfo'];
                 if (tool) {
                     const studioResult = await tool({});
-                    if (!toolResult) {
-                        toolResult = studioResult;
-                    } else {
-                        // Merge if both exist
-                        if (typeof toolResult === 'object') {
-                            toolResult.studioInfo = studioResult;
-                        }
-                    }
+                    if (!toolResult) toolResult = {};
+                    toolResult.studioInfo = studioResult;
                 }
 
                 // --- PHOTO SENDING LOGIC (Nearby/Confused) ---
@@ -212,8 +235,8 @@ async function toolExecutorNode(state) {
                             senderNumber: state.metadata?.phoneReal || ''
                         });
                         
-                        if (!toolResult) toolResult = { studioPhoto: photoResult };
-                        else toolResult.studioPhoto = photoResult;
+                        if (!toolResult) toolResult = {};
+                        toolResult.studioPhoto = photoResult;
                     }
                 }
             }
@@ -247,7 +270,7 @@ async function toolExecutorNode(state) {
         }
 
         return {
-            context: context,
+            context: Object.keys(contextUpdate).length > 0 ? contextUpdate : context,
             metadata: {
                 ...state.metadata,
                 toolResult: toolResult,
@@ -259,6 +282,7 @@ async function toolExecutorNode(state) {
     } catch (error) {
         console.error('[toolExecutorNode] Error:', error);
         return {
+            context: typeof contextUpdate !== 'undefined' ? contextUpdate : (state.context || {}),
             metadata: {
                 ...state.metadata,
                 toolError: error.message
