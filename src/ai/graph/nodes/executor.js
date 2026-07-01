@@ -20,7 +20,7 @@ async function toolExecutorNode(state) {
     toolResult.results = [];
 
     try {
-        if (intent === 'GENERAL_INQUIRY' || intent === 'BOOKING_SERVICE') {
+        if (intent === 'GENERAL_INQUIRY' || intent === 'BOOKING_SERVICE' || intent === 'CONSULTATION') {
             const lastMsgForPrice = state.messages[state.messages.length - 1];
             const lastMsgTextForPrice = extractTextFromContent(
                 lastMsgForPrice?.content || lastMsgForPrice?.kwargs?.content || ''

@@ -185,7 +185,14 @@ Wajib menghasilkan skema JSON murni dengan properti: intent, internal_thought, m
     
     // Prevent tool execution if there are generic services
     const hasGenericService = ctx.serviceTypes.some(s => ['repaint', 'detailing', 'coating'].includes(s.toLowerCase()));
-    ctx.isReadyForTools = Boolean(classifiedIntent === 'GENERAL_INQUIRY' || (classifiedIntent === 'BOOKING_SERVICE' && !!ctx.vehicleType && ctx.serviceTypes.length > 0 && !hasGenericService && ctx.missingQuestions.length === 0));
+    
+    // Izinkan eksekusi tool jika intent berupa BOOKING_SERVICE atau CONSULTATION selama data valid
+    const isBookingOrConsult = classifiedIntent === 'BOOKING_SERVICE' || classifiedIntent === 'CONSULTATION';
+    
+    ctx.isReadyForTools = Boolean(
+        classifiedIntent === 'GENERAL_INQUIRY' || 
+        (isBookingOrConsult && !!ctx.vehicleType && ctx.serviceTypes.length > 0 && !hasGenericService && ctx.missingQuestions.length === 0)
+    );
 
     let replyMode = 'inform';
     if (classifiedIntent === 'GREETING') {
