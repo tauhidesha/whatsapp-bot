@@ -51,17 +51,7 @@ async function formatterNode(state) {
     }
 
     // Build combo offer text for formatter
-    let comboOfferInstruction = '';
-    if (replyMode === 'inform' && comboPromo && context.serviceTypes?.length === 1 && !context.comboOffered) {
-        comboOfferInstruction = `
-PROMOSI / UPSELL (WAJIB ditawarkan secara natural di akhir pesan):
-Setelah memberikan estimasi harga, rayu pelanggan secara santai untuk mengambil layanan tambahan: "${upsellSuggestion || 'Detailing/Coating'}".
-Jelaskan keuntungannya berdasarkan promo aktif ini:
-"${comboPromo.promoText || 'Diskon spesial untuk pengambilan lebih dari 1 layanan'}"
-
-Contoh gaya bahasa: "Oh iya kak, kebetulan kita lagi ada promo (sebutkan keuntungan dari teks promo di atas). Kalau kakak mau sekalian ambil ${upsellSuggestion || 'Detailing'}, nanti bisa langsung dapet promonya lho! Mau?"
-PENTING: Jangan kaku. Sampaikan secara conversational layaknya ngobrol biasa.`;
-    }
+    let comboOfferInstruction = ''; // DEPRECATED: Upsell combo text removed since promo logic changed to tier based
 
     // Pass combo data without hardcoding visual display rules
     let comboResultInstruction = '';
@@ -81,7 +71,40 @@ Total akhir: ${toolResult.combo.total_after_formatted}`;
     const hasVelgRepaint = context.serviceTypes?.some(s => s.toLowerCase().includes('repaint') && s.toLowerCase().includes('velg'));
 
     const pricingFormatInstruction = toolResult?.pricingMode === 'choosing_tier'
-        ? `FORMAT: user sedang MEMILIH paket. Tampilkan semua tier dari termahal ke termurah, WAJIB sertakan 2-3 baris benefit tiap paket, rekomendasikan Paket Standar sebagai "paling worth it".\nJika ada harga promo (discount_percent > 0), tampilkan harga normal dicoret dan harga promo.\nContoh:\nPremium: ~Rp1.800.000~ Rp1.530.000 (hemat 15%)`
+        ? `
+FORMAT: user sedang MEMILIH paket repaint.
+
+WAJIB tampilkan semua paket dari Premium ke Ekonomis.
+SETIAP paket WAJIB punya:
+- harga
+- benefit utama
+- rekomendasi singkat
+
+Format WAJIB:
+
+• Paket Premium: RpX
+  ✓ [benefit]
+  ✓ [benefit]
+
+• Paket Standar: RpX
+  ✓ [benefit]
+  ✓ [benefit]
+
+• Paket Basic: RpX
+  ✓ [benefit]
+  ✓ [benefit]
+
+• Paket Ekonomis: RpX
+  ✓ [benefit]
+  ✓ [benefit]
+
+Setelah itu:
+- rekomendasikan Paket Standar sebagai "paling worth it"
+- jangan hanya list harga
+
+Jika ada promo (discount_percent > 0):
+tampilkan harga normal dicoret + harga promo.
+`
         : `FORMAT: item sudah final (bukan lagi pilihan). Breakdown ringkas per-item + total, TANPA penjelasan benefit ulang. Jika ada discount_percent > 0, coret original_price dan tampilkan discount_price.`;
 
     const contextInfo = `
@@ -138,6 +161,7 @@ ${modeInstructions[replyMode] || modeInstructions.inform}
 1. Hasil Teknis/Tool WAJIB jadi dasar info harga dan JADWAL BOOKING. Jika kosong, JANGAN beri harga/jadwal spesifik.
 2. Ada biaya tambahan untuk warna khusus/tertentu.
 3. **WAJIB BREAKDOWN PER-ITEM** jika toolResult punya multiple results. JANGAN langsung kasih total saja.
+   3a. Untuk paket repaint (Premium/Standar/Basic/Ekonomis), user sedang membandingkan kualitas. Jangan hanya tampilkan angka. Jelaskan perbedaan benefit tiap paket secara singkat.
    ${pricingFormatInstruction}
 4. Harga HANYA diberikan di mode INFORM atau jika user eksplisit tanya harga. Di mode ASK, fokus tanya data dulu — jangan selipin harga.
 5. Durasi pengerjaan Repaint secara default adalah 3-5 hari kerja. JANGAN MENGARANG bilang 7-10 hari kerja.
