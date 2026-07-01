@@ -16,7 +16,7 @@ async function infoCollectorNode(state) {
     const startTime = Date.now();
     const { context, metadata } = state;
     const sanitizedMessages = sanitizeMessagesForGemini(state.messages);
-    const prevIntent = state.intent;
+    const prevIntent = state.intent || metadata?.prevIntent;
     const lastMessage = sanitizedMessages[sanitizedMessages.length - 1];
     const lastMessageText = extractTextFromContent(lastMessage.content);
 
@@ -72,7 +72,10 @@ Wajib menghasilkan skema JSON murni dengan properti: intent, internal_thought, m
         // Intent Recovery Logic untuk menjaga kontinuitas diskusi harga
         const isShortReply = lastMessageText.split(' ').length <= 15;
         const containsBookingKeywords = /warna|cat|nmax|scoopy|pcx|vespa|vario|repaint|detailing/i.test(lastMessageText);
-        if (prevIntent === 'BOOKING_SERVICE' && (isShortReply || containsBookingKeywords)) {
+        if (
+            (prevIntent === 'BOOKING_SERVICE' || metadata?.flow === 'pricing') && 
+            (isShortReply || containsBookingKeywords)
+        ) {
             if (classifiedIntent !== 'GENERAL_INQUIRY' || !/lokasi|alamat|dimana/i.test(lastMessageText)) {
                 classifiedIntent = 'BOOKING_SERVICE';
             }
@@ -214,7 +217,11 @@ Wajib menghasilkan skema JSON murni dengan properti: intent, internal_thought, m
     // Track conversation flow (pricing vs general) to preserve context
     const userAskedPrice = /harga|biaya|tarif|berapa|price|cost|estimasi|ongkos|bayar/i.test(lastMessageText);
     let currentFlow = metadata?.flow || 'general';
-    if (userAskedPrice || classifiedIntent === 'BOOKING_SERVICE') {
+    if (
+        userAskedPrice || 
+        classifiedIntent === 'BOOKING_SERVICE' ||
+        metadata?.flow === 'pricing'
+    ) {
         currentFlow = 'pricing';
     } else if (classifiedIntent === 'GREETING') {
         currentFlow = 'general';
