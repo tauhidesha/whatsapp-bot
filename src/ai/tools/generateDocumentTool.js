@@ -321,11 +321,17 @@ const generateDocumentTool = {
         headless: 'new'
       });
       const page = await browser.newPage();
+      await page.setViewport({
+        width: 794,
+        height: 1123,
+        deviceScaleFactor: 2
+      });
       await page.setContent(html, { waitUntil: 'networkidle0' });
       await page.pdf({
         path: filePath,
         format: 'A4',
         printBackground: true,
+        preferCSSPageSize: true,
         margin: { top: '0px', bottom: '0px', left: '0px', right: '0px' }
       });
       await browser.close();
@@ -358,11 +364,17 @@ const generateDocumentTool = {
         headless: 'new'
       });
       const page = await browser.newPage();
+      await page.setViewport({
+        width: 794,
+        height: 1123,
+        deviceScaleFactor: 2
+      });
       await page.setContent(html, { waitUntil: 'networkidle0' });
       await page.pdf({
         path: filePath,
         format: 'A4',
         printBackground: true,
+        preferCSSPageSize: true,
         margin: {
           top: '0px',
           bottom: '0px',
