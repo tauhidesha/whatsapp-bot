@@ -254,7 +254,7 @@ module.exports = function generateInvoiceHTML(data) {
         </div>
       </div>
 
-      <div style="background:#2a2a2a; padding:20px; display:flex; flex-direction:column; gap:16px">
+      <div style="background:#2a2a2a; padding:20px; display:flex; flex-direction:column; gap:10px">
         <div style="display:flex; justify-content:space-between">
           <span class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em">Subtotal</span>
           <span style="font-size:16px">Rp${subtotal.toLocaleString('id-ID')}</span>
@@ -275,7 +275,7 @@ module.exports = function generateInvoiceHTML(data) {
           <span style="font-size:16px; color:#85ff7a">Rp${totalPaid.toLocaleString('id-ID')}</span>
         </div>` : ''}
         
-        <div style="border-top:1px solid #484831; padding-top:24px; margin-top:8px">
+        <div style="border-top:1px solid #484831; padding-top:14px; margin-top:2px">
           <span class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em; display:block; margin-bottom:8px">Total Keseluruhan</span>
           <span class="font-headline" style="font-size:36px; font-weight:900">Rp${grandTotal.toLocaleString('id-ID')}</span>
         </div>
