@@ -150,27 +150,42 @@ Wajib menghasilkan skema JSON murni dengan properti: intent, internal_thought, m
         missingQuestion = "Tanyakan tipe motor user (contoh: Nmax, Scoopy, Vario)";
     } else if (needsMotorModel && ctx.serviceTypes.length === 0) {
         missingQuestion = "Tanyakan rencana layanan yang diinginkan (Repaint, Coating, atau Detailing)";
-    } else if (classifiedIntent === 'BOOKING_SERVICE') {
-        for (const svc of ctx.serviceTypes) {
-            const sLower = svc.toLowerCase();
-            if (sLower.includes('halus') && !ctx.colorChoice) {
-                missingQuestion = "Tanyakan rencana warna baru untuk bodi halusnya";
-                break;
-            }
-            // Skenario Utama Gagal Cari Harga Velg: Kita butuh warna velg-nya dulu agar pencarian database akurat
-            if (sLower.includes('velg') && !ctx.velgColorChoice) {
-                missingQuestion = "Tanyakan pilihan warna untuk repaint velgnya";
-                break;
-            }
-            if (sLower.includes('velg') && ctx.isPreviouslyPainted === null) {
-                missingQuestion = "Tanyakan apakah velg masih cat ori pabrik atau sudah pernah repaint";
-                break;
+    } else {
+        const hasGenericRepaint = ctx.serviceTypes.some(s => s.toLowerCase() === 'repaint');
+        const hasGenericDetailing = ctx.serviceTypes.some(s => s.toLowerCase() === 'detailing');
+        const hasGenericCoating = ctx.serviceTypes.some(s => s.toLowerCase() === 'coating');
+
+        if (hasGenericRepaint) {
+            missingQuestion = "Tanyakan detail bagian yang mau di-repaint (Bodi Halus, Kasar, Velg, atau CVT)";
+        } else if (hasGenericDetailing) {
+            missingQuestion = "Tanyakan paket detailing apa yang diinginkan (contoh: Detailing Bodi, Mesin, atau Full)";
+        } else if (hasGenericCoating) {
+            missingQuestion = "Tanyakan bagian apa yang ingin di-coating";
+        } else if (classifiedIntent === 'BOOKING_SERVICE') {
+            for (const svc of ctx.serviceTypes) {
+                const sLower = svc.toLowerCase();
+                if (sLower.includes('halus') && !ctx.colorChoice) {
+                    missingQuestion = "Tanyakan rencana warna baru untuk bodi halusnya";
+                    break;
+                }
+                // Skenario Utama Gagal Cari Harga Velg: Kita butuh warna velg-nya dulu agar pencarian database akurat
+                if (sLower.includes('velg') && !ctx.velgColorChoice) {
+                    missingQuestion = "Tanyakan pilihan warna untuk repaint velgnya";
+                    break;
+                }
+                if (sLower.includes('velg') && ctx.isPreviouslyPainted === null) {
+                    missingQuestion = "Tanyakan apakah velg masih cat ori pabrik atau sudah pernah repaint";
+                    break;
+                }
             }
         }
     }
 
     ctx.missingQuestions = missingQuestion ? [missingQuestion] : [];
-    ctx.isReadyForTools = Boolean(classifiedIntent === 'GENERAL_INQUIRY' || (classifiedIntent === 'BOOKING_SERVICE' && !!ctx.vehicleType && ctx.serviceTypes.length > 0 && ctx.missingQuestions.length === 0));
+    
+    // Prevent tool execution if there are generic services
+    const hasGenericService = ctx.serviceTypes.some(s => ['repaint', 'detailing', 'coating'].includes(s.toLowerCase()));
+    ctx.isReadyForTools = Boolean(classifiedIntent === 'GENERAL_INQUIRY' || (classifiedIntent === 'BOOKING_SERVICE' && !!ctx.vehicleType && ctx.serviceTypes.length > 0 && !hasGenericService && ctx.missingQuestions.length === 0));
 
     let replyMode = 'inform';
     if (classifiedIntent === 'GREETING') replyMode = 'greet';
