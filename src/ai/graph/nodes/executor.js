@@ -39,7 +39,7 @@ async function toolExecutorNode(state) {
                     try {
                         const bookingResult = await tool({
                             bookingDate: context.bookingDate,
-                            bookingTime: context.bookingTime,
+                            bookingTime: context.bookingTime || undefined,
                             serviceName: context.serviceTypes?.join(', '),
                             estimatedDurationMinutes: undefined
                         });
