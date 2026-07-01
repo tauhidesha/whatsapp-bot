@@ -81,8 +81,8 @@ Total akhir: ${toolResult.combo.total_after_formatted}`;
     const hasVelgRepaint = context.serviceTypes?.some(s => s.toLowerCase().includes('repaint') && s.toLowerCase().includes('velg'));
 
     const pricingFormatInstruction = toolResult?.pricingMode === 'choosing_tier'
-        ? `FORMAT: user sedang MEMILIH paket. Tampilkan semua tier dari termahal ke termurah, WAJIB sertakan 2-3 baris benefit tiap paket, rekomendasikan Paket Standar sebagai "paling worth it".`
-        : `FORMAT: item sudah final (bukan lagi pilihan). Breakdown ringkas per-item + total, TANPA penjelasan benefit ulang.`;
+        ? `FORMAT: user sedang MEMILIH paket. Tampilkan semua tier dari termahal ke termurah, WAJIB sertakan 2-3 baris benefit tiap paket, rekomendasikan Paket Standar sebagai "paling worth it".\nJika ada harga promo (discount_percent > 0), tampilkan harga normal dicoret dan harga promo.\nContoh:\nPremium: ~Rp1.800.000~ Rp1.530.000 (hemat 15%)`
+        : `FORMAT: item sudah final (bukan lagi pilihan). Breakdown ringkas per-item + total, TANPA penjelasan benefit ulang. Jika ada discount_percent > 0, coret original_price dan tampilkan discount_price.`;
 
     const contextInfo = `
 - Nama Pelanggan: ${customer.name || 'Sobat Bosmat'}
@@ -109,7 +109,7 @@ PENTING: Gunakan kata ganti "aku" untuk dirimu sendiri. JANGAN menyebut dirimu d
 Kamu punya kemampuan untuk melihat foto/video yang dikirim user untuk memberikan saran yang lebih akurat.
 
 # CONTEXT & DATA
-- Promo Berlaku Saat Ini: ${state.metadata.activePromo?.promoText ? state.metadata.activePromo.promoText : 'Tidak ada promo khusus saat ini.'}
+- Promo Berlaku Saat Ini: ${state.metadata.activePromo?.promoText ? state.metadata.activePromo.promoText : 'Tidak ada promo khusus saat ini.'}\n  Aturan Promo: Promo repaint berlaku untuk Paket Premium, Standar, dan Basic. Paket Ekonomis menggunakan harga normal.
 - Studio Info (Alamat & Jam Buka):
   Alamat: ${studioMetadata.location.address}
   Landmark: ${studioMetadata.location.landmark}

@@ -52,7 +52,17 @@ async function toolExecutorNode(state) {
                         });
                         
                         if (pricingResult && pricingResult.results) {
-                            toolResult.results = pricingResult.results;
+                            const eligiblePattern = /premium|standar|basic/i;
+                            toolResult.results = pricingResult.results.map(item => {
+                                const price = item.final_price || item.price || 0;
+                                const eligible = eligiblePattern.test(item.name || '');
+                                return {
+                                    ...item,
+                                    original_price: price,
+                                    discount_percent: eligible ? 15 : 0,
+                                    discount_price: eligible ? Math.round(price * 0.85) : price
+                                };
+                            });
                         }
                     } catch (err) {
                         console.error('[executorNode] getServiceDetails failed:', err.message);
