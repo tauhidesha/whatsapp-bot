@@ -43,7 +43,8 @@ async function toolExecutorNode(state) {
                             serviceName: context.serviceTypes?.join(', '),
                             estimatedDurationMinutes: undefined
                         });
-                        toolResult = { ...toolResult, ...bookingResult, bookingChecked: true };
+                        toolResult.availability = bookingResult;
+                        toolResult.bookingChecked = true;
                     } catch (err) {
                         console.error('[executorNode] checkBookingAvailability failed:', err.message);
                         toolResult.bookingError = err.message;
@@ -210,19 +211,28 @@ async function toolExecutorNode(state) {
                 toolResult.mockup = { success: false, limit_reached: true, count: mockupCount, max: MAX_MOCKUPS };
             }
 
-            // Booking Availability
-            if (context.bookingDate) {
-                const tool = toolsByName['checkBookingAvailability'];
-                if (tool) {
+            // Booking Creation
+            if (intent === 'BOOKING_SERVICE' && toolResult.bookingChecked && toolResult.availability?.available === true) {
+                console.log(`[executorNode] Slot available. Executing createBooking...`);
+                const createTool = toolsByName['createBooking'];
+                if (createTool) {
                     try {
-                        toolResult.availability = await tool({
+                        toolResult.booking = await createTool({
+                            customerName: customer?.name || 'Customer',
+                            phone: state.metadata?.phoneReal || '',
                             bookingDate: context.bookingDate,
-                            bookingTime: context.bookingTime || '',
-                            serviceName: context.serviceTypes?.join(', ') || 'Layanan Umum',
-                            estimatedDurationMinutes: context.serviceTypes?.length > 1 ? 240 : 120
+                            bookingTime: context.bookingTime || '09:00',
+                            motorModel: context.vehicleType || 'Unknown',
+                            services: context.serviceTypes || [],
+                            notes: {
+                                color: context.colorChoice,
+                                velgColor: context.velgColorChoice,
+                                package: context.detailingFocus
+                            }
                         });
                     } catch (err) {
-                        console.error('[executorNode] checkBookingAvailability failed:', err.message);
+                        console.error('[executorNode] createBooking failed:', err.message);
+                        toolResult.bookingCreationError = err.message;
                     }
                 }
             }
