@@ -63,6 +63,8 @@ Wajib menghasilkan skema JSON murni dengan properti: intent, internal_thought, m
 
         extracted = JSON.parse(cleanJson(extractTextFromContent(response.content)));
         classifiedIntent = (extracted.intent || 'GENERAL_INQUIRY').trim().toUpperCase();
+        console.log(`[INFO_COLLECTOR_NODE] STEP 1: Gemini Extracted Intent -> ${classifiedIntent}`);
+        console.log(`[INFO_COLLECTOR_NODE] STEP 1: Gemini Extracted Data ->`, JSON.stringify(extracted));
 
         // Intent Recovery Logic untuk menjaga kontinuitas diskusi harga
         const isShortReply = lastMessageText.split(' ').length <= 15;
@@ -80,6 +82,8 @@ Wajib menghasilkan skema JSON murni dengan properti: intent, internal_thought, m
         if (/mahal|kecewa|jelek|komplain|nipu/i.test(lastMessageText) || /\b(ppf|wrapping|airbrush|decal)\b/i.test(lastMessageText)) {
             classifiedIntent = 'HUMAN_HANDOVER';
         }
+        
+        console.log(`[INFO_COLLECTOR_NODE] STEP 2: Intent after Rules & Recovery -> ${classifiedIntent}`);
 
         if (classifiedIntent !== 'BOOKING_SERVICE' && classifiedIntent !== 'GENERAL_INQUIRY' && classifiedIntent !== 'CONSULTATION') {
             return {
@@ -158,7 +162,7 @@ Wajib menghasilkan skema JSON murni dengan properti: intent, internal_thought, m
                 ctx.serviceTypes = ctx.serviceTypes.filter(s => s.toLowerCase() !== 'repaint');
                 ctx.serviceTypes.push(...resolved);
                 ctx.serviceTypes = [...new Set(ctx.serviceTypes)];
-                console.log(`[INFO_COLLECTOR_NODE] Auto-resolved from message "${resolved.join(', ')}"`);
+                console.log(`[INFO_COLLECTOR_NODE] STEP 3: Auto-resolved generic service to -> "${resolved.join(', ')}"`);
             }
         }
 
@@ -207,6 +211,7 @@ Wajib menghasilkan skema JSON murni dengan properti: intent, internal_thought, m
     }
 
     ctx.missingQuestions = missingQuestion ? [missingQuestion] : [];
+    console.log('[INFO_COLLECTOR_NODE] STEP 4: Missing Questions Evaluation ->', missingQuestion ? `Found: ${missingQuestion}` : 'None');
     
     // Prevent tool execution if there are generic services
     const hasGenericService = ctx.serviceTypes.some(s => ['repaint', 'detailing', 'coating'].includes(s.toLowerCase()));
