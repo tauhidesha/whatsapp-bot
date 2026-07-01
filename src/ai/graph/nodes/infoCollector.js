@@ -124,16 +124,24 @@ Wajib menghasilkan skema JSON murni dengan properti: intent, internal_thought, m
         // Auto-resolve kata kunci generik "Repaint" menjadi spesifik berdasarkan fokus bodi/velg
         const genericRepaintIdx = ctx.serviceTypes.findIndex(s => s.toLowerCase() === 'repaint');
         if (genericRepaintIdx !== -1 && ctx.detailingFocus) {
-            const focus = ctx.detailingFocus.toLowerCase();
+            
+            // 🌟 PERBAIKAN 1: Konversi aman ke lowercase, tidak peduli LLM kasih Array atau String
+            const focusStr = Array.isArray(ctx.detailingFocus) 
+                ? ctx.detailingFocus.join(' ').toLowerCase() 
+                : String(ctx.detailingFocus).toLowerCase();
+
             const resolved = [];
-            if (/halus|bodi|body/.test(focus)) resolved.push('Repaint Bodi Halus');
-            if (/kasar/.test(focus)) resolved.push('Repaint Bodi Kasar');
-            if (/velg|pelek/.test(focus)) resolved.push('Repaint Velg');
-            if (/cvt/.test(focus)) resolved.push('Repaint CVT');
+            
+            // 🌟 PERBAIKAN 2: Tambahkan regex "boli" untuk toleransi typo user
+            if (/halus|bodi|body|boli/.test(focusStr)) resolved.push('Repaint Bodi Halus');
+            if (/kasar/.test(focusStr)) resolved.push('Repaint Bodi Kasar');
+            if (/velg|pelek/.test(focusStr)) resolved.push('Repaint Velg');
+            if (/cvt/.test(focusStr)) resolved.push('Repaint CVT');
 
             if (resolved.length > 0) {
                 ctx.serviceTypes.splice(genericRepaintIdx, 1, ...resolved);
                 ctx.serviceTypes = [...new Set(ctx.serviceTypes)];
+                console.log(`[INFO_COLLECTOR_NODE] Auto-resolved "Repaint" to [${resolved.join(', ')}]`);
             }
         }
 
