@@ -29,11 +29,6 @@ async function infoCollectorNode(state) {
     }
     if (!Array.isArray(ctx.serviceTypes)) ctx.serviceTypes = [];
 
-    if (prevIntent && prevIntent !== state.intent) {
-        ctx.missingQuestions = [];
-        ctx.isReadyForTools = false;
-    }
-
     const chatTranscript = sanitizedMessages.slice(-10).map(m => {
         const role = (m.type === 'human' || m.role === 'user') ? '[USER]' : '[AI]';
         return `${role}: ${extractTextFromContent(m.content)}`;
@@ -94,6 +89,11 @@ Wajib menghasilkan skema JSON murni dengan properti: intent, internal_thought, m
             };
         }
 
+        if (prevIntent && prevIntent !== classifiedIntent) {
+            ctx.missingQuestions = [];
+            ctx.isReadyForTools = false;
+        }
+
         // PERBAIKAN CONTEXT BLEED: Reset data jika tipe kendaraan berubah total
         if (extracted.motor_model) {
             const currentVehicle = ctx.vehicleType || '';
@@ -126,25 +126,38 @@ Wajib menghasilkan skema JSON murni dengan properti: intent, internal_thought, m
 
         // Auto-resolve kata kunci generik "Repaint" menjadi spesifik berdasarkan fokus bodi/velg
         const genericRepaintIdx = ctx.serviceTypes.findIndex(s => s.toLowerCase() === 'repaint');
-        if (genericRepaintIdx !== -1 && ctx.detailingFocus) {
+        if (genericRepaintIdx !== -1) {
             
-            // 🌟 PERBAIKAN 1: Konversi aman ke lowercase, tidak peduli LLM kasih Array atau String
-            const focusStr = Array.isArray(ctx.detailingFocus) 
-                ? ctx.detailingFocus.join(' ').toLowerCase() 
-                : String(ctx.detailingFocus).toLowerCase();
+            const focusStr = [
+                Array.isArray(ctx.detailingFocus) ? ctx.detailingFocus.join(' ') : ctx.detailingFocus,
+                lastMessageText
+            ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
 
             const resolved = [];
             
-            // 🌟 PERBAIKAN 2: Tambahkan regex "boli" untuk toleransi typo user
-            if (/halus|bodi|body|boli/.test(focusStr)) resolved.push('Repaint Bodi Halus');
-            if (/kasar/.test(focusStr)) resolved.push('Repaint Bodi Kasar');
-            if (/velg|pelek/.test(focusStr)) resolved.push('Repaint Velg');
-            if (/cvt/.test(focusStr)) resolved.push('Repaint CVT');
+            if (/halus|bodi|body|boli/.test(focusStr)) {
+                resolved.push('Repaint Bodi Halus');
+            }
+
+            if (/kasar/.test(focusStr)) {
+                resolved.push('Repaint Bodi Kasar');
+            }
+
+            if (/velg|pelek/.test(focusStr)) {
+                resolved.push('Repaint Velg');
+            }
+
+            if (/cvt/.test(focusStr)) {
+                resolved.push('Repaint CVT');
+            }
 
             if (resolved.length > 0) {
                 ctx.serviceTypes.splice(genericRepaintIdx, 1, ...resolved);
                 ctx.serviceTypes = [...new Set(ctx.serviceTypes)];
-                console.log(`[INFO_COLLECTOR_NODE] Auto-resolved "Repaint" to [${resolved.join(', ')}]`);
+                console.log(`[INFO_COLLECTOR_NODE] Auto-resolved from message "${resolved.join(', ')}"`);
             }
         }
 
