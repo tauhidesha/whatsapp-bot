@@ -155,7 +155,8 @@ Wajib menghasilkan skema JSON murni dengan properti: intent, internal_thought, m
             }
 
             if (resolved.length > 0) {
-                ctx.serviceTypes.splice(genericRepaintIdx, 1, ...resolved);
+                ctx.serviceTypes = ctx.serviceTypes.filter(s => s.toLowerCase() !== 'repaint');
+                ctx.serviceTypes.push(...resolved);
                 ctx.serviceTypes = [...new Set(ctx.serviceTypes)];
                 console.log(`[INFO_COLLECTOR_NODE] Auto-resolved from message "${resolved.join(', ')}"`);
             }
@@ -213,6 +214,14 @@ Wajib menghasilkan skema JSON murni dengan properti: intent, internal_thought, m
     // Izinkan eksekusi tool jika intent berupa BOOKING_SERVICE atau CONSULTATION selama data valid
     const isBookingOrConsult = classifiedIntent === 'BOOKING_SERVICE' || classifiedIntent === 'CONSULTATION';
     
+    console.log('[INFO_COLLECTOR_NODE] Pre-isReady Check:', {
+        classifiedIntent,
+        serviceTypes: ctx.serviceTypes,
+        missingQuestions: ctx.missingQuestions,
+        hasGenericService,
+        vehicleType: ctx.vehicleType
+    });
+
     ctx.isReadyForTools = Boolean(
         classifiedIntent === 'GENERAL_INQUIRY' || 
         (isBookingOrConsult && !!ctx.vehicleType && ctx.serviceTypes.length > 0 && !hasGenericService && ctx.missingQuestions.length === 0)

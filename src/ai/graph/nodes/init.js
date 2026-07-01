@@ -98,7 +98,7 @@ async function initNode(state) {
                 paintType: context.paintType || dbCtx.paintType || null,
                 isBongkarTotal: context.isBongkarTotal !== null ? context.isBongkarTotal : (dbCtx.isBongkarTotal ?? null),
                 serviceDetail: context.serviceDetail || dbCtx.serviceDetail || null,
-                isReadyForTools: context.isReadyForTools || (dbCtx.conversationStage === 'ready')
+                isReadyForTools: false
             },
             metadata: {
                 ...metadata,
