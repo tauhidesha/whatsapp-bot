@@ -37,13 +37,13 @@ module.exports = function generateInvoiceHTML(data) {
       .replace(/^62/, '0');
 
   // Parse items jadi array - Split by newline ONLY
-  const itemsList = (items || '').split('\n').map(i => i.trim()).filter(Boolean);
+  const itemsList = (items || '').split('\n').map((i: string) => i.trim()).filter(Boolean);
 
   // Filter redundant notes
   let filteredNotes = notes || '-';
   if (filteredNotes && filteredNotes !== '-' && filteredNotes.match(/^Layanan:\s*/i)) {
     const headerRemoved = filteredNotes.replace(/^Layanan:\s*/i, '').trim();
-    const itemsSummary = itemsList.map(i => i.split('||')[0].trim()).join(', ');
+    const itemsSummary = itemsList.map((i: string) => i.split('||')[0].trim()).join(', ');
     if (headerRemoved === itemsSummary) {
       filteredNotes = '';
     } else {
@@ -53,48 +53,30 @@ module.exports = function generateInvoiceHTML(data) {
 
   const notesList = (filteredNotes && filteredNotes !== '-')
     ? filteredNotes.split('\n')
-      .map(n => n.trim())
-      .filter(n => n
+      .map((n: string) => n.trim())
+      .filter((n: string) => n
         && !n.match(/^Layanan:?$/i)
         && !n.includes('||')              // filter raw item strings
         && !n.match(/^[●•\-*]\s*.+\|\|/) // filter bullet + item format
       )
     : [];
 
-  return `<!DOCTYPE html>
-<html class="dark">
-<head>
-  <meta charset="utf-8"/>
+  return `<div class="invoice-container" style="background: #131313; color: #e5e2e1; font-family: 'Manrope', sans-serif; font-weight: 600; width: 794px; margin: 0 auto; -webkit-print-color-adjust: exact;">
   <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@100..900&family=Manrope:wght@200..800&display=swap" rel="stylesheet"/>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    .invoice-container * { margin: 0; padding: 0; box-sizing: border-box; }
     @page { margin: 0; size: A4; }
-    html { background: #131313; -webkit-print-color-adjust: exact; }
-    body {
-      background: #131313;
-      color: #e5e2e1;
-      font-family: 'Manrope', sans-serif;
-      font-weight: 600;
-      padding: 0;
-      width: 794px; /* A4 width in px at 96dpi */
-      margin: 0 auto;
-      -webkit-print-color-adjust: exact;
-    }
-    .page-wrap {
-      padding: 40px;
-      background: #131313;
-    }
     .margin-top, .margin-bottom {
       height: 40px;
       background: #131313;
     }
     
     .font-headline { font-family: 'League Spartan', sans-serif; }
-    .text-yellow { color: #FFFF00; }
-    .bg-dark { background: #1c1b1b; }
-    .bg-darker { background: #0e0e0e; }
-    .text-muted { color: #cac8aa; }
-    .border-yellow { border-left: 2px solid #FFFF00; }
+    .text-yellow { color: #FFFF00 !important; }
+    .bg-dark { background: #1c1b1b !important; }
+    .bg-darker { background: #0e0e0e !important; }
+    .text-muted { color: #cac8aa !important; }
+    .border-yellow { border-left: 2px solid #FFFF00 !important; }
     
     .items-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
     .items-table thead { display: table-header-group; }
@@ -109,13 +91,7 @@ module.exports = function generateInvoiceHTML(data) {
     .totals-section {
       page-break-inside: avoid;
     }
-    
-    @media print {
-      body { background: #131313; }
-    }
   </style>
-</head>
-<body>
   <table style="width:100%; border-collapse:collapse; background:#131313;">
     <thead><tr><td class="margin-top"></td></tr></thead>
     <tbody><tr><td style="padding: 0 40px; background:#131313;">
@@ -134,10 +110,10 @@ module.exports = function generateInvoiceHTML(data) {
         </div>
       </div>
       <div style="text-align:right">
-        <img src="${logoBase64}" style="height:75px; margin-bottom:12px"/>
+        <img src="data:image/png;base64,${logoBase64}" style="height:75px; margin-bottom:12px" crossorigin="anonymous"/>
         <div>
           <p class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em">Nomor Dokumen</p>
-          <p class="font-headline text-yellow" style="font-size:28px; font-weight:700">#BS-${docNumber || 'PREVIEW'}</p>
+          <p class="font-headline text-yellow" style="font-size:28px; font-weight:700">#BS-${docNumber ? (docNumber.length > 8 ? docNumber.split('-')[0].toUpperCase() : docNumber.toUpperCase()) : 'DRAFT'}</p>
         </div>
         <div style="margin-top:16px">
           <p class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em">Tanggal Terbit</p>
@@ -209,7 +185,7 @@ module.exports = function generateInvoiceHTML(data) {
         </tr>
       </thead>
       <tbody>
-        ${itemsList.length > 0 ? itemsList.map(item => {
+        ${itemsList.length > 0 ? itemsList.map((item: string) => {
           const parts = item.split('||');
           const cleanTitle = (parts[0] || '').trim().replace(/^(\d+\.|[-*•●])\s*/, '');
           const price = parseInt(parts[1]) || 0;
@@ -252,7 +228,7 @@ module.exports = function generateInvoiceHTML(data) {
         <div class="bg-darker border-yellow" style="padding:32px; margin-bottom:24px">
           <p class="font-headline" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.15em; margin-bottom:16px">Catatan Teknis Layanan</p>
           <div style="display:flex; flex-direction:column; gap:8px">
-            ${notesList.map(n => {
+            ${notesList.map((n: string) => {
           let icon = '●';
           if (n.toLowerCase().includes('garansi')) icon = '✓';
           else if (n.toLowerCase().match(/waktu|jam|hari/)) icon = '⏱';
@@ -292,7 +268,7 @@ module.exports = function generateInvoiceHTML(data) {
         </div>` : ''}
         ${totalPaid > 0 && !(dp > 0 && dp === totalPaid) ? `
         <div style="display:flex; justify-content:space-between">
-          <span class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em">${documentType === 'bukti_bayar' ? 'Bayar Hari Ini' : 'Total Bayar'}</span>
+          <span class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em">${documentType === 'bukti_bayar' ? 'Bayar Hari Hari Ini' : 'Total Bayar'}</span>
           <span style="font-size:16px; color:#85ff7a">Rp${totalPaid.toLocaleString('id-ID')}</span>
         </div>` : ''}
         
@@ -311,8 +287,7 @@ module.exports = function generateInvoiceHTML(data) {
       </div>
     </div>
       </td></tr></tbody>
-    <tfoot><tr><td class="margin-bottom"></td></tr></tfoot>
-  </table>
-</body>
-</html>`;
+      <tfoot><tr><td class="margin-bottom"></td></tr></tfoot>
+    </table>
+  </div>`;
 };
