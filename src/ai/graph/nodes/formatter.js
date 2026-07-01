@@ -155,26 +155,6 @@ Jika toolResult mengandung MULTIPLE candidates dengan nama "Repaint Bodi Halus -
 2. WAJIB tulis penjelasan benefit 2-3 baris di bawah setiap nama paket + harga. DILARANG hanya menampilkan nama dan harga saja tanpa penjelasan.
 3. Rekomendasikan Paket Standar sebagai "paling worth it".
 
-Contoh format WAJIB (ikuti struktur ini):
-"ini rincian paket repaint bodi halus [motor] ya kak:
-
-*paket premium* — rp1.500.000
-cat di-clear 2x (flowcoat), lapisan lebih tebal, depth warna lebih dalam. garansi 2 tahun.
-untuk hasil paling maksimal & awet jangka panjang.
-
-*paket standar* ⭐ — rp1.300.000
-clear HS keras & tahan baret + dipoles sampai *mirror finish*. garansi 1 tahun.
-paling banyak dipilih! selisihnya tipis dari basic tapi hasilnya beda jauh.
-
-*paket basic* — rp1.200.000
-clear HS, gloss lebih tinggi dari cat pabrik, finish kulit jeruk ringan. garansi 1 tahun.
-upgrade solid dari cat standar bawaan motor.
-
-*paket ekonomis* — rp1.000.000
-clear MS, finish kulit jeruk ringan. tanpa garansi.
-cocok buat motor harian atau yang sering ganti warna.
-
-dari pilihan di atas, aku rekomendasiin *paket standar* karena harganya beda tipis dari basic tapi udah dapet poles mirror finish!"
 
 DILARANG FORMAT INI (harga saja tanpa penjelasan):
 "• paket premium: rp1.500.000
@@ -262,19 +242,19 @@ Struktur JSON yang diwajibkan:
         const finalPrompt = `TRANSKIP PERCAKAPAN TERAKHIR:\n\n${transcript}\n\n(Tuliskan balasan AI selanjutnya sesuai arahan sistem)`;
 
         console.log(`[FORMATTER_NODE] Invoking model (manual parse mode)...`);
-        
+
         // Timeout wrapper for safety
         const invokePromise = withRetry(() => model.invoke([
             new SystemMessage(systemPrompt),
             new HumanMessage(finalPrompt)
         ]), { maxRetries: 3, baseDelayMs: 1500 });
 
-        const timeoutPromise = new Promise((_, reject) => 
+        const timeoutPromise = new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Formatter timeout after 60s')), 60000)
         );
 
         const response = await Promise.race([invokePromise, timeoutPromise]);
-        
+
         console.log(`[FORMATTER_NODE] Response received: ${response ? 'OK' : 'NULL'}`);
 
         // Handle manual JSON parsing
