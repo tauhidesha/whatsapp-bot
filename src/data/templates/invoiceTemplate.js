@@ -61,7 +61,7 @@ module.exports = function generateInvoiceHTML(data) {
       )
     : [];
 
-  return `<div class="invoice-container" style="background: #131313; color: #e5e2e1; font-family: 'Manrope', sans-serif; font-weight: 600; width: 794px; min-height: 1123px; margin: 0 auto; -webkit-print-color-adjust: exact;">
+  return `<div class="invoice-container" style="background: #131313; color: #e5e2e1; font-family: 'Manrope', sans-serif; font-weight: 600; width: 100%; min-height: 100vh; margin: 0; -webkit-print-color-adjust: exact;">
   <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@100..900&family=Manrope:wght@200..800&display=swap" rel="stylesheet"/>
   <style>
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #131313; -webkit-print-color-adjust: exact; }
@@ -210,7 +210,8 @@ module.exports = function generateInvoiceHTML(data) {
               ${itemDesc ? (
               itemDesc.startsWith('Catatan Warna:')
                 ? `<div style="display:flex; align-items:center; gap:6px; margin-top:6px; padding:4px 10px; background:rgba(255,255,0,0.05); border-left:2px solid #FFFF00; width:fit-content">
-                    <span style="font-size:10px; color:#FFFF00; font-weight:800; text-transform:uppercase; letter-spacing:0.1em">🎨 ${itemDesc}</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFF00" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path></svg>
+                    <span style="font-size:10px; color:#FFFF00; font-weight:800; text-transform:uppercase; letter-spacing:0.1em">${itemDesc}</span>
                    </div>`
                 : `<p class="text-muted" style="font-size:12px; line-height:1.4; margin-top:4px">${itemDesc}</p>`
             ) : ''}
