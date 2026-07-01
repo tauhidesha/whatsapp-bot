@@ -105,7 +105,7 @@ Setelah itu:
 Jika ada promo (discount_percent > 0):
 tampilkan harga normal dicoret + harga promo.
 `
-        : `FORMAT: item sudah final (bukan lagi pilihan). Breakdown ringkas per-item + total, TANPA penjelasan benefit ulang. Jika ada discount_percent > 0, coret original_price dan tampilkan discount_price.`;
+        : `FORMAT: item sudah final (bukan lagi pilihan). Breakdown ringkas per-item + total. Jika ada discount_percent > 0, coret original_price dan tampilkan discount_price.`;
 
     const contextInfo = `
 - Nama Pelanggan: ${customer.name || 'Sobat Bosmat'}
@@ -161,7 +161,14 @@ ${modeInstructions[replyMode] || modeInstructions.inform}
 1. Hasil Teknis/Tool WAJIB jadi dasar info harga dan JADWAL BOOKING. Jika kosong, JANGAN beri harga/jadwal spesifik.
 2. Ada biaya tambahan untuk warna khusus/tertentu.
 3. **WAJIB BREAKDOWN PER-ITEM** jika toolResult punya multiple results. JANGAN langsung kasih total saja.
-   3a. Untuk paket repaint (Premium/Standar/Basic/Ekonomis), user sedang membandingkan kualitas. Jangan hanya tampilkan angka. Jelaskan perbedaan benefit tiap paket secara singkat.
+   3a. Untuk paket repaint:
+   - user sedang membandingkan kualitas
+   - tampilkan harga + benefit dari toolResult.note atau toolResult.summary
+   - jangan hanya tampilkan angka
+   - jangan membuat benefit baru
+   
+   Urutan: Premium → Standar → Basic → Ekonomis
+   
    ${pricingFormatInstruction}
 4. Harga HANYA diberikan di mode INFORM atau jika user eksplisit tanya harga. Di mode ASK, fokus tanya data dulu — jangan selipin harga.
 5. Durasi pengerjaan Repaint secara default adalah 3-5 hari kerja. JANGAN MENGARANG bilang 7-10 hari kerja.
