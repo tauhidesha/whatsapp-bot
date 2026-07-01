@@ -127,6 +127,8 @@ Wajib menghasilkan skema JSON murni dengan properti: intent, internal_thought, m
         if (extracted.color_choice) ctx.colorChoice = extracted.color_choice;
         if (extracted.velg_color_choice) ctx.velgColorChoice = extracted.velg_color_choice;
         if (extracted.is_previously_painted !== null) ctx.isPreviouslyPainted = extracted.is_previously_painted;
+        if (extracted.booking_date) ctx.bookingDate = extracted.booking_date;
+        if (extracted.booking_time) ctx.bookingTime = extracted.booking_time;
 
         // Auto-resolve kata kunci generik "Repaint" menjadi spesifik berdasarkan fokus bodi/velg
         const genericRepaintIdx = ctx.serviceTypes.findIndex(s => s.toLowerCase() === 'repaint');

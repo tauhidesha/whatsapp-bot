@@ -32,7 +32,24 @@ async function toolExecutorNode(state) {
                 intent === 'CONSULTATION' ||
                 userAskedPrice;
             
-            if (shouldLookupPrice && context.serviceTypes?.length > 0 && context.vehicleType) {
+            if (intent === 'BOOKING_SERVICE' && context.bookingDate) {
+                console.log(`[executorNode] Executing checkBookingAvailability for date ${context.bookingDate}...`);
+                const tool = toolsByName['checkBookingAvailability'];
+                if (tool) {
+                    try {
+                        const bookingResult = await tool({
+                            bookingDate: context.bookingDate,
+                            bookingTime: context.bookingTime,
+                            serviceName: context.serviceTypes?.join(', '),
+                            estimatedDurationMinutes: undefined
+                        });
+                        toolResult = { ...toolResult, ...bookingResult, bookingChecked: true };
+                    } catch (err) {
+                        console.error('[executorNode] checkBookingAvailability failed:', err.message);
+                        toolResult.bookingError = err.message;
+                    }
+                }
+            } else if (shouldLookupPrice && context.serviceTypes?.length > 0 && context.vehicleType) {
                 console.log(`[executorNode] Executing getServiceDetails for ${context.vehicleType} and [${context.serviceTypes.join(', ')}]...`);
                 const tool = toolsByName['getServiceDetails'];
                 
