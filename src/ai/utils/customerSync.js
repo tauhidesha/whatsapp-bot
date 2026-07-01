@@ -37,12 +37,12 @@ async function syncCustomer(customerId) {
           status: { in: ['PAID', 'SUCCESS'] },
           bookingId: null // Standalone only
         },
-        orderBy: { date: 'desc' }
+        orderBy: { paymentDate: 'desc' }
       })
     ]);
 
     const bookingDate = lastBooking ? new Date(lastBooking.bookingDate) : null;
-    const incomeDate = lastIncomeTx ? new Date(lastIncomeTx.date) : null;
+    const incomeDate = lastIncomeTx ? new Date(lastIncomeTx.paymentDate) : null;
     
     let lastServiceAt = null;
     if (bookingDate && incomeDate) {
