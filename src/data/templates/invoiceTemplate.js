@@ -61,7 +61,7 @@ module.exports = function generateInvoiceHTML(data) {
       )
     : [];
 
-  return `<div class="invoice-container" style="background: #131313; color: #e5e2e1; font-family: 'Manrope', sans-serif; font-weight: 600; width: 794px; margin: 0 auto; -webkit-print-color-adjust: exact;">
+  return `<div class="invoice-container" style="background: #131313; color: #e5e2e1; font-family: 'Manrope', sans-serif; font-weight: 600; width: 794px; min-height: 1123px; margin: 0 auto; -webkit-print-color-adjust: exact;">
   <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@100..900&family=Manrope:wght@200..800&display=swap" rel="stylesheet"/>
   <style>
     .invoice-container * { margin: 0; padding: 0; box-sizing: border-box; color: inherit; }
@@ -110,7 +110,7 @@ module.exports = function generateInvoiceHTML(data) {
         </div>
       </div>
       <div style="text-align:right">
-        <img src="data:image/png;base64,${logoBase64}" style="height:75px; margin-bottom:12px" crossorigin="anonymous"/>
+        <img src="data:image/png;base64,${logoBase64}" style="height:75px; margin-bottom:12px"/>
         <div>
           <p class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em">Nomor Dokumen</p>
           <p class="font-headline text-yellow" style="font-size:28px; font-weight:700">#BS-${docNumber ? (docNumber.length > 8 ? docNumber.split('-')[0].toUpperCase() : docNumber.toUpperCase()) : 'DRAFT'}</p>
@@ -277,7 +277,7 @@ module.exports = function generateInvoiceHTML(data) {
           <span class="font-headline" style="font-size:36px; font-weight:900">Rp${grandTotal.toLocaleString('id-ID')}</span>
         </div>
 
-        <div style="background:#FFFF00; padding:20px 24px; margin:0 -40px -40px; display:flex; justify-content:space-between; align-items:center">
+        <div style="background:#FFFF00; padding:20px 24px; margin:0 -28px -28px; display:flex; justify-content:space-between; align-items:center">
           <div>
             <span style="color:#1d1d00; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.2em; display:block; margin-bottom:4px">Sisa Tagihan</span>
             <span class="font-headline" style="color:#1d1d00; font-size:44px; font-weight:900">Rp${balance.toLocaleString('id-ID')}</span>
