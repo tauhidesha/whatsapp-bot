@@ -227,8 +227,23 @@ Output: {
             };
         }
 
-        // --- ENTITY EXTRACTION ---
-        if (extracted.motor_model) ctx.vehicleType = extracted.motor_model;
+        if (extracted.motor_model) {
+            const currentVehicle = ctx.vehicleType || '';
+            const newVehicle = extracted.motor_model;
+            
+            // Prevent context bleed: if vehicle changes, reset service-related context
+            if (currentVehicle && newVehicle.toLowerCase() !== currentVehicle.toLowerCase()) {
+                console.log(`[INFO_COLLECTOR_NODE] Vehicle changed from ${currentVehicle} to ${newVehicle}. Resetting service context.`);
+                ctx.serviceTypes = [];
+                ctx.paintType = null;
+                ctx.detailingFocus = null;
+                ctx.colorChoice = null;
+                ctx.velgColorChoice = null;
+                ctx.isBongkarTotal = null;
+                ctx.isPreviouslyPainted = null;
+            }
+            ctx.vehicleType = newVehicle;
+        }
         if (extracted.booking_date) ctx.bookingDate = extracted.booking_date;
         if (extracted.booking_time) ctx.bookingTime = extracted.booking_time;
 
