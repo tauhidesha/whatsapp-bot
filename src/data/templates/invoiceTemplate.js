@@ -37,13 +37,13 @@ module.exports = function generateInvoiceHTML(data) {
       .replace(/^62/, '0');
 
   // Parse items jadi array - Split by newline ONLY
-  const itemsList = (items || '').split('\n').map((i: string) => i.trim()).filter(Boolean);
+  const itemsList = (items || '').split('\n').map((i) => i.trim()).filter(Boolean);
 
   // Filter redundant notes
   let filteredNotes = notes || '-';
   if (filteredNotes && filteredNotes !== '-' && filteredNotes.match(/^Layanan:\s*/i)) {
     const headerRemoved = filteredNotes.replace(/^Layanan:\s*/i, '').trim();
-    const itemsSummary = itemsList.map((i: string) => i.split('||')[0].trim()).join(', ');
+    const itemsSummary = itemsList.map((i) => i.split('||')[0].trim()).join(', ');
     if (headerRemoved === itemsSummary) {
       filteredNotes = '';
     } else {
@@ -53,8 +53,8 @@ module.exports = function generateInvoiceHTML(data) {
 
   const notesList = (filteredNotes && filteredNotes !== '-')
     ? filteredNotes.split('\n')
-      .map((n: string) => n.trim())
-      .filter((n: string) => n
+      .map((n) => n.trim())
+      .filter((n) => n
         && !n.match(/^Layanan:?$/i)
         && !n.includes('||')              // filter raw item strings
         && !n.match(/^[●•\-*]\s*.+\|\|/) // filter bullet + item format
@@ -185,7 +185,7 @@ module.exports = function generateInvoiceHTML(data) {
         </tr>
       </thead>
       <tbody>
-        ${itemsList.length > 0 ? itemsList.map((item: string) => {
+        ${itemsList.length > 0 ? itemsList.map((item) => {
           const parts = item.split('||');
           const cleanTitle = (parts[0] || '').trim().replace(/^(\d+\.|[-*•●])\s*/, '');
           const price = parseInt(parts[1]) || 0;
@@ -228,7 +228,7 @@ module.exports = function generateInvoiceHTML(data) {
         <div class="bg-darker border-yellow" style="padding:20px; margin-bottom:16px">
           <p class="font-headline" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.15em; margin-bottom:16px">Catatan Teknis Layanan</p>
           <div style="display:flex; flex-direction:column; gap:8px">
-            ${notesList.map((n: string) => {
+            ${notesList.map((n) => {
           let icon = '●';
           if (n.toLowerCase().includes('garansi')) icon = '✓';
           else if (n.toLowerCase().match(/waktu|jam|hari/)) icon = '⏱';
