@@ -67,7 +67,7 @@ module.exports = function generateInvoiceHTML(data) {
     .invoice-container * { margin: 0; padding: 0; box-sizing: border-box; }
     @page { margin: 0; size: A4; }
     .margin-top, .margin-bottom {
-      height: 20px;
+      height: 8px;
       background: #131313;
     }
     
@@ -82,7 +82,7 @@ module.exports = function generateInvoiceHTML(data) {
     .items-table thead { display: table-header-group; }
     
     .item-row td {
-      padding: 16px 16px;
+      padding: 10px 12px;
       border-bottom: 1px solid rgba(255,255,255,0.05);
       vertical-align: middle;
     }
@@ -94,12 +94,12 @@ module.exports = function generateInvoiceHTML(data) {
   </style>
   <table style="width:100%; border-collapse:collapse; background:#131313;">
     <thead><tr><td class="margin-top"></td></tr></thead>
-    <tbody><tr><td style="padding: 0 30px; background:#131313;">
+    <tbody><tr><td style="padding: 0 22px; background:#131313;">
 
     <!-- Header -->
-    <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:30px">
+    <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:18px">
       <div>
-        <h1 class="font-headline" style="font-size:56px; font-weight:900; line-height:0.8; text-transform:uppercase; margin-bottom:16px">
+        <h1 class="font-headline" style="font-size:44px; font-weight:900; line-height:0.8; text-transform:uppercase; margin-bottom:16px">
           ${documentType === 'tanda_terima' ? 'Receipt' : documentType === 'bukti_bayar' ? 'Payment' : 'Invoice'}<br/>
           <span class="text-yellow">Repaint &<br/>Detailing</span>
         </h1>
@@ -110,7 +110,7 @@ module.exports = function generateInvoiceHTML(data) {
         </div>
       </div>
       <div style="text-align:right">
-        <img src="data:image/png;base64,${logoBase64}" style="height:75px; margin-bottom:12px" crossorigin="anonymous"/>
+        <img src="data:image/png;base64,${logoBase64}" style="height:55px; margin-bottom:12px" crossorigin="anonymous"/>
         <div>
           <p class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em">Nomor Dokumen</p>
           <p class="font-headline text-yellow" style="font-size:28px; font-weight:700">#BS-${docNumber ? (docNumber.length > 8 ? docNumber.split('-')[0].toUpperCase() : docNumber.toUpperCase()) : 'DRAFT'}</p>
@@ -123,8 +123,8 @@ module.exports = function generateInvoiceHTML(data) {
     </div>
 
     <!-- Info Section -->
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1px; background:#484831; margin-bottom:30px">
-      <div class="bg-dark" style="padding:20px">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1px; background:#484831; margin-bottom:18px">
+      <div class="bg-dark" style="padding:14px">
         <p class="text-yellow" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.2em; margin-bottom:20px">Informasi Pelanggan</p>
         <p class="font-headline" style="font-size:24px; font-weight:700; text-transform:uppercase; margin-bottom:8px">${customerName || '-'}</p>
         <p class="text-muted" style="font-size:14px; line-height:1.8">
@@ -132,7 +132,7 @@ module.exports = function generateInvoiceHTML(data) {
           Kendaraan: ${motorDetails || '-'}
         </p>
       </div>
-      <div class="bg-dark" style="padding:20px">
+      <div class="bg-dark" style="padding:14px">
         <p class="text-yellow" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.2em; margin-bottom:20px">Studio Layanan</p>
         <p class="font-headline" style="font-size:24px; font-weight:700; text-transform:uppercase; margin-bottom:8px">${studioMetadata.name.toUpperCase()}</p>
         <p class="text-muted" style="font-size:14px; line-height:1.8">
@@ -143,8 +143,8 @@ module.exports = function generateInvoiceHTML(data) {
     </div>
 
     <!-- Status Banner Message -->
-    <div style="margin-bottom:20px; padding:16px; background:rgba(255,255,0,0.03); border:1px solid rgba(255,255,0,0.15); display:flex; align-items:flex-start; gap:16px;">
-      <div style="background:#FFFF00; padding:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+    <div style="margin-bottom:20px; padding:10px; background:rgba(255,255,0,0.03); border:1px solid rgba(255,255,0,0.15); display:flex; align-items:flex-start; gap:16px;">
+      <div style="background:#FFFF00; padding:7px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
         ${documentType === 'tanda_terima'
       ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>'
       : documentType === 'bukti_bayar'
@@ -205,7 +205,7 @@ module.exports = function generateInvoiceHTML(data) {
           return `
           <tr class="item-row" style="page-break-inside: avoid;">
             <td>
-              <p class="font-headline" style="font-size:18px; font-weight:700; text-transform:uppercase">${cleanTitle}</p>
+              <p class="font-headline" style="font-size:15px; font-weight:700; text-transform:uppercase">${cleanTitle}</p>
               ${itemDesc ? (
               itemDesc.startsWith('Catatan Warna:')
                 ? `<div style="display:flex; align-items:center; gap:6px; margin-top:6px; padding:4px 10px; background:rgba(255,255,0,0.05); border-left:2px solid #FFFF00; width:fit-content">
@@ -214,9 +214,9 @@ module.exports = function generateInvoiceHTML(data) {
                 : `<p class="text-muted" style="font-size:12px; line-height:1.4; margin-top:4px">${itemDesc}</p>`
             ) : ''}
             </td>
-            <td style="text-align:center"><p class="font-headline" style="font-size:18px; font-weight:700">01</p></td>
+            <td style="text-align:center"><p class="font-headline" style="font-size:15px; font-weight:700">01</p></td>
             <td style="text-align:right"><p class="text-muted" style="font-size:14px">${priceStr}</p></td>
-            <td style="text-align:right"><p class="font-headline text-yellow" style="font-size:18px; font-weight:700">${priceStr}</p></td>
+            <td style="text-align:right"><p class="font-headline text-yellow" style="font-size:15px; font-weight:700">${priceStr}</p></td>
           </tr>`;
         }).join('') : '<tr><td colspan="4" style="text-align:center; padding:40px; color:#666;">Belum ada layanan ditambahkan</td></tr>'}
       </tbody>
@@ -251,7 +251,7 @@ module.exports = function generateInvoiceHTML(data) {
         </div>
       </div>
 
-      <div style="background:#2a2a2a; padding:40px; display:flex; flex-direction:column; gap:20px">
+      <div style="background:#2a2a2a; padding:22px; display:flex; flex-direction:column; gap:10px">
         <div style="display:flex; justify-content:space-between">
           <span class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em">Subtotal</span>
           <span style="font-size:16px">Rp${subtotal.toLocaleString('id-ID')}</span>
@@ -274,13 +274,13 @@ module.exports = function generateInvoiceHTML(data) {
         
         <div style="border-top:1px solid #484831; padding-top:24px; margin-top:8px">
           <span class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em; display:block; margin-bottom:8px">Total Keseluruhan</span>
-          <span class="font-headline" style="font-size:36px; font-weight:900">Rp${grandTotal.toLocaleString('id-ID')}</span>
+          <span class="font-headline" style="font-size:28px; font-weight:900">Rp${grandTotal.toLocaleString('id-ID')}</span>
         </div>
 
-        <div style="background:#FFFF00; padding:20px 24px; margin:0 -40px -40px; display:flex; justify-content:space-between; align-items:center">
+        <div style="background:#FFFF00; padding:14px 18px; margin:0 -22px -22px; display:flex; justify-content:space-between; align-items:center">
           <div>
             <span style="color:#1d1d00; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.2em; display:block; margin-bottom:4px">Sisa Tagihan</span>
-            <span class="font-headline" style="color:#1d1d00; font-size:44px; font-weight:900">Rp${balance.toLocaleString('id-ID')}</span>
+            <span class="font-headline" style="color:#1d1d00; font-size:34px; font-weight:900">Rp${balance.toLocaleString('id-ID')}</span>
           </div>
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="2" y="5" width="20" height="14" rx="2" stroke="#1d1d00" stroke-width="2"/><path d="M2 10H22" stroke="#1d1d00" stroke-width="2"/><path d="M6 15H10" stroke="#1d1d00" stroke-width="2" stroke-linecap="round"/></svg>
         </div>
