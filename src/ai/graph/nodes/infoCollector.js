@@ -188,9 +188,13 @@ Wajib menghasilkan skema JSON murni dengan properti: intent, internal_thought, m
     ctx.isReadyForTools = Boolean(classifiedIntent === 'GENERAL_INQUIRY' || (classifiedIntent === 'BOOKING_SERVICE' && !!ctx.vehicleType && ctx.serviceTypes.length > 0 && !hasGenericService && ctx.missingQuestions.length === 0));
 
     let replyMode = 'inform';
-    if (classifiedIntent === 'GREETING') replyMode = 'greet';
-    else if (classifiedIntent === 'CONSULTATION') replyMode = 'consult';
-    else if (ctx.missingQuestions.length > 0) replyMode = 'ask';
+    if (classifiedIntent === 'GREETING') {
+        replyMode = 'greet';
+    } else if (ctx.missingQuestions.length > 0) {
+        replyMode = 'ask';
+    } else if (classifiedIntent === 'CONSULTATION') {
+        replyMode = 'consult';
+    }
 
     return {
         intent: classifiedIntent,
