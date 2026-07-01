@@ -67,7 +67,7 @@ module.exports = function generateInvoiceHTML(data) {
     .invoice-container * { margin: 0; padding: 0; box-sizing: border-box; }
     @page { margin: 0; size: A4; }
     .margin-top, .margin-bottom {
-      height: 20px;
+      height: 10px;
       background: #131313;
     }
     
@@ -82,7 +82,7 @@ module.exports = function generateInvoiceHTML(data) {
     .items-table thead { display: table-header-group; }
     
     .item-row td {
-      padding: 16px 16px;
+      padding: 10px 12px;
       border-bottom: 1px solid rgba(255,255,255,0.05);
       vertical-align: middle;
     }
@@ -94,10 +94,10 @@ module.exports = function generateInvoiceHTML(data) {
   </style>
   <table style="width:100%; border-collapse:collapse; background:#131313;">
     <thead><tr><td class="margin-top"></td></tr></thead>
-    <tbody><tr><td style="padding: 0 30px; background:#131313;">
+    <tbody><tr><td style="padding: 0 24px; background:#131313;">
 
     <!-- Header -->
-    <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:30px">
+    <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:20px">
       <div>
         <h1 class="font-headline" style="font-size:56px; font-weight:900; line-height:0.8; text-transform:uppercase; margin-bottom:16px">
           ${documentType === 'tanda_terima' ? 'Receipt' : documentType === 'bukti_bayar' ? 'Payment' : 'Invoice'}<br/>
@@ -123,7 +123,7 @@ module.exports = function generateInvoiceHTML(data) {
     </div>
 
     <!-- Info Section -->
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1px; background:#484831; margin-bottom:30px">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1px; background:#484831; margin-bottom:18px">
       <div class="bg-dark" style="padding:20px">
         <p class="text-yellow" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.2em; margin-bottom:20px">Informasi Pelanggan</p>
         <p class="font-headline" style="font-size:24px; font-weight:700; text-transform:uppercase; margin-bottom:8px">${customerName || '-'}</p>
@@ -143,7 +143,7 @@ module.exports = function generateInvoiceHTML(data) {
     </div>
 
     <!-- Status Banner Message -->
-    <div style="margin-bottom:20px; padding:16px; background:rgba(255,255,0,0.03); border:1px solid rgba(255,255,0,0.15); display:flex; align-items:flex-start; gap:16px;">
+    <div style="margin-bottom:20px; padding:12px; background:rgba(255,255,0,0.03); border:1px solid rgba(255,255,0,0.15); display:flex; align-items:flex-start; gap:16px;">
       <div style="background:#FFFF00; padding:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
         ${documentType === 'tanda_terima'
       ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>'
@@ -222,7 +222,7 @@ module.exports = function generateInvoiceHTML(data) {
       </tbody>
     </table>
 
-    <div class="totals-section" style="display:grid; grid-template-columns:7fr 5fr; gap:32px; margin-top:20px">
+    <div class="totals-section" style="display:grid; grid-template-columns:7fr 5fr; gap:32px; margin-top:12px">
       <div>
         ${notesList.length > 0 ? `
         <div class="bg-darker border-yellow" style="padding:20px; margin-bottom:16px">
@@ -251,7 +251,7 @@ module.exports = function generateInvoiceHTML(data) {
         </div>
       </div>
 
-      <div style="background:#2a2a2a; padding:40px; display:flex; flex-direction:column; gap:20px">
+      <div style="background:#2a2a2a; padding:28px; display:flex; flex-direction:column; gap:20px">
         <div style="display:flex; justify-content:space-between">
           <span class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em">Subtotal</span>
           <span style="font-size:16px">Rp${subtotal.toLocaleString('id-ID')}</span>
