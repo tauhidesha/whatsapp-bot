@@ -217,18 +217,20 @@ async function toolExecutorNode(state) {
                 const createTool = toolsByName['createBooking'];
                 if (createTool) {
                     try {
+                        const notesArr = [];
+                        if (context.colorChoice) notesArr.push(`Warna Bodi: ${context.colorChoice}`);
+                        if (context.velgColorChoice) notesArr.push(`Warna Velg: ${context.velgColorChoice}`);
+                        if (context.detailingFocus) notesArr.push(`Paket: ${context.detailingFocus}`);
+
                         toolResult.booking = await createTool({
                             customerName: customer?.name || 'Customer',
-                            phone: state.metadata?.phoneReal || '',
+                            customerPhone: state.metadata?.phoneReal || '',
+                            realPhone: state.metadata?.phoneReal || '',
                             bookingDate: context.bookingDate,
-                            bookingTime: context.bookingTime || '09:00',
+                            bookingTime: context.bookingTime || toolResult.availability?.recommendedTime || '09:00',
                             motorModel: context.vehicleType || 'Unknown',
-                            services: context.serviceTypes || [],
-                            notes: {
-                                color: context.colorChoice,
-                                velgColor: context.velgColorChoice,
-                                package: context.detailingFocus
-                            }
+                            serviceName: context.serviceTypes?.join(', ') || 'Layanan Umum',
+                            notes: notesArr.join(', ')
                         });
                     } catch (err) {
                         console.error('[executorNode] createBooking failed:', err.message);
