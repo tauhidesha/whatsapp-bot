@@ -185,7 +185,7 @@ Wajib menghasilkan skema JSON murni dengan properti: intent, internal_thought, m
             missingQuestion = "Tanyakan paket detailing apa yang diinginkan (contoh: Detailing Bodi, Mesin, atau Full)";
         } else if (hasGenericCoating) {
             missingQuestion = "Tanyakan bagian apa yang ingin di-coating";
-        } else if (classifiedIntent === 'BOOKING_SERVICE') {
+        } else if (classifiedIntent === 'BOOKING_SERVICE' || classifiedIntent === 'CONSULTATION') {
             for (const svc of ctx.serviceTypes) {
                 const sLower = svc.toLowerCase();
                 if (sLower.includes('halus') && !ctx.colorChoice) {
