@@ -207,9 +207,6 @@ Wajib menghasilkan skema JSON murni dengan properti: intent, internal_thought, m
 
     ctx.missingQuestions = missingQuestion ? [missingQuestion] : [];
     
-    // Track conversation flow (pricing vs general) to preserve context
-    const userAskedPrice = /harga|biaya|tarif|berapa|price|cost|estimasi|ongkos|bayar/i.test(lastMessageText);
-
     // Prevent tool execution if there are generic services
     const hasGenericService = ctx.serviceTypes.some(s => ['repaint', 'detailing', 'coating'].includes(s.toLowerCase()));
     
@@ -218,18 +215,20 @@ Wajib menghasilkan skema JSON murni dengan properti: intent, internal_thought, m
     
     ctx.isReadyForTools = Boolean(
         classifiedIntent === 'GENERAL_INQUIRY' || 
-        (isBookingOrConsult && !!ctx.vehicleType && ctx.serviceTypes.length > 0 && !hasGenericService && (ctx.missingQuestions.length === 0 || userAskedPrice))
+        (isBookingOrConsult && !!ctx.vehicleType && ctx.serviceTypes.length > 0 && !hasGenericService && ctx.missingQuestions.length === 0)
     );
 
     let replyMode = 'inform';
     if (classifiedIntent === 'GREETING') {
         replyMode = 'greet';
-    } else if (ctx.missingQuestions.length > 0 && !userAskedPrice) {
+    } else if (ctx.missingQuestions.length > 0) {
         replyMode = 'ask';
     } else if (classifiedIntent === 'CONSULTATION') {
         replyMode = 'consult';
     }
 
+    // Track conversation flow (pricing vs general) to preserve context
+    const userAskedPrice = /harga|biaya|tarif|berapa|price|cost|estimasi|ongkos|bayar/i.test(lastMessageText);
     let currentFlow = metadata?.flow || 'general';
     if (
         userAskedPrice || 
