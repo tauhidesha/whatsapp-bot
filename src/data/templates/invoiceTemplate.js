@@ -64,6 +64,7 @@ module.exports = function generateInvoiceHTML(data) {
   return `<div class="invoice-container" style="background: #131313; color: #e5e2e1; font-family: 'Manrope', sans-serif; font-weight: 600; width: 794px; min-height: 1123px; margin: 0 auto; -webkit-print-color-adjust: exact;">
   <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@100..900&family=Manrope:wght@200..800&display=swap" rel="stylesheet"/>
   <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #131313; -webkit-print-color-adjust: exact; }
     .invoice-container * { margin: 0; padding: 0; box-sizing: border-box; color: inherit; }
     @page { margin: 0; size: A4; }
     .margin-top, .margin-bottom {
@@ -110,7 +111,7 @@ module.exports = function generateInvoiceHTML(data) {
         </div>
       </div>
       <div style="text-align:right">
-        <img src="data:image/png;base64,${logoBase64}" style="height:75px; margin-bottom:12px"/>
+        ${logoBase64 ? `<img src="${logoBase64.startsWith('data:') ? logoBase64 : `data:image/png;base64,${logoBase64}`}" style="height:75px; margin-bottom:12px"/>` : ''}
         <div>
           <p class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em">Nomor Dokumen</p>
           <p class="font-headline text-yellow" style="font-size:28px; font-weight:700">#BS-${docNumber ? (docNumber.length > 8 ? docNumber.split('-')[0].toUpperCase() : docNumber.toUpperCase()) : 'DRAFT'}</p>
