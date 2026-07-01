@@ -2,26 +2,25 @@ const { toolsByName } = require('../tools');
 const { getActivePromo } = require('../../utils/promoConfig');
 const { extractTextFromContent } = require('../utils/sanitizeMessages');
 
-// extractTextMessage removed - now using extractTextFromContent from shared utility
-
 /**
  * Node: toolExecutor
  * Mengeksekusi tool berdasarkan intent dan context yang sudah terkumpul.
- * Mendukung multi-service dengan combo discount.
+ * Mendukung multi-service dengan combo discount tanpa mutasi langsung.
  */
 async function toolExecutorNode(state) {
     console.log('--- [EXECUTOR_NODE] Starting ---');
     const { intent, customer } = state;
     const context = state.context || {};
+    
+    // PERBAIKAN BUG-5: Hindari in-place mutation, buat salinan baru
     const contextUpdate = { ...context };
     
-    let toolResult = null;
+    // PERBAIKAN BUG-2: Selalu inisialisasi sebagai objek kosong agar bentuknya konsisten
+    let toolResult = {};
+    toolResult.results = [];
 
     try {
         if (intent === 'GENERAL_INQUIRY' || intent === 'BOOKING_SERVICE') {
-            // Cek harga jika sudah ada layanan & motor
-            // GUARD: Pada GENERAL_INQUIRY, jangan lookup harga kecuali user eksplisit tanya harga
-            // Ini mencegah Zoya kasih harga saat user cuma tanya lokasi/jam buka
             const lastMsgForPrice = state.messages[state.messages.length - 1];
             const lastMsgTextForPrice = extractTextFromContent(
                 lastMsgForPrice?.content || lastMsgForPrice?.kwargs?.content || ''
@@ -32,9 +31,11 @@ async function toolExecutorNode(state) {
             if (shouldLookupPrice && context.serviceTypes?.length > 0 && context.vehicleType) {
                 console.log(`[executorNode] Executing getServiceDetails for ${context.vehicleType} and [${context.serviceTypes.join(', ')}]...`);
                 const tool = toolsByName['getServiceDetails'];
+                
                 if (tool) {
+                    // PERBAIKAN BUG-4: Bungkus setiap external tool dengan try/catch masing-masing
                     try {
-                        toolResult = await tool({
+                        const pricingResult = await tool({
                             service_name: context.serviceTypes,
                             motor_model: context.vehicleType,
                             extraContext: {
@@ -46,26 +47,27 @@ async function toolExecutorNode(state) {
                                 isPreviouslyPainted: context.isPreviouslyPainted
                             }
                         });
+                        
+                        if (pricingResult && pricingResult.results) {
+                            toolResult.results = pricingResult.results;
+                        }
                     } catch (err) {
                         console.error('[executorNode] getServiceDetails failed:', err.message);
-                        if (!toolResult) toolResult = {};
                         toolResult.pricingError = err.message;
                     }
 
-                    // Fetch & apply combo discount if multiple services
-                    if (context.serviceTypes.length >= 2) {
+                    // PERBAIKAN BUG-1: Penghitungan diskon combo yang difilter per item eligible
+                    if (context.serviceTypes.length >= 2 && toolResult.results?.length > 0) {
                         const promo = await getActivePromo();
                         if (promo && promo.comboDiscount > 0 && context.serviceTypes.length >= promo.comboMinServices) {
-                            // Deduplicate results by service_id to prevent double-counting
-                            // (e.g. "Detailing Bodi Halus,Bodi Kasar" can match "Repaint Bodi Halus" again)
-                            const results = toolResult?.results || [];
+                            
+                            // Deduplikasi bodi halus/kasar jika ada double match
                             const seen = new Set();
-                            const uniqueResults = results.filter(r => {
+                            const uniqueResults = toolResult.results.filter(r => {
                                 if (r.service_id && seen.has(r.service_id)) return false;
                                 if (r.service_id) seen.add(r.service_id);
                                 return true;
                             });
-                            // Replace results array with deduplicated version
                             toolResult.results = uniqueResults;
                             
                             const getPrice = (r) => r.final_price || r.price || r.candidates?.[0]?.price || 0;
@@ -73,6 +75,7 @@ async function toolExecutorNode(state) {
                             
                             let totalBefore = 0;
                             let totalAfter = 0;
+                            
                             const breakdown = uniqueResults.map(r => {
                                 const price = getPrice(r);
                                 totalBefore += price;
@@ -101,53 +104,49 @@ async function toolExecutorNode(state) {
                                     total_after: totalAfter,
                                     total_after_formatted: `Rp${totalAfter.toLocaleString('id-ID')}`,
                                 };
-                                console.log(`[executorNode] Combo discount applied.`);
+                                console.log(`[executorNode] Combo discount applied correctly.`);
                             }
                         }
                     }
 
-                    // --- FIX BUG-3: pricingMode determination ---
+                    // PERBAIKAN BUG-3: Penentuan pricingMode secara dinamis dari Executor
                     function isChoosingPaketTier(results) {
                         const groups = {};
                         for (const r of results) {
                             const base = (r.name || '').replace(/\s*-\s*Paket\s+(Premium|Standar|Basic|Ekonomis)/i, '').trim();
                             (groups[base] ||= []).push(r);
                         }
-                        // True HANYA kalau ada kategori dengan >1 kandidat (user belum milih)
                         return Object.values(groups).some(g => g.length > 1);
                     }
-                    if (toolResult?.results) {
+                    
+                    if (toolResult?.results?.length > 0) {
                         toolResult.pricingMode = isChoosingPaketTier(toolResult.results) ? 'choosing_tier' : 'finalized';
                     }
-
-                    console.log(`[executorNode] Tool Result Success: ${toolResult ? 'Yes' : 'No'}`);
                 }
             }
 
-            // --- FIX B: Auto-handover if pricing data not found ---
+            // Fallback Auto-handover jika data esensial tidak ditemukan sama sekali
             if (shouldLookupPrice && context.serviceTypes?.length > 0) {
                 const results = toolResult?.results || [];
                 const hasUsableResult = results.length > 0 && results.some(r => !r.error && r.status !== 'not_found');
                 if (!hasUsableResult) {
-                    console.log(`[executorNode] ⚠️ No pricing data found for [${context.serviceTypes.join(', ')}] + ${context.vehicleType}. Auto-triggering handover...`);
+                    console.log(`[executorNode] ⚠️ No pricing data found. Auto-triggering handover...`);
                     const handoverTool = toolsByName['triggerBosMatTool'];
                     if (handoverTool) {
                         const lastUserMsgRecord = state.messages.slice().reverse().find(m => m.type === 'human' || m.role === 'user');
                         const lastUserMsg = lastUserMsgRecord ? extractTextFromContent(lastUserMsgRecord.content) : 'No text found';
                         const handoffResult = await handoverTool({
-                            reason: `Harga layanan [${context.serviceTypes.join(', ')}] untuk ${context.vehicleType} tidak ditemukan di database. Perlu konfirmasi manual.`,
+                            reason: `Harga layanan [${context.serviceTypes.join(', ')}] untuk ${context.vehicleType} tidak ditemukan.`,
                             customerQuestion: lastUserMsg,
                             senderNumber: state.metadata?.phoneReal || ''
                         });
-                        if (!toolResult) toolResult = { handoff: handoffResult };
-                        else toolResult.handoff = handoffResult;
+                        toolResult.handoff = handoffResult;
                         toolResult.autoHandoverReason = 'no_pricing_data';
                     }
                 }
             }
 
-            // --- COLOR MOCKUP GENERATION ---
-            // Generate AI mockup only when ALL required colors are filled (max 3 per session)
+            // MOCKUP GENERATION
             const MAX_MOCKUPS = 3;
             const serviceTypes = context.serviceTypes || [];
             const wantsBodi = serviceTypes.some(s => s.toLowerCase().includes('repaint') && s.toLowerCase().includes('halus'));
@@ -159,8 +158,6 @@ async function toolExecutorNode(state) {
             const canGenerate = mockupCount < MAX_MOCKUPS;
 
             if (allColorsReady && canGenerate && context.vehicleType) {
-                console.log(`[executorNode] 🎨 All colors ready! Generating mockup (${mockupCount + 1}/${MAX_MOCKUPS})...`);
-                console.log(`[executorNode]   Motor: ${context.vehicleType} | Body: ${context.colorChoice || '-'} | Velg: ${context.velgColorChoice || '-'}`);
                 const mockupTool = toolsByName['generateColorMockup'];
                 if (mockupTool) {
                     try {
@@ -170,119 +167,94 @@ async function toolExecutorNode(state) {
                             velgColor: context.velgColorChoice || undefined,
                             senderNumber: state.metadata?.phoneReal || '',
                         });
-
-                        if (!toolResult) toolResult = { mockup: mockupResult };
-                        else toolResult.mockup = mockupResult;
-
-                        // Increment counter on success
+                        toolResult.mockup = mockupResult;
                         if (mockupResult.success) {
                             contextUpdate.mockupGenerated = mockupCount + 1;
                         }
-                        console.log(`[executorNode] 🎨 Mockup result: ${mockupResult.success ? '✅' : '❌'} (${context.mockupGenerated}/${MAX_MOCKUPS})`);
                     } catch (mockupErr) {
-                        console.error(`[executorNode] 🎨 Mockup generation failed:`, mockupErr.message);
-                        // Non-fatal — don't break the flow, just skip mockup
+                        console.error(`[executorNode] Mockup failed:`, mockupErr.message);
                     }
                 }
             } else if (allColorsReady && !canGenerate && context.vehicleType) {
-                // Limit reached — inform formatter
-                console.log(`[executorNode] 🎨 Mockup limit reached (${mockupCount}/${MAX_MOCKUPS}). Skipping.`);
-                if (!toolResult) toolResult = { mockup: { success: false, limit_reached: true, count: mockupCount, max: MAX_MOCKUPS } };
-                else toolResult.mockup = { success: false, limit_reached: true, count: mockupCount, max: MAX_MOCKUPS };
+                toolResult.mockup = { success: false, limit_reached: true, count: mockupCount, max: MAX_MOCKUPS };
             }
-            
 
-
-            // Cek Booking Availability jika ada tanggal/jam
+            // Booking Availability
             if (context.bookingDate) {
-                console.log(`[executorNode] Checking availability for ${context.bookingDate} at ${context.bookingTime || 'anytime'}...`);
                 const tool = toolsByName['checkBookingAvailability'];
                 if (tool) {
-                    const availResult = await tool({
-                        bookingDate: context.bookingDate,
-                        bookingTime: context.bookingTime || '',
-                        serviceName: context.serviceTypes?.join(', ') || 'Layanan Umum',
-                        estimatedDurationMinutes: context.serviceTypes?.length > 1 ? 240 : 120 // 4h for multi, 2h for single
-                    });
-
-                    // Merge into toolResult or set if toolResult was null
-                    if (!toolResult) toolResult = {};
-                    toolResult.availability = availResult;
+                    try {
+                        toolResult.availability = await tool({
+                            bookingDate: context.bookingDate,
+                            bookingTime: context.bookingTime || '',
+                            serviceName: context.serviceTypes?.join(', ') || 'Layanan Umum',
+                            estimatedDurationMinutes: context.serviceTypes?.length > 1 ? 240 : 120
+                        });
+                    } catch (err) {
+                        console.error('[executorNode] checkBookingAvailability failed:', err.message);
+                    }
                 }
             }
 
-            // Cek Jam Buka/Studio Info (Selalu panggil jika intent GENERAL_INQUIRY atau ada keyword studio)
-            const lastMsgNode = state.messages[state.messages.length - 1];
-            const lastMsgRaw = lastMsgNode.content || (lastMsgNode.kwargs && lastMsgNode.kwargs.content) || lastMsgNode;
-            const lastMsgContent = extractTextFromContent(lastMsgRaw).toLowerCase();
-            const studioKeywords = /lokasi|alamat|dimana|buka|tutup|istirahat|jam berapa|kontak|wa|map|maps|koordinat/i.test(lastMsgContent);
-            
+            // Studio Info & Photo Sending
+            const studioKeywords = /lokasi|alamat|dimana|buka|tutup|jam berapa|map|maps/i.test(lastMsgTextForPrice);
             if (intent === 'GENERAL_INQUIRY' || studioKeywords) {
                 const tool = toolsByName['getStudioInfo'];
                 if (tool) {
-                    const studioResult = await tool({});
-                    if (!toolResult) toolResult = {};
-                    toolResult.studioInfo = studioResult;
+                    try {
+                        toolResult.studioInfo = await tool({});
+                    } catch (err) {
+                        console.error('[executorNode] getStudioInfo failed:', err.message);
+                    }
                 }
 
-                // --- PHOTO SENDING LOGIC (Nearby/Confused) ---
-                const locationConfusionKeywords = /bingung|nyasar|depan|dimananya|liat tempatnya|foto|sebelah|patokan|pintu/i.test(lastMsgContent);
+                const locationConfusionKeywords = /bingung|nyasar|depan|dimananya|patokan/i.test(lastMsgTextForPrice);
                 if (locationConfusionKeywords) {
-                    console.log(`[executorNode] Location confusion detected. Triggering sendStudioPhoto...`);
                     const photoTool = toolsByName['sendStudioPhoto'];
                     if (photoTool) {
-                        const photoResult = await photoTool({
-                            senderNumber: state.metadata?.phoneReal || ''
-                        });
-                        
-                        if (!toolResult) toolResult = {};
-                        toolResult.studioPhoto = photoResult;
+                        try {
+                            toolResult.studioPhoto = await photoTool({ senderNumber: state.metadata?.phoneReal || '' });
+                        } catch (err) {
+                            console.error('[executorNode] sendStudioPhoto failed:', err.message);
+                        }
                     }
                 }
             }
         }
 
-        // --- FIX A: Standalone HUMAN_HANDOVER trigger (works for ANY intent) ---
+        // Standalone Human Handover
         const isCar = context.vehicleType === 'Mobil';
         if ((intent === 'HUMAN_HANDOVER' || isCar) && !toolResult?.handoff) {
-            console.log(`[executorNode] Triggering HUMAN HANDOVER (Reason: ${isCar ? 'Car Inquiry' : 'User Request'})...`);
             const handoverTool = toolsByName['triggerBosMatTool'];
             if (handoverTool) {
                 const lastUserMsgRecord = state.messages.slice().reverse().find(m => m.type === 'human' || m.role === 'user');
                 const lastUserMsg = lastUserMsgRecord ? extractTextFromContent(lastUserMsgRecord.content) : 'No text found';
-                const handoffResult = await handoverTool({
-                    reason: isCar ? 'Tanya repaint/detailing Mobil (perlu konfirmasi bos)' : 'User minta bantuan admin/human handover',
+                toolResult.handoff = await handoverTool({
+                    reason: isCar ? 'Tanya servis Mobil (luar scope utama)' : 'User request handover',
                     customerQuestion: lastUserMsg,
                     senderNumber: state.metadata?.phoneReal || ''
                 });
-                if (!toolResult) toolResult = { handoff: handoffResult };
-                else toolResult.handoff = handoffResult;
-                console.log(`[executorNode] Handover Success: ${handoffResult.success}`);
             }
         }
 
-        // Fetch active promo to be available globally in context
         const activePromo = await getActivePromo();
-        
-        let comboPromo = null;
-        if (context.serviceTypes?.length === 1 && !context.comboOffered) {
-            comboPromo = activePromo;
-        }
+        const comboPromo = (context.serviceTypes?.length === 1 && !context.comboOffered) ? activePromo : null;
 
         return {
-            context: Object.keys(contextUpdate).length > 0 ? contextUpdate : context,
+            context: contextUpdate,
             metadata: {
                 ...state.metadata,
                 toolResult: toolResult,
                 activePromo: activePromo,
-                comboPromo: comboPromo // Pass to formatter for proactive offer
+                comboPromo: comboPromo
             }
         };
 
     } catch (error) {
-        console.error('[toolExecutorNode] Error:', error);
+        console.error('[toolExecutorNode] Critical Error:', error);
+        // PERBAIKAN BUG-4: Selalu return context lama dan jangan mereset state saat error besar terjadi
         return {
-            context: typeof contextUpdate !== 'undefined' ? contextUpdate : (state.context || {}),
+            context: context,
             metadata: {
                 ...state.metadata,
                 toolError: error.message
