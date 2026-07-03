@@ -193,7 +193,7 @@ Mode INFORM: "siapp mas! untuk *nmax bodi halus* estimasi harganya *rp1.200.000*
         ]), { maxRetries: 3, baseDelayMs: 1500 });
 
         const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Formatter timeout after 60s')), 60000)
+            setTimeout(() => reject(new Error('Formatter timeout after 120s')), 120000)
         );
 
         const response = await Promise.race([invokePromise, timeoutPromise]);
