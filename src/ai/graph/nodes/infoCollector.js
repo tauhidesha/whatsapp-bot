@@ -322,7 +322,9 @@ Output: {
             }
             if (svc === 'detailing') {
                 if (ctx.detailingFocus || ctx.isBongkarTotal) {
-                    let focus = (ctx.detailingFocus || '').toLowerCase();
+                    let focusRaw = ctx.detailingFocus;
+                    let focusStr = typeof focusRaw === 'string' ? focusRaw : (Array.isArray(focusRaw) ? focusRaw.join(' ') : String(focusRaw || ''));
+                    let focus = focusStr.toLowerCase();
                     if (focus.includes('full') || ctx.isBongkarTotal) {
                          ctx.serviceTypes[i] = "Full Detailing";
                     } else {
