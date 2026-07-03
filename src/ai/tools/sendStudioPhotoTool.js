@@ -15,8 +15,8 @@ const sendStudioPhotoSchema = z.object({
 });
 
 const DEFAULT_CAPTION = `${studioMetadata.name}, ${studioMetadata.location.address}. Mohon kabari sebelum tiba agar tim siap menyambut.`;
-const STUDIO_PHOTO_PATH = path.resolve(__dirname, '../../../data/bosmat-garasi-54.png');
-const STUDIO_PHOTO_FILENAME = 'bosmat-garasi-54.png';
+const STUDIO_PHOTO_PATH = path.resolve(__dirname, '../../../data/bosmat-studio.png');
+const STUDIO_PHOTO_FILENAME = 'bosmat-studio.png';
 const SUPPORTED_META_CHANNELS = new Set(['instagram', 'messenger']);
 
 function parseRecipientIdentity(rawValue) {
@@ -136,13 +136,13 @@ const sendStudioPhotoTool = {
     type: 'function',
     function: {
       name: 'sendStudioPhoto',
-      description: `Kirim foto eksterior Bosmat (berlokasi di ${studioMetadata.location.address}) ke pelanggan via WhatsApp. Gunakan saat pelanggan sulit menemukan lokasi.`,
+      description: 'Kirim foto penampakan depan Bosmat Repaint Detailing Studio agar pelanggan mudah mencari lokasi',
       parameters: {
         type: 'object',
         properties: {
           caption: {
             type: 'string',
-            description: 'Caption opsional yang akan disertakan bersama foto.',
+            description: 'Caption opsional yang akan disertakan bersama foto. Contoh: "Ini penampakan lokasi Bosmat Repaint Detailing Studio dari depan ya kak..."',
           },
         },
       },

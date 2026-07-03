@@ -5,13 +5,13 @@
  */
 
 const studioMetadata = {
-  name: 'Bosmat x Garasi 54',
+  name: 'Bosmat Repaint Detailing Studio',
   shortName: 'Bosmat',
   location: {
-    address: 'Jl. Raden Sanim No.99, Tanah Baru, Kecamatan Beji, Kota Depok, Jawa Barat 16426',
-    landmark: 'Dekat Sekolah Tunas Iblam',
+    address: 'Bukit Cengkeh 1, Jl. Medan No.B3/2, Tugu, Kec. Cimanggis, Kota Depok, Jawa Barat 16451',
+    landmark: 'Dekat gapura bukit cengkeh 1',
     googleMaps: 'https://maps.app.goo.gl/m71ihhee1q9XVveu5',
-    directions: 'Langsung menuju Jl. Raden Sanim No.99, Tanah Baru. Patokannya dekat dengan Sekolah Tunas Iblam.',
+    directions: 'patokan dari gapura bukit cengkeh 1 masuk ada perempatan pertama belok kanan. lokasi disebelah kiri rumah hijau b3/2. jika sudah sampai bisa panggil dari luar atau call wa. portal jalan medan kadang ditutup. masuk bisa dari jalan padang atau bengkulu',
   },
   contact: {
     phone: '0895401527556',
