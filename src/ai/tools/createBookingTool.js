@@ -224,7 +224,7 @@ const createBookingTool = {
         };
       }
 
-      const normalizedPhone = getIdentifier(customerPhone) || customerPhone;
+      const normalizedPhone = getIdentifier(customerPhone);
 
       const { parseDateTime } = require('../utils/dateTime');
       let finalDate = bookingDate;

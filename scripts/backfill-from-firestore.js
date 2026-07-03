@@ -43,17 +43,32 @@ async function backfill() {
             console.log(`\n👤 Processing: ${phone} (${convData.name || 'No Name'})`);
 
             // 2. Ensure Customer exists in Prisma
-            const customer = await prisma.customer.upsert({
-                where: { phone },
-                create: {
-                    phone,
-                    name: convData.name || null,
-                    whatsappLid: rawId.endsWith('@lid') ? rawId : null
-                },
-                update: {
-                    whatsappLid: rawId.endsWith('@lid') ? rawId : undefined
+            let customer = await prisma.customer.findFirst({
+                where: {
+                    OR: [
+                        { phone },
+                        { phone: rawId },
+                        { whatsappLid: rawId }
+                    ]
                 }
             });
+
+            if (customer) {
+                if (rawId.endsWith('@lid') && !customer.whatsappLid) {
+                    customer = await prisma.customer.update({
+                        where: { id: customer.id },
+                        data: { whatsappLid: rawId }
+                    });
+                }
+            } else {
+                customer = await prisma.customer.create({
+                    data: {
+                        phone: rawId, // Keep rawId format to match webhook behavior
+                        name: convData.name || null,
+                        whatsappLid: rawId.endsWith('@lid') ? rawId : null
+                    }
+                });
+            }
 
             // 3. Ambil sub-collection 'messages'
             const messagesSnapshot = await db.collection('directMessages').doc(rawId).collection('messages').orderBy('timestamp', 'asc').get();
