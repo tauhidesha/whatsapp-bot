@@ -34,7 +34,7 @@ async function initNode(state) {
         console.log('[INIT_NODE] No phoneReal, using default Stranger.');
         return { 
             isAdmin: false,
-            customer: { name: metadata?.senderName || 'Stranger' },
+            customer: { name: 'Stranger' },
             metadata: { ...metadata, currentDateTime }
         };
     }
@@ -44,7 +44,7 @@ async function initNode(state) {
             return {
                 isAdmin: isAdmin,
                 customer: {
-                    name: isAdmin ? 'Admin' : (metadata?.senderName || 'Guest'),
+                    name: isAdmin ? 'Admin' : 'Guest',
                     status: 'new'
                 },
                 metadata: { ...metadata, currentDateTime }
@@ -64,7 +64,7 @@ async function initNode(state) {
             return {
                 isAdmin: isAdmin,
                 customer: {
-                    name: isAdmin ? 'Admin' : (metadata?.senderName || 'Guest'),
+                    name: isAdmin ? 'Admin' : 'Guest',
                     status: 'new'
                 },
                 metadata: { ...metadata, currentDateTime }
@@ -78,7 +78,7 @@ async function initNode(state) {
             isAdmin: isAdmin,
             customer: {
                 id: customer.id,
-                name: customer.name || (isAdmin ? 'Admin' : (metadata?.senderName || `Sobat ${studioMetadata.shortName}`)),
+                name: customer.name || (isAdmin ? 'Admin' : `Sobat ${studioMetadata.shortName}`),
                 phone: customer.phone,
                 status: customer.status,
                 vehicles: customer.vehicles.map(v => ({
@@ -98,7 +98,7 @@ async function initNode(state) {
                 paintType: context.paintType || dbCtx.paintType || null,
                 isBongkarTotal: context.isBongkarTotal !== null ? context.isBongkarTotal : (dbCtx.isBongkarTotal ?? null),
                 serviceDetail: context.serviceDetail || dbCtx.serviceDetail || null,
-                isReadyForTools: false
+                isReadyForTools: context.isReadyForTools || (dbCtx.conversationStage === 'ready')
             },
             metadata: {
                 ...metadata,
@@ -110,7 +110,7 @@ async function initNode(state) {
         console.error('[initNode] Error loading customer:', error);
         return { 
             isAdmin: isAdmin,
-            customer: { name: metadata?.senderName || `Sobat ${studioMetadata.shortName}` },
+            customer: { name: `Sobat ${studioMetadata.shortName}` },
             metadata: { ...metadata, currentDateTime }
         };
     }

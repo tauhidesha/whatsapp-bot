@@ -33,10 +33,10 @@ const masterLayanan = [
     usesModelPricing: true,
   },
   {
-    name: "Repaint Part Satuan",
+    name: "Repaint Cover CVT / Arm",
     category: "repaint",
-    summary: "Cat ulang part kecil satuan: CVT, Arm, Bottom Shock Depan, atau Behel.",
-    description: "Pengecatan ulang per bagian kecil motor. Harga flat Rp150.000 per part, berlaku untuk: Cover CVT, Swing Arm, Bottom Shock Depan, Behel. Harga belum termasuk bongkar pasang jika diperlukan.",
+    summary: "Segarkan tampilan area mesin dan arm motormu dengan pengecatan ulang.",
+    description: "Pengecatan ulang bagian cover CVT atau swing arm. Harga sama untuk kebanyakan motor.",
     price: 150000,
     estimatedDuration: "480"
   },
@@ -158,39 +158,7 @@ const masterLayanan = [
     description: "Pengecatan ulang hanya pada bagian yang lecet atau baret (tidak satu panel penuh). Sangat efisien untuk perbaikan kecil agar tampilan motor kembali rapi tanpa harus cat full. Harga bervariasi tergantung warna dan tingkat kerusakan.\n\nEstimasi pengerjaan: 1–2 hari kerja.",
     price: 0,
     estimatedDuration: "480",
-    note: "Harga mulai dari Rp150.000 - Rp250.000 per panel (tergantung warna & kondisi)."
-  },
-  {
-    name: "Repaint Cover CVT",
-    category: "repaint",
-    summary: "Cat ulang cover CVT motor agar kembali bersih dan segar.",
-    description: "Pengecatan ulang cover CVT motor. Estimasi pengerjaan: 1-2 hari kerja.",
-    price: 200000,
-    estimatedDuration: "480"
-  },
-  {
-    name: "Repaint Arm",
-    category: "repaint",
-    summary: "Cat ulang swing arm motor agar terbebas dari kusam dan karat.",
-    description: "Pengecatan ulang swing arm motor. Estimasi pengerjaan: 1-2 hari kerja.",
-    price: 150000,
-    estimatedDuration: "480"
-  },
-  {
-    name: "Repaint Bottom Shock Depan",
-    category: "repaint",
-    summary: "Cat ulang bottom shock depan (sepasang) agar kaki-kaki kembali mulus.",
-    description: "Pengecatan ulang sepasang bottom shock depan motor. Estimasi pengerjaan: 1-2 hari kerja.",
-    price: 150000,
-    estimatedDuration: "480"
-  },
-  {
-    name: "Repaint Behel",
-    category: "repaint",
-    summary: "Cat ulang behel/planger belakang motor.",
-    description: "Pengecatan ulang behel/planger belakang motor. Estimasi pengerjaan: 1-2 hari kerja.",
-    price: 150000,
-    estimatedDuration: "480"
+    note: "Harga mulai dari Rp75.000 - Rp150.000 per spot (tergantung warna & kondisi)."
   }
 ];
 

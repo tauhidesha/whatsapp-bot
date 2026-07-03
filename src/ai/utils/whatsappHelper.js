@@ -1,31 +1,30 @@
 /**
  * WhatsApp Helper Utilities
- * Provides optimized methods to interact with Baileys
+ * Provides optimized methods to interact with WPPConnect
  */
 
 /**
- * Direct send message
+ * Direct send without fetch by ID (Bypass WPPConnect sendText double-evaluate)
+ * This avoids CDP timeouts on @lid identifiers by bypassing getMessageById.
  * 
- * @param {object} client - Baileys socket instance
- * @param {string} to - Destination ID (@s.whatsapp.net or @lid)
+ * @param {object} client - WPPConnect client instance
+ * @param {string} to - Destination ID (@c.us or @lid)
  * @param {string} content - Message content
  * @returns {Promise<any>}
  */
 async function sendTextDirect(client, to, content) {
-    if (!client) {
-        throw new Error('WhatsApp client not available');
+    if (!client || !client.page) {
+        throw new Error('WhatsApp client/page not available');
     }
     
-    console.log(`[Baileys] Attempting to send message to: ${to}`);
-    try {
-        const result = await client.sendMessage(to, { text: content });
-        // Hanya log status dasar agar tidak terlalu panjang di console
-        console.log(`[Baileys] Successfully sent message to ${to}. Status: ${result?.status || 'SENT'}`);
-        return result;
-    } catch (err) {
-        console.error(`[Baileys] ERROR sending message to ${to}:`, err.message || err);
-        throw err;
-    }
+    // Bypass wppconnect's sendText yang double-evaluate (send + getMessageById)
+    // Langsung pakai WPP.chat.sendTextMessage via page.evaluate
+    const { evaluateAndReturn } = require('@wppconnect-team/wppconnect/dist/api/helpers');
+    return evaluateAndReturn(
+        client.page,
+        ({ to, content }) => WPP.chat.sendTextMessage(to, content, { waitForAck: false }),
+        { to, content }
+    );
 }
 
 module.exports = {

@@ -114,14 +114,10 @@ const generateDocumentTool = {
     // Auto-fix WID suffix: ONLY if missing '@'
     if (targetRecipient && typeof targetRecipient === 'string' && !targetRecipient.includes('@')) {
       let cleaned = targetRecipient.replace(/\D/g, '');
-      if (cleaned.length >= 14 && ['1', '2'].includes(cleaned[0])) {
-        targetRecipient = cleaned + '@lid';
-      } else {
-        if (cleaned.startsWith('0')) {
-          cleaned = '62' + cleaned.substring(1);
-        }
-        targetRecipient = cleaned + '@c.us';
+      if (cleaned.startsWith('0')) {
+        cleaned = '62' + cleaned.substring(1);
       }
+      targetRecipient = cleaned + '@c.us';
     }
 
     // Auto-Calculate Price if totalAmount is 0/missing, or enrich items with descriptions
@@ -321,17 +317,11 @@ const generateDocumentTool = {
         headless: 'new'
       });
       const page = await browser.newPage();
-      await page.setViewport({
-        width: 794,
-        height: 1123,
-        deviceScaleFactor: 2
-      });
       await page.setContent(html, { waitUntil: 'networkidle0' });
       await page.pdf({
         path: filePath,
         format: 'A4',
         printBackground: true,
-        preferCSSPageSize: true,
         margin: { top: '0px', bottom: '0px', left: '0px', right: '0px' }
       });
       await browser.close();
@@ -364,17 +354,11 @@ const generateDocumentTool = {
         headless: 'new'
       });
       const page = await browser.newPage();
-      await page.setViewport({
-        width: 794,
-        height: 1123,
-        deviceScaleFactor: 2
-      });
       await page.setContent(html, { waitUntil: 'networkidle0' });
       await page.pdf({
         path: filePath,
         format: 'A4',
         printBackground: true,
-        preferCSSPageSize: true,
         margin: {
           top: '0px',
           bottom: '0px',
@@ -414,14 +398,11 @@ const generateDocumentTool = {
         markBotMessage(targetRecipient, fileCaption);
 
         try {
-          await global.whatsappClient.sendMessage(
+          await global.whatsappClient.sendFile(
             targetRecipient,
-            {
-              document: { url: filePath },
-              mimetype: 'application/pdf',
-              fileName: `${title}_${customerName}.pdf`,
-              caption: fileCaption
-            }
+            filePath,
+            `${title}_${customerName}.pdf`,
+            fileCaption
           );
         } catch (initialError) {
           // FALLBACK LOGIC: If sending to LID or @c.us fails, try the alternative
@@ -462,14 +443,11 @@ const generateDocumentTool = {
             if (fallbackTarget && fallbackTarget !== targetRecipient) {
               console.log(`[generateDocument] Retrying with fallback: ${fallbackTarget}`);
               markBotMessage(fallbackTarget, fileCaption);
-              await global.whatsappClient.sendMessage(
+              await global.whatsappClient.sendFile(
                 fallbackTarget,
-                {
-                  document: { url: filePath },
-                  mimetype: 'application/pdf',
-                  fileName: `${title}_${customerName}.pdf`,
-                  caption: fileCaption
-                }
+                filePath,
+                `${title}_${customerName}.pdf`,
+                fileCaption
               );
               // Update targetRecipient for the return success message
               targetRecipient = fallbackTarget;

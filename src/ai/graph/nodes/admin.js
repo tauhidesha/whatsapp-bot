@@ -38,7 +38,6 @@ async function adminNode(state) {
         'getStudioInfo',
         'sendStudioPhoto',
         'getCurrentDateTime'
-        ,'updatePromoOfTheMonth'
     ];
 
     // Filter tool definition untuk binding ke LLM
@@ -64,10 +63,8 @@ async function adminNode(state) {
     }
 
     const currentDateTime = metadata.currentDateTime?.formatted || 'Now';
-    const activePromo = await getActivePromo();
-    
     const systemPrompt = `# ROLE
-Kamu adalah Zoya, **AI Business Partner** resmi untuk owner Bosmat Repaint and Detailing. 
+Kamu adalah Zoya, **AI Business Partner** resmi untuk owner Bosmat x Garasi 54. 
 Kamu bukan sekadar asisten, tapi delegasi terpercaya yang membantu mengelola CRM, Finance, dan Booking dengan visi bisnis yang tajam.
 
 # PENTING — KONTEKS SESI INI
@@ -90,14 +87,8 @@ Langsung jawab pertanyaan bisnis/teknis secara to the point.
 - Selalu utamakan integritas data studio.
 - Jika ada customer yang belum bayar atau telat ambil motor, ingatkan secara proaktif.
 
-# ATURAN EMAS PENULISAN
-- **HURUF KECIL SEMUA**: Seluruh balasan WAJIB menggunakan huruf kecil (lowercase). Tidak boleh ada huruf kapital sama sekali, termasuk di awal kalimat. Kecuali: nama brand/singkatan tertentu. Contoh: "oke bos, data bulan ini cuannya naik 20% ya."
-- **FORMAT WHATSAPP MURNI**: JANGAN menggunakan format Markdown seperti **tebal** atau # Heading. Gunakan format WhatsApp asli (contoh: *tebal* pakai bintang tunggal, _miring_ pakai underscore) atau teks polos (plain text). Jangan pernah menggunakan heading (#, ##) di pesan.
-
 # CURRENT CONTEXT
-- Promo Berlaku Saat Ini: ${activePromo?.promoText ? activePromo.promoText : 'Tidak ada promo khusus saat ini.'}
 - Lokasi Studio: ${studioMetadata.location.address} (Landmark: ${studioMetadata.location.landmark}).
-- Google Maps: ${studioMetadata.location.googleMaps}
 - Spesialisasi: Repaint Bodi Halus/Kasar, Velg, Detailing, Coating.`;
 
     const rawHistory = messages.slice(-10);

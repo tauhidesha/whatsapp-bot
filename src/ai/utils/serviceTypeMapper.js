@@ -9,10 +9,6 @@ const SERVICE_TYPE_MAP = {
     'Repaint Bodi Kasar':       'repaint',
     'Repaint Velg':             'repaint',
     'Repaint Cover CVT / Arm':  'repaint',
-    'Repaint Cover CVT':        'repaint',
-    'Repaint Arm':              'repaint',
-    'Repaint Bottom Shock Depan': 'repaint',
-    'Repaint Behel':            'repaint',
     'Spot Repair':              'repaint',
 
     // Detailing

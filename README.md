@@ -169,7 +169,7 @@ PORT=4000
 NODE_ENV=development
 
 # Debouncing
-DEBOUNCE_DELAY_MS=20000
+DEBOUNCE_DELAY_MS=15000
 
 # Firebase (Optional)
 FIREBASE_SERVICE_ACCOUNT_BASE64=your_base64_key
@@ -372,7 +372,7 @@ Setel ke `false` bila ingin pesan admin dikirim apa adanya.
 ### Custom Debounce Time:
 Edit `.env`:
 ```env
-DEBOUNCE_DELAY_MS=20000  # 20 seconds
+DEBOUNCE_DELAY_MS=10000  # 10 seconds
 ```
 
 ### Custom AI Model:

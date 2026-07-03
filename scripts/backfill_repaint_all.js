@@ -26,44 +26,6 @@ function isMatch(dbModel, item) {
     return false;
 }
 
-/**
- * Score-based matching: returns a numeric score (0 = no match, 100 = exact).
- * Prefers exact model name matches over fuzzy alias matches.
- */
-function matchScore(dbModel, item) {
-    const dbName = dbModel.modelName.toLowerCase();
-    const dbAliases = dbModel.aliases.map(a => a.toLowerCase());
-    const itemModel = item.model.toLowerCase();
-    const itemAliases = (item.aliases || []).map(a => a.toLowerCase());
-    const allDbNames = [dbName, ...dbAliases];
-    const allItemNames = [itemModel, ...itemAliases];
-
-    // Exact model name match = highest priority
-    if (dbName === itemModel) return 100;
-    if (dbAliases.includes(itemModel) || itemAliases.includes(dbName)) return 90;
-
-    // Exact alias-to-alias match
-    for (const d of allDbNames) {
-        if (allItemNames.includes(d)) return 85;
-    }
-
-    // Substring match — score by how closely the lengths match (penalize partial matches)
-    let bestSubScore = 0;
-    for (const d of allDbNames) {
-        for (const i of allItemNames) {
-            if (i.includes(d) || d.includes(i)) {
-                const shorter = Math.min(d.length, i.length);
-                const longer = Math.max(d.length, i.length);
-                const ratio = shorter / longer; // 1.0 = identical length, 0.x = partial
-                const score = Math.round(50 + ratio * 30); // Range: 50-80
-                if (score > bestSubScore) bestSubScore = score;
-            }
-        }
-    }
-
-    return bestSubScore;
-}
-
 function getVelgPrice(dbModel) {
     const dbNames = [dbModel.modelName.toLowerCase(), ...dbModel.aliases.map(a => a.toLowerCase())];
     
@@ -126,15 +88,14 @@ async function main() {
   console.log(`\n=== STEP 2: BACKFILL REPAINT BODI HALUS UNTUK SEMUA MODEL ===`);
   let bodiFilled = 0;
   for (const model of models) {
-      // Find BEST matching price from repaintPrices (not just first match)
+      // Find matching price from repaintPrices
       let bestMatchItem = null;
-      let bestScore = 0;
-
       for (const item of repaintBodiHalus) {
-          const score = matchScore(model, item);
-          if (score > bestScore) {
-              bestScore = score;
+          if (isMatch(model, item)) {
+              // we take the first match.
+              // For "cbr 150", it will match "cbr".
               bestMatchItem = item;
+              break;
           }
       }
 
@@ -206,21 +167,16 @@ async function main() {
           });
           console.log(`[SURCHARGE] Created ${w.type} (+${w.surcharge})`);
           surchargesUpserted++;
-      } else {
-          // Always update amount and aliases to stay in sync with seed data
-          const aliasesChanged = JSON.stringify(existing.aliases?.sort()) !== JSON.stringify(w.aliases.sort());
-          const amountChanged = existing.amount !== w.surcharge;
-          if (amountChanged || aliasesChanged) {
-              await prisma.surcharge.update({
-                  where: { id: existing.id },
-                  data: {
-                      amount: w.surcharge,
-                      aliases: w.aliases
-                  }
-              });
-              console.log(`[SURCHARGE] Updated ${w.type} (amount=${amountChanged ? w.surcharge : 'same'}, aliases=${aliasesChanged ? 'updated' : 'same'})`);
-              surchargesUpserted++;
-          }
+      } else if (existing.amount !== w.surcharge) {
+          await prisma.surcharge.update({
+              where: { id: existing.id },
+              data: {
+                  amount: w.surcharge,
+                  aliases: w.aliases
+              }
+          });
+          console.log(`[SURCHARGE] Updated ${w.type} (+${w.surcharge})`);
+          surchargesUpserted++;
       }
   }
 

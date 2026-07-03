@@ -41,7 +41,7 @@ async function sendWhatsappNotification(message) {
   }
 
   const client = global.whatsappClient;
-  if (!client || typeof client.sendMessage !== 'function') {
+  if (!client || typeof client.sendText !== 'function') {
     console.warn('[humanHandover] whatsappClient belum tersedia. Notifikasi WA tidak dikirim.');
     return;
   }
@@ -271,7 +271,7 @@ async function clearSnoozeMode(senderNumber) {
   const phone = identifier.replace(/@c\.us$|@lid$/, '');
   
   try {
-    await prisma.handoverSnooze.deleteMany({ where: { id: identifier } });
+    await prisma.handoverSnooze.delete({ where: { id: identifier } }).catch(() => {});
     
     // Sync to Customer table
     try {

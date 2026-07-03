@@ -16,17 +16,8 @@ module.exports = function generateInvoiceHTML(data) {
   const dp = Number(downPayment) || 0;
   const totalPaid = Number(amountPaid) || 0;
 
-  // Prevent double-counting: if dp and amountPaid are the same value,
-  // they refer to the same payment (AI filled both fields with the same number).
-  // Only add them when they are genuinely different amounts.
-  const actualTotalPaid = (dp > 0 && totalPaid > 0 && dp === totalPaid)
-    ? dp           // same value → count once
-    : dp + totalPaid; // different → DP + additional payment
-
-  // Total setelah diskon
-  const grandTotal = subtotal - discountAmount;
-  // Sisa Tagihan = Total Keseluruhan - Total yang sudah dibayar
-  const balance = Math.max(0, Math.round(grandTotal - actualTotalPaid));
+  // Sisa Tagihan = (Subtotal - Diskon) - DP - Bayar Hari Ini
+  const balance = Math.max(0, Math.round(subtotal - discountAmount - dp - totalPaid));
 
   // Clean recipient number - prefer realPhone (actual WA number) over @lid
   const displayPhone = realPhone
@@ -37,13 +28,13 @@ module.exports = function generateInvoiceHTML(data) {
       .replace(/^62/, '0');
 
   // Parse items jadi array - Split by newline ONLY
-  const itemsList = (items || '').split('\n').map((i) => i.trim()).filter(Boolean);
+  const itemsList = (items || '').split('\n').map(i => i.trim()).filter(Boolean);
 
   // Filter redundant notes
   let filteredNotes = notes || '-';
   if (filteredNotes && filteredNotes !== '-' && filteredNotes.match(/^Layanan:\s*/i)) {
     const headerRemoved = filteredNotes.replace(/^Layanan:\s*/i, '').trim();
-    const itemsSummary = itemsList.map((i) => i.split('||')[0].trim()).join(', ');
+    const itemsSummary = itemsList.map(i => i.split('||')[0].trim()).join(', ');
     if (headerRemoved === itemsSummary) {
       filteredNotes = '';
     } else {
@@ -53,38 +44,53 @@ module.exports = function generateInvoiceHTML(data) {
 
   const notesList = (filteredNotes && filteredNotes !== '-')
     ? filteredNotes.split('\n')
-      .map((n) => n.trim())
-      .filter((n) => n
+      .map(n => n.trim())
+      .filter(n => n
         && !n.match(/^Layanan:?$/i)
         && !n.includes('||')              // filter raw item strings
         && !n.match(/^[●•\-*]\s*.+\|\|/) // filter bullet + item format
       )
     : [];
 
-  return `<div class="invoice-container" style="background: #131313; color: #e5e2e1; font-family: 'Manrope', sans-serif; font-weight: 600; width: 100%; min-height: 297mm; margin: 0; -webkit-print-color-adjust: exact;">
+  return `<!DOCTYPE html>
+<html class="dark">
+<head>
+  <meta charset="utf-8"/>
   <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@100..900&family=Manrope:wght@200..800&display=swap" rel="stylesheet"/>
   <style>
-    html, body { margin: 0; padding: 0; width: 100%; min-height: 297mm; background: #131313 !important; -webkit-print-color-adjust: exact; }
-    html::before { content: ''; position: fixed; top: -6px; left: -6px; right: -6px; bottom: -6px; background: #131313; z-index: -1; }
-    .invoice-container * { margin: 0; padding: 0; box-sizing: border-box; color: inherit; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     @page { margin: 0; size: A4; }
+    html { background: #131313; -webkit-print-color-adjust: exact; }
+    body {
+      background: #131313;
+      color: #e5e2e1;
+      font-family: 'Manrope', sans-serif;
+      padding: 0;
+      width: 794px; /* A4 width in px at 96dpi */
+      margin: 0 auto;
+      -webkit-print-color-adjust: exact;
+    }
+    .page-wrap {
+      padding: 40px;
+      background: #131313;
+    }
     .margin-top, .margin-bottom {
-      height: 10px;
+      height: 40px;
       background: #131313;
     }
     
     .font-headline { font-family: 'League Spartan', sans-serif; }
-    .text-yellow { color: #FFFF00 !important; }
-    .bg-dark { background: #1c1b1b !important; }
-    .bg-darker { background: #0e0e0e !important; }
-    .text-muted { color: #cac8aa !important; }
-    .border-yellow { border-left: 2px solid #FFFF00 !important; }
+    .text-yellow { color: #FFFF00; }
+    .bg-dark { background: #1c1b1b; }
+    .bg-darker { background: #0e0e0e; }
+    .text-muted { color: #cac8aa; }
+    .border-yellow { border-left: 2px solid #FFFF00; }
     
     .items-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
     .items-table thead { display: table-header-group; }
     
     .item-row td {
-      padding: 10px 12px;
+      padding: 28px 16px;
       border-bottom: 1px solid rgba(255,255,255,0.05);
       vertical-align: middle;
     }
@@ -93,29 +99,35 @@ module.exports = function generateInvoiceHTML(data) {
     .totals-section {
       page-break-inside: avoid;
     }
+    
+    @media print {
+      body { background: #131313; }
+    }
   </style>
+</head>
+<body>
   <table style="width:100%; border-collapse:collapse; background:#131313;">
     <thead><tr><td class="margin-top"></td></tr></thead>
-    <tbody><tr><td style="padding: 0 24px; background:#131313;">
+    <tbody><tr><td style="padding: 0 40px; background:#131313;">
 
     <!-- Header -->
-    <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:20px">
+    <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:60px">
       <div>
-        <h1 class="font-headline" style="font-size:56px; font-weight:900; line-height:0.8; text-transform:uppercase; margin-bottom:16px">
+        <h1 class="font-headline" style="font-size:48px; font-weight:900; line-height:0.8; text-transform:uppercase; margin-bottom:16px">
           ${documentType === 'tanda_terima' ? 'Receipt' : documentType === 'bukti_bayar' ? 'Payment' : 'Invoice'}<br/>
           <span class="text-yellow">Repaint &<br/>Detailing</span>
         </h1>
-        <div style="display:flex; gap:12px; margin-top:20px">
-          <span style="background:#676700; color:#e6e67a; padding:6px 14px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em">
-            Status: ${actualTotalPaid >= grandTotal ? 'Lunas' : actualTotalPaid > 0 ? 'DP' : 'Belum Bayar'}
+        <div style="display:flex; gap:12px; margin-top:16px">
+          <span style="background:#676700; color:#e6e67a; padding:4px 12px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em">
+            Status: ${(totalPaid) >= (subtotal - discountAmount) ? 'Lunas' : (totalPaid) > 0 ? 'DP' : 'Belum Bayar'}
           </span>
         </div>
       </div>
       <div style="text-align:right">
-        ${logoBase64 ? `<img src="${logoBase64.startsWith('data:') ? logoBase64 : `data:image/png;base64,${logoBase64}`}" style="height:75px; margin-bottom:12px"/>` : ''}
+        <img src="${logoBase64}" style="height:60px; margin-bottom:24px"/>
         <div>
           <p class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em">Nomor Dokumen</p>
-          <p class="font-headline text-yellow" style="font-size:28px; font-weight:700">#BS-${docNumber ? (docNumber.length > 8 ? docNumber.split('-')[0].toUpperCase() : docNumber.toUpperCase()) : 'DRAFT'}</p>
+          <p class="font-headline text-yellow" style="font-size:28px; font-weight:700">#BS-${docNumber || 'PREVIEW'}</p>
         </div>
         <div style="margin-top:16px">
           <p class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em">Tanggal Terbit</p>
@@ -125,8 +137,8 @@ module.exports = function generateInvoiceHTML(data) {
     </div>
 
     <!-- Info Section -->
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1px; background:#484831; margin-bottom:18px">
-      <div class="bg-dark" style="padding:20px">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1px; background:#484831; margin-bottom:60px">
+      <div class="bg-dark" style="padding:28px">
         <p class="text-yellow" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.2em; margin-bottom:20px">Informasi Pelanggan</p>
         <p class="font-headline" style="font-size:24px; font-weight:700; text-transform:uppercase; margin-bottom:8px">${customerName || '-'}</p>
         <p class="text-muted" style="font-size:14px; line-height:1.8">
@@ -134,7 +146,7 @@ module.exports = function generateInvoiceHTML(data) {
           Kendaraan: ${motorDetails || '-'}
         </p>
       </div>
-      <div class="bg-dark" style="padding:20px">
+      <div class="bg-dark" style="padding:28px">
         <p class="text-yellow" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.2em; margin-bottom:20px">Studio Layanan</p>
         <p class="font-headline" style="font-size:24px; font-weight:700; text-transform:uppercase; margin-bottom:8px">${studioMetadata.name.toUpperCase()}</p>
         <p class="text-muted" style="font-size:14px; line-height:1.8">
@@ -145,7 +157,7 @@ module.exports = function generateInvoiceHTML(data) {
     </div>
 
     <!-- Status Banner Message -->
-    <div style="margin-bottom:20px; padding:12px; background:rgba(255,255,0,0.03); border:1px solid rgba(255,255,0,0.15); display:flex; align-items:flex-start; gap:16px;">
+    <div style="margin-bottom:40px; padding:24px; background:rgba(255,255,0,0.03); border:1px solid rgba(255,255,0,0.15); display:flex; align-items:flex-start; gap:16px;">
       <div style="background:#FFFF00; padding:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
         ${documentType === 'tanda_terima'
       ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>'
@@ -187,7 +199,7 @@ module.exports = function generateInvoiceHTML(data) {
         </tr>
       </thead>
       <tbody>
-        ${itemsList.length > 0 ? itemsList.map((item) => {
+        ${itemsList.length > 0 ? itemsList.map(item => {
           const parts = item.split('||');
           const cleanTitle = (parts[0] || '').trim().replace(/^(\d+\.|[-*•●])\s*/, '');
           const price = parseInt(parts[1]) || 0;
@@ -211,8 +223,7 @@ module.exports = function generateInvoiceHTML(data) {
               ${itemDesc ? (
               itemDesc.startsWith('Catatan Warna:')
                 ? `<div style="display:flex; align-items:center; gap:6px; margin-top:6px; padding:4px 10px; background:rgba(255,255,0,0.05); border-left:2px solid #FFFF00; width:fit-content">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFF00" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path></svg>
-                    <span style="font-size:10px; color:#FFFF00; font-weight:800; text-transform:uppercase; letter-spacing:0.1em">${itemDesc}</span>
+                    <span style="font-size:10px; color:#FFFF00; font-weight:800; text-transform:uppercase; letter-spacing:0.1em">🎨 ${itemDesc}</span>
                    </div>`
                 : `<p class="text-muted" style="font-size:12px; line-height:1.4; margin-top:4px">${itemDesc}</p>`
             ) : ''}
@@ -225,13 +236,13 @@ module.exports = function generateInvoiceHTML(data) {
       </tbody>
     </table>
 
-    <div class="totals-section" style="display:grid; grid-template-columns:7fr 5fr; gap:32px; margin-top:12px">
+    <div class="totals-section" style="display:grid; grid-template-columns:7fr 5fr; gap:32px; margin-top:40px">
       <div>
         ${notesList.length > 0 ? `
-        <div class="bg-darker border-yellow" style="padding:20px; margin-bottom:16px">
+        <div class="bg-darker border-yellow" style="padding:32px; margin-bottom:24px">
           <p class="font-headline" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.15em; margin-bottom:16px">Catatan Teknis Layanan</p>
           <div style="display:flex; flex-direction:column; gap:8px">
-            ${notesList.map((n) => {
+            ${notesList.map(n => {
           let icon = '●';
           if (n.toLowerCase().includes('garansi')) icon = '✓';
           else if (n.toLowerCase().match(/waktu|jam|hari/)) icon = '⏱';
@@ -240,7 +251,7 @@ module.exports = function generateInvoiceHTML(data) {
           </div>
         </div>` : ''}
 
-        <div style="padding:20px; border:1px solid #484831; background:#1c1b1b">
+        <div style="padding:24px; border:1px solid #484831; background:#1c1b1b">
           <p class="text-yellow" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.15em; margin-bottom:16px">Informasi Pembayaran</p>
           <div style="display:flex; align-items:center; gap:16px">
             <div style="background:rgba(255,255,255,0.05); padding:12px; display:flex; align-items:center; justify-content:center">
@@ -254,7 +265,7 @@ module.exports = function generateInvoiceHTML(data) {
         </div>
       </div>
 
-      <div style="background:#2a2a2a; padding:20px; display:flex; flex-direction:column; gap:10px">
+      <div style="background:#2a2a2a; padding:40px; display:flex; flex-direction:column; gap:20px">
         <div style="display:flex; justify-content:space-between">
           <span class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em">Subtotal</span>
           <span style="font-size:16px">Rp${subtotal.toLocaleString('id-ID')}</span>
@@ -269,18 +280,18 @@ module.exports = function generateInvoiceHTML(data) {
           <span class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em">Down Payment (DP)</span>
           <span style="font-size:16px; color:#ffb4ab">- Rp${dp.toLocaleString('id-ID')}</span>
         </div>` : ''}
-        ${totalPaid > 0 && !(dp > 0 && dp === totalPaid) ? `
+        ${totalPaid > 0 ? `
         <div style="display:flex; justify-content:space-between">
-          <span class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em">${documentType === 'bukti_bayar' ? 'Bayar Hari Hari Ini' : 'Total Bayar'}</span>
+          <span class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.1em">${documentType === 'bukti_bayar' ? 'Bayar Hari Ini' : 'Total Bayar'}</span>
           <span style="font-size:16px; color:#85ff7a">Rp${totalPaid.toLocaleString('id-ID')}</span>
         </div>` : ''}
         
-        <div style="border-top:1px solid #484831; padding-top:14px; margin-top:2px">
+        <div style="border-top:1px solid #484831; padding-top:24px; margin-top:8px">
           <span class="text-muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.2em; display:block; margin-bottom:8px">Total Keseluruhan</span>
-          <span class="font-headline" style="font-size:36px; font-weight:900">Rp${grandTotal.toLocaleString('id-ID')}</span>
+          <span class="font-headline" style="font-size:36px; font-weight:900">Rp${(subtotal - discountAmount).toLocaleString('id-ID')}</span>
         </div>
 
-        <div style="background:#FFFF00; padding:18px 20px; margin:0 -20px -20px; display:flex; justify-content:space-between; align-items:center">
+        <div style="background:#FFFF00; padding:20px 24px; margin:0 -40px -40px; display:flex; justify-content:space-between; align-items:center">
           <div>
             <span style="color:#1d1d00; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.2em; display:block; margin-bottom:4px">Sisa Tagihan</span>
             <span class="font-headline" style="color:#1d1d00; font-size:44px; font-weight:900">Rp${balance.toLocaleString('id-ID')}</span>
@@ -290,7 +301,8 @@ module.exports = function generateInvoiceHTML(data) {
       </div>
     </div>
       </td></tr></tbody>
-      <tfoot><tr><td class="margin-bottom"></td></tr></tfoot>
-    </table>
-  </div>`;
+    <tfoot><tr><td class="margin-bottom"></td></tr></tfoot>
+  </table>
+</body>
+</html>`;
 };

@@ -40,91 +40,55 @@ async function formatterNode(state) {
         'poles': 'Coating Ceramic',
     };
     let upsellSuggestion = '';
-    if (context.serviceTypes?.length > 0) {
-        const allServicesStr = context.serviceTypes.join(' ').toLowerCase();
+    if (context.serviceTypes?.length === 1) {
+        const primarySvc = context.serviceTypes[0].toLowerCase();
         for (const [key, val] of Object.entries(upsellMap)) {
-            if (allServicesStr.includes(key)) {
-                const hasUpsellAlready = context.serviceTypes.some(s => s.toLowerCase().includes(val.toLowerCase()));
-                if (!hasUpsellAlready) {
-                    upsellSuggestion = val;
-                    break;
-                }
+            if (primarySvc.includes(key)) {
+                upsellSuggestion = val;
+                break;
             }
         }
     }
 
     // Build combo offer text for formatter
-    let comboOfferInstruction = ''; // DEPRECATED: Upsell combo text removed since promo logic changed to tier based
+    let comboOfferInstruction = '';
+    if (replyMode === 'inform' && comboPromo && context.serviceTypes?.length === 1 && !context.comboOffered) {
+        const pct = Math.round(comboPromo.comboDiscount * 100);
+        comboOfferInstruction = `
+PROMOSI COMBO (WAJIB ditawarkan secara natural di akhir pesan):
+Setelah kasih estimasi harga, tawarkan dengan santai: lagi ada promo diskon ${pct}% kalau ambil 2 layanan sekaligus.
+Sarankan spesifik: "${upsellSuggestion || 'Detailing/Coating'}".
+Contoh natural: "Oh iya, lagi ada promo nih! Kalau sekalian ${upsellSuggestion || 'Detailing'}, dapet diskon ${pct}% dari total. Lumayan banget kan? 😄"
+JANGAN bilang ini "promo combo". Sampaikan secara conversational.`;
+    }
 
     // Pass combo data without hardcoding visual display rules
     let comboResultInstruction = '';
-    if ((replyMode === 'inform' || replyMode === 'partial') && toolResult?.combo?.applied) {
+    if (replyMode === 'inform' && toolResult?.combo?.applied) {
         comboResultInstruction = `
-HASIL COMBO (WAJIB tampilkan PERSIS sesuai breakdown ini, JANGAN hitung ulang atau pindahkan diskon ke item lain):
-${JSON.stringify(toolResult.combo.breakdown)}
-Total akhir: ${toolResult.combo.total_after_formatted}`;
+HASIL COMBO DATA (Terapkan pada rincian harga sesuai Aturan Emas #2):
+${JSON.stringify(toolResult.combo)}`;
     }
 
     const dateInfo = state.metadata?.currentDateTime
         ? `Tanggal & Waktu Sekarang: ${state.metadata.currentDateTime.dayName}, ${state.metadata.currentDateTime.formatted} (Waktu Indonesia Barat)`
         : `Tanggal & Waktu Sekarang: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB`;
 
-    // Only show color fields relevant to selected services
-    const hasBodiRepaint = context.serviceTypes?.some(s => s.toLowerCase().includes('repaint') && s.toLowerCase().includes('halus'));
-    const hasVelgRepaint = context.serviceTypes?.some(s => s.toLowerCase().includes('repaint') && s.toLowerCase().includes('velg'));
-
-    const pricingFormatInstruction = toolResult?.pricingMode === 'choosing_tier'
-        ? `
-FORMAT: user sedang MEMILIH paket repaint.
-
-WAJIB tampilkan semua paket dari Premium ke Ekonomis.
-SETIAP paket WAJIB punya:
-- harga
-- benefit utama
-- rekomendasi singkat
-
-Format WAJIB:
-
-• Paket Premium: RpX
-  ✓ [benefit]
-  ✓ [benefit]
-
-• Paket Standar: RpX
-  ✓ [benefit]
-  ✓ [benefit]
-
-• Paket Basic: RpX
-  ✓ [benefit]
-  ✓ [benefit]
-
-• Paket Ekonomis: RpX
-  ✓ [benefit]
-  ✓ [benefit]
-
-Setelah itu:
-- rekomendasikan Paket Standar sebagai "paling worth it"
-- jangan hanya list harga
-
-Jika ada promo (discount_percent > 0):
-tampilkan harga normal dicoret + harga promo.
-`
-        : `FORMAT: item sudah final (bukan lagi pilihan). Breakdown ringkas per-item + total. Jika ada discount_percent > 0, coret original_price dan tampilkan discount_price.`;
-
+    // Build context summary for the model
     const contextInfo = `
-- Nama Pelanggan: ${customer.name || 'Sobat Bosmat'}
 ${dateInfo}
 - Motor: ${context.vehicleType || 'Belum diketahui'}
-- Layanan Siap (harga tersedia di toolResult): ${context.readyServices?.join(', ') || '-'}
-- Layanan Perlu Info Tambahan: ${context.pendingServices?.join(', ') || '-'}
+- Layanan yang dipilih: ${context.serviceTypes?.join(', ') || 'Belum ada'}
 - Detail/Fokus: ${context.detailingFocus || 'General'}
-- Bongkar Total: ${context.isBongkarTotal ? 'Ya' : 'Tidak'}${hasBodiRepaint ? `\n- Warna Body: ${context.colorChoice || 'Belum ditentukan'}` : ''}${hasVelgRepaint ? `\n- Warna Velg: ${context.velgColorChoice || 'Belum ditentukan'}` : ''}
+- Bongkar Total: ${context.isBongkarTotal ? 'Ya' : 'Tidak'}
+- Warna Body: ${context.colorChoice || 'Belum ditentukan'}
+- Warna Velg: ${context.velgColorChoice || 'Belum ditentukan'}
 `.trim();
 
 
     const modeInstructions = {
-        greet: "Mode PERKENALAN. Sapa user dengan sangat ramah dengan menyebutkan nama mereka, kenalkan dirimu, dan tanyakan apa yang bisa dibantu hari ini.",
-        ask: `Mode TANYA DATA. Kamu sedang mengumpulkan info. Fokus utama: Tanyakan soal "${missingQ}" secara sangat santai tapi jelas. JANGAN tanya data lain dulu.`,
-        partial: `Mode INFO SEBAGIAN. Sebagian layanan sudah punya harga di Hasil Teknis/Tool, sebagian lagi masih kurang data. WAJIB: (1) sampaikan dulu harga/breakdown untuk layanan yang sudah ready — JANGAN skip ini. (2) Setelah itu, di pesan yang sama, tanyakan "${missingQ}" untuk layanan yang masih kurang. Jangan buang info harga yang sudah tersedia hanya karena masih ada pertanyaan lain. ${comboResultInstruction}`,
+        greet: "Mode PERKENALAN. Sapa user dengan sangat ramah, kenalkan dirimu sebagai Zoya, dan tanyakan apa yang bisa dibantu hari ini.",
+        ask: `Mode TANYA DATA. Zoya sedang mengumpulkan info. Fokus utama: Tanyakan soal "${missingQ}" secara sangat santai tapi jelas. JANGAN tanya data lain dulu.`,
         inform: `Mode INFO HARGA/JADWAL. Sampaikan detail biaya atau ketersediaan jadwal dari Tool Result secara transparan. ${comboOfferInstruction} ${comboResultInstruction}`,
         consult: "Mode KONSULTASI. User sedang bingung atau minta saran. Berikan masukan ahli otomotif. PENTING: Jika visual_summary menunjukkan user datang dari iklan/postingan IG, referensikan konten iklan tersebut secara natural (misal: 'Oh tertarik sama hasil Vario Mazda Red di postingan kita ya? Cakep emang 🔥'). Lalu langsung tanyakan tipe motor user-nya."
     };
@@ -133,16 +97,14 @@ ${dateInfo}
     const systemPrompt = `# ROLE
 Kamu adalah Zoya, Automotive Consultant & Studio Assistant (Vision-Enabled) di ${studioMetadata.name}.
 Persona: "The Cool Expert Friend". Penasihat yang asik, paham hobi otomotif, jujur, dan hangat.
-PENTING: Gunakan kata ganti "aku" untuk dirimu sendiri. JANGAN menyebut dirimu dengan nama orang ketiga (seperti "Zoya rekomendasiin...") saat membalas. Selalu sapa user dengan nama mereka.
 Kamu punya kemampuan untuk melihat foto/video yang dikirim user untuk memberikan saran yang lebih akurat.
 
 # CONTEXT & DATA
-- Promo Berlaku Saat Ini: ${state.metadata.activePromo?.promoText ? state.metadata.activePromo.promoText : 'Tidak ada promo khusus saat ini.'}\n  Aturan Promo: Promo repaint berlaku untuk Paket Premium, Standar, dan Basic. Paket Ekonomis menggunakan harga normal.
 - Studio Info (Alamat & Jam Buka):
   Alamat: ${studioMetadata.location.address}
   Landmark: ${studioMetadata.location.landmark}
   Google Maps: ${studioMetadata.location.googleMaps}
-  Jam Buka: Senin-Sabtu (${studioMetadata.hours.senin}), Minggu (${studioMetadata.hours.minggu}).
+  Jam Buka: Senin-Kamis & Sabtu-Minggu (${studioMetadata.hours.senin}), Jumat (Tutup).
 - Data Motor & Layanan (Hasil Ekstraksi):
 ${contextInfo}
 - Hasil Teknis/Tool:
@@ -158,95 +120,44 @@ Gunakan foto yang dikirim user untuk membuat percakapan jadi lebih personal dan 
 Informasi visual dari pesan terakhir user:
 ${state.metadata.visualSummary || 'Tidak ada gambar yang terdeteksi.'}
 
-# UPSELL & RECOMMENDATION
-${upsellSuggestion ? `- Tawarkan juga layanan tambahan ini secara santai: "${upsellSuggestion}". (Contoh: "Oiya, biar sekalian maksimal, mau ditambah ${upsellSuggestion} juga nggak kak?")` : ''}
-- Jika kamu sedang menanyakan pilihan paket (misal: paket detailing bodi/mesin/full), berikan satu saran secara halus untuk mengambil paket terlengkap (seperti Detailing Full) dengan alasan santai (misal: "biar sekalian kinclong semua kak").
-
 
 # STRATEGY MODE: ${replyMode.toUpperCase()}
 ${modeInstructions[replyMode] || modeInstructions.inform}
 
 # PENTING (HARGA & DATA):
-1. Hasil Teknis/Tool WAJIB jadi dasar info harga dan JADWAL BOOKING. Jika kosong, JANGAN beri harga/jadwal spesifik.
+1. Hasil Teknis/Tool WAJIB jadi dasar info harga. Jika kosong, JANGAN beri harga spesifik.
 2. Ada biaya tambahan untuk warna khusus/tertentu.
-3. **WAJIB BREAKDOWN PER-ITEM** jika toolResult punya multiple results. JANGAN langsung kasih total saja.
-   3a. Untuk paket repaint:
-   - user sedang membandingkan kualitas
-   - tampilkan harga + benefit dari toolResult.note atau toolResult.summary
-   - jangan hanya tampilkan angka
-   - jangan membuat benefit baru
-   
-   Urutan: Premium → Standar → Basic → Ekonomis
-   
-   ${pricingFormatInstruction}
-4. Harga diberikan di mode INFORM atau PARTIAL (untuk layanan yang toolResult-nya sudah ada), atau jika user eksplisit tanya harga. Di mode ASK murni (toolResult belum ada isinya sama sekali), fokus tanya data dulu — jangan selipin harga.
-5. Durasi pengerjaan Repaint secara default adalah 3-5 hari kerja. JANGAN MENGARANG bilang 7-10 hari kerja.
-6. **Jadwal Booking**:
-   - JIKA user menyebut tanggal (bookingDate) TAPI toolResult.bookingChecked belum true: JANGAN ngarang ketersediaan slot. Cukup bilang: "aku cek dulu ketersediaan slotnya ya kak, tunggu sebentar 🙏".
-   - JIKA toolResult.bookingChecked true dan availability ada TAPI toolResult.booking belum ada: bacakan ketersediaannya. JIKA available=false (overlap), beritahu user bahwa jadwal tersebut kepenuhan dan arahkan untuk cari jam/hari lain. JIKA user maksa/jadwal padat, BARU gunakan trigger_handover: true. JANGAN otomatis handover.
-   - JIKA toolResult.booking ada (sukses dibuat): Beritahu user bahwa jadwal sudah dicatat, berikan ringkasan booking-nya, dan BARENGI dengan memberikan alamat studio.
-   - **TENTANG ALAMAT**: JANGAN berikan alamat lengkap studio SEBELUM booking berhasil dibuat (toolResult.booking ada). Jika user sekadar tanya harga/jadwal atau slot baru dicek, simpan info alamat sampai deal.
+3. Gunakan format rincian berikut jika ada breakdown biaya:
+   [kalimat pengantar...]
+   • [layanan]: rp...
+   ✅ total: rp...
 
 # EXAMPLE
 Mode GREET: "pagi juga kak! kenalin aku zoya 🎨✨\n\nbiar aku bisa bantu, motornya apa ya kak?"
-Mode INFORM (single): "siapp mas! untuk *nmax bodi halus* estimasi harganya *rp1.200.000* ya. ✨"
-Mode INFORM (multi): "oke, ini rinciannya ya kak! 📋\n\n• *Repaint Bodi Halus*: Rp1.200.000\n• *Repaint Bodi Kasar*: Rp380.000\n✅ *Total*: Rp1.580.000\n\n💡 karena ambil 2 layanan, dapet diskon 10% jadi *Rp1.422.000* aja!\n\nmau warna apa nih kak untuk bodi halusnya?"
-Mode ASK: "oke kak vario 125! mau direpaint warna apa nih bodi halusnya?"
+Mode INFORM: "siapp mas! untuk *nmax bodi halus* estimasi harganya *rp1.200.000* ya. ✨"
 
 # ATURAN EMAS
-- **HURUF KECIL SEMUA**: Seluruh balasan Zoya WAJIB menggunakan huruf kecil (lowercase). Tidak boleh ada huruf kapital sama sekali, termasuk di awal kalimat. Kecuali: nama brand/model motor (NMax, PCX), dan singkatan (CVT, PU). Contoh: "oke kak, untuk vario 125 harga repaint bodi halusnya rp1.200.000 ya ✨"
 - **Mobil Constraint**: Jika user tanya soal *repaint* atau *detailing mobil*, katakan bahwa Zoya perlu tanya/konfirmasi ke bos/admin dulu (karena ${studioMetadata.shortName} biasanya fokus ke motor). JANGAN langsung tolak, tapi bilang akan ditanyakan dulu.
 - **Studio Photo**: Jika \`toolResult\` mengandung \`studioPhoto\`, sebutkan dengan santai bahwa kamu sudah mengirimkan foto depan studio agar mas/kak tidak bingung carinya. 
-- **AI Mockup**: Jika \`toolResult\` mengandung \`mockup\` dengan \`success: true\`, beritahu user bahwa kamu sudah kirimkan preview AI mockup warnanya. Tambahkan: "⚠️ ini preview AI ya kak, hasil asli bisa sedikit berbeda". Tawarkan: "kalau mau lihat contoh foto real dari studio, bilang aja ya!".
-- **Mockup Focus**: Jika pesan terakhir user hanya minta mockup/visual preview, FOKUSKAN balasan ke mockup saja. JANGAN langsung dump breakdown harga di pesan yang sama. Tanya dulu "gimana mas, udah cocok warnanya?" — baru kasih harga kalau user minta atau confirm.
-- **Mockup Limit**: Jika \`toolResult\` mengandung \`mockup.limit_reached: true\`, beritahu user dengan santai bahwa jatah preview AI sudah habis (max 3 mockup). Sarankan untuk langsung datang ke studio supaya bisa konsultasi warna secara langsung dan lihat sampel warna aslinya. Contoh: "untuk preview AI-nya udah 3x ya kak 😊 biar lebih puas, mending langsung mampir ke studio aja kak, bisa pilih warna sambil lihat sampel langsung!"
-- **Foto Real Request**: Jika user minta contoh foto real/portofolio, trigger triggerBosMatTool (bukan generate AI). Bilang akan ditanyakan ke admin/bos.
-- **Harga Layanan Belum Dikonfirmasi**: JANGAN tampilkan harga untuk layanan yang belum EKSPLISIT diminta/disetujui user. Jika toolResult punya multiple results tapi user hanya minta 1 layanan, tampilkan hanya layanan itu. Contoh: user hanya minta "repaint bodi halus" → JANGAN tampilkan harga "cuci komplit" meskipun ada di toolResult.
 - Sapaan (\`greeting\`) hanya diberikan jika ini awal diskusi atau perpindahan topik yang butuh "lem" percakapan. Kosongkan jika sedang diskusi intens.
 - Selalu akhiri dengan Call-to-Action (CTA) yang jelas.
 
 # ANTI-YAPPING (WAJIB)
 - **Max 3 kalimat** untuk first response / sapaan awal. JANGAN tulis essay.
-- **JANGAN beri info yang tidak diminta** (jam buka, alamat, promo) kecuali user memintanya atau replyMode === 'inform' atau replyMode === 'partial'.
+- **JANGAN beri info yang tidak diminta** (jam buka, alamat, promo) kecuali user memintanya atau replyMode === 'inform'.
 - **JANGAN minta foto** di pesan pertama. Terlalu agresif. Cukup tanya motor apa.
 - **Satu pertanyaan per pesan**. Jangan tumpuk 3 pertanyaan sekaligus.
 - Contoh BURUK: "Kenalin aku Zoya 🎨✨ Biar aku bisa kasih info yang pas... boleh kasih tahu motornya apa? Atau mungkin ada bagian tertentu? Kalau ada foto boleh kirim juga ya! Oh ya kita buka jam 08.00-17.00..."
 - Contoh BAGUS: "Halo kak! Aku Zoya dari Bosmat 🎨 Tertarik sama hasil repaint Vario yang di postingan ya? Motornya apa nih kak?"
-
-# BATASAN PENGETAHUAN (ANTI-SOTOY) 🚫
-- **Harga WAJIB dari toolResult**. Jika toolResult kosong/null: DILARANG MENYEBUT ANGKA HARGA APAPUN. TERMASUK ESTIMASI.
-  JIKA replyMode === 'ask': ABAIKAN pertanyaan harga user (JANGAN jawab harganya, dan JANGAN bilang mau tanya bosmat). Langsung saja tanyakan data yang kurang dengan santai. Contoh: "Untuk harganya menyesuaikan warna ya kak, kira-kira untuk bodi halusnya mau warna apa nih?"
-  JIKA replyMode === 'partial': toolResult SUDAH berisi harga untuk sebagian layanan. WAJIB sampaikan harga itu dulu, baru tanyakan data yang kurang untuk layanan lainnya. JANGAN diamkan harga yang sudah tersedia.
-  JIKA replyMode !== 'ask' && replyMode !== 'partial': JANGAN ngarang. Bilang: "aku tanyain dulu ke bosmat ya kak, biar harganya akurat 🙏" dan WAJIB set trigger_handover: true.
-- **Jangan ngarang angka**. Durasi pengerjaan, garansi, spesifikasi cat — JANGAN sebutkan angka spesifik kecuali sudah ada di toolResult atau studioMetadata.
-- **Pertanyaan teknis mendalam** (berapa lama cat kering, beda cat PU vs 2K, ketahanan coating, proses pengerjaan detail) → jawab secara UMUM singkat, lalu arahkan: "untuk detail teknisnya nanti bisa langsung konsultasi sama bosmat ya kak 😊"
-- **Layanan di luar scope** (PPF, wrapping, airbrush, cutting sticker, dll) → "wah untuk layanan itu aku perlu cek dulu ke bosmat ya kak, soalnya biasanya kita fokus di repaint, detailing & coating. nanti aku kabarin! 🙏"
-- **Komplain/dispute** → JANGAN defensif atau bantah. Empati dulu, lalu: "aku sampaikan ke bosmat langsung ya kak biar bisa ditangani. mohon maaf atas ketidaknyamanannya 🙏"
-
-# HANDOVER MODE
-Jika toolResult mengandung \`handoff\` (human handover sudah di-trigger):
-- Sampaikan ke user bahwa pertanyaannya sudah diteruskan ke admin/bosmat.
-- Jika handover karena user request: \"oke kak, aku sudah hubungi bosmat ya. nanti dibalas langsung sama beliau 🙏\"
-- JANGAN lanjut kasih info/harga setelah handover. Cukup sampaikan bahwa sudah diteruskan.
-
-# OUTPUT FORMAT
-Kamu WAJIB membalas DALAM FORMAT JSON MURNI (tanpa markdown blocks, tanpa teks pembuka/penutup).
-Struktur JSON yang diwajibkan:
-{
-  "greeting": "sapaan pendek (max 5 kata) jika di awal/pindah topik, kosongkan jika diskusi intens",
-  "main_content": "isi pesan utama, gunakan double-newline antar paragraf",
-  "internal_thought": "analisis singkat pemilihan pesan",
-  "trigger_handover": true/false // WAJIB set true HANYA JIKA kamu bilang akan menanyakan/konsultasi/cek ke bosmat atau admin
-}
-
-\`\`\`json
-{
-  "greeting": "halo kak!",
-  "main_content": "untuk warna custom itu aku tanyain dulu ke bosmat ya kak biar pasti 🙏",
-  "internal_thought": "Warna custom tidak ada di database, perlu konfirmasi bosmat.",
-  "trigger_handover": true
-}
-\`\`\``;
+174: 
+175: # OUTPUT FORMAT
+176: Kamu WAJIB membalas DALAM FORMAT JSON MURNI (tanpa markdown blocks, tanpa teks pembuka/penutup).
+177: Struktur JSON yang diwajibkan:
+178: {
+179:   "greeting": "sapaan pendek (max 5 kata) jika di awal/pindah topik, kosongkan jika diskusi intens",
+180:   "main_content": "isi pesan utama, gunakan double-newline antar paragraf",
+181:   "internal_thought": "analisis singkat pemilihan pesan"
+182: }`;
 
     console.log(`[FORMATTER_NODE] missingQ detected: "${missingQ}"`);
 
@@ -274,26 +185,26 @@ Struktur JSON yang diwajibkan:
         const finalPrompt = `TRANSKIP PERCAKAPAN TERAKHIR:\n\n${transcript}\n\n(Tuliskan balasan AI selanjutnya sesuai arahan sistem)`;
 
         console.log(`[FORMATTER_NODE] Invoking model (manual parse mode)...`);
-
+        
         // Timeout wrapper for safety
         const invokePromise = withRetry(() => model.invoke([
             new SystemMessage(systemPrompt),
             new HumanMessage(finalPrompt)
         ]), { maxRetries: 3, baseDelayMs: 1500 });
 
-        const timeoutPromise = new Promise((_, reject) =>
+        const timeoutPromise = new Promise((_, reject) => 
             setTimeout(() => reject(new Error('Formatter timeout after 60s')), 60000)
         );
 
         const response = await Promise.race([invokePromise, timeoutPromise]);
-
+        
         console.log(`[FORMATTER_NODE] Response received: ${response ? 'OK' : 'NULL'}`);
 
         // Handle manual JSON parsing
         const rawText = extractTextFromContent(response.content);
         console.log(`[FORMATTER_NODE] Raw response (first 100 char):`, rawText.substring(0, 100).replace(/\n/g, ' '));
 
-        let parsed = { greeting: '', main_content: rawText, internal_thought: 'manual_fallback', trigger_handover: false };
+        let parsed = { greeting: '', main_content: rawText, internal_thought: 'manual_fallback' };
         try {
             // Clean markdown if model still provides it despite instructions
             const cleaned = rawText.replace(/```json\n?|```/g, '').trim();
@@ -316,11 +227,6 @@ Struktur JSON yang diwajibkan:
         const contextUpdate = {};
         if (replyMode === 'inform' && comboPromo && context.serviceTypes?.length === 1) {
             contextUpdate.comboOffered = true;
-        }
-
-        if (parsed.trigger_handover) {
-            contextUpdate.pendingHandover = true;
-            console.log(`[FORMATTER_NODE] 🚨 LLM explicitly requested handover via trigger_handover flag.`);
         }
 
         return {

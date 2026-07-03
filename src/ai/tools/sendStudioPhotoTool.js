@@ -1,5 +1,5 @@
 // File: src/ai/tools/sendStudioPhotoTool.js
-// Mengirim foto eksterior Bosmat (lokasi di Jl. Medan B3/2 Tugu Kecamatan Cimanggis Kota Depok) ke pelanggan melalui WhatsApp.
+// Mengirim foto eksterior Bosmat (lokasi di Jl. Raden Sanim No.99, Tanah Baru, Kecamatan Beji, Kota Depok, Jawa Barat 16426) ke pelanggan melalui WhatsApp.
 
 const path = require('path');
 const fs = require('fs');
@@ -15,8 +15,8 @@ const sendStudioPhotoSchema = z.object({
 });
 
 const DEFAULT_CAPTION = `${studioMetadata.name}, ${studioMetadata.location.address}. Mohon kabari sebelum tiba agar tim siap menyambut.`;
-const STUDIO_PHOTO_PATH = path.resolve(__dirname, '../../../data/bosmat.png');
-const STUDIO_PHOTO_FILENAME = 'bosmat.png';
+const STUDIO_PHOTO_PATH = path.resolve(__dirname, '../../../data/bosmat-garasi-54.png');
+const STUDIO_PHOTO_FILENAME = 'bosmat-garasi-54.png';
 const SUPPORTED_META_CHANNELS = new Set(['instagram', 'messenger']);
 
 function parseRecipientIdentity(rawValue) {
@@ -79,7 +79,7 @@ async function implementation(input = {}) {
 
   if (identity.channel === 'whatsapp') {
     const client = global.whatsappClient;
-    if (!client || typeof client.sendMessage !== 'function') {
+    if (!client || typeof client.sendImage !== 'function') {
       throw new Error('[sendStudioPhoto] WhatsApp client belum siap.');
     }
 
@@ -88,7 +88,7 @@ async function implementation(input = {}) {
 
     // Mark before sending so onAnyMessage doesn't treat it as admin-from-HP
     markBotMessage(recipient, caption);
-    await client.sendMessage(recipient, { image: { url: STUDIO_PHOTO_PATH }, caption: caption });
+    await client.sendImage(recipient, STUDIO_PHOTO_PATH, STUDIO_PHOTO_FILENAME, caption);
 
     return {
       success: true,

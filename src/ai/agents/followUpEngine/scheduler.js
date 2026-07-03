@@ -165,9 +165,6 @@ function isEligible(context, metadata) {
     if (lastFollowUp) {
         const daysSinceLastFollowUp = Math.floor((now - lastFollowUp) / (1000 * 60 * 60 * 24));
         if (daysSinceLastFollowUp < (strategy.intervalDays || strategy.waitDays)) return false;
-    } else {
-        const daysSinceLastMessage = Math.floor((now - lastMessage) / (1000 * 60 * 60 * 24));
-        if (daysSinceLastMessage < strategy.waitDays) return false;
     }
 
     // Check max follow-ups
@@ -209,10 +206,6 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
                         where: {
                             status: { notIn: ['DONE', 'CANCELLED'] }
                         }
-                    },
-                    messages: {
-                        orderBy: { createdAt: 'desc' },
-                        take: 5
                     }
                 }
             }
@@ -233,21 +226,11 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
         // Skip jika tidak ada customer
         if (!customer) continue;
 
-        // Check active booking status (PENDING/CONFIRMED/IN_PROGRESS)
-        const activeBookings = customer.bookings || [];
-        const hasActiveBooking = activeBookings.length > 0;
-
-        const chatHistory = (customer.messages || [])
-            .slice()
-            .reverse()
-            .map(m => `${m.role === 'user' ? 'Customer' : 'Zoya'}: ${m.content}`)
-            .join('\n');
-
+        // Ambil metadata dari customer
         const metadata = {
             lastMessageAt: customer.lastMessageAt,
             name: customer.name,
-            fullSenderId: customer.phone.includes('@') ? customer.phone : customer.phone + '@c.us',
-            chatHistory
+            fullSenderId: customer.phone.includes('@') ? customer.phone : customer.phone + '@c.us'
         };
 
         // 2. Label downgrade check
@@ -272,28 +255,28 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
             }
         }
 
-        // 3. Nurturing eligibility — BLOCKED if customer has active booking
-        const isNurtureEligible = hasActiveBooking ? false : isEligible(context, metadata);
+        // 3. Eligibility checks
+        const isNurtureEligible = isEligible(context, metadata);
 
         // 4. Review eligibility (Post-Service 3 Days)
-        // Review is for COMPLETED services (lastService), NOT blocked by new active bookings
         let isReviewEligible = false;
         const lastService = customer.lastService ? new Date(customer.lastService) : null;
+        
+        // Skip review if customer has active/pending bookings
+        const activeBookings = customer.bookings || [];
+        const hasActiveBooking = activeBookings.length > 0;
 
-        if (lastService && !context.reviewFollowUpSent) {
+        if (lastService && !context.reviewFollowUpSent && !hasActiveBooking) {
             const daysSinceService = Math.floor((now - lastService) / (1000 * 60 * 60 * 24));
-            // Wider window (3-30 days) for customers who NEVER received a review (backfill catch-up)
-            // Standard window (3-7 days) for repeat reviews after subsequent services
-            const maxDays = context.lastReviewAt ? 7 : 30;
-            if (daysSinceService >= 3 && daysSinceService <= maxDays) {
+            if (daysSinceService >= 3 && daysSinceService <= 7) {
                 isReviewEligible = true;
             }
         }
 
-        // 5. Rebooking eligibility — BLOCKED if customer has active booking (already rebooked!)
+        // 5. Rebooking eligibility (Maintenance Reminders)
         let isRebookingEligible = false;
         let rebookingAngle = null;
-        if (!hasActiveBooking && lastService && context.lastServiceType) {
+        if (lastService && context.lastServiceType) {
             const daysSinceService = Math.floor((now - lastService) / (1000 * 60 * 60 * 24));
             const interval = REBOOKING_INTERVALS[context.lastServiceType];
 
@@ -310,12 +293,10 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
             }
         }
 
-        const senderNumber = customer.phone.includes('@') 
-            ? customer.phone 
-            : (customer.phone.startsWith('62') ? customer.phone + '@c.us' : customer.phone + '@lid');
+        const senderNumber = customer.phone.includes('@') ? customer.phone : customer.phone + '@c.us';
 
         if (isReviewEligible) {
-            // Priority 1: Review (for completed services — allowed even with new active booking)
+            // Priority 1: Review
             queue.unshift({
                 docId,
                 senderNumber,
@@ -325,7 +306,7 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
                 strategy: { ...STRATEGY_CONFIG[context.customerLabel], angle: 'review' },
             });
         } else if (isRebookingEligible) {
-            // Priority 2: Rebooking (blocked if has active booking)
+            // Priority 2: Rebooking
             queue.splice(queue.findIndex(item => !item.context.reviewMode), 0, {
                 docId,
                 senderNumber,
@@ -335,14 +316,14 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
                 strategy: { ...STRATEGY_CONFIG[context.customerLabel], angle: rebookingAngle },
             });
         } else if (isNurtureEligible) {
-            // Priority 3: Nurturing (blocked if has active booking)
+            // Priority 3: Nurturing
             queue.push({
                 docId,
                 senderNumber,
                 name: customer.name || 'Mas',
                 context,
                 metadata,
-                strategy: { ...STRATEGY_CONFIG[context.customerLabel] },
+                strategy: STRATEGY_CONFIG[context.customerLabel],
             });
         }
     }
@@ -392,7 +373,7 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
 
         // Jeda 2 menit di antara pengiriman agar terhindar dari spam list (HANYA JIKA BUKAN DRY RUN)
         if (i < queue.length - 1 && !dryRun) {
-            await delay(5 * 60 * 1000); // 5 minutes delay between messages
+            await delay(2 * 60 * 1000);
         }
     }
 
@@ -474,13 +455,10 @@ async function processFollowUp(customer, promoData = null, dryRun = false) {
     }
     console.log(`[Scheduler] ✅ Sent to ${docId}: "${message.substring(0, 50)}..."`);
 
-    const followUpCount = context.followUpCount || 0;
-    const activeAngle = strategy.angles ? strategy.angles[Math.min(followUpCount, strategy.angles.length - 1)] : (strategy.angle || 'standard');
-
     const updateData = {
-        followUpCount: followUpCount + 1,
+        followUpCount: (context.followUpCount || 0) + 1,
         lastFollowUpAt: new Date(),
-        lastFollowUpStrategy: activeAngle,
+        lastFollowUpStrategy: strategy.angle,
     };
 
     if (context.reviewMode) {
@@ -511,10 +489,6 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
                 include: {
                     bookings: {
                         where: { status: { notIn: ['DONE', 'CANCELLED'] } }
-                    },
-                    messages: {
-                        orderBy: { createdAt: 'desc' },
-                        take: 5
                     }
                 }
             }
@@ -529,38 +503,25 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
         const customer = context.customer;
         if (!customer) continue;
 
-        // Check active booking status (PENDING/CONFIRMED/IN_PROGRESS)
-        const hasActiveBooking = (customer.bookings || []).length > 0;
-
-        const chatHistory = (customer.messages || [])
-            .slice()
-            .reverse()
-            .map(m => `${m.role === 'user' ? 'Customer' : 'Zoya'}: ${m.content}`)
-            .join('\n');
-
         const metadata = {
             lastMessageAt: customer.lastMessageAt,
             name: customer.name,
-            fullSenderId: customer.phone.includes('@') ? customer.phone : customer.phone + '@c.us',
-            chatHistory
+            fullSenderId: customer.phone.includes('@') ? customer.phone : customer.phone + '@c.us'
         };
 
-        // Nurturing — BLOCKED if customer has active booking
-        const isNurtureEligible = hasActiveBooking ? false : isEligible(context, metadata);
+        const isNurtureEligible = isEligible(context, metadata);
 
-        // Review — for COMPLETED services, NOT blocked by new active bookings
         let isReviewEligible = false;
         const lastService = customer.lastService ? new Date(customer.lastService) : null;
-        if (lastService && !context.reviewFollowUpSent) {
+        const hasActiveBooking = (customer.bookings || []).length > 0;
+        if (lastService && !context.reviewFollowUpSent && !hasActiveBooking) {
             const daysSinceService = Math.floor((now - lastService) / (1000 * 60 * 60 * 24));
-            const maxDays = context.lastReviewAt ? 7 : 30;
-            if (daysSinceService >= 3 && daysSinceService <= maxDays) isReviewEligible = true;
+            if (daysSinceService >= 3 && daysSinceService <= 7) isReviewEligible = true;
         }
 
-        // Rebooking — BLOCKED if customer has active booking (already rebooked!)
         let isRebookingEligible = false;
         let rebookingAngle = null;
-        if (!hasActiveBooking && lastService && context.lastServiceType) {
+        if (lastService && context.lastServiceType) {
             const daysSinceService = Math.floor((now - lastService) / (1000 * 60 * 60 * 24));
             const interval = REBOOKING_INTERVALS[context.lastServiceType];
             if (interval && daysSinceService >= interval && daysSinceService <= interval + 3) {
@@ -573,9 +534,7 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
             }
         }
 
-        const senderNumber = customer.phone.includes('@') 
-            ? customer.phone 
-            : (customer.phone.startsWith('62') ? customer.phone + '@c.us' : customer.phone + '@lid');
+        const senderNumber = customer.phone.includes('@') ? customer.phone : customer.phone + '@c.us';
         const name = customer.name || 'Mas';
 
 
@@ -592,15 +551,12 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
             itemType = 'rebooking';
             queueItem = { docId: context.id, senderNumber, name, context: { ...context, rebookingMode: true }, metadata, strategy: itemStrategy };
         } else if (isNurtureEligible) {
-            itemStrategy = { ...STRATEGY_CONFIG[context.customerLabel] };
+            itemStrategy = STRATEGY_CONFIG[context.customerLabel];
             itemType = 'nurturing';
             queueItem = { docId: context.id, senderNumber, name, context, metadata, strategy: itemStrategy };
         }
 
         if (queueItem && itemStrategy) {
-            const currentCount = context.followUpCount || 0;
-            itemStrategy.angle = itemStrategy.angles ? itemStrategy.angles[Math.min(currentCount, itemStrategy.angles.length - 1)] : (itemStrategy.angle || 'standard');
-            
             try {
                 const generatedMessage = await generateFollowUpMessage(queueItem, itemStrategy, promoData);
                 if (generatedMessage) {

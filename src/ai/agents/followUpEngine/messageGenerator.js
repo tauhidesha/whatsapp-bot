@@ -1,8 +1,7 @@
 // File: src/ai/agents/followUpEngine/messageGenerator.js
 // Logic for generating follow-up messages based on customer context and AI personality.
 
-const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
-const { getLangSmithCallbacks } = require('../../utils/langsmith');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 /**
  * Calculate days passed since a given date.
@@ -66,8 +65,8 @@ const ANGLE_INSTRUCTIONS = {
         Goal: Panggilan terakhir untuk reservasi hari ini/besok agar hak garansi aman.
     `,
     booking_reminder: `
-        Angle: Pengingat jadwal kedatangan (Booking) BESOK (H-1).
-        Goal: Memastikan pelanggan ingat tanggal dan jam kedatangannya besok dan merasa disambut di studio. Cantumkan tanggal, jam booking, dan layanannya.
+        Angle: Pengingat jadwal kedatangan (Booking) hari ini.
+        Goal: Memastikan pelanggan ingat jam kedatangannya dan merasa disambut di studio. Cantumkan jam booking dan layanannya.
     `
 };
 
@@ -132,17 +131,12 @@ async function generateFollowUpMessage(customerData, strategy, promoData = null)
         const { name, context, metadata } = customerData;
         const daysSinceChat = getDaysSince(metadata.lastMessageAt);
         const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const modelName = 'gemini-2.5-flash-lite';
+        const model = genAI.getGenerativeModel({ model: modelName });
 
         const followUpCount = context.followUpCount || 0;
         const lastFollowUpStrategy = context.lastFollowUpStrategy || 'tidak ada';
-
-        let activeAngle = 'standard';
-        if (strategy.angles && strategy.angles.length > 0) {
-            // Rotasi angle berdasarkan urutan follow up (0, 1, 2, dst)
-            activeAngle = strategy.angles[Math.min(followUpCount, strategy.angles.length - 1)];
-        } else if (strategy.angle) {
-            activeAngle = strategy.angle; // Fallback jika config lama belum terupdate
-        }
 
         const promoSection = promoData && promoData.promoText 
             ? `# PROMO AKTIF SAAT INI\n- Info Promo: ${promoData.promoText}\n`
@@ -150,7 +144,7 @@ async function generateFollowUpMessage(customerData, strategy, promoData = null)
 
         const prompt = `
 # PERSONALITY: ZOYA
-- Nama: Zoya (Customer Relations @ Bosmat Repaint and Detailing)
+- Nama: Zoya (Customer Relations @ Bosmat x Garasi 54)
 - Gaya Chat: Casual, lowercase (kecuali singkatan), pakai emoji secukupnya, tidak kaku, tanpa "Halo" atau "Selamat Pagi".
 - PANGGILAN: WAJIB gunakan panggilan "mas" atau "kak" diikuti nama pelanggan (contoh: "mas rully", "kak budi"). Utamakan "mas" jika nama laki-laki.
 - Batasan: Jangan hanya panggil nama saja tanpa Mas/Kak. Chat pendek saja, jangan jadi sales yang haus closing.
@@ -169,32 +163,22 @@ ${promoSection}
 - Motor: ${context.motorModel || 'tidak diketahui'}
 - Kondisi motor: ${context.motorCondition || 'tidak diketahui'}
 - Warna motor: ${context.motorColor || 'tidak diketahui'}
-- Layanan diminati: ${context.targetServices && context.targetServices.length > 0 ? context.targetServices.join(', ') : (context.target_service || 'tidak diketahui')}
+- Layanan diminati: ${context.targetServices && context.targetServices.length > 0 ? context.targetServices.join(', ') : 'tidak diketahui'}
 - Terakhir chat: ${daysSinceChat !== null ? daysSinceChat + ' hari lalu' : 'tidak diketahui'}
-${context.bookingDate ? `- Tanggal Booking: ${context.bookingDate}` : ''}
-${context.bookingTime ? `- Jam Booking: ${context.bookingTime}` : ''}
-
-# HISTORY CHAT TERAKHIR (5 Pesan Terakhir)
-${metadata.chatHistory ? metadata.chatHistory : '(Belum ada riwayat chat)'}
 
 # STRATEGIC CONTEXT
 - Follow-up Ke: ${followUpCount + 1}
 - Strategi Sebelumnya: ${lastFollowUpStrategy}
 ${followUpCount > 0 ? '- INSTRUKSI: Ini bukan follow up pertama. JANGAN gunakan pembukaan standar. Coba pendekatan yang lebih personal atau spesifik ke detail motornya.' : ''}
-- INSTRUKSI KONTEKS WAKTU: Terakhir ngobrol ${daysSinceChat !== null ? daysSinceChat + ' hari' : 'beberapa waktu'} yang lalu. WAJIB sesuaikan gaya sapaan dengan durasi ini agar terasa natural!
-  - Jika 1-3 hari lalu: Lanjutkan obrolan seakan baru kemarin (contoh: "ngelanjutin obrolan kemaren nih...", "gimana mas jadi merapat?").
-  - Jika 4-14 hari lalu: Sapa santai karena udah agak lama (contoh: "halo mas, lama ga ngobrol, gimana kabar motornya?", "sibuk touring ya mas?").
-  - Jika >14 hari lalu: Sapaan hangat karena udah lama banget hilang (contoh: "halo mas, zoya ngecek aja nih siapa tau kemaren kelupaan bales...").
 
 # ANTI-TEMPLATE RULES
-- DILARANG KERAS mengulang kalimat sapaan yang sama terus-menerus. JANGAN selalu bilang "gimana kabarnya" di awal.
 - DILARANG mulai dengan "gimana perkembangan motornya" atau "udah sempat mampir" jika sudah pernah follow up sebelumnya.
-- Variasikan pembukaan setiap kali; gunakan kreativitasmu untuk langsung masuk ke topik dengan nyeleneh atau lucu.
+- Variasikan pembukaan setiap kali; jangan pakai pola yang sama dengan pesan sebelumnya.
 - Referensikan detail motor (model/warna) atau layanan yang diminati agar terasa personal.
 - Boleh mulai dengan pertanyaan ringan atau mention sesuatu yang relevan dengan hobi motor.
 
 # INSTRUKSI ANGLE
-${ANGLE_INSTRUCTIONS[activeAngle] || ANGLE_INSTRUCTIONS.standard}
+${ANGLE_INSTRUCTIONS[strategy.angle] || ANGLE_INSTRUCTIONS.standard}
 
 # TUGAS & OUTPUT (PENTING!)
 1. Buat 1 pesan chat personal sesuai karakter Zoya.
@@ -203,23 +187,9 @@ ${ANGLE_INSTRUCTIONS[activeAngle] || ANGLE_INSTRUCTIONS.standard}
 4. RESPOND HANYA DENGAN TEKS PESAN FINAL. JANGAN ADA PENJELASAN ATAU DRAFT.
 `;
 
-        const model = new ChatGoogleGenerativeAI({
-            model: 'gemini-flash-lite-latest',
-            apiKey: apiKey,
-            temperature: 0.7,
-        });
-
-        const callbacks = getLangSmithCallbacks('FollowUpEngine', {
-            metadata: {
-                customerName: name,
-                strategy: activeAngle,
-                followUpCount: followUpCount + 1
-            },
-            tags: ['follow-up']
-        });
-
-        const response = await model.invoke(prompt, { callbacks });
-        const rawText = response.content;
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const rawText = response.text();
         
         // Clean the response before returning
         return cleanAiResponse(rawText);
