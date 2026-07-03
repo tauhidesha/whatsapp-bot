@@ -73,6 +73,21 @@ async function toolExecutorNode(state) {
                         if (pricingResult && pricingResult.results) {
                             const eligiblePattern = /premium|standar|basic/i;
                             toolResult.results = pricingResult.results.map(item => {
+                                if (Array.isArray(item.candidates)) {
+                                    // Response bertingkat (repaint dengan pilihan paket)
+                                    const candidates = item.candidates.map(c => {
+                                        const price = c.final_price || c.price || 0;
+                                        const eligible = eligiblePattern.test(c.name || '');
+                                        return {
+                                            ...c,
+                                            original_price: price,
+                                            discount_percent: eligible ? 15 : 0,
+                                            discount_price: eligible ? Math.round(price * 0.85) : price
+                                        };
+                                    });
+                                    return { ...item, candidates };
+                                }
+                                // Response flat (satu harga langsung)
                                 const price = item.final_price || item.price || 0;
                                 const eligible = eligiblePattern.test(item.name || '');
                                 return {
