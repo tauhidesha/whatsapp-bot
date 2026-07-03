@@ -56,10 +56,9 @@ async function formatterNode(state) {
         const pct = Math.round(comboPromo.comboDiscount * 100);
         comboOfferInstruction = `
 PROMOSI COMBO (WAJIB ditawarkan secara natural di akhir pesan):
-Setelah kasih estimasi harga, tawarkan dengan santai: lagi ada promo diskon ${pct}% kalau ambil 2 layanan sekaligus.
-Sarankan spesifik: "${upsellSuggestion || 'Detailing/Coating'}".
-Contoh natural: "Oh iya, lagi ada promo nih! Kalau sekalian ${upsellSuggestion || 'Detailing'}, dapet diskon ${pct}% dari total. Lumayan banget kan? 😄"
-JANGAN bilang ini "promo combo". Sampaikan secara conversational.`;
+Setelah kasih estimasi harga, tawarkan layanan tambahan ini secara santai: "${upsellSuggestion || 'Coating Ceramic'}".
+Contoh natural: "Oiya, biar sekalian maksimal, mau ditambah ${upsellSuggestion || 'Coating Ceramic'} juga nggak kak? Lagi ada promo diskon ${pct}% nih kalau ambil 2 layanan sekaligus."
+JANGAN bilang ini "promo combo" secara kaku. Sampaikan secara conversational.`;
     }
 
     // Pass combo data without hardcoding visual display rules

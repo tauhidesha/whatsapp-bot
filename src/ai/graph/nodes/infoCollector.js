@@ -89,7 +89,7 @@ Ekstrak data ke dalam format JSON dengan field berikut:
 4. **service_types**: Array layanan (Repaint, Detailing, Coating, Cuci).
 5. **paint_type**: Jenis cat (Glossy / Doff).
 6. **is_bongkar_total**: (Boolean/null) Jika user sebut "bongkar total" atau "bongkar mesin".
-7. **detailing_focus**: Fokus area (Bodi Halus, Bodi Kasar, Velg, Mesin).
+7. **detailing_focus**: Fokus area (Full, Bodi Halus, Bodi Kasar, Velg, Mesin).
 8. **color_choice**: Warna bodi yang diinginkan.
 9. **velg_color_choice**: Warna velg (SERINGKALI berbeda dengan bodi).
 10. **is_previously_painted**: (Boolean/null) Jika motor/velg sudah pernah dicat ulang (terlihat di foto atau disebut user).
@@ -322,10 +322,15 @@ Output: {
             }
             if (svc === 'detailing') {
                 if (ctx.detailingFocus || ctx.isBongkarTotal) {
-                    ctx.serviceTypes[i] = ctx.isBongkarTotal ? "Full Detailing" : `Detailing ${ctx.detailingFocus}`;
+                    let focus = (ctx.detailingFocus || '').toLowerCase();
+                    if (focus.includes('full') || ctx.isBongkarTotal) {
+                         ctx.serviceTypes[i] = "Full Detailing";
+                    } else {
+                         ctx.serviceTypes[i] = `Detailing ${ctx.detailingFocus}`;
+                    }
                     continue; // Skip generic missing question since we auto-resolved it
                 } else {
-                    missingQuestion = "Tanyakan fokus detailingnya (Hilangkan baret bodi, bersihkan mesin, atau cuci bongkar total)";
+                    missingQuestion = "Tanyakan fokus detailingnya (Hilangkan baret bodi, bersihkan mesin, atau cuci bongkar total). Berikan juga saran secara halus untuk mengambil paket terlengkap (Full Detailing) dengan alasan santai (misal: 'biar sekalian kinclong semua kak').";
                     break;
                 }
             }
@@ -348,8 +353,15 @@ Output: {
                     if (!ctx.paintType) { missingQuestion = "Cari tahu jenis cat motor (Glossy atau Doff)"; break; }
                     if (ctx.isBongkarTotal === null && svcLower.includes('coating')) { missingQuestion = "Tanyakan apakah mau proteksi bodi saja atau bongkar total (Complete Service)"; break; }
                 } else if (svcLower.includes('detailing') || svcLower.includes('poles') || svcLower.includes('cuci')) {
-                    if (!ctx.detailingFocus && !ctx.isBongkarTotal) { missingQuestion = "Tanyakan fokus pembersihan (Bodi, Mesin, atau Kolong)"; break; }
-                    if (!ctx.paintType && (svcLower.includes('poles') || svcLower.includes('full detailing'))) { missingQuestion = "Pastikan jenis catnya Glossy atau Doff"; break; }
+                    const isFull = svcLower.includes('full');
+                    if (!isFull && !ctx.detailingFocus && !ctx.isBongkarTotal) { 
+                        missingQuestion = "Tanyakan fokus pembersihan (Bodi, Mesin, atau Kolong). Berikan juga saran secara halus untuk mengambil paket terlengkap (Full Detailing) dengan alasan santai (misal: 'biar sekalian kinclong semua kak')."; 
+                        break; 
+                    }
+                    if (!ctx.paintType && (svcLower.includes('poles') || isFull)) { 
+                        missingQuestion = "Pastikan jenis catnya Glossy atau Doff"; 
+                        break; 
+                    }
                 } else if (svcLower.includes('repaint')) {
                     if (svcLower.includes('halus') && !ctx.colorChoice) { missingQuestion = "Tanyakan rencana warna baru untuk bodi halusnya"; break; }
                     if (svcLower.includes('velg') && !ctx.velgColorChoice) { missingQuestion = "Tanyakan pilihan warna untuk repaint velgnya"; break; }
