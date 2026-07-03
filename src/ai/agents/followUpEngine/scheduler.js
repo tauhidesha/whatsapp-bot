@@ -392,7 +392,7 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
 
         // Jeda 2 menit di antara pengiriman agar terhindar dari spam list (HANYA JIKA BUKAN DRY RUN)
         if (i < queue.length - 1 && !dryRun) {
-            await delay(2 * 60 * 1000);
+            await delay(5 * 60 * 1000); // 5 minutes delay between messages
         }
     }
 
@@ -639,17 +639,17 @@ const TIMEZONE = process.env.APP_TIMEZONE || 'Asia/Jakarta';
 function startFollowUpScheduler() {
     if (schedulerHandle) return;
 
-    // Check every 5 minutes
-    const intervalMs = 5 * 60 * 1000;
+    // Check every 15 minutes
+    const intervalMs = 15 * 60 * 1000;
 
     schedulerHandle = setInterval(async () => {
         const now = DateTime.now().setZone(TIMEZONE);
         const hour = now.hour;
         const todayStr = now.toFormat('yyyy-MM-dd');
 
-        // Execute every 5 minutes (ignoring 9 AM restriction)
-        if (true) {
-            // lastDailyRunDate = todayStr; // Mark immediately to prevent concurrent duplicates
+        // Execute only once a day at 9 AM
+        if (hour === 9 && lastDailyRunDate !== todayStr) {
+            lastDailyRunDate = todayStr; // Mark immediately to prevent concurrent duplicates
 
             // Skip run completely if it's Sunday (Luxon weekday 7 is Sunday)
             if (now.weekday === 7) {
@@ -759,7 +759,7 @@ function startFollowUpScheduler() {
     }, intervalMs);
 
 
-    console.log(`[Scheduler] Follow-up scheduler started (Target: Every 5 minutes)`);
+    console.log(`[Scheduler] Follow-up scheduler started (Target: 09:00 ${TIMEZONE})`);
 }
 
 function stopFollowUpScheduler() {
