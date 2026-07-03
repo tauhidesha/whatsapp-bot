@@ -55,7 +55,7 @@ async function formatterNode(state) {
 
     // Pass combo data without hardcoding visual display rules
     let comboResultInstruction = '';
-    if (replyMode === 'inform' && toolResult?.combo?.applied) {
+    if ((replyMode === 'inform' || replyMode === 'partial') && toolResult?.combo?.applied) {
         comboResultInstruction = `
 HASIL COMBO (WAJIB tampilkan PERSIS sesuai breakdown ini, JANGAN hitung ulang atau pindahkan diskon ke item lain):
 ${JSON.stringify(toolResult.combo.breakdown)}
@@ -121,7 +121,7 @@ ${dateInfo}
     const modeInstructions = {
         greet: "Mode PERKENALAN. Sapa user dengan sangat ramah dengan menyebutkan nama mereka, kenalkan dirimu, dan tanyakan apa yang bisa dibantu hari ini.",
         ask: `Mode TANYA DATA. Kamu sedang mengumpulkan info. Fokus utama: Tanyakan soal "${missingQ}" secara sangat santai tapi jelas. JANGAN tanya data lain dulu.`,
-        partial: `Mode INFO SEBAGIAN. Sebagian layanan sudah punya harga di Hasil Teknis/Tool, sebagian lagi masih kurang data. WAJIB: (1) sampaikan dulu harga/breakdown untuk layanan yang sudah ready — JANGAN skip ini. (2) Setelah itu, di pesan yang sama, tanyakan "${missingQ}" untuk layanan yang masih kurang. Jangan buang info harga yang sudah tersedia hanya karena masih ada pertanyaan lain.`,
+        partial: `Mode INFO SEBAGIAN. Sebagian layanan sudah punya harga di Hasil Teknis/Tool, sebagian lagi masih kurang data. WAJIB: (1) sampaikan dulu harga/breakdown untuk layanan yang sudah ready — JANGAN skip ini. (2) Setelah itu, di pesan yang sama, tanyakan "${missingQ}" untuk layanan yang masih kurang. Jangan buang info harga yang sudah tersedia hanya karena masih ada pertanyaan lain. ${comboResultInstruction}`,
         inform: `Mode INFO HARGA/JADWAL. Sampaikan detail biaya atau ketersediaan jadwal dari Tool Result secara transparan. ${comboOfferInstruction} ${comboResultInstruction}`,
         consult: "Mode KONSULTASI. User sedang bingung atau minta saran. Berikan masukan ahli otomotif. PENTING: Jika visual_summary menunjukkan user datang dari iklan/postingan IG, referensikan konten iklan tersebut secara natural (misal: 'Oh tertarik sama hasil Vario Mazda Red di postingan kita ya? Cakep emang 🔥'). Lalu langsung tanyakan tipe motor user-nya."
     };
@@ -200,7 +200,7 @@ Mode ASK: "oke kak vario 125! mau direpaint warna apa nih bodi halusnya?"
 
 # ANTI-YAPPING (WAJIB)
 - **Max 3 kalimat** untuk first response / sapaan awal. JANGAN tulis essay.
-- **JANGAN beri info yang tidak diminta** (jam buka, alamat, promo) kecuali user memintanya atau replyMode === 'inform'.
+- **JANGAN beri info yang tidak diminta** (jam buka, alamat, promo) kecuali user memintanya atau replyMode === 'inform' atau replyMode === 'partial'.
 - **JANGAN minta foto** di pesan pertama. Terlalu agresif. Cukup tanya motor apa.
 - **Satu pertanyaan per pesan**. Jangan tumpuk 3 pertanyaan sekaligus.
 - Contoh BURUK: "Kenalin aku Zoya 🎨✨ Biar aku bisa kasih info yang pas... boleh kasih tahu motornya apa? Atau mungkin ada bagian tertentu? Kalau ada foto boleh kirim juga ya! Oh ya kita buka jam 08.00-17.00..."
