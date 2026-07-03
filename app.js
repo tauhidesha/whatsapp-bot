@@ -7,7 +7,8 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { DateTime } = require('luxon');
-const wppconnect = require('@wppconnect-team/wppconnect');
+const { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, makeCacheableSignalKeyStore, downloadMediaMessage } = require('@whiskeysockets/baileys');
+const pino = require('pino');
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
@@ -1961,24 +1962,56 @@ async function processBufferedMetaMessages(normalizedSenderId, queue) {
 // --- WhatsApp Event Handlers ---
 function start(client) {
     // 🛡️ ENHANCED SAFEGUARD FOR UI INTERACTIONS
-    // Many @lid identifiers are now standard for WA Business.
-    // We wrap these methods to prevent library-level crashes while attempting to interact.
     const wrapSafe = (originalMethod) => async (to, ...args) => {
         try {
-            return await originalMethod(to, ...args);
+            if (originalMethod) return await originalMethod(to, ...args);
         } catch (e) {
             if (to?.toString().endsWith('@lid')) {
-                // Silently log and ignore failures for @lid to prevent cascading crashes
                 console.warn(`[Safeguard] UI Interaction Failed for @lid (${to}): ${e.message}`);
             } else {
-                throw e; // Rethrow for normal @c.us numbers
+                throw e;
             }
         }
     };
 
-    client.sendSeen = wrapSafe(client.sendSeen.bind(client));
-    client.startTyping = wrapSafe(client.startTyping.bind(client));
-    client.stopTyping = wrapSafe(client.stopTyping.bind(client));
+    // Polyfill for Baileys
+    client.sendSeen = wrapSafe(async (to) => {
+        // Usually handled automatically or via readMessages elsewhere
+    });
+    client.startTyping = wrapSafe(async (to) => {
+        await client.sendPresenceUpdate('composing', to);
+    });
+    client.stopTyping = wrapSafe(async (to) => {
+        await client.sendPresenceUpdate('paused', to);
+    });
+    client.sendText = wrapSafe(async (to, text) => {
+        return await client.sendMessage(to, { text: text });
+    });
+    client.sendFile = wrapSafe(async (to, dataUri, filename, caption) => {
+        // Parse data uri: data:image/jpeg;base64,...
+        const match = dataUri.match(/^data:(.*?);base64,(.*)$/);
+        if (!match) throw new Error('Invalid data URI format');
+        const mimetype = match[1];
+        const buffer = Buffer.from(match[2], 'base64');
+        const isImage = mimetype.startsWith('image/');
+        const isVideo = mimetype.startsWith('video/');
+
+        let msgPayload = { mimetype, fileName: filename };
+        if (isImage) {
+            msgPayload.image = buffer;
+            if (caption) msgPayload.caption = caption;
+        } else if (isVideo) {
+            msgPayload.video = buffer;
+            if (caption) msgPayload.caption = caption;
+        } else {
+            msgPayload.document = buffer;
+            if (caption) msgPayload.caption = caption;
+        }
+        return await client.sendMessage(to, msgPayload);
+    });
+    client.close = () => {
+        if (client.ws) client.ws.close();
+    };
 
     // Background Schedulers (Nurturing & Follow-up)
     const { startFollowUpScheduler } = require('./src/ai/agents/followUpEngine/index');
@@ -1989,304 +2022,330 @@ function start(client) {
     });
     client.__debounceQueue = debounceQueue;
 
-    // --- META DEBOUNCE QUEUE ALREADY INITIALIZED AT TOP LEVEL ---
+    // Baileys Message Event
+    client.ev.on('messages.upsert', async ({ messages, type }) => {
+        if (type !== 'notify') return;
 
-    client.onAnyMessage(async (msg) => {
-        await handleAdminHpMessage(msg);
-    });
+        for (const rawMsg of messages) {
+            if (!rawMsg.message) continue;
 
-    client.onMessage(async (msg) => {
-        if (msg.from === 'status@broadcast' || msg.fromMe) {
-            return;
-        }
+            // Map Baileys msg to WPPConnect msg format
+            const senderJid = rawMsg.key.remoteJid;
+            const fromMe = rawMsg.key.fromMe;
 
-        let senderNumber = msg.from;
-        let originalLid = senderNumber.endsWith('@lid') ? senderNumber : null;
-        let realPhoneFallback = '';
+            let msgType = 'chat';
+            let body = rawMsg.message?.conversation || rawMsg.message?.extendedTextMessage?.text || '';
+            let caption = '';
+            let lat, lng, loc, address;
 
-        // Handle @lid (Linked Identity)
-        if (senderNumber.endsWith('@lid')) {
-            // LAYER 1 ONLY: Check from message object (passive, harmless)
-            if (msg.sender && msg.sender.pnJid) {
-                senderNumber = msg.sender.pnJid;
-                console.log(`[LID] Resolved via pnJid: ${senderNumber}`);
-            } else {
-                console.log(`[LID] Unresolved LID accepted: ${senderNumber}. Proceeding with masked identity.`);
+            if (rawMsg.message?.imageMessage) {
+                msgType = 'image';
+                caption = rawMsg.message.imageMessage.caption || '';
+            } else if (rawMsg.message?.videoMessage) {
+                msgType = 'video';
+                caption = rawMsg.message.videoMessage.caption || '';
+            } else if (rawMsg.message?.documentMessage) {
+                msgType = 'document';
+            } else if (rawMsg.message?.locationMessage) {
+                msgType = 'location';
+                lat = rawMsg.message.locationMessage.degreesLatitude;
+                lng = rawMsg.message.locationMessage.degreesLongitude;
+                loc = rawMsg.message.locationMessage.name;
+                address = rawMsg.message.locationMessage.address;
+            } else if (rawMsg.message?.templateButtonReplyMessage) {
+                msgType = 'chat';
             }
-        }
 
-        // Standardize to 62...
-        const { normalizePhone } = require('./src/ai/utils/mergeCustomerContext.js');
-        const normalized = normalizePhone(senderNumber);
-        
-        if (normalized) {
-            // Keep suffix only if normalized doesn't already have one
-            senderNumber = normalized.includes('@') 
-                ? normalized 
-                : (senderNumber.includes('@') ? `${normalized}${senderNumber.substring(senderNumber.indexOf('@'))}` : `${normalized}@c.us`);
-        } else if (originalLid) {
-            // Unresolved lid, set fallback empty so AI can ask
-            realPhoneFallback = '';
-        }
-
-        const senderName = msg.sender?.pushname || msg.sender?.name || msg.notifyName || senderNumber;
-        let messageContent = msg.body;
-        const isMedia = msg.isMedia || msg.type === 'image' || msg.type === 'video' || msg.type === 'tv' || msg.type === 'document';
-        const isImage = msg.type === 'image';
-        const isVideo = msg.type === 'video' || msg.type === 'tv';
-        const isLocation = msg.type === 'location';
-
-        // --- CAPTURE IG AD / QUOTED CONTEXT ---
-        // When user clicks an IG Boost ad and sends a message via WhatsApp,
-        // the ad context (post text, link) appears in quotedMsg/title/description
-        // but msg.body only contains the user's typed text (e.g. "Halo! Bisakah saya...")
-        const quotedParts = [];
-        
-        // WPPConnect: quoted message body
-        if (msg.quotedMsg?.body) {
-            quotedParts.push(msg.quotedMsg.body);
-        } else if (msg.quotedMsgObj?.body) {
-            quotedParts.push(msg.quotedMsgObj.body);
-        }
-        
-        // WPPConnect: link preview / external ad context
-        if (msg.title) quotedParts.push(msg.title);
-        if (msg.description) quotedParts.push(msg.description);
-        if (msg.matchedText) quotedParts.push(msg.matchedText);
-        
-        // Also check for ctwa_context (Click-to-WhatsApp Ad context)
-        if (msg.ctwaContext?.sourceUrl) {
-            quotedParts.push(`[Ad Link: ${msg.ctwaContext.sourceUrl}]`);
-        }
-        if (msg.ctwaContext?.displayText) {
-            quotedParts.push(msg.ctwaContext.displayText);
-        }
-        
-        if (quotedParts.length > 0) {
-            const quotedContext = [...new Set(quotedParts)].join('\n');
-            console.log(`[BUFFER] 📢 IG/Ad context detected for ${senderName}: "${quotedContext.substring(0, 100)}..."`);
-            // Prepend quoted context so the AI knows what the user is referring to
-            messageContent = `[Konteks Iklan/Postingan yang dikutip user]\n${quotedContext}\n\n[Pesan User]\n${messageContent}`;
-        }
-
-        if (!messageContent && !isMedia && !isLocation) return;
-
-        // Log different types of messages
-        if (isLocation) {
-            console.log(`[BUFFER] 📍 Location received from ${senderName}. Lat: ${msg.lat || msg.latitude}, Lng: ${msg.lng || msg.longitude}`);
-        } else if (isImage || isVideo) {
-            console.log(`[BUFFER] 📸/🎥 Media (${isImage ? 'Image' : 'Video'}) received from ${senderName}. Caption: "${msg.caption || 'No caption'}"`);
-        } else if (isMedia) {
-            console.log(`[BUFFER] 📎 Media received from ${senderName}. Type: ${msg.type}`);
-        } else {
-            console.log(`[BUFFER] 💬 Text received from ${senderName}: "${messageContent.substring(0, 120)}"`);
-        }
-
-        // Save sender metadata
-        await saveSenderMeta(senderNumber, senderName, client);
-
-        // Mark coating reminders as replied
-        const { markCoatingReminderAsReplied } = require('./src/ai/utils/coatingReminders');
-        markCoatingReminderAsReplied(senderNumber).catch(e => console.error('[ReminderAck]', e.message));
-
-        let locationContext = null;
-
-        if (isLocation) {
-            const latitude = typeof msg.lat === 'number' ? msg.lat : parseFloat(msg.lat || msg.latitude);
-            const longitude = typeof msg.lng === 'number' ? msg.lng : parseFloat(msg.lng || msg.longitude);
-            const label = msg.loc || msg.address || msg.description || null;
-            const address = msg.address || null;
-
-            if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
-                locationContext = {
-                    latitude,
-                    longitude,
-                    label,
-                    address,
+            let quotedMsgObj = null;
+            if (rawMsg.message?.extendedTextMessage?.contextInfo?.quotedMessage) {
+                const quoted = rawMsg.message.extendedTextMessage.contextInfo.quotedMessage;
+                quotedMsgObj = {
+                    body: quoted.conversation || quoted.extendedTextMessage?.text || quoted.imageMessage?.caption || '',
+                    fromMe: rawMsg.message.extendedTextMessage.contextInfo.participant === client.user?.id
                 };
+            }
 
-                const locationTextParts = [
-                    '📍 Lokasi dibagikan pelanggan:',
-                    label || 'Tanpa label',
-                    `Koordinat: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
-                ];
-                if (address) {
-                    locationTextParts.push(`Alamat: ${address}`);
+            const contextInfo = rawMsg.message?.extendedTextMessage?.contextInfo || rawMsg.message?.imageMessage?.contextInfo || rawMsg.message?.videoMessage?.contextInfo;
+
+            const msg = {
+                from: senderJid,
+                to: fromMe ? senderJid : 'me',
+                fromMe: fromMe,
+                type: msgType,
+                body: body || caption,
+                caption: caption,
+                isMedia: ['image', 'video', 'document'].includes(msgType),
+                lat: lat,
+                lng: lng,
+                loc: loc,
+                address: address,
+                sender: {
+                    pushname: rawMsg.pushName || senderJid,
+                    name: rawMsg.pushName || senderJid,
+                    pnJid: senderJid
+                },
+                quotedMsgObj: quotedMsgObj,
+                ctwaContext: contextInfo?.externalAdReply ? {
+                    sourceUrl: contextInfo.externalAdReply.sourceUrl,
+                    displayText: contextInfo.externalAdReply.title || contextInfo.externalAdReply.body
+                } : null,
+                _raw: rawMsg // Save raw message for media decryption
+            };
+
+            await handleAdminHpMessage(msg);
+
+            if (msg.from === 'status@broadcast' || msg.fromMe) {
+                continue;
+            }
+
+            let senderNumber = msg.from;
+            let originalLid = senderNumber.endsWith('@lid') ? senderNumber : null;
+            let realPhoneFallback = '';
+
+            // Handle @lid (Linked Identity)
+            if (senderNumber.endsWith('@lid')) {
+                // LAYER 1 ONLY: Check from message object (passive, harmless)
+                if (msg.sender && msg.sender.pnJid) {
+                    senderNumber = msg.sender.pnJid;
+                    console.log(`[LID] Resolved via pnJid: ${senderNumber}`);
+                } else {
+                    console.log(`[LID] Unresolved LID accepted: ${senderNumber}. Proceeding with masked identity.`);
                 }
-                messageContent = locationTextParts.join('\n');
+            }
 
-                try {
-                    await saveCustomerLocation(senderNumber, {
+            // Standardize to 62...
+            const { normalizePhone } = require('./src/ai/utils/mergeCustomerContext.js');
+            const normalized = normalizePhone(senderNumber);
+
+            if (normalized) {
+                // Keep suffix only if normalized doesn't already have one
+                senderNumber = normalized.includes('@')
+                    ? normalized
+                    : (senderNumber.includes('@') ? `${normalized}${senderNumber.substring(senderNumber.indexOf('@'))}` : `${normalized}@c.us`);
+            } else if (originalLid) {
+                // Unresolved lid, set fallback empty so AI can ask
+                realPhoneFallback = '';
+            }
+
+            const senderName = msg.sender?.pushname || msg.sender?.name || msg.notifyName || senderNumber;
+            let messageContent = msg.body;
+            const isMedia = msg.isMedia || msg.type === 'image' || msg.type === 'video' || msg.type === 'tv' || msg.type === 'document';
+            const isImage = msg.type === 'image';
+            const isVideo = msg.type === 'video' || msg.type === 'tv';
+            const isLocation = msg.type === 'location';
+
+            // --- CAPTURE IG AD / QUOTED CONTEXT ---
+            // When user clicks an IG Boost ad and sends a message via WhatsApp,
+            // the ad context (post text, link) appears in quotedMsg/title/description
+            // but msg.body only contains the user's typed text (e.g. "Halo! Bisakah saya...")
+            // IMPORTANT: Filter out bot's own replies — when user uses WA "reply" feature,
+            // quotedMsg contains the bot's previous message, NOT ad context.
+            const quotedParts = [];
+
+            // WPPConnect: quoted message body — only if NOT from bot itself
+            const quotedMsg = msg.quotedMsg || msg.quotedMsgObj;
+            if (quotedMsg?.body && !quotedMsg.fromMe) {
+                quotedParts.push(quotedMsg.body);
+            }
+
+            // WPPConnect: link preview / external ad context (these are never bot replies)
+            if (msg.title) quotedParts.push(msg.title);
+            if (msg.description) quotedParts.push(msg.description);
+            if (msg.matchedText) quotedParts.push(msg.matchedText);
+
+            // Click-to-WhatsApp Ad context (ctwa) — definitive IG ad indicator
+            if (msg.ctwaContext?.sourceUrl) {
+                quotedParts.push(`[Ad Link: ${msg.ctwaContext.sourceUrl}]`);
+            }
+            if (msg.ctwaContext?.displayText) {
+                quotedParts.push(msg.ctwaContext.displayText);
+            }
+
+            if (quotedParts.length > 0) {
+                const quotedContext = [...new Set(quotedParts)].join('\n');
+                console.log(`[BUFFER] 📢 IG/Ad context detected for ${senderName}: "${quotedContext.substring(0, 100)}..."`);
+                messageContent = `[Konteks Iklan/Postingan yang dikutip user]\n${quotedContext}\n\n[Pesan User]\n${messageContent}`;
+            }
+
+            if (!messageContent && !isMedia && !isLocation) return;
+
+            // Log different types of messages
+            if (isLocation) {
+                console.log(`[BUFFER] 📍 Location received from ${senderName}. Lat: ${msg.lat || msg.latitude}, Lng: ${msg.lng || msg.longitude}`);
+            } else if (isImage || isVideo) {
+                console.log(`[BUFFER] 📸/🎥 Media (${isImage ? 'Image' : 'Video'}) received from ${senderName}. Caption: "${msg.caption || 'No caption'}"`);
+            } else if (isMedia) {
+                console.log(`[BUFFER] 📎 Media received from ${senderName}. Type: ${msg.type}`);
+            } else {
+                console.log(`[BUFFER] 💬 Text received from ${senderName}: "${messageContent.substring(0, 120)}"`);
+            }
+
+            // Save sender metadata
+            await saveSenderMeta(senderNumber, senderName, client);
+
+            // Mark coating reminders as replied
+            const { markCoatingReminderAsReplied } = require('./src/ai/utils/coatingReminders');
+            markCoatingReminderAsReplied(senderNumber).catch(e => console.error('[ReminderAck]', e.message));
+
+            let locationContext = null;
+
+            if (isLocation) {
+                const latitude = typeof msg.lat === 'number' ? msg.lat : parseFloat(msg.lat || msg.latitude);
+                const longitude = typeof msg.lng === 'number' ? msg.lng : parseFloat(msg.lng || msg.longitude);
+                const label = msg.loc || msg.address || msg.description || null;
+                const address = msg.address || null;
+
+                if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+                    locationContext = {
                         latitude,
                         longitude,
-                        address,
                         label,
-                        raw: {
+                        address,
+                    };
+
+                    const locationTextParts = [
+                        '📍 Lokasi dibagikan pelanggan:',
+                        label || 'Tanpa label',
+                        `Koordinat: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
+                    ];
+                    if (address) {
+                        locationTextParts.push(`Alamat: ${address}`);
+                    }
+                    messageContent = locationTextParts.join('\n');
+
+                    try {
+                        await saveCustomerLocation(senderNumber, {
                             latitude,
                             longitude,
                             address,
                             label,
-                            from: 'whatsapp-share-location',
-                        },
-                        source: 'whatsapp-share-location',
-                    });
+                            raw: {
+                                latitude,
+                                longitude,
+                                address,
+                                label,
+                                from: 'whatsapp-share-location',
+                            },
+                            source: 'whatsapp-share-location',
+                        });
+                    } catch (error) {
+                        console.warn('[Location] Gagal menyimpan lokasi pelanggan:', error);
+                    }
+                } else {
+                    messageContent = '📍 Lokasi dibagikan, namun koordinat tidak terbaca.';
+                }
+            }
+
+            const { normalizedAddress } = parseSenderIdentity(senderNumber);
+            if (await isSnoozeActive(normalizedAddress)) {
+                const storedContent = (() => {
+                    if (messageContent && messageContent.trim()) {
+                        return messageContent.trim();
+                    }
+                    if (isImage || isVideo) {
+                        const captionText = (msg.caption || '').trim();
+                        return captionText || `[${isImage ? 'Foto' : 'Video'} diterima]`;
+                    }
+                    if (isMedia) {
+                        return `[${msg.type}]`;
+                    }
+                    return '[Pesan kosong]';
+                })();
+
+                await saveMessageToPrisma(senderNumber, storedContent, 'user');
+                console.log(`[SNOOZE] Pesan dari ${senderName} disimpan tanpa respons AI (handover aktif).`);
+                return;
+            }
+
+            const entry = pendingMessages.get(senderNumber) || { senderName, messages: [] };
+            entry.senderName = senderName;
+
+            let analysisResult = null;
+
+            const messageEntry = {
+                content: '',
+                isMedia,
+                isImage,
+                isVideo,
+                originalMsg: msg,
+            };
+
+            if (isImage || isVideo) {
+                const captionText = (msg.caption || '').trim();
+
+                try {
+                    console.log(`[MULTIMODAL] 🔄 Mengunduh media (${isImage ? 'Image' : 'Video'}) dari ${senderName}...`);
+                    const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+                    const pino = require('pino');
+                    const mediaBuffer = await downloadMediaMessage(msg._raw, 'buffer', {}, { logger: pino({ level: 'silent' }) });
+                    console.log(`[MULTIMODAL] ✅ Media terunduh (${mediaBuffer.length} bytes)`);
+
+                    // Store media info for multimodal processing
+                    messageEntry.mediaData = {
+                        buffer: mediaBuffer,
+                        mimetype: msg.mimetype || (isImage ? 'image/jpeg' : 'video/mp4'),
+                        type: isImage ? 'image' : 'video'
+                    };
                 } catch (error) {
-                    console.warn('[Location] Gagal menyimpan lokasi pelanggan:', error);
+                    console.error(`[MULTIMODAL] ❌ Gagal mengunduh media dari ${senderName}:`, error);
                 }
+
+                messageContent = captionText || `[${isImage ? 'Foto' : 'Video'} diterima]`;
+                messageEntry.content = messageContent;
             } else {
-                messageContent = '📍 Lokasi dibagikan, namun koordinat tidak terbaca.';
-            }
-        }
-
-        const { normalizedAddress } = parseSenderIdentity(senderNumber);
-        if (await isSnoozeActive(normalizedAddress)) {
-            const storedContent = (() => {
-                if (messageContent && messageContent.trim()) {
-                    return messageContent.trim();
-                }
-                if (isImage || isVideo) {
-                    const captionText = (msg.caption || '').trim();
-                    return captionText || `[${isImage ? 'Foto' : 'Video'} diterima]`;
-                }
-                if (isMedia) {
-                    return `[${msg.type}]`;
-                }
-                return '[Pesan kosong]';
-            })();
-
-            await saveMessageToPrisma(senderNumber, storedContent, 'user');
-            console.log(`[SNOOZE] Pesan dari ${senderName} disimpan tanpa respons AI (handover aktif).`);
-            return;
-        }
-
-        const entry = pendingMessages.get(senderNumber) || { senderName, messages: [] };
-        entry.senderName = senderName;
-
-        let analysisResult = null;
-
-        const messageEntry = {
-            content: '',
-            isMedia,
-            isImage,
-            isVideo,
-            originalMsg: msg,
-        };
-
-        if (isImage || isVideo) {
-            const captionText = (msg.caption || '').trim();
-
-            try {
-                console.log(`[MULTIMODAL] 🔄 Mengunduh media (${isImage ? 'Image' : 'Video'}) dari ${senderName}...`);
-                const mediaBuffer = await client.decryptFile(msg);
-                console.log(`[MULTIMODAL] ✅ Media terunduh (${mediaBuffer.length} bytes)`);
-
-                // Store media info for multimodal processing
-                messageEntry.mediaData = {
-                    buffer: mediaBuffer,
-                    mimetype: msg.mimetype || (isImage ? 'image/jpeg' : 'video/mp4'),
-                    type: isImage ? 'image' : 'video'
-                };
-            } catch (error) {
-                console.error(`[MULTIMODAL] ❌ Gagal mengunduh media dari ${senderName}:`, error);
+                messageEntry.content = messageContent || (isLocation ? '[Lokasi diterima]' : `[${msg.type}]`);
             }
 
-            messageContent = captionText || `[${isImage ? 'Foto' : 'Video'} diterima]`;
-            messageEntry.content = messageContent;
-        } else {
-            messageEntry.content = messageContent || (isLocation ? '[Lokasi diterima]' : `[${msg.type}]`);
-        }
+            if (analysisResult) {
+                messageEntry.analysis = analysisResult;
+            }
 
-        if (analysisResult) {
-            messageEntry.analysis = analysisResult;
-        }
+            if (locationContext) {
+                messageEntry.location = locationContext;
+            }
 
-        if (locationContext) {
-            messageEntry.location = locationContext;
-        }
+            // --- INSTANT SAVE ---
+            const adminNumbers = [
+                process.env.BOSMAT_ADMIN_NUMBER,
+                process.env.ADMIN_WHATSAPP_NUMBER
+            ].filter(Boolean);
 
-        entry.messages.push(messageEntry);
-        pendingMessages.set(senderNumber, entry);
+            /* normalize replaced by normalizePhone in mergeCustomerContext.js */
+            const senderNormalized = normalizePhone(senderNumber);
+            const isAdmin = adminNumbers.some(num => normalizePhone(num) === senderNormalized);
 
-        // Cek apakah pengirim adalah admin untuk bypass buffer time
-        const adminNumbers = [
-            process.env.BOSMAT_ADMIN_NUMBER,
-            process.env.ADMIN_WHATSAPP_NUMBER
-        ].filter(Boolean);
+            if (prisma) {
+                const userRole = isAdmin ? 'admin' : 'user';
+                // Fire & forget to save incoming message instantly so UI is updated realtime
+                saveMessageToPrisma(senderNumber, messageEntry.content, userRole).catch(err => console.warn('[InstantSave] Failed:', err.message));
+            }
+            // --------------------
 
-        /* normalize replaced by normalizePhone in mergeCustomerContext.js */
-        const senderNormalized = normalizePhone(senderNumber);
-        const isAdmin = adminNumbers.some(num => normalizePhone(num) === senderNormalized);
+            entry.messages.push(messageEntry);
+            pendingMessages.set(senderNumber, entry);
 
-        if (isAdmin) {
-            console.log(`[BUFFER] ⚡ Admin detected (${senderNumber}), skipping debounce buffer.`);
-            await processBufferedMessages(senderNumber, client);
-        } else {
-            debounceQueue.schedule(senderNumber, messageEntry);
-        }
-    });
+            if (isAdmin) {
+                console.log(`[BUFFER] ⚡ Admin detected (${senderNumber}), skipping debounce buffer.`);
+                await processBufferedMessages(senderNumber, client);
+            } else {
+                debounceQueue.schedule(senderNumber, messageEntry);
+            }
+        } // End of for (const rawMsg of messages)
+    }); // End of client.ev.on('messages.upsert')
 
     // --- Handle Incoming Calls ---
-    client.onIncomingCall(async (call) => {
-        console.log(`[CALL] Panggilan masuk dari ${call.peerJid}`);
-        try {
-            // Zoya tidak bisa angkat telepon, kirim pesan otomatis yang ramah
-            const message = "Waduh, maaf ya Mas, Zoya nggak bisa angkat telepon 😅.\n\nKetik aja pertanyaannya di sini, nanti Zoya bantu jawab kok! 👇";
-            markBotMessage(call.peerJid, message);
-            await client.sendText(call.peerJid, message);
-        } catch (e) {
-            console.error('[CALL] Error handling incoming call:', e);
-        }
-    });
-
-    client.onStateChange(async (state) => {
-        console.log('📱 [WhatsApp] State changed:', state);
-
-        if (state.includes('CONFLICT')) {
-            console.log('⚠️ [WhatsApp] Conflict detected, using current session...');
-            try {
-                await client.useHere();
-                console.log('✅ [WhatsApp] Conflict resolved');
-            } catch (e) {
-                console.error('❌ [WhatsApp] Failed to resolve conflict:', e.message);
+    client.ev.on('call', async (calls) => {
+        for (const call of calls) {
+            if (call.status === 'offer') {
+                console.log(`[CALL] Panggilan masuk dari ${call.from}`);
+                try {
+                    const message = "Waduh, maaf ya Mas, Zoya nggak bisa angkat telepon 😅.\n\nKetik aja pertanyaannya di sini, nanti Zoya bantu jawab kok! 👇";
+                    markBotMessage(call.from, message);
+                    await client.sendMessage(call.from, { text: message });
+                } catch (e) {
+                    console.error('[CALL] Error handling incoming call:', e);
+                }
             }
-        }
-
-        // Handle SYNCING state - jangan trigger reconnect saat masih syncing
-        if (state.includes('SYNCING')) {
-            console.log('⏳ [WhatsApp] Syncing connection... (TUNGGU, jangan logout dari mobile!)');
-            // Jangan trigger reconnect saat masih syncing, biarkan proses selesai
-            return;
-        }
-
-        if (state.includes('UNPAIRED') || state.includes('LOGOUT')) {
-            console.error('❌ [WhatsApp] Logged out / Unpaired detected!');
-            console.warn('⚠️ [WhatsApp] Kemungkinan penyebab:');
-            console.warn('   1. WhatsApp logout dari mobile device');
-            console.warn('   2. WhatsApp Multi-Device tidak aktif');
-            console.warn('   3. Session expired atau invalid');
-            console.warn('   4. WhatsApp Web di-unlink dari mobile');
-            console.log('🔄 [WhatsApp] Attempting to reconnect in 15 seconds...');
-
-            // Set flag untuk trigger reconnect
-            global.whatsappClient = null;
-
-            // Reconnect setelah delay lebih lama untuk pastikan state sudah stabil
-            setTimeout(async () => {
-                await reconnectWhatsApp();
-            }, 15000);
-        }
-
-        if (state.includes('DISCONNECTED') || state.includes('disconnectedMobile')) {
-            console.warn('⚠️ [WhatsApp] Disconnected / disconnectedMobile detected');
-            console.warn('💡 [WhatsApp] INSTRUKSI PENTING:');
-            console.warn('   1. Buka WhatsApp di HP Anda');
-            console.warn('   2. Settings → Linked Devices');
-            console.warn('   3. Pastikan "Multi-device beta" atau "Link a Device" AKTIF');
-            console.warn('   4. JANGAN logout dari WhatsApp di HP saat bot running');
-            console.log('🔄 [WhatsApp] Attempting to reconnect in 10 seconds...');
-            setTimeout(async () => {
-                await reconnectWhatsApp();
-            }, 10000);
         }
     });
 }
@@ -2294,7 +2353,7 @@ function start(client) {
 // --- Prisma Message Saving ---
 async function saveMessageToPrisma(senderNumber, message, senderType) {
     const prisma = require('./src/lib/prisma');
-    
+
     const { docId, channel, platformId, isLid } = parseSenderIdentity(senderNumber);
     if (!docId) return;
 
@@ -2336,14 +2395,48 @@ async function saveMessageToPrisma(senderNumber, message, senderType) {
         }
 
         if (customer) {
+            const msgRole = roleMap[senderType] || 'user';
             await prisma.directMessage.create({
                 data: {
                     customerId: customer.id,
                     senderId: senderNumber,
-                    role: roleMap[senderType] || 'user',
+                    role: msgRole,
                     content: messageText,
                 }
             });
+
+            // Send Web Push Notification to Admins if it's from a user
+            if (msgRole === 'user' && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+                try {
+                    const subscriptions = await prisma.pushSubscription.findMany();
+                    const payload = JSON.stringify({
+                        title: customer.name || senderNumber,
+                        body: messageText,
+                        url: '/conversations'
+                    });
+                    
+                    const pushPromises = subscriptions.map(sub => {
+                        const pushSub = {
+                            endpoint: sub.endpoint,
+                            keys: {
+                                p256dh: sub.p256dh,
+                                auth: sub.auth
+                            }
+                        };
+                        return webpush.sendNotification(pushSub, payload).catch(err => {
+                            if (err.statusCode === 404 || err.statusCode === 410) {
+                                // Subscription has expired or is no longer valid
+                                return prisma.pushSubscription.delete({ where: { id: sub.id } });
+                            } else {
+                                console.error('Push notification error:', err);
+                            }
+                        });
+                    });
+                    await Promise.all(pushPromises);
+                } catch (pushErr) {
+                    console.error('Error in sending web push:', pushErr);
+                }
+            }
 
             // Update customer data
             const updateData = {
@@ -2353,12 +2446,12 @@ async function saveMessageToPrisma(senderNumber, message, senderType) {
                 aiPausedUntil: snoozeInfo.expiresAt ? new Date(snoozeInfo.expiresAt) : null,
                 aiPauseReason: snoozeInfo.reason,
             };
-            
+
             // If sender uses @lid format, save it to whatsappLid field
             if (senderNumber.endsWith('@lid')) {
                 updateData.whatsappLid = senderNumber;
             }
-            
+
             await prisma.customer.update({
                 where: { id: customer.id },
                 data: updateData
@@ -2409,8 +2502,7 @@ async function saveSenderMeta(senderNumber, displayName, client = null) {
     let profilePicUrl = null;
     if (client && channel === 'whatsapp' && !isLid && !fetchedProfilePics.has(senderNumber)) {
         try {
-            const picResult = await client.getProfilePicFromServer(senderNumber);
-            // Extract URL string from the object returned by WhatsApp
+            const picResult = await client.profilePictureUrl(senderNumber, 'image');
             if (typeof picResult === 'string') {
                 profilePicUrl = picResult;
             } else if (picResult && typeof picResult === 'object') {
@@ -2433,7 +2525,7 @@ async function saveSenderMeta(senderNumber, displayName, client = null) {
             aiPausedUntil: snoozeInfo.expiresAt ? new Date(snoozeInfo.expiresAt) : null,
             aiPauseReason: snoozeInfo.reason,
         };
-        
+
         if (isLid) {
             customerData.whatsappLid = originalId;
         }
@@ -2537,7 +2629,7 @@ async function listConversations(limit = 100) {
 
 // --- API Endpoints ---
 const metaWebhookRouter = createMetaWebhookRouter({
-    getAIResponse,
+    zoyaAgent,
     saveMessageToFirestore,
     saveSenderMeta,
     debounceQueue: metaDebounceQueue,
@@ -2583,14 +2675,14 @@ app.get('/trigger-scheduler-manual', async (req, res) => {
     try {
         const { runDailyFollowUp } = require('./src/ai/agents/followUpEngine/scheduler.js');
         const limit = req.query.limit ? parseInt(req.query.limit) : 0; // Default limit 0 means all
-        
+
         console.log(`[Manual-Trigger] Triggering scheduler for ${limit || 'ALL'} customers...`);
-        
+
         // Run in background so request doesn't timeout
         runDailyFollowUp(false, limit).catch(err => console.error('[Manual-Trigger] Error:', err));
-        
-        res.json({ 
-            status: 'success', 
+
+        res.json({
+            status: 'success',
             message: 'Scheduler triggered in background',
             limitApplied: limit || 'ALL',
             note: 'Cek PM2 logs untuk melihat progres pengiriman.'
@@ -2698,7 +2790,7 @@ app.post('/generate-invoice', requireAuth, async (req, res) => {
         // Fetch customer + latest booking dari DB sekaligus
         const prisma = require('./src/lib/prisma');
         const normalizedPhone = customerPhone.replace(/[^0-9]/g, '');
-        
+
         const customer = await prisma.customer.findFirst({
             where: {
                 OR: [
@@ -2756,7 +2848,9 @@ app.post('/generate-invoice', requireAuth, async (req, res) => {
             console.log(`[API] Using customer phone: ${recipientNumber}`);
         } else {
             recipientNumber = recipientNumber.replace(/\D/g, '');
-            if (recipientNumber.length > 0) {
+            if (recipientNumber.length >= 14 && ['1', '2'].includes(recipientNumber[0])) {
+                recipientNumber = `${recipientNumber}@lid`;
+            } else if (recipientNumber.length > 0) {
                 recipientNumber = `${recipientNumber}@c.us`;
             }
             console.log(`[API] Formatted customer phone: ${recipientNumber}`);
@@ -2845,21 +2939,21 @@ app.post('/send-message', requireAuth, async (req, res) => {
             }
 
             let targetNumber = identity.normalizedAddress || toSenderNumberWithSuffix(number);
-            
+
             // Active LID resolution has been disabled here to prevent mobile unpairing.
             if (targetNumber && targetNumber.endsWith('@lid')) {
                 console.log(`[API] LID targeted for sending: ${targetNumber} (Resolution disabled)`);
             }
-            
+
             // Ensure proper suffix for non-suffixed numbers (fallback)
             if (targetNumber && !targetNumber.includes('@')) {
                 targetNumber = targetNumber + '@c.us';
             }
 
-            
+
             console.log(`[API] Sending to: ${targetNumber}`);
             markBotMessage(targetNumber, finalMessage);
-            
+
             try {
                 await global.whatsappClient.sendText(targetNumber, finalMessage);
                 console.log(`[API] Successfully sent WhatsApp message to ${targetNumber}`);
@@ -2892,7 +2986,7 @@ app.post('/send-message', requireAuth, async (req, res) => {
                 if (sendError.message && sendError.message.includes('No LID')) {
                     console.log(`[API] Send failed with No LID for: ${targetNumber}`);
                     const cleanPhone = targetNumber.replace(/@c\.us$|@lid$/, '');
-                    
+
                     const prisma = require('./src/lib/prisma');
                     const customerFallback = await prisma.customer.findFirst({
                         where: {
@@ -2958,7 +3052,7 @@ app.post('/send-message', requireAuth, async (req, res) => {
                     throw sendError;
                 }
             }
-            
+
             await saveMessageToPrisma(targetNumber, finalMessage, 'admin');
             return res.status(200).json({ success: true, channel: 'whatsapp', rewritten });
         }
@@ -3017,17 +3111,52 @@ app.post('/test-ai', requireAuth, async (req, res) => {
         // If mode is 'admin', use the admin number so getAIResponse picks up the ADMIN_SYSTEM_PROMPT
         let effectiveSenderNumber = senderNumber || null;
         let senderName = "Test User";
+        let isAdmin = false;
         if (mode === 'admin') {
             // Only force the sender number if it's already set somehow, otherwise we still want it to be null to use local memory if applicable
             if (effectiveSenderNumber) {
                 effectiveSenderNumber = process.env.BOSMAT_ADMIN_NUMBER || process.env.ADMIN_WHATSAPP_NUMBER || effectiveSenderNumber;
             }
             senderName = "Admin (Playground)";
+            isAdmin = true;
         }
 
-        const aiResult = await getAIResponse(testMessage, senderName, effectiveSenderNumber, "", mediaItems, model_override, history);
-        const response = aiResult.content;
-        const runId = aiResult.id;
+        const { HumanMessage } = require('@langchain/core/messages');
+        const messageContent = [];
+        if (testMessage) {
+            messageContent.push({ type: 'text', text: testMessage });
+        }
+        if (mediaItems && mediaItems.length > 0) {
+            mediaItems.forEach(media => {
+                if (media.mimetype && media.buffer) {
+                    messageContent.push({
+                        type: 'image_url',
+                        image_url: `data:${media.mimetype};base64,${media.buffer.toString('base64')}`
+                    });
+                }
+            });
+        }
+        if (messageContent.length === 0) {
+            messageContent.push({ type: 'text', text: '[Pesan Kosong]' });
+        }
+
+        const input = {
+            messages: [new HumanMessage({ content: messageContent })],
+            metadata: {
+                phoneReal: effectiveSenderNumber || "test_user_playground",
+                senderName: senderName,
+                mediaItems: mediaItems,
+                isAdmin: isAdmin 
+            }
+        };
+
+        const aiResult = await zoyaAgent.invoke(input, {
+            configurable: { thread_id: effectiveSenderNumber || "test_user_playground" }
+        });
+
+        const lastMessage = aiResult.messages[aiResult.messages.length - 1];
+        const response = lastMessage ? lastMessage.content : "No response";
+        const runId = aiResult.runId || null;
 
         // Save messages to history AFTER processing to avoid doubling in history
         if (effectiveSenderNumber && prisma) {
@@ -3539,11 +3668,11 @@ app.post('/follow-up-queue/execute', requireAuth, async (req, res) => {
                         if (customer) {
                             await prisma.directMessage.create({
                                 data: { customerId: customer.id, senderId: senderNumber, role: 'assistant', content: message }
-                            }).catch(() => {});
+                            }).catch(() => { });
                             await prisma.customer.update({
                                 where: { id: customer.id },
                                 data: { lastMessage: message, lastMessageAt: new Date() }
-                            }).catch(() => {});
+                            }).catch(() => { });
                         }
 
                         const ctx = await prisma.customerContext.findUnique({ where: { id: docId } }).catch(() => null);
@@ -3554,12 +3683,12 @@ app.post('/follow-up-queue/execute', requireAuth, async (req, res) => {
                                 lastFollowUpStrategy: type,
                             };
                             if (type === 'review') updateData.reviewFollowUpSent = true;
-                            
+
                             await prisma.customerContext.update({
                                 where: { id: docId },
                                 data: updateData,
                             }).catch(err => console.warn(`[QueueExecute] Context update failed for ${docId}:`, err.message));
-                            
+
                             console.log(`[QueueExecute] Context updated for ${docId} (followUpCount => ${updateData.followUpCount})`);
                         } else {
                             console.warn(`[QueueExecute] Warning: Context not found for ${docId}, followUpCount not updated.`);
@@ -3592,7 +3721,7 @@ app.post('/follow-up-queue/execute', requireAuth, async (req, res) => {
             // Clear saved queue after execute
             await prisma.keyValueStore.deleteMany({
                 where: { collection: 'follow_up_queue', key: 'saved' }
-            }).catch(() => {});
+            }).catch(() => { });
 
             _executeStatus.running = false;
             _executeStatus.current = null;
@@ -3642,370 +3771,8 @@ server.listen(PORT, '0.0.0.0', async () => {
     // Force false untuk production (jika env tidak di-set atau bukan 'true', maka false)
     const shouldAutoClose = process.env.WHATSAPP_AUTO_CLOSE === 'true';
 
-    console.log(`🔧 WhatsApp Config: AUTO_CLOSE=${shouldAutoClose} (env: "${process.env.WHATSAPP_AUTO_CLOSE}"), HEADLESS=${whatsappHeadless}`);
 
-    console.log(`🔧 Puppeteer Config: Headless=${whatsappHeadless}, Executable=${process.env.PUPPETEER_EXECUTABLE_PATH || 'System Default'}`);
-
-    wppconnect.create({
-        session: sessionName,
-        // 🛠️ FIX: Set User Agent di awal config agar lolos deteksi saat loading/syncing
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-        authTimeout: 300000, // Perpanjang ke 5 menit untuk VPS
-        blockCrashLogs: true,
-        disableGoogleAnalytics: true,
-        catchQR: (base64Qr, asciiQR, attempt, urlCode) => {
-            console.log('📱 WhatsApp QR Code (Small Mode):');
-            if (urlCode) {
-                qrcode.generate(urlCode, { small: true });
-                console.log('\n🎫 Pairing Code (Raw):', urlCode);
-                console.log('💡 Jika QR terpotong, copy kode di atas ke https://www.the-qrcode-generator.com/');
-                console.log('💡 Jika scan gagal, coba perbesar terminal atau copy kode di atas.');
-            } else {
-                console.log(asciiQR);
-            }
-        },
-        statusFind: (statusSession, session) => {
-            console.log('📱 WhatsApp Status:', statusSession, 'Session:', session);
-            if (statusSession === 'isLogged') {
-                console.log('✅ WhatsApp sudah login, tidak perlu QR code');
-            } else if (statusSession === 'notLogged') {
-                console.log('⚠️ WhatsApp belum login, menunggu QR code...');
-            } else if (statusSession === 'qrReadSuccess') {
-                console.log('✅ QR code berhasil di-scan!');
-            } else if (statusSession === 'autocloseCalled') {
-                console.error('❌ ERROR: Auto close dipanggil! Pastikan WHATSAPP_AUTO_CLOSE=false');
-                console.error('⚠️ Mencoba reconnect...');
-                // Jangan throw error, biarkan retry
-            } else if (statusSession === 'disconnectedMobile' || statusSession.includes('disconnectedMobile')) {
-                console.error('❌ [WhatsApp] Session Unpaired - WhatsApp terdeteksi login di mobile device');
-                console.error('⚠️ [WhatsApp] ============================================');
-                console.error('⚠️ [WhatsApp] MASALAH: WhatsApp Web di-unpair oleh mobile');
-                console.error('⚠️ [WhatsApp] ============================================');
-                console.warn('💡 [WhatsApp] SOLUSI (WAJIB DILAKUKAN):');
-                console.warn('   1. Buka WhatsApp di HP Anda');
-                console.warn('   2. Masuk ke: Settings → Linked Devices');
-                console.warn('   3. Pastikan "Multi-device beta" atau "Link a Device" AKTIF');
-                console.warn('   4. Jika belum aktif, AKTIFKAN sekarang');
-                console.warn('   5. JANGAN logout dari WhatsApp di HP saat bot running');
-                console.warn('   6. Bot akan auto-reconnect, scan QR code yang muncul');
-                console.warn('💡 [WhatsApp] Setelah Multi-Device aktif, bot tidak akan unpair lagi');
-                // Trigger reconnect setelah delay lebih lama
-                setTimeout(async () => {
-                    if (global.whatsappClient) {
-                        global.whatsappClient = null;
-                        await reconnectWhatsApp();
-                    }
-                }, 15000);
-            } else if (statusSession === 'SYNCING' || statusSession.includes('SYNCING')) {
-                console.log('⏳ [WhatsApp] Syncing connection... (TUNGGU, jangan logout dari mobile!)');
-                console.log('⏳ [WhatsApp] State: SYNCING - Proses normal, tunggu selesai...');
-            }
-        },
-        puppeteerOptions: {
-            userDataDir: sessionDataPath,
-            executablePath: CHROMIUM_PATH,
-            args: PUPPETEER_CHROME_ARGS,
-            ignoreHTTPSErrors: true,
-            defaultViewport: PUPPETEER_VIEWPORT,
-            timeout: 300000,
-            protocolTimeout: 600000,
-        },
-        headless: whatsappHeadless,
-        logQR: false,
-        autoClose: shouldAutoClose ? 60000 : 0, // 0 to disable auto close
-        disableWelcome: true, // Disable welcome message
-        sessionDataPath,
-    })
-        .then(async (client) => {
-            global.whatsappClient = client;
-
-            // Inject stealth mode setelah client ready
-            try {
-                if (client.page) {
-                    const page = client.page;
-                    // Bypass webdriver detection
-                    await page.evaluateOnNewDocument(() => {
-                        // Override navigator.webdriver
-                        Object.defineProperty(navigator, 'webdriver', {
-                            get: () => false,
-                        });
-
-                        // Override chrome object
-                        window.chrome = {
-                            runtime: {},
-                            loadTimes: function () { },
-                            csi: function () { },
-                            app: {}
-                        };
-
-                        // Override permissions
-                        const originalQuery = window.navigator.permissions.query;
-                        window.navigator.permissions.query = (parameters) => (
-                            parameters.name === 'notifications' ?
-                                Promise.resolve({ state: Notification.permission }) :
-                                originalQuery(parameters)
-                        );
-
-                        // Override plugins
-                        Object.defineProperty(navigator, 'plugins', {
-                            get: () => [1, 2, 3, 4, 5],
-                        });
-
-                        // Override languages
-                        Object.defineProperty(navigator, 'languages', {
-                            get: () => ['en-US', 'en'],
-                        });
-                    });
-
-                    // Set realistic user agent
-                    await page.setUserAgent(
-                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'
-                    );
-
-                    console.log('🕵️ [Stealth] Anti-detection scripts injected successfully');
-                }
-            } catch (stealthError) {
-                console.warn('[Stealth] Failed to inject anti-detection (non-critical):', stealthError.message);
-            }
-
-            start(client);
-            console.log('✅ WhatsApp client initialized successfully!');
-
-            if (process.env.RUN_ADMIN_BACKFILL === 'true') {
-                console.log('🔄 [Backfill] Starting admin message backfill...');
-                backfillAdminMessages(client)
-                    .then(() => console.log('✅ [Backfill] Admin message backfill complete'))
-                    .catch(err => console.error('❌ [Backfill] Backfill failed:', err.message))
-                    .finally(() => {
-                        console.log('💡 [Backfill] Set RUN_ADMIN_BACKFILL=false to disable');
-                    });
-            }
-
-            if (process.env.RUN_PROFILE_PIC_BACKFILL === 'true') {
-                console.log('🖼️  [Backfill] Starting profile picture backfill...');
-                backfillProfilePics(client)
-                    .then(() => console.log('✅ [Backfill] Profile picture backfill complete'))
-                    .catch(err => console.error('❌ [Backfill] Profile pic backfill failed:', err.message))
-                    .finally(() => {
-                        console.log('💡 [Backfill] Set RUN_PROFILE_PIC_BACKFILL=false to disable');
-                    });
-            }
-
-            // Start keep-alive mechanism untuk mencegah server idle timeout
-            startKeepAlive();
-
-            // Start WhatsApp connection keep-alive
-            startWhatsAppKeepAlive(client);
-        })
-        .catch((error) => {
-            console.error('❌ WhatsApp initialization error:', error);
-            // Tetap start keep-alive meskipun WhatsApp belum connect
-            startKeepAlive();
-
-            // Retry connection setelah delay
-            setTimeout(async () => {
-                await reconnectWhatsApp();
-            }, 30000);
-        });
 });
-
-// Reconnect WhatsApp function
-async function reconnectWhatsApp() {
-    if (global.whatsappReconnecting) {
-        console.log('⏳ [WhatsApp] Reconnection already in progress, skipping...');
-        return;
-    }
-
-    global.whatsappReconnecting = true;
-    console.log('🔄 [WhatsApp] Starting reconnection process...');
-
-    try {
-        const sessionName = process.env.WHATSAPP_SESSION || 'ai-chatbot';
-        const sessionDataPath = './tokens';
-        const whatsappHeadless = process.env.WHATSAPP_HEADLESS === 'true';
-        const shouldAutoClose = process.env.WHATSAPP_AUTO_CLOSE === 'true';
-
-        // Cleanup old client jika ada
-        if (global.whatsappClient) {
-            try {
-                await global.whatsappClient.close();
-            } catch (e) {
-                console.warn('[WhatsApp] Error closing old client:', e.message);
-            }
-            global.whatsappClient = null;
-        }
-
-        // Cleanup locks
-        await cleanupChromiumProfileLocks(sessionName, sessionDataPath).catch((error) => {
-            console.warn('[Browser] Failed to clean up Chromium profile locks:', error.message);
-        });
-
-        // Recreate connection
-        console.log(`🔄 [WhatsApp] Reconnecting...`);
-
-        const client = await wppconnect.create({
-            session: sessionName,
-            // 🛠️ FIX: Terapkan config yang sama saat reconnect
-            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-            authTimeout: 120000,
-            blockCrashLogs: true,
-            catchQR: (base64Qr, asciiQR, attempt, urlCode) => {
-                console.log('📱 [WhatsApp] QR Code (Reconnect):');
-                if (urlCode) {
-                    qrcode.generate(urlCode, { small: true });
-                    console.log('\n🎫 Pairing Code (Raw):', urlCode);
-                } else {
-                    console.log(asciiQR);
-                }
-                console.log('💡 [WhatsApp] SCAN QR CODE INI dengan WhatsApp di HP Anda');
-                console.log('💡 [WhatsApp] Pastikan Multi-Device sudah aktif sebelum scan!');
-            },
-            // Stealth mode untuk reconnect juga
-            browserArgs: PUPPETEER_CHROME_ARGS,
-            puppeteerOptions: {
-                timeout: 300000,
-                protocolTimeout: 600000,
-                args: PUPPETEER_CHROME_ARGS,
-                defaultViewport: PUPPETEER_VIEWPORT,
-                ignoreHTTPSErrors: true,
-                headless: whatsappHeadless,
-                executablePath: CHROMIUM_PATH,
-            },
-            onLoadingScreen: async (page) => {
-                try {
-                    await page.evaluateOnNewDocument(() => {
-                        Object.defineProperty(navigator, 'webdriver', { get: () => false });
-                        window.chrome = { runtime: {}, loadTimes: function () { }, csi: function () { }, app: {} };
-                    });
-                    await page.setUserAgent(
-                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                    );
-                } catch (e) {
-                    console.warn('[Stealth] Reconnect injection failed:', e.message);
-                }
-            },
-            statusFind: (statusSession, session) => {
-                console.log('📱 [WhatsApp] Status (Reconnect):', statusSession);
-                if (statusSession === 'disconnectedMobile' || statusSession.includes('disconnectedMobile')) {
-                    console.error('❌ [WhatsApp] Masih terdeteksi disconnectedMobile');
-                    console.error('⚠️ [WhatsApp] INSTRUKSI: Aktifkan Multi-Device di HP SEBELUM scan QR!');
-                } else if (statusSession === 'isLogged') {
-                    console.log('✅ [WhatsApp] Reconnected successfully!');
-                } else if (statusSession === 'qrReadSuccess') {
-                    console.log('✅ [WhatsApp] QR code scanned! Connecting...');
-                }
-            },
-            headless: whatsappHeadless,
-            logQR: true,
-            autoClose: shouldAutoClose,
-            disableWelcome: true,
-            sessionDataPath,
-        });
-
-        global.whatsappClient = client;
-
-        // Inject stealth mode untuk reconnect juga
-        try {
-            if (client.page) {
-                const page = client.page;
-                await page.evaluateOnNewDocument(() => {
-                    Object.defineProperty(navigator, 'webdriver', { get: () => false });
-                    window.chrome = { runtime: {}, loadTimes: function () { }, csi: function () { }, app: {} };
-                });
-                await page.setUserAgent(
-                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'
-                );
-                console.log('🕵️ [Stealth] Anti-detection injected on reconnect');
-            }
-        } catch (stealthError) {
-            console.warn('[Stealth] Reconnect injection failed (non-critical):', stealthError.message);
-        }
-
-        start(client);
-        startWhatsAppKeepAlive(client);
-        console.log('✅ [WhatsApp] Reconnected successfully!');
-
-    } catch (error) {
-        console.error('❌ [WhatsApp] Reconnection failed:', error.message);
-        console.log('🔄 [WhatsApp] Will retry in 60 seconds...');
-        setTimeout(async () => {
-            global.whatsappReconnecting = false;
-            await reconnectWhatsApp();
-        }, 60000);
-        return;
-    }
-
-    global.whatsappReconnecting = false;
-}
-
-// WhatsApp connection keep-alive: periodic check untuk memastikan connection tetap aktif
-function startWhatsAppKeepAlive(client) {
-    const KEEP_ALIVE_INTERVAL_MS = parseInt(process.env.WHATSAPP_KEEP_ALIVE_INTERVAL_MS || '300000', 10);
-    const PING_TIMEOUT_MS = 15000; // 15 detik max untuk ping
-
-    console.log(`💚 [WhatsApp Keep-Alive] Starting (interval: ${KEEP_ALIVE_INTERVAL_MS}ms)`);
-
-    const keepAliveInterval = setInterval(async () => {
-        try {
-            if (!global.whatsappClient || !client) {
-                console.warn('⚠️ [WhatsApp Keep-Alive] Client tidak tersedia, skip ping');
-                return;
-            }
-
-            // Cek state dulu (ringan, tidak pakai CDP evaluate)
-            if (client.getState) {
-                const statePromise = client.getState();
-                const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error('getState timeout')), PING_TIMEOUT_MS)
-                );
-                
-                const state = await Promise.race([statePromise, timeoutPromise]);
-                
-                if (state === 'UNPAIRED' || state === 'LOGOUT' || state === 'DISCONNECTED') {
-                    console.warn(`⚠️ [WhatsApp Keep-Alive] State tidak sehat: ${state}, trigger reconnect...`);
-                    clearInterval(keepAliveInterval);
-                    await reconnectWhatsApp();
-                    return;
-                }
-                
-                console.log(`💚 [WhatsApp Keep-Alive] Connection active (state: ${state})`);
-                return; // Cukup, tidak perlu getHostDevice
-            }
-
-            // Fallback: getHostDevice dengan timeout
-            if (client.getHostDevice) {
-                const hostPromise = client.getHostDevice();
-                const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error('getHostDevice timeout')), PING_TIMEOUT_MS)
-                );
-                
-                await Promise.race([hostPromise, timeoutPromise]);
-                console.log('💚 [WhatsApp Keep-Alive] Connection active');
-            }
-
-        } catch (error) {
-            // Timeout dari CDP = WA sedang busy/syncing, JANGAN reconnect langsung
-            const isTimeout = error.message.includes('timeout') || 
-                              error.message.includes('protocolTimeout') ||
-                              error.message.includes('Runtime.callFunctionOn');
-            
-            if (isTimeout) {
-                console.warn(`⚠️ [WhatsApp Keep-Alive] Ping timeout (WA mungkin sedang sync), skip reconnect.`);
-                return; // Biarkan, coba lagi di interval berikutnya
-            }
-            
-            console.warn(`⚠️ [WhatsApp Keep-Alive] Error: ${error.message}`);
-            if (error.message.includes('not connected') || error.message.includes('closed')) {
-                console.warn('🔄 [WhatsApp Keep-Alive] Connection lost, trigger reconnect...');
-                clearInterval(keepAliveInterval);
-                await reconnectWhatsApp();
-            }
-        }
-    }, KEEP_ALIVE_INTERVAL_MS);
-
-    process.on('SIGINT', () => clearInterval(keepAliveInterval));
-    process.on('SIGTERM', () => clearInterval(keepAliveInterval));
-}
 
 // Keep-alive mechanism: periodic ping ke health endpoint sendiri
 // Mencegah server idle timeout saat tidak ada aktivitas
@@ -4091,6 +3858,60 @@ process.on('SIGTERM', () => {
     }
     process.exit(0);
 });
+
+async function connectToWhatsApp() {
+    console.log('🤖 [STARTUP] Initializing Baileys WhatsApp Connection...');
+    const { state, saveCreds } = await useMultiFileAuthState('./auth_info_baileys');
+    const { version, isLatest } = await fetchLatestBaileysVersion();
+    console.log(`using WA v${version.join('.')}, isLatest: ${isLatest}`);
+
+    const client = makeWASocket({
+        version,
+        logger: pino({ level: 'silent' }),
+        printQRInTerminal: true,
+        auth: {
+            creds: state.creds,
+            keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "fatal" }).child({ level: "fatal" })),
+        },
+        generateHighQualityLinkPreview: true,
+        getMessage: async (key) => {
+            return { conversation: 'hello' }
+        }
+    });
+
+    client.ev.on('creds.update', saveCreds);
+
+    client.ev.on('connection.update', (update) => {
+        const { connection, lastDisconnect, qr } = update;
+        
+        if (qr) {
+            console.log('\n=========================================');
+            console.log('📱 SCAN THIS QR CODE DARI WHATSAPP:');
+            qrcode.generate(qr, { small: true });
+            console.log('\nAtau copy Raw QR String ini ke QR Generator online:');
+            console.log(qr);
+            console.log('=========================================\n');
+        }
+
+        if (connection === 'close') {
+            const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
+            console.log('connection closed due to ', lastDisconnect.error, ', reconnecting ', shouldReconnect);
+            // reconnect if not logged out
+            if (shouldReconnect) {
+                setTimeout(connectToWhatsApp, 5000);
+            }
+        } else if (connection === 'open') {
+            console.log('opened connection');
+            global.whatsappClient = client;
+
+            // start functionality after connect
+            start(client);
+            startKeepAlive();
+        }
+    });
+}
+
+connectToWhatsApp().catch(err => console.log("unexpected error: " + err));
 
 module.exports = { 
     getAIResponse, 
