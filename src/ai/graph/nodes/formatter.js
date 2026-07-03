@@ -40,13 +40,19 @@ async function formatterNode(state) {
         'poles': 'Coating Ceramic',
     };
     let upsellSuggestion = '';
-    if (context.serviceTypes?.length === 1) {
-        const primarySvc = context.serviceTypes[0].toLowerCase();
-        for (const [key, val] of Object.entries(upsellMap)) {
-            if (primarySvc.includes(key)) {
-                upsellSuggestion = val;
-                break;
+    if (context.serviceTypes?.length > 0) {
+        for (const svc of context.serviceTypes) {
+            const svcLower = svc.toLowerCase();
+            for (const [key, val] of Object.entries(upsellMap)) {
+                if (svcLower.includes(key)) {
+                    const hasUpsellAlready = context.serviceTypes.some(s => s.toLowerCase().includes(val.toLowerCase()));
+                    if (!hasUpsellAlready) {
+                        upsellSuggestion = val;
+                        break;
+                    }
+                }
             }
+            if (upsellSuggestion) break;
         }
     }
 
@@ -156,7 +162,7 @@ Informasi visual dari pesan terakhir user:
 ${state.metadata.visualSummary || 'Tidak ada gambar yang terdeteksi.'}
 
 # UPSELL & RECOMMENDATION
-${upsellSuggestion ? `- Jika user sudah yakin dengan pesanannya, kamu BISA menawarkan layanan tambahan ini secara santai: "${upsellSuggestion}". Jangan memaksa.` : ''}
+${upsellSuggestion ? `- Tawarkan juga layanan tambahan ini secara santai: "${upsellSuggestion}". (Contoh: "Oiya, biar sekalian maksimal, mau ditambah ${upsellSuggestion} juga nggak kak?")` : ''}
 - Jika kamu sedang menanyakan pilihan paket (misal: paket detailing bodi/mesin/full), berikan satu saran secara halus untuk mengambil paket terlengkap (seperti Detailing Full) dengan alasan santai (misal: "biar sekalian kinclong semua kak").
 
 
