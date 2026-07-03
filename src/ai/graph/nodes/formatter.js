@@ -41,18 +41,15 @@ async function formatterNode(state) {
     };
     let upsellSuggestion = '';
     if (context.serviceTypes?.length > 0) {
-        for (const svc of context.serviceTypes) {
-            const svcLower = svc.toLowerCase();
-            for (const [key, val] of Object.entries(upsellMap)) {
-                if (svcLower.includes(key)) {
-                    const hasUpsellAlready = context.serviceTypes.some(s => s.toLowerCase().includes(val.toLowerCase()));
-                    if (!hasUpsellAlready) {
-                        upsellSuggestion = val;
-                        break;
-                    }
+        const allServicesStr = context.serviceTypes.join(' ').toLowerCase();
+        for (const [key, val] of Object.entries(upsellMap)) {
+            if (allServicesStr.includes(key)) {
+                const hasUpsellAlready = context.serviceTypes.some(s => s.toLowerCase().includes(val.toLowerCase()));
+                if (!hasUpsellAlready) {
+                    upsellSuggestion = val;
+                    break;
                 }
             }
-            if (upsellSuggestion) break;
         }
     }
 
