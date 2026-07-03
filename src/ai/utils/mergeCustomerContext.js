@@ -38,7 +38,6 @@ function mapExtractedToPrismaFields(extracted) {
         saidExpensive: extracted.said_expensive === true ? true : extracted.said_expensive === false ? false : null,
         askedPrice: extracted.asked_price === true ? true : extracted.asked_price === false ? false : null,
         askedAvailability: extracted.asked_availability === true ? true : extracted.asked_availability === false ? false : null,
-        sharedPhoto: extracted.shared_photo === true ? true : extracted.shared_photo === false ? false : null,
         preferredDay: extracted.preferred_day || null,
         preferredTime: extracted.preferred_time || null,
         locationHint: extracted.location_hint || null,
@@ -303,7 +302,7 @@ async function syncGraphStateToCRM(senderNumber, state) {
             is_bongkar_total: context.isBongkarTotal,
             visual_summary: metadata.visualSummary || context.visualSummary,
             detected_intents: [intent],
-            conversation_stage: context.isReadyForTools ? 'ready' : 'collecting',
+            conversation_stage: context.toolExecutionMode !== 'none' ? 'ready' : 'collecting',
             shared_photo: !!(metadata.visualSummary || context.visualSummary)
         };
 

@@ -50,15 +50,15 @@ async function toolExecutorNode(state) {
                         toolResult.bookingError = err.message;
                     }
                 }
-            } else if (shouldLookupPrice && context.serviceTypes?.length > 0 && context.vehicleType) {
-                console.log(`[executorNode] Executing getServiceDetails for ${context.vehicleType} and [${context.serviceTypes.join(', ')}]...`);
+            } else if (shouldLookupPrice && context.readyServices?.length > 0 && context.vehicleType && context.toolExecutionMode !== 'none') {
+                console.log(`[executorNode] Executing getServiceDetails for ${context.vehicleType} and [${context.readyServices.join(', ')}]...`);
                 const tool = toolsByName['getServiceDetails'];
                 
                 if (tool) {
                     // PERBAIKAN BUG-4: Bungkus setiap external tool dengan try/catch masing-masing
                     try {
                         const pricingResult = await tool({
-                            service_name: context.serviceTypes,
+                            service_name: context.readyServices,
                             motor_model: context.vehicleType,
                             extraContext: {
                                 paintType: context.paintType,
@@ -89,9 +89,9 @@ async function toolExecutorNode(state) {
                     }
 
                     // PERBAIKAN BUG-1: Penghitungan diskon combo yang difilter per item eligible
-                    if (context.serviceTypes.length >= 2 && toolResult.results?.length > 0) {
+                    if (context.readyServices.length >= 2 && toolResult.results?.length > 0) {
                         const promo = await getActivePromo();
-                        if (promo && promo.comboDiscount > 0 && context.serviceTypes.length >= promo.comboMinServices) {
+                        if (promo && promo.comboDiscount > 0 && context.readyServices.length >= promo.comboMinServices) {
                             
                             // Deduplikasi bodi halus/kasar jika ada double match
                             const seen = new Set();
@@ -129,7 +129,7 @@ async function toolExecutorNode(state) {
                                 toolResult.combo = {
                                     applied: true,
                                     promo_text: promo.promoText,
-                                    trigger_reason: `Ambil ${context.serviceTypes.length} layanan sekaligus`,
+                                    trigger_reason: `Ambil ${context.readyServices.length} layanan sekaligus`,
                                     breakdown,
                                     total_before: totalBefore,
                                     total_before_formatted: `Rp${totalBefore.toLocaleString('id-ID')}`,
@@ -158,7 +158,7 @@ async function toolExecutorNode(state) {
             }
 
             // Fallback Auto-handover jika data esensial tidak ditemukan sama sekali
-            if (shouldLookupPrice && context.serviceTypes?.length > 0) {
+            if (shouldLookupPrice && context.readyServices?.length > 0 && context.toolExecutionMode !== 'none') {
                 const results = toolResult?.results || [];
                 const hasUsableResult = results.length > 0 && results.some(r => !r.error && r.status !== 'not_found');
                 if (!hasUsableResult) {
@@ -168,7 +168,7 @@ async function toolExecutorNode(state) {
                         const lastUserMsgRecord = state.messages.slice().reverse().find(m => m.type === 'human' || m.role === 'user');
                         const lastUserMsg = lastUserMsgRecord ? extractTextFromContent(lastUserMsgRecord.content) : 'No text found';
                         const handoffResult = await handoverTool({
-                            reason: `Harga layanan [${context.serviceTypes.join(', ')}] untuk ${context.vehicleType} tidak ditemukan.`,
+                            reason: `Harga layanan [${context.readyServices.join(', ')}] untuk ${context.vehicleType} tidak ditemukan.`,
                             customerQuestion: lastUserMsg,
                             senderNumber: state.metadata?.phoneReal || ''
                         });

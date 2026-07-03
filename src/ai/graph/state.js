@@ -54,7 +54,10 @@ const ZoyaState = Annotation.Root({
             comboOffered: false, // Track apakah promo combo sudah ditawarkan
             mockupGenerated: 0, // Track jumlah mockup yang sudah digenerate (max 3)
             missingQuestions: [], // Daftar pertanyaan yang harus diajukan Zoya
-            isReadyForTools: false
+            isReadyForTools: false, // Used for admin flow
+            toolExecutionMode: 'none', // 'none' | 'partial' | 'full' for customer flow
+            readyServices: [],
+            pendingServices: []
         })
     }),
 

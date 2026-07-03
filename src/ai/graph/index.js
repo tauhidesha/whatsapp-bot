@@ -58,11 +58,11 @@ workflow.addConditionalEdges(
     (state) => {
         const { intent, context } = state;
 
-        if (intent === 'HUMAN_HANDOVER') {
+        if (intent === 'HUMAN_HANDOVER' || context.vehicleType === 'Mobil') {
             return 'executor';
         }
 
-        if (context.isReadyForTools) {
+        if (context.toolExecutionMode !== 'none') {
             return 'executor';
         }
         return 'formatter';

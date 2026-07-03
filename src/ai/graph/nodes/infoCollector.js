@@ -95,7 +95,7 @@ Wajib menghasilkan skema JSON murni dengan properti: intent, internal_thought, m
 
         if (prevIntent && prevIntent !== classifiedIntent) {
             ctx.missingQuestions = [];
-            ctx.isReadyForTools = false;
+            ctx.toolExecutionMode = 'none';
         }
 
         // PERBAIKAN CONTEXT BLEED: Reset data jika tipe kendaraan berubah total
@@ -217,31 +217,44 @@ Wajib menghasilkan skema JSON murni dengan properti: intent, internal_thought, m
 
     ctx.missingQuestions = missingQuestion ? [missingQuestion] : [];
     console.log('[INFO_COLLECTOR_NODE] STEP 4: Missing Questions Evaluation ->', missingQuestion ? `Found: ${missingQuestion}` : 'None');
+    // Prepare readyServices and pendingServices
+    ctx.readyServices = [];
+    ctx.pendingServices = [];
     
-    // Prevent tool execution if there are generic services
-    const hasGenericService = ctx.serviceTypes.some(s => ['repaint', 'detailing', 'coating'].includes(s.toLowerCase()));
-    
-    // Izinkan eksekusi tool jika intent berupa BOOKING_SERVICE atau CONSULTATION selama data valid
-    const isBookingOrConsult = classifiedIntent === 'BOOKING_SERVICE' || classifiedIntent === 'CONSULTATION';
-    
-    console.log('[INFO_COLLECTOR_NODE] Pre-isReady Check:', {
-        classifiedIntent,
-        serviceTypes: ctx.serviceTypes,
-        missingQuestions: ctx.missingQuestions,
-        hasGenericService,
-        vehicleType: ctx.vehicleType
-    });
+    if (ctx.serviceTypes && Array.isArray(ctx.serviceTypes)) {
+        for (const s of ctx.serviceTypes) {
+            if (['repaint', 'detailing', 'coating'].includes(s.toLowerCase())) {
+                ctx.pendingServices.push(s);
+            } else {
+                ctx.readyServices.push(s);
+            }
+        }
+    }
 
-    ctx.isReadyForTools = Boolean(
-        classifiedIntent === 'GENERAL_INQUIRY' || 
-        (isBookingOrConsult && !!ctx.vehicleType && ctx.serviceTypes.length > 0 && !hasGenericService && ctx.missingQuestions.length === 0)
-    );
+    // Determine toolExecutionMode
+    const isBookingOrConsult = classifiedIntent === 'BOOKING_SERVICE' || classifiedIntent === 'CONSULTATION';
+
+    if (classifiedIntent === 'GENERAL_INQUIRY') {
+        ctx.toolExecutionMode = 'full';
+    } else if (isBookingOrConsult && !!ctx.vehicleType) {
+        if (ctx.readyServices.length > 0 && ctx.pendingServices.length > 0) {
+            ctx.toolExecutionMode = 'partial';
+        } else if (ctx.readyServices.length > 0) {
+            ctx.toolExecutionMode = 'full';
+        } else {
+            ctx.toolExecutionMode = 'none';
+        }
+    } else {
+        ctx.toolExecutionMode = 'none';
+    }
 
     let replyMode = 'inform';
     if (classifiedIntent === 'GREETING') {
         replyMode = 'greet';
+    } else if (ctx.toolExecutionMode !== 'none' && ctx.missingQuestions.length > 0) {
+        replyMode = 'partial';   // ready service ada harga, tapi masih ada yang kurang
     } else if (ctx.missingQuestions.length > 0) {
-        replyMode = 'ask';
+        replyMode = 'ask';       // belum ada data sama sekali buat lookup harga
     } else if (classifiedIntent === 'CONSULTATION') {
         replyMode = 'consult';
     }
