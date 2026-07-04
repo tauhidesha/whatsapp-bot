@@ -10,7 +10,7 @@ const studioMetadata = {
   location: {
     address: 'Bukit Cengkeh 1, Jl. Medan No.B3/2, Tugu, Kec. Cimanggis, Kota Depok, Jawa Barat 16451',
     landmark: 'Dekat gapura bukit cengkeh 1',
-    googleMaps: 'https://maps.app.goo.gl/m71ihhee1q9XVveu5',
+    googleMaps: 'https://maps.app.goo.gl/pBgpmG2EoGRrKX9v5',
     directions: 'patokan dari gapura bukit cengkeh 1 masuk ada perempatan pertama belok kanan. lokasi disebelah kiri rumah hijau b3/2. jika sudah sampai bisa panggil dari luar atau call wa. portal jalan medan kadang ditutup. masuk bisa dari jalan padang atau bengkulu',
   },
   contact: {
