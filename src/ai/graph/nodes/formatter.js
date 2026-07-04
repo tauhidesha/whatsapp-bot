@@ -23,6 +23,7 @@ async function formatterNode(state) {
     const lastUserMessage = sanitizedMessages[sanitizedMessages.length - 1];
     const toolResult = metadata?.toolResult;
     const comboPromo = metadata?.comboPromo; // Structured: { promoText, comboDiscount, comboMinServices }
+    const activePromo = metadata?.activePromo;
 
     // Ambil mode balasan dari metadata
     const replyMode = metadata?.replyMode || 'inform';
@@ -54,10 +55,12 @@ async function formatterNode(state) {
     let comboOfferInstruction = '';
     if (replyMode === 'inform' && comboPromo && context.serviceTypes?.length === 1 && !context.comboOffered) {
         const pct = Math.round(comboPromo.comboDiscount * 100);
+        const promoMsg = comboPromo.promoText ? comboPromo.promoText : `Lagi ada promo diskon ${pct}% nih kalau ambil ${comboPromo.comboMinServices} layanan sekaligus`;
         comboOfferInstruction = `
 PROMOSI COMBO (WAJIB ditawarkan secara natural di akhir pesan):
 Setelah kasih estimasi harga, tawarkan layanan tambahan ini secara santai: "${upsellSuggestion || 'Coating Ceramic'}".
-Contoh natural: "Oiya, biar sekalian maksimal, mau ditambah ${upsellSuggestion || 'Coating Ceramic'} juga nggak kak? Lagi ada promo diskon ${pct}% nih kalau ambil 2 layanan sekaligus."
+Info Promo: "${promoMsg}"
+Contoh natural: "Oiya, biar sekalian maksimal, mau ditambah ${upsellSuggestion || 'Coating Ceramic'} juga nggak kak? ${promoMsg}"
 JANGAN bilang ini "promo combo" secara kaku. Sampaikan secara conversational.`;
     }
 
@@ -106,6 +109,7 @@ Kamu punya kemampuan untuk melihat foto/video yang dikirim user untuk memberikan
   Jam Buka: Senin-Kamis & Sabtu-Minggu (${studioMetadata.hours.senin}), Jumat (Tutup).
 - Data Motor & Layanan (Hasil Ekstraksi):
 ${contextInfo}
+${activePromo && activePromo.promoText ? `- Promo Aktif Saat Ini: ${activePromo.promoText}` : ''}
 - Hasil Teknis/Tool:
 ${JSON.stringify(toolResult || 'Tidak ada data tambahan')}
 
