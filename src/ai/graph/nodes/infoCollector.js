@@ -88,8 +88,8 @@ Ekstrak data ke dalam format JSON dengan field berikut:
 3. **motor_model**: Jenis motor (Nmax, Scoopy, dll). Jika user menyebut *Mobil*, masukkan "Mobil".
 4. **service_types**: Array layanan (Repaint, Detailing, Coating, Cuci).
 5. **paint_type**: Jenis cat (Glossy / Doff).
-6. **is_bongkar_total**: (Boolean/null) Jika user sebut "bongkar total" atau "bongkar mesin".
-7. **detailing_focus**: Fokus area (Bodi Halus, Bodi Kasar, Velg, Mesin).
+6. **is_bongkar_total**: (Boolean/null) Jika user sebut "bongkar total", "bongkar mesin", atau "full" (untuk detailing).
+7. **detailing_focus**: Fokus area (Bodi Halus, Bodi Kasar, Velg, Mesin). (Jika "full", akan diproses ke is_bongkar_total).
 8. **color_choice**: Warna bodi yang diinginkan.
 9. **velg_color_choice**: Warna velg (SERINGKALI berbeda dengan bodi).
 10. **is_previously_painted**: (Boolean/null) Jika motor/velg sudah pernah dicat ulang (terlihat di foto atau disebut user).
@@ -239,7 +239,14 @@ Output: {
         // Update other fields (only if not null)
         if (extracted.paint_type) ctx.paintType = extracted.paint_type;
         if (extracted.is_bongkar_total !== null && extracted.is_bongkar_total !== undefined) ctx.isBongkarTotal = extracted.is_bongkar_total;
-        if (extracted.detailing_focus) ctx.detailingFocus = extracted.detailing_focus;
+        if (extracted.detailing_focus) {
+            if (typeof extracted.detailing_focus === 'string' && extracted.detailing_focus.toLowerCase().includes('full')) {
+                ctx.isBongkarTotal = true;
+                ctx.detailingFocus = null;
+            } else {
+                ctx.detailingFocus = extracted.detailing_focus;
+            }
+        }
         if (extracted.color_choice) ctx.colorChoice = extracted.color_choice;
         if (extracted.velg_color_choice) ctx.velgColorChoice = extracted.velg_color_choice;
         if (extracted.is_previously_painted !== null && extracted.is_previously_painted !== undefined) ctx.isPreviouslyPainted = extracted.is_previously_painted;
