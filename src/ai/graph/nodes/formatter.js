@@ -147,6 +147,21 @@ ATURAN BAHASA PENAWARAN PROMO:
 - Contoh kalimat santai: "Oiya kak buat info kalau ambil ${upsellSuggestion} sekalian, nanti paket ${primarySvcTitle} kakak dapet diskon ${pct}%. ${effectiveBongkar ? 'Isi paketnya sudah detailing sampai rangka dengan tambahan di coating juga. ' : ''}${benefitText ? (benefitText.charAt(0).toUpperCase() + benefitText.slice(1)) + '. ' : ''}Mau sekalian tambah ${upsellSuggestion} nggak kak? ${upsellPriceStr ? `Harga ${upsellSuggestion} normalnya ${upsellPriceStr}, tapi lumayan dapet diskon di ${primarySvcTitle}-nya.` : ''}"`;
     }
 
+    // Custom Instruction for 4 Paket Repaint Bodi Halus
+    let repaintBodiHalusInstruction = '';
+    if (replyMode === 'inform' && (toolResult?.category === 'repaint_bodi_halus' || toolResult?.results?.[0]?.category === 'repaint_bodi_halus') && (toolResult?.candidates || toolResult?.results?.[0]?.candidates)) {
+        repaintBodiHalusInstruction = `
+INSTRUKSI KHUSUS 4 PAKET REPAINT BODI HALUS:
+Kamu harus langsung menampilkan ke-4 pilihan paket ini ke user (Ekonomis, Basic, Standar, Premium).
+Aturan penyajian:
+1. Urutkan dari yang Termahal (Premium) sampai yang Termurah (Ekonomis).
+2. TAMPILKAN PROMO CORET: Untuk paket Premium, Standar, dan Basic, kalikan harga dasar dengan 0.85 (diskon 15%), lalu coret harga asli dan tampilkan harga diskonnya. (Contoh: ~Rp1.000.000~ jadi Rp850.000).
+3. Paket Ekonomis TIDAK MENDAPAT DISKON (jangan dicoret).
+4. WAJIB sampaikan dengan jelas bahwa Promo Diskon 15% ini HANYA BERLAKU jika kakak sekalian mengambil layanan ${upsellSuggestion || 'Cuci Komplit, Repaint Velg, atau Repaint Bodi Kasar'}.
+5. NUDGE PAKET STANDAR: Secara halus, arahkan dan sangat sarankan user untuk memilih "Paket Standar" (misal: "Zoya paling saranin Paket Standar kak, hasilnya udah mantap mirror finish dan dapet garansi 1 tahun"). Tentu sampaikan juga kalau mau pilih paket lain bebas.
+`;
+    }
+
     // Pass combo data without hardcoding visual display rules
     let comboResultInstruction = '';
     if (replyMode === 'inform' && toolResult?.combo?.applied) {
@@ -174,7 +189,7 @@ ${dateInfo}
     const modeInstructions = {
         greet: "Mode PERKENALAN. Sapa user dengan sangat ramah, kenalkan dirimu sebagai Zoya, dan tanyakan apa yang bisa dibantu hari ini.",
         ask: `Mode TANYA DATA. Zoya sedang mengumpulkan info. Fokus utama: Tanyakan soal "${missingQ}" secara sangat santai tapi jelas. JANGAN tanya data lain dulu.`,
-        inform: `Mode INFO HARGA/JADWAL. Sampaikan detail biaya atau ketersediaan jadwal dari Tool Result secara transparan. ${comboOfferInstruction} ${comboResultInstruction}`,
+        inform: `Mode INFO HARGA/JADWAL. Sampaikan detail biaya atau ketersediaan jadwal dari Tool Result secara transparan. ${comboOfferInstruction} ${comboResultInstruction} ${repaintBodiHalusInstruction}`,
         consult: "Mode KONSULTASI. User sedang bingung atau minta saran. Berikan masukan ahli otomotif. PENTING: Jika visual_summary menunjukkan user datang dari iklan/postingan IG, referensikan konten iklan tersebut secara natural (misal: 'Oh tertarik sama hasil Vario Mazda Red di postingan kita ya? Cakep emang 🔥'). Lalu langsung tanyakan tipe motor user-nya."
     };
 
