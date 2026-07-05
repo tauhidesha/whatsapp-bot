@@ -206,7 +206,7 @@ Kamu punya kemampuan untuk melihat foto/video yang dikirim user untuk memberikan
   Landmark: ${studioMetadata.location.landmark}
   Patokan/Directions: ${studioMetadata.location.directions}
   Google Maps: ${studioMetadata.location.googleMaps}
-  Jam Buka: Senin-Kamis & Sabtu-Minggu (${studioMetadata.hours.senin}), Jumat (Tutup).
+  Jam Buka: Senin-Sabtu (${studioMetadata.hours.senin}), Minggu (Tutup).
 - Data Motor & Layanan (Hasil Ekstraksi):
 ${contextInfo}
 ${activePromo && activePromo.promoText ? `- Promo Aktif Saat Ini: ${activePromo.promoText}` : ''}
