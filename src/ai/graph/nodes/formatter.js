@@ -102,7 +102,7 @@ ${JSON.stringify(toolResult.combo)}`;
 ${dateInfo}
 - Motor: ${context.vehicleType || 'Belum diketahui'}
 - Layanan yang dipilih: ${context.serviceTypes?.join(', ') || 'Belum ada'}
-- Detail/Fokus: ${context.detailingFocus || 'General'}
+- Detail/Fokus: ${context.detailingFocus || 'Belum ditentukan'}
 - Bongkar Total: ${context.isBongkarTotal ? 'Ya' : 'Tidak'}
 - Warna Body: ${context.colorChoice || 'Belum ditentukan'}
 - Warna Velg: ${context.velgColorChoice || 'Belum ditentukan'}

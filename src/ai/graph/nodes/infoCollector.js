@@ -322,7 +322,7 @@ Output: {
                     ctx.serviceTypes[i] = ctx.isBongkarTotal ? "Full Detailing" : `Detailing ${ctx.detailingFocus || 'Bodi & Kaki-kaki'}`;
                     continue; // Skip generic missing question since we auto-resolved it
                 } else {
-                    missingQuestion = "Tanyakan detail pengerjaan: apakah mau sampai rangka (bongkar total), hanya bodi dan kaki-kaki saja, atau hanya mesin saja?";
+                    missingQuestion = "Tanya secara santai: 'detailingnya mau sampai rangka apa nggak kak? atau cuma bodi dan kaki-kaki aja?'";
                     break;
                 }
             }
@@ -331,7 +331,7 @@ Output: {
                     ctx.serviceTypes[i] = `Coating Ceramic ${ctx.paintType}`;
                     continue; // Skip generic missing question since we auto-resolved it
                 } else {
-                    missingQuestion = "Tanyakan jenis cat motor saat ini (Glossy atau Doff/Matte) karena paketnya berbeda";
+                    missingQuestion = "Tanya secara santai: 'motornya catnya glossy apa doff kak?'";
                     break;
                 }
             }
