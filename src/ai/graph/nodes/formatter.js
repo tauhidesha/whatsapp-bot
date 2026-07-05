@@ -4,6 +4,7 @@ const { z } = require('zod');
 const studioMetadata = require('../../constants/studioMetadata');
 const { withRetry } = require('../../utils/retry');
 const { sanitizeMessagesForGemini, extractTextFromContent, getMessageType } = require('../utils/sanitizeMessages');
+const { getServiceDetailsTool } = require('../../tools/getServiceDetailsTool');
 
 const model = new ChatGoogleGenerativeAI({
     model: process.env.AI_MODEL || 'gemini-flash-lite-latest',
@@ -64,10 +65,10 @@ async function formatterNode(state) {
                 if (effectiveBongkar) {
                     if (paint === 'doff') {
                         upsellSuggestion = 'Complete Service Doff';
-                        packageExplanation = '(Tawarkan upgrade ke Complete Service Doff. Karena user ambil bongkar total, tanggung kalau nggak sekalian di-coating keramik doff biar warna makin pekat dan terlindungi lama).';
+                        packageExplanation = '(Jelaskan bahwa isi paket Complete Service Doff ini sudah termasuk Full Detailing sampai rangka dengan tambahan di-coating juga. Cocok banget biar warnanya makin pekat dan terlindungi lama).';
                     } else {
                         upsellSuggestion = 'Complete Service Glossy';
-                        packageExplanation = '(Tawarkan upgrade ke Complete Service Glossy. Karena user ambil bongkar total, tanggung kalau nggak sekalian di-coating keramik glossy biar dapat efek daun talas dan kilap kaca).';
+                        packageExplanation = '(Jelaskan bahwa isi paket Complete Service Glossy ini sudah termasuk Full Detailing sampai rangka dengan tambahan di-coating juga. Biar dapat efek daun talas dan kilap kaca).';
                     }
                 } else if (focus.includes('mesin')) {
                     upsellSuggestion = 'Detailing Bodi juga';
@@ -95,19 +96,42 @@ async function formatterNode(state) {
 
     // Build combo offer text for formatter
     let comboOfferInstruction = '';
-    if (replyMode === 'inform' && comboPromo && context.serviceTypes?.length === 1 && !context.comboOffered) {
+    if (replyMode === 'inform' && comboPromo && context.serviceTypes?.length === 1 && !context.comboOffered && upsellSuggestion) {
         const pct = Math.round(comboPromo.comboDiscount * 100);
+        let upsellPriceStr = "";
+        
+        try {
+            const upsellDetails = await getServiceDetailsTool.implementation({
+                service_name: [upsellSuggestion],
+                motor_model: context.vehicleType
+            });
+            
+            if (upsellDetails?.results?.length > 0) {
+                const res = upsellDetails.results[0];
+                let rawPrice = res.final_price || res.price || 0;
+                if (res.candidates && res.candidates.length > 0) {
+                    rawPrice = res.candidates[0].final_price || res.candidates[0].price || 0;
+                }
+                if (rawPrice > 0) {
+                    const discountedPrice = Math.round(rawPrice * (1 - comboPromo.comboDiscount));
+                    upsellPriceStr = `Rp${discountedPrice.toLocaleString('id-ID')}`;
+                }
+            }
+        } catch (err) {
+            console.error("[FORMATTER_NODE] Failed to fetch upsell price:", err);
+        }
+
         const promoMsg = comboPromo.promoText ? comboPromo.promoText : `Lagi ada promo diskon ${pct}% nih kalau ambil ${comboPromo.comboMinServices} layanan sekaligus`;
         comboOfferInstruction = `
 PROMOSI COMBO (WAJIB ditawarkan secara natural di akhir pesan):
-Setelah kasih estimasi harga, tawarkan layanan tambahan: "${upsellSuggestion || 'Coating Ceramic'}".
+Setelah kasih estimasi harga, tawarkan layanan tambahan: "${upsellSuggestion}".
 Catatan Paket: ${packageExplanation || 'Jelaskan benefit intinya secara ringkas.'}
 Detail Promo Asli: "${promoMsg}"
 ATURAN BAHASA PENAWARAN PROMO:
 - JANGAN copy-paste syarat promo mentah-mentah (hindari kata kaku seperti "paket ekonomis tidak diskon", "khusus 10 motor", dll).
-- WAJIB SEBUT NAMA PAKET SPESIFIKNYA: "${upsellSuggestion || 'Coating Ceramic'}". Jangan digeneralisir menjadi "layanan coating" atau "layanan repaint".
+- WAJIB SEBUT NAMA PAKET SPESIFIKNYA: "${upsellSuggestion}". Jangan digeneralisir menjadi "layanan coating" atau "layanan repaint".
 - Sampaikan info intinya saja (diskon ${pct}%) dengan sangat santai, seperti gaya ngobrol.
-- Contoh kalimat santai: "Oiya kak buat info kita lagi ada diskon ${pct}% lho buat paket ${upsellSuggestion || 'Coating Ceramic'} kalau sekalian diambil bareng layanan tadi. Mau sekalian ambil paket ${upsellSuggestion || 'Coating Ceramic'} nggak kak?"`;
+- Contoh kalimat santai: "Oiya kak buat info kita lagi ada diskon ${pct}% lho buat paket ${upsellSuggestion}. ${primarySvc.includes('detailing') ? 'Isi paketnya sudah detailing sampai rangka dengan tambahan di coating juga. ' : ''}Mau sekalian ambil paket ${upsellSuggestion} nggak kak? ${upsellPriceStr ? `Harga paketnya setelah diskon jadi ${upsellPriceStr}.` : ''}"`;
     }
 
     // Pass combo data without hardcoding visual display rules
