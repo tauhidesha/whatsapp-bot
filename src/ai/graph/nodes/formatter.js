@@ -97,9 +97,9 @@ async function formatterNode(state) {
             }
         } else if (primarySvc.includes('repaint')) {
             if (primarySvc.includes('halus')) {
-                upsellSuggestion = 'Cuci Komplit';
-                benefitText = 'biar ruang mesin dan rangka ikut kinclong mengimbangi bodi barunya';
-                packageExplanation = '(Tawarkan cuci komplit saja. Jelaskan singkat: Repaint bodi sudah otomatis dapat poles bodi. Cat baru belum bisa dicoating, harus nunggu 1 bulan biar cat matang).';
+                upsellSuggestion = 'Cuci Komplit, Repaint Velg, atau Repaint Bodi Kasar';
+                benefitText = 'biar tampilan motor makin maksimal secara keseluruhan';
+                packageExplanation = '(Tawarkan 3 opsi pilihan: cuci komplit, repaint velg, atau repaint bodi kasar. Jelaskan singkat: Ambil salah satu dari opsi itu aja, Repaint Bodi Halus-nya udah otomatis dapet diskon 15%. Info juga kalau cat baru belum bisa dicoating, harus nunggu 1 bulan biar cat matang.)';
             }
         }
         
