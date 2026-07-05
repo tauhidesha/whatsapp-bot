@@ -13,8 +13,18 @@
  * @returns {Promise<any>}
  */
 async function sendTextDirect(client, to, content) {
-    if (!client || !client.page) {
-        throw new Error('WhatsApp client/page not available');
+    if (!client) {
+        throw new Error('WhatsApp client not available');
+    }
+
+    // Baileys support
+    if (typeof client.sendMessage === 'function') {
+        return client.sendMessage(to, { text: content });
+    }
+
+    // WPPConnect legacy support
+    if (!client.page) {
+        throw new Error('WhatsApp client/page not available for WPPConnect');
     }
     
     // Bypass wppconnect's sendText yang double-evaluate (send + getMessageById)
