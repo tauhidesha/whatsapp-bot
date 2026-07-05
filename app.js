@@ -2959,19 +2959,32 @@ app.post('/generate-invoice', requireAuth, async (req, res) => {
             if (recipientNumber.endsWith('@lid')) {
                 try {
                     const cleanPhone = (customerPhone || '').replace(/\D/g, '');
-                    const updated = await prisma.customer.updateMany({
-                        where: {
-                            OR: [
-                                { phone: cleanPhone },
-                                { phone: `${cleanPhone}@c.us` },
-                                { phone: customerPhone }
-                            ],
-                            whatsappLid: null // Hanya update jika belum ada LID
-                        },
-                        data: { whatsappLid: recipientNumber }
+                    
+                    // Cek apakah LID ini sudah dipakai di DB
+                    const existingLid = await prisma.customer.findUnique({
+                        where: { whatsappLid: recipientNumber }
                     });
-                    if (updated.count > 0) {
-                        console.log(`[API] Linked LID ${recipientNumber} → ${customerPhone}`);
+
+                    if (!existingLid) {
+                        const targetCustomer = await prisma.customer.findFirst({
+                            where: {
+                                OR: [
+                                    { phone: cleanPhone },
+                                    { phone: `${cleanPhone}@c.us` },
+                                    { phone: customerPhone }
+                                ],
+                                whatsappLid: null
+                            },
+                            orderBy: { createdAt: 'desc' }
+                        });
+
+                        if (targetCustomer) {
+                            await prisma.customer.update({
+                                where: { id: targetCustomer.id },
+                                data: { whatsappLid: recipientNumber }
+                            });
+                            console.log(`[API] Linked LID ${recipientNumber} → ${customerPhone}`);
+                        }
                     }
                 } catch (e) {
                     console.warn('[API] Failed to link LID:', e.message);
