@@ -467,9 +467,9 @@ Output: {
     const hasGenericService = ctx.serviceTypes.some(s => ['repaint', 'detailing', 'coating', 'poles', 'cuci'].includes(s.toLowerCase()));
     const isHumanHandoff = classifiedIntent === 'HUMAN_HANDOVER' || ctx.vehicleType === 'Mobil';
 
-    // Check if this is the very first service request turn
-    const isFirstTurn = (!context.serviceTypes || context.serviceTypes.length === 0);
-    const forceAskBeforeTools = isFirstTurn && (ctx.missingQuestions.length > 0);
+    // We want to force the user to answer missing questions before fetching tools,
+    // EXCEPT if they are responding to a combo promo offer (in which case it's fine to show prices)
+    const forceAskBeforeTools = !context.comboOffered && (ctx.missingQuestions.length > 0);
 
     // Ready if:
     // 1. Human handoff
