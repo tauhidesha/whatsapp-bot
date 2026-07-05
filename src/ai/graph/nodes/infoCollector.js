@@ -403,7 +403,8 @@ Output: {
                     const focusStrForMesin = String(ctx.detailingFocus || '').toLowerCase();
                     const isMesinSaja = !ctx.isBongkarTotal && focusStrForMesin.includes('mesin') && !focusStrForMesin.includes('bodi') && !focusStrForMesin.includes('rangka');
                     
-                    if (!isMesinSaja && !ctx.paintType) {
+                    const isRepainting = ctx.serviceTypes.some(s => s.toLowerCase().includes('repaint'));
+                    if (!isMesinSaja && !ctx.paintType && !isRepainting) {
                          missingQuestion = "Tanyakan jenis cat motornya saat ini, apakah Glossy atau Doff? (Karena paket treatment-nya berbeda)";
                          break;
                     }
