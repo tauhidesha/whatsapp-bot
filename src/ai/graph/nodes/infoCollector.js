@@ -90,7 +90,7 @@ Ekstrak data ke dalam format JSON dengan field berikut:
 4. **service_types**: Array layanan (Repaint, Detailing, Coating, Cuci).
 5. **paint_type**: (JANGAN TEBAK! Wajib diisi HANYA JIKA user secara eksplisit menyebut "glossy", "doff", atau "matte" di teks. Jika tidak disebut, biarkan null).
 6. **is_bongkar_total**: (Boolean/null) Jika user sebut "bongkar total", "bongkar mesin", "sampai rangka", atau "full" (untuk detailing).
-7. **detailing_focus**: Fokus area (Bodi Halus, Bodi Kasar, Velg, Mesin). (Jika "full", akan diproses ke is_bongkar_total).
+7. **detailing_focus**: Fokus area (Bodi Halus, Bodi Kasar, Velg, Mesin). (JANGAN TEBAK! Hanya isi jika user secara eksplisit menyebutkannya. Jika "full", biarkan null dan set is_bongkar_total = true).
 8. **color_choice**: Warna bodi yang diinginkan.
 9. **velg_color_choice**: Warna velg (SERINGKALI berbeda dengan bodi).
 10. **is_previously_painted**: (Boolean/null) Jika motor/velg sudah pernah dicat ulang (terlihat di foto atau disebut user).
@@ -116,7 +116,6 @@ Output: {
   "motor_model": "Nmax",
   "service_types": ["Repaint"],
   "paint_type": "Glossy",
-  "detailing_focus": "Bodi Halus",
   "color_choice": "Merah",
   "visual_summary": "Foto menampakkan Yamaha Nmax warna merah glossy standar dengan bodi yang masih cukup mulus."
 }`;
@@ -354,13 +353,28 @@ Output: {
                         ctx.serviceTypes[i] = "Full Detailing";
                     }
                 } else if (ctx.detailingFocus) {
-                    ctx.serviceTypes[i] = `Detailing ${ctx.detailingFocus}`;
-                    continue;
+                    const focusLower = ctx.detailingFocus.toLowerCase();
+                    if (focusLower.includes('mesin')) {
+                        ctx.serviceTypes[i] = "Detailing Mesin";
+                        continue;
+                    } else if (focusLower.includes('bodi')) {
+                        // Bodi-only detailing maps to Poles Bodi Glossy or Coating Doff (no bongkar)
+                        ctx.isBongkarTotal = false;
+                        if (ctx.paintType && (ctx.paintType.toLowerCase() === 'doff' || ctx.paintType.toLowerCase() === 'matte')) {
+                            ctx.serviceTypes[i] = "Coating Motor Doff";
+                        } else {
+                            ctx.serviceTypes[i] = "Poles Bodi Glossy";
+                        }
+                        continue;
+                    } else {
+                        ctx.serviceTypes[i] = `Detailing ${ctx.detailingFocus}`;
+                        continue;
+                    }
                 } else if (ctx.isBongkarTotal === false) {
                     if (ctx.paintType && (ctx.paintType.toLowerCase() === 'doff' || ctx.paintType.toLowerCase() === 'matte')) {
                         ctx.serviceTypes[i] = "Coating Motor Doff";
                     } else {
-                        ctx.serviceTypes[i] = "Detailing Bodi & Kaki-kaki";
+                        ctx.serviceTypes[i] = "Poles Bodi Glossy";
                     }
                     continue;
                 } else {
