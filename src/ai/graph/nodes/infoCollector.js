@@ -270,15 +270,21 @@ Output: {
             const focus = focusStr.toLowerCase();
             const resolvedServices = [];
 
-            if (focus.includes('halus') || focus.includes('bodi') || focus.includes('body')) {
-                resolvedServices.push('Repaint Bodi Halus');
-            }
-            if (focus.includes('kasar')) {
-                resolvedServices.push('Repaint Bodi Kasar');
-            }
-            if (focus.includes('full')) {
+            const hasHalus = focus.includes('halus');
+            const hasKasar = focus.includes('kasar');
+            const hasFull = focus.includes('full');
+            const hasBodi = focus.includes('bodi') || focus.includes('body');
+
+            if (hasFull) {
                 if (!resolvedServices.includes('Repaint Bodi Halus')) resolvedServices.push('Repaint Bodi Halus');
                 if (!resolvedServices.includes('Repaint Bodi Kasar')) resolvedServices.push('Repaint Bodi Kasar');
+            } else {
+                if (hasHalus || (hasBodi && !hasKasar)) {
+                    resolvedServices.push('Repaint Bodi Halus');
+                }
+                if (hasKasar) {
+                    resolvedServices.push('Repaint Bodi Kasar');
+                }
             }
             if (focus.includes('velg') || focus.includes('pelek')) {
                 resolvedServices.push('Repaint Velg');
