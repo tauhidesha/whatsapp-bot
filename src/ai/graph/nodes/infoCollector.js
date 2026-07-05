@@ -377,7 +377,8 @@ Output: {
                     }
 
                     // Jika user pilih mesin saja, kita biarkan lolos dulu (Formatter nanti akan tawarin bodi juga).
-                    const isMesinSaja = ctx.detailingFocus && String(ctx.detailingFocus).toLowerCase().includes('mesin');
+                    const focusStrForMesin = String(ctx.detailingFocus || '').toLowerCase();
+                    const isMesinSaja = !ctx.isBongkarTotal && focusStrForMesin.includes('mesin') && !focusStrForMesin.includes('bodi') && !focusStrForMesin.includes('rangka');
                     
                     if (!isMesinSaja && !ctx.paintType) {
                          missingQuestion = "Tanyakan jenis cat motornya saat ini, apakah Glossy atau Doff? (Karena paket treatment-nya berbeda)";
