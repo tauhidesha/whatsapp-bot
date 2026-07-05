@@ -342,10 +342,9 @@ Output: {
                 if (ctx.isBongkarTotal) {
                     if (ctx.paintType) {
                         const isDoff = ctx.paintType.toLowerCase() === 'doff' || ctx.paintType.toLowerCase() === 'matte';
-                        // User request: glossy = "Full Detailing" & "Complete Service Glossy", doff = "Cuci Komplit" & "Complete Service Doff"
+                        // Doff bongkar total -> Cuci Komplit. Glossy bongkar total -> Full Detailing Glossy.
                         if (isDoff) {
-                            ctx.serviceTypes[i] = "Complete Service Doff"; 
-                            // Kita pakai 'Complete Service Doff' agar executor cari ini.
+                            ctx.serviceTypes[i] = "Cuci Komplit";
                         } else {
                             ctx.serviceTypes[i] = "Full Detailing Glossy";
                         }
@@ -366,6 +365,16 @@ Output: {
                     continue;
                 } else {
                     missingQuestion = "Tanya secara santai: 'detailingnya mau sampai rangka apa nggak kak? atau cuma bodi dan kaki-kaki aja?'";
+                    break;
+                }
+            }
+            if (svc === 'complete service') {
+                if (ctx.paintType) {
+                    const isDoff = ctx.paintType.toLowerCase() === 'doff' || ctx.paintType.toLowerCase() === 'matte';
+                    ctx.serviceTypes[i] = isDoff ? "Complete Service Doff" : "Complete Service Glossy";
+                    continue; // Skip generic missing question
+                } else {
+                    missingQuestion = "Tanya secara santai: 'motornya catnya glossy apa doff kak?'";
                     break;
                 }
             }
