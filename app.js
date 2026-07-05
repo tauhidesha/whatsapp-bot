@@ -66,7 +66,7 @@ const { getSpecificPriceContext } = require('./src/ai/utils/priceCalculator.js')
 const browserUtils = require('./src/ai/utils/browser.js');
 
 // --- LangGraph Integration ---
-const { zoyaAgent } = require('./src/ai/graph/index.js');
+const { zoyaAgent, checkpointer } = require('./src/ai/graph/index.js');
 
 // --- Global Constants ---
 const ACTIVE_AI_MODEL = process.env.AI_MODEL || 'gemini-flash-lite-latest';
@@ -3285,6 +3285,38 @@ app.post('/test-ai', requireAuth, async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+app.delete('/test-ai/clear', requireAuth, async (req, res) => {
+    try {
+        const thread_id = "test_user_playground";
+        
+        // Clear LangGraph memory for test user
+        if (checkpointer) {
+            if (checkpointer.storage && checkpointer.storage[thread_id]) {
+                delete checkpointer.storage[thread_id];
+            }
+            if (checkpointer.writes && checkpointer.writes[thread_id]) {
+                delete checkpointer.writes[thread_id];
+            }
+        }
+
+        // Clear Prisma history for test user
+        if (prisma) {
+            await prisma.customerContext.deleteMany({ where: { phone: thread_id } }).catch(() => {});
+            
+            const customer = await prisma.customer.findUnique({ where: { phone: thread_id } }).catch(() => null);
+            if (customer) {
+                await prisma.directMessage.deleteMany({ where: { customerId: customer.id } }).catch(() => {});
+                await prisma.customer.delete({ where: { id: customer.id } }).catch(() => {});
+            }
+        }
+
+        res.json({ success: true, message: "Playground memory cleared" });
+    } catch (e) {
+        console.error('[API] Error clearing test-ai memory:', e);
+        res.status(500).json({ error: e.message });
     }
 });
 

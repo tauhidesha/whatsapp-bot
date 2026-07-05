@@ -81,4 +81,4 @@ workflow.addEdge('formatter', END);
  */
 const zoyaAgent = workflow.compile({ checkpointer });
 
-module.exports = { zoyaAgent };
+module.exports = { zoyaAgent, checkpointer };
