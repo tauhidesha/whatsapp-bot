@@ -37,8 +37,8 @@ async function formatterNode(state) {
     let packageExplanation = '';
     if (context.serviceTypes?.length === 1) {
         const primarySvc = context.serviceTypes[0].toLowerCase();
-        const paint = (context.paintType || '').toLowerCase();
-        const focus = (context.detailingFocus || '').toLowerCase();
+        const paint = String(context.paintType || '').toLowerCase();
+        const focus = String(context.detailingFocus || '').toLowerCase();
         const bongkar = context.isBongkarTotal;
 
         if (primarySvc.includes('detailing') || primarySvc.includes('poles') || primarySvc.includes('cuci')) {
