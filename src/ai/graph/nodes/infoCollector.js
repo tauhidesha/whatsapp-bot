@@ -26,6 +26,7 @@ async function infoCollectorNode(state) {
     const prevIntent = state.intent;
     const lastMessage = sanitizedMessages[sanitizedMessages.length - 1];
     const lastMessageText = extractTextFromContent(lastMessage.content);
+    console.log(`[INFO_COLLECTOR_NODE] User Input: "${lastMessageText}"`);
 
     // Helper to clean JSON string from potential markdown code blocks
     const cleanJson = (str) => {
@@ -157,6 +158,7 @@ Output: {
         const rawResponse = extractTextFromContent(response.content);
         const cleanedContent = cleanJson(rawResponse);
         extracted = JSON.parse(cleanedContent);
+        console.log(`[INFO_COLLECTOR_NODE] Raw Extracted Data:`, JSON.stringify(extracted));
         console.log(`[INFO_COLLECTOR_NODE] Thread Analysis: ${extracted.internal_thought}`);
 
         // --- INTENT PROCESSING ---
@@ -449,6 +451,7 @@ Output: {
     };
 
     console.log(`[INFO_COLLECTOR_NODE] Visual Summary: ${newMetadata.visualSummary || 'None'}`);
+    console.log(`[INFO_COLLECTOR_NODE] Final Context State:`, JSON.stringify(ctx, null, 2));
 
     return {
         intent: classifiedIntent,
