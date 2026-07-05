@@ -464,16 +464,17 @@ Output: {
     }
 
     // Determine readiness for tool execution
-    const hasGenericService = ctx.serviceTypes.some(s => ['repaint', 'detailing', 'coating'].includes(s.toLowerCase()));
+    // Determine readiness for tool execution
+    const hasGenericService = ctx.serviceTypes.some(s => ['repaint', 'detailing', 'coating', 'poles', 'cuci'].includes(s.toLowerCase()));
     const isHumanHandoff = classifiedIntent === 'HUMAN_HANDOVER' || ctx.vehicleType === 'Mobil';
 
     // Ready if:
     // 1. Human handoff
-    // 2. Booking flow has enough data
+    // 2. Booking flow has enough data (even if there are missing questions, we can fetch base prices!)
     // 3. General inquiry (Location/Studio info)
     const isReady = isHumanHandoff ||
         (classifiedIntent === 'GENERAL_INQUIRY' || studioKeywords) ||
-        (classifiedIntent === 'BOOKING_SERVICE' && !!ctx.vehicleType && ctx.serviceTypes.length > 0 && !hasGenericService && ctx.missingQuestions.length === 0);
+        (classifiedIntent === 'BOOKING_SERVICE' && !!ctx.vehicleType && ctx.serviceTypes.length > 0 && !hasGenericService);
 
     ctx.isReadyForTools = Boolean(isReady);
 
