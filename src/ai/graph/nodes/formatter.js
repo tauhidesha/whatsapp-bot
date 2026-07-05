@@ -51,21 +51,11 @@ async function formatterNode(state) {
             const isAlreadyCoating = primarySvc.includes('coating') || primarySvc.includes('complete service');
 
             if (isAlreadyCoating) {
-                if (effectiveBongkar) {
-                    if (paint === 'doff') {
-                        upsellSuggestion = 'Repaint Bodi Kasar';
-                        benefitText = 'biar bodi kasar yang kusam jadi baru lagi mumpung motornya dibongkar';
-                        packageExplanation = '(Tawarkan Repaint Bodi Kasar karena motor sudah dibongkar dan sudah ambil Complete Service, mumpung sekalian biar bodi kasar yang kusam jadi baru lagi).';
-                    } else {
-                        upsellSuggestion = 'Repaint Bodi Halus atau Kasar';
-                        benefitText = 'biar warna bodi makin fresh mumpung motornya lagi dibongkar';
-                        packageExplanation = '(Tawarkan Repaint Bodi karena motor sudah dibongkar dan sudah ambil Complete Service, mumpung sekalian biar warna makin fresh).';
-                    }
-                } else {
-                    upsellSuggestion = 'Detailing Mesin';
-                    benefitText = 'biar kinclong total dari bodi sampai ke ruang mesin. Nanti velg belakangnya kita buka juga jadi mesin bersih banget';
-                    packageExplanation = '(Tawarkan sekalian detailing mesin biar kinclong total dari bodi sampai ke ruang mesin. Jelaskan juga nanti velg belakangnya dibuka biar mesin bersih maksimal).';
-                }
+                // DO NOT UPSELL for Coating/Complete Service. 
+                // They already get the 15% discount automatically, and we should just book them.
+                upsellSuggestion = null;
+                benefitText = null;
+                packageExplanation = null;
             } else {
                 // Belum coating, tawarkan upgrade ke Coating / Complete Service
                 if (effectiveBongkar) {
@@ -165,6 +155,21 @@ Aturan penyajian:
 `;
     }
 
+    let coatingDiscountInstruction = '';
+    const isCoatingFlow = context.serviceTypes?.some(s => s.toLowerCase().includes('coating') || s.toLowerCase().includes('complete service'));
+    if (replyMode === 'inform' && comboPromo && isCoatingFlow) {
+        const pct = Math.round(comboPromo.comboDiscount * 100);
+        coatingDiscountInstruction = `
+INSTRUKSI KHUSUS COATING:
+User SUDAH memilih paket Coating / Complete Service. 
+Karena ada promo khusus Coating diskon ${pct}%, kamu WAJIB mematuhinya:
+1. Potong harga dasar Coating sebesar ${pct}%, lalu coret harga asli dan tampilkan harga diskonnya. (Contoh: ~Rp1.000.000~ jadi Rp850.000).
+2. JANGAN PERNAH menawarkan/upsell layanan lain lagi.
+3. Langsung tanyakan kapan jadwal motor mau dibawa ke studio (Jam buka studio: Senin-Sabtu jam 08.00-17.00, Minggu Tutup).
+4. JIKA ada hasil layanan Detailing/Poles dalam JSON yang muncul BERSAMAAN dengan Coating, ABAIKAN SAJA (jangan ditampilkan harganya), karena Coating sudah mencakup semuanya.
+`;
+    }
+
     // Pass combo data without hardcoding visual display rules
     let comboResultInstruction = '';
     if (replyMode === 'inform' && toolResult?.combo?.applied) {
@@ -192,7 +197,7 @@ ${dateInfo}
     const modeInstructions = {
         greet: "Mode PERKENALAN. Sapa user dengan sangat ramah, kenalkan dirimu sebagai Zoya, dan tanyakan apa yang bisa dibantu hari ini.",
         ask: `Mode TANYA DATA. Zoya sedang mengumpulkan info. Fokus utama: Tanyakan soal "${missingQ}" secara sangat santai tapi jelas. JANGAN tanya data lain dulu.`,
-        inform: `Mode INFO HARGA/JADWAL. Sampaikan detail biaya atau ketersediaan jadwal dari Tool Result secara transparan. ${comboOfferInstruction} ${comboResultInstruction} ${repaintBodiHalusInstruction}`,
+        inform: `Mode INFO HARGA/JADWAL. Sampaikan detail biaya atau ketersediaan jadwal dari Tool Result secara transparan. ${comboOfferInstruction} ${comboResultInstruction} ${repaintBodiHalusInstruction} ${coatingDiscountInstruction}`,
         consult: "Mode KONSULTASI. User sedang bingung atau minta saran. Berikan masukan ahli otomotif. PENTING: Jika visual_summary menunjukkan user datang dari iklan/postingan IG, referensikan konten iklan tersebut secara natural (misal: 'Oh tertarik sama hasil Vario Mazda Red di postingan kita ya? Cakep emang 🔥'). Lalu langsung tanyakan tipe motor user-nya."
     };
 
