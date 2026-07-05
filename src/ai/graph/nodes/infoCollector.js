@@ -90,7 +90,7 @@ Ekstrak data ke dalam format JSON dengan field berikut:
 4. **service_types**: Array layanan (Repaint, Detailing, Coating, Cuci).
 5. **paint_type**: (JANGAN TEBAK! Wajib diisi HANYA JIKA user secara eksplisit menyebut "glossy", "doff", atau "matte" di teks. Jika tidak disebut, biarkan null).
 6. **is_bongkar_total**: (Boolean/null) Jika user sebut "bongkar total", "bongkar mesin", "sampai rangka", atau "full" (untuk detailing).
-7. **detailing_focus**: Fokus area (Bodi Halus, Bodi Kasar, Velg, Mesin). (JANGAN TEBAK! Hanya isi jika user secara eksplisit menyebutkannya. Jika "full", biarkan null dan set is_bongkar_total = true).
+7. **detailing_focus**: Fokus area (Bodi Halus, Bodi Kasar, Velg, Mesin). (JANGAN TEBAK! Hanya isi jika user secara eksplisit menyebutkannya. Jika user bilang "full detailing", biarkan null dan set is_bongkar_total = true. TAPI jika user bilang "full bodi" untuk repaint, isi dengan "full bodi").
 8. **color_choice**: Warna bodi yang diinginkan.
 9. **velg_color_choice**: Warna velg (SERINGKALI berbeda dengan bodi).
 10. **is_previously_painted**: (Boolean/null) Jika motor/velg sudah pernah dicat ulang (terlihat di foto atau disebut user).
@@ -243,7 +243,8 @@ Output: {
         if (extracted.paint_type) ctx.paintType = extracted.paint_type;
         if (extracted.is_bongkar_total !== null && extracted.is_bongkar_total !== undefined) ctx.isBongkarTotal = extracted.is_bongkar_total;
         if (extracted.detailing_focus) {
-            if (typeof extracted.detailing_focus === 'string' && extracted.detailing_focus.toLowerCase().includes('full')) {
+            const focusStr = typeof extracted.detailing_focus === 'string' ? extracted.detailing_focus.toLowerCase() : '';
+            if (focusStr === 'full' || focusStr === 'full detailing') {
                 ctx.isBongkarTotal = true;
                 ctx.detailingFocus = null;
             } else {
