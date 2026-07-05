@@ -41,26 +41,44 @@ async function formatterNode(state) {
         const focus = String(context.detailingFocus || '').toLowerCase();
         const bongkar = context.isBongkarTotal;
 
-        if (primarySvc.includes('detailing') || primarySvc.includes('poles') || primarySvc.includes('cuci') || primarySvc.includes('complete service')) {
-            if (bongkar) {
-                if (paint === 'doff') {
-                    upsellSuggestion = 'Repaint Bodi Kasar';
-                    packageExplanation = '(Tawarkan Repaint Bodi Kasar karena motor sudah dibongkar, mumpung sekalian biar bodi kasar yang kusam jadi baru lagi).';
+        if (primarySvc.includes('detailing') || primarySvc.includes('poles') || primarySvc.includes('cuci') || primarySvc.includes('complete service') || primarySvc.includes('coating')) {
+            const isAlreadyCoating = primarySvc.includes('coating') || primarySvc.includes('complete service');
+
+            if (isAlreadyCoating) {
+                if (bongkar) {
+                    if (paint === 'doff') {
+                        upsellSuggestion = 'Repaint Bodi Kasar';
+                        packageExplanation = '(Tawarkan Repaint Bodi Kasar karena motor sudah dibongkar dan sudah ambil Complete Service, mumpung sekalian biar bodi kasar yang kusam jadi baru lagi).';
+                    } else {
+                        upsellSuggestion = 'Repaint Bodi Halus atau Kasar';
+                        packageExplanation = '(Tawarkan Repaint Bodi karena motor sudah dibongkar dan sudah ambil Complete Service, mumpung sekalian biar warna makin fresh).';
+                    }
                 } else {
-                    upsellSuggestion = 'Repaint Bodi Halus atau Kasar';
-                    packageExplanation = '(Tawarkan Repaint Bodi karena motor sudah dibongkar, mumpung sekalian biar warna makin fresh).';
+                    upsellSuggestion = 'Detailing Mesin';
+                    packageExplanation = '(Tawarkan sekalian detailing mesin biar kinclong total dari bodi sampai ke ruang mesin).';
                 }
-            } else if (focus.includes('mesin')) {
-                upsellSuggestion = 'Detailing Bodi juga';
-                packageExplanation = '(Tawarkan sekalian detailing bodi karena mesin sudah bersih, sayang kalau bodinya masih kusam).';
             } else {
-                // Bodi & Kaki-kaki
-                if (paint === 'doff') {
-                    upsellSuggestion = 'Coating Doff';
-                    packageExplanation = '(Jelaskan singkat: Coating doff bikin cat awet, anti kusam, dan udah termasuk bersihin kaki-kaki juga).';
+                // Belum coating, tawarkan upgrade ke Coating / Complete Service
+                if (bongkar) {
+                    if (paint === 'doff') {
+                        upsellSuggestion = 'Complete Service Doff';
+                        packageExplanation = '(Tawarkan upgrade ke Complete Service Doff. Karena user ambil bongkar total, tanggung kalau nggak sekalian di-coating keramik doff biar warna makin pekat dan terlindungi lama).';
+                    } else {
+                        upsellSuggestion = 'Complete Service Glossy';
+                        packageExplanation = '(Tawarkan upgrade ke Complete Service Glossy. Karena user ambil bongkar total, tanggung kalau nggak sekalian di-coating keramik glossy biar dapat efek daun talas dan kilap kaca).';
+                    }
+                } else if (focus.includes('mesin')) {
+                    upsellSuggestion = 'Detailing Bodi juga';
+                    packageExplanation = '(Tawarkan sekalian poles bodi/coating karena mesin sudah bersih, sayang kalau bodinya masih kusam).';
                 } else {
-                    upsellSuggestion = 'Coating Glossy atau Poles Bodi';
-                    packageExplanation = '(Jelaskan singkat: Poles bodi bikin kilap, kalau mau yang proteksinya lebih tahan lama bisa ambil Coating Glossy).';
+                    // Bodi & Kaki-kaki
+                    if (paint === 'doff') {
+                        upsellSuggestion = 'Coating Motor Doff';
+                        packageExplanation = '(Tawarkan upgrade ke Coating Motor Doff. Bikin cat awet, anti kusam, dan udah termasuk bersihin kaki-kaki juga).';
+                    } else {
+                        upsellSuggestion = 'Coating Motor Glossy';
+                        packageExplanation = '(Tawarkan upgrade ke Coating Motor Glossy biar proteksinya lebih tahan lama, kilap kaca, dan efek daun talas).';
+                    }
                 }
             }
         } else if (primarySvc.includes('repaint')) {
