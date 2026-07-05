@@ -147,6 +147,20 @@ ATURAN BAHASA PENAWARAN PROMO:
     // Custom Instruction for 4 Paket Repaint Bodi Halus
     let repaintBodiHalusInstruction = '';
     if ((replyMode === 'inform' || replyMode === 'ask') && (toolResult?.category === 'repaint_bodi_halus' || toolResult?.results?.[0]?.category === 'repaint_bodi_halus') && (toolResult?.candidates || toolResult?.results?.[0]?.candidates)) {
+        
+        const hasHalus = context.serviceTypes?.some(s => s.toLowerCase().includes('bodi halus'));
+        const comboPartners = context.serviceTypes?.filter(s => {
+            const lower = s.toLowerCase();
+            return lower.includes('velg') || lower.includes('kasar') || lower.includes('cuci');
+        });
+        const alreadyGotHalusCombo = hasHalus && comboPartners?.length > 0;
+        
+        let promoInstruction4 = `4. WAJIB sampaikan dengan jelas bahwa Promo Diskon 15% ini HANYA BERLAKU jika kakak sekalian mengambil layanan ${upsellSuggestion || 'Cuci Komplit, Repaint Velg, atau Repaint Bodi Kasar'}.`;
+        
+        if (alreadyGotHalusCombo) {
+            promoInstruction4 = `4. WAJIB konfirmasi dengan antusias bahwa kakak BERHAK MENDAPATKAN promo diskon 15% untuk paket Repaint Bodi Halus ini karena kakak sudah mengambil layanan kombinasi (${comboPartners.join(', ')}). JANGAN sebutkan syarat promo lagi karena sudah terpenuhi!`;
+        }
+
         repaintBodiHalusInstruction = `
 INSTRUKSI KHUSUS 4 PAKET REPAINT BODI HALUS:
 Kamu harus langsung menampilkan ke-4 pilihan paket ini ke user (Ekonomis, Basic, Standar, Premium).
@@ -156,7 +170,7 @@ Aturan penyajian:
 1b. DESKRIPSI PAKET: WAJIB sertakan deskripsi/penjelasan singkat untuk setiap paket persis seperti yang tertera pada hasil tool JSON. Jangan hilangkan deskripsi paket.
 2. TAMPILKAN PROMO CORET: Untuk paket Premium, Standar, dan Basic, kalikan harga dasar dengan 0.85 (diskon 15%), lalu coret harga asli dan tampilkan harga diskonnya. (Contoh: ~Rp1.000.000~ jadi Rp850.000).
 3. Paket Ekonomis TIDAK MENDAPAT DISKON (jangan dicoret).
-4. WAJIB sampaikan dengan jelas bahwa Promo Diskon 15% ini HANYA BERLAKU jika kakak sekalian mengambil layanan ${upsellSuggestion || 'Cuci Komplit, Repaint Velg, atau Repaint Bodi Kasar'}.
+${promoInstruction4}
 5. WAJIB NUDGE PAKET STANDAR: Setelah menampilkan harga, kamu WAJIB menuliskan kalimat rekomendasi untuk memilih "Paket Standar". Contoh: "Dari 4 paket di atas, Zoya paling saranin kakak ambil Paket Standar ya! Hasilnya udah mantap mirror finish dan dapet garansi 1 tahun lho." (JANGAN SAMPAI LUPA BAGIAN INI!).
 6. TAMPILKAN LAYANAN LAIN: JIKA ada layanan lain selain Bodi Halus di dalam TOOL RESULT JSON (misalnya Repaint Bodi Kasar, Cuci Komplit, dll), WAJIB berikan juga harga layanan tersebut. Jangan pernah bilang "harga akan diinfokan nanti", harganya sudah ada di JSON!
 `;
@@ -272,6 +286,10 @@ Mode INFORM: "siapp mas! untuk *nmax bodi halus* estimasi harganya *rp1.200.000*
 ${missingQ && replyMode === 'ask' ? `
 # ATURAN MUTLAK (ASK MODE)
 Karena ada info yang masih kurang, KALIMAT PALING TERAKHIR dari \`main_content\` WAJIB berupa pertanyaan santai untuk menanyakan hal ini: "${missingQ}". JANGAN TUTUP PESAN TANPA BERTANYA!
+` : ''}
+${!missingQ && replyMode === 'inform' && !comboOfferInstruction ? `
+# ATURAN MUTLAK (INFORM MODE)
+Karena kamu sudah memberikan rincian harga dan tidak ada info yang kurang, KALIMAT PALING TERAKHIR dari \`main_content\` WAJIB berupa pertanyaan santai ("Call to Action") untuk menanyakan langkah selanjutnya. Contoh: "Gimana kak, mau sekalian dibooking jadwalnya untuk hari apa?", atau "Kira-kira ada yang mau ditanyain lagi soal paketnya kak?". JANGAN TUTUP PESAN TANPA BERTANYA!
 ` : ''}
 # OUTPUT FORMAT
 Kamu WAJIB membalas DALAM FORMAT JSON MURNI (tanpa markdown blocks, tanpa teks pembuka/penutup).
