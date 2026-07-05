@@ -89,6 +89,8 @@ async function formatterNode(state) {
                 packageExplanation = '(Tawarkan cuci komplit saja. Jelaskan singkat: Repaint bodi sudah otomatis dapat poles bodi. Cat baru belum bisa dicoating, harus nunggu 1 bulan biar cat matang).';
             }
         }
+        
+        console.log(`[FORMATTER_NODE] Upsell Logic - primarySvc: "${primarySvc}", effectiveBongkar: ${effectiveBongkar}, paint: "${paint}" -> Suggestion: "${upsellSuggestion}"`);
     }
 
     // Build combo offer text for formatter
@@ -103,8 +105,9 @@ Catatan Paket: ${packageExplanation || 'Jelaskan benefit intinya secara ringkas.
 Detail Promo Asli: "${promoMsg}"
 ATURAN BAHASA PENAWARAN PROMO:
 - JANGAN copy-paste syarat promo mentah-mentah (hindari kata kaku seperti "paket ekonomis tidak diskon", "khusus 10 motor", dll).
+- WAJIB SEBUT NAMA PAKET SPESIFIKNYA: "${upsellSuggestion || 'Coating Ceramic'}". Jangan digeneralisir menjadi "layanan coating" atau "layanan repaint".
 - Sampaikan info intinya saja (diskon ${pct}%) dengan sangat santai, seperti gaya ngobrol.
-- Contoh kalimat santai: "Oiya kak buat info kita lagi ada diskon ${pct}% lho buat ${upsellSuggestion || 'Coating Ceramic'} kalau sekalian diambil bareng layanan tadi. Mau sekalian nggak kak?"`;
+- Contoh kalimat santai: "Oiya kak buat info kita lagi ada diskon ${pct}% lho buat paket ${upsellSuggestion || 'Coating Ceramic'} kalau sekalian diambil bareng layanan tadi. Mau sekalian ambil paket ${upsellSuggestion || 'Coating Ceramic'} nggak kak?"`;
     }
 
     // Pass combo data without hardcoding visual display rules
