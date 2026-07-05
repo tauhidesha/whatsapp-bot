@@ -18,6 +18,7 @@ async function toolExecutorNode(state) {
     // PERBAIKAN BUG-2: Selalu inisialisasi sebagai objek kosong agar bentuknya konsisten
     let toolResult = {};
     toolResult.results = [];
+    let newIntent = intent;
 
     try {
         if (intent === 'GENERAL_INQUIRY' || intent === 'BOOKING_SERVICE' || intent === 'CONSULTATION') {
@@ -118,7 +119,7 @@ async function toolExecutorNode(state) {
                             toolResult.results = uniqueResults;
 
                             const getPrice = (r) => r.final_price || r.price || r.candidates?.[0]?.price || 0;
-                            const eligiblePattern = new RegExp(promo.discountEligiblePattern || 'bodi halus', 'i');
+                            const eligiblePattern = new RegExp(promo.discountEligiblePattern || 'repaint bodi halus', 'i');
 
                             let totalBefore = 0;
                             let totalAfter = 0;
@@ -189,6 +190,8 @@ async function toolExecutorNode(state) {
                         });
                         toolResult.handoff = handoffResult;
                         toolResult.autoHandoverReason = 'no_pricing_data';
+                        toolResult.needBosmat = true;
+                        newIntent = 'HUMAN_HANDOVER';
                     }
                 }
             }
@@ -299,6 +302,7 @@ async function toolExecutorNode(state) {
         const comboPromo = (context.serviceTypes?.length === 1 && !context.comboOffered) ? activePromo : null;
 
         return {
+            intent: newIntent,
             context: contextUpdate,
             metadata: {
                 ...state.metadata,

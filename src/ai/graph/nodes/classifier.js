@@ -27,6 +27,8 @@ Tentukan SATU intent yang paling sesuai dari pesan terakhir user.
 - JAWAB HANYA DENGAN SATU KATA KUNCI kategori intent.
 - JANGAN berikan penjelasan, tanda baca, atau karakter tambahan.
 - JIKA user hanya menyapa (Halo, P, Assalamualaikum), WAJIB klasifikasikan sebagai **GREETING**.
+- JIKA user menyebutkan 2 motor secara bersamaan, TETAP proses sebagai intent yang relevan (biasanya **BOOKING_SERVICE**), jangan bingung.
+- JIKA user secara spesifik menanyakan layanan untuk **Mobil** (misal: "bisa coating mobil?"), WAJIB klasifikasikan sebagai **HUMAN_HANDOVER**.
 
 # INTENT CATEGORIES
 - **GREETING**: Sapaan awal (Halo, P, Assalamualaikum).

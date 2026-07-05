@@ -100,6 +100,7 @@ Ekstrak data ke dalam format JSON dengan field berikut:
 - JIKA user menjawab pertanyaan AI tentang motor/layanan, intent = "BOOKING_SERVICE".
 
 # EXTRACTION STRATEGY
+- **Multi-Motor Constraint**: JIKA user menyebutkan lebih dari 1 motor (misal: "mau repaint aerox dan coating nmax"), FOKUS HANYA pada motor PERTAMA yang disebut. Abaikan data motor kedua sampai motor pertama selesai diproses.
 - **Bodi Halus vs Kasar**: Jika user sebut "bodi kasar", masukkan ke \`detailing_focus\`.
 - **Warna**: Bedakan dengan teliti antara warna bodi dan warna velg.
 - **Visual Summary**: Wajib isi field "visual_summary" dengan deskripsi singkat (1-2 kalimat) tentang apa yang kamu lihat dalam foto.
@@ -317,11 +318,11 @@ Output: {
                 break;
             }
             if (svc === 'detailing') {
-                if (ctx.detailingFocus || ctx.isBongkarTotal) {
-                    ctx.serviceTypes[i] = ctx.isBongkarTotal ? "Full Detailing" : `Detailing ${ctx.detailingFocus}`;
+                if (ctx.detailingFocus || ctx.isBongkarTotal !== null) {
+                    ctx.serviceTypes[i] = ctx.isBongkarTotal ? "Full Detailing" : `Detailing ${ctx.detailingFocus || 'Bodi & Kaki-kaki'}`;
                     continue; // Skip generic missing question since we auto-resolved it
                 } else {
-                    missingQuestion = "Tanyakan fokus detailingnya (Hilangkan baret bodi, bersihkan mesin, atau cuci bongkar total)";
+                    missingQuestion = "Tanyakan detail pengerjaan: apakah mau sampai rangka (bongkar total), hanya bodi dan kaki-kaki saja, atau hanya mesin saja?";
                     break;
                 }
             }
@@ -330,7 +331,7 @@ Output: {
                     ctx.serviceTypes[i] = `Coating Ceramic ${ctx.paintType}`;
                     continue; // Skip generic missing question since we auto-resolved it
                 } else {
-                    missingQuestion = "Tanyakan jenis cat saat ini (Glossy atau Doff/Matte)";
+                    missingQuestion = "Tanyakan jenis cat motor saat ini (Glossy atau Doff/Matte) karena paketnya berbeda";
                     break;
                 }
             }
@@ -340,16 +341,29 @@ Output: {
         if (!missingQuestion) {
             for (const svc of ctx.serviceTypes) {
                 const svcLower = svc.toLowerCase();
-                if (svcLower.includes('coating') || svcLower.includes('complete service')) {
-                    if (!ctx.paintType) { missingQuestion = "Cari tahu jenis cat motor (Glossy atau Doff)"; break; }
-                    if (ctx.isBongkarTotal === null && svcLower.includes('coating')) { missingQuestion = "Tanyakan apakah mau proteksi bodi saja atau bongkar total (Complete Service)"; break; }
-                } else if (svcLower.includes('detailing') || svcLower.includes('poles') || svcLower.includes('cuci')) {
-                    if (!ctx.detailingFocus && !ctx.isBongkarTotal) { missingQuestion = "Tanyakan fokus pembersihan (Bodi, Mesin, atau Kolong)"; break; }
-                    if (!ctx.paintType && (svcLower.includes('poles') || svcLower.includes('full detailing'))) { missingQuestion = "Pastikan jenis catnya Glossy atau Doff"; break; }
-                } else if (svcLower.includes('repaint')) {
+                
+                // Repaint Flow
+                if (svcLower.includes('repaint')) {
                     if (svcLower.includes('halus') && !ctx.colorChoice) { missingQuestion = "Tanyakan rencana warna baru untuk bodi halusnya"; break; }
                     if (svcLower.includes('velg') && !ctx.velgColorChoice) { missingQuestion = "Tanyakan pilihan warna untuk repaint velgnya"; break; }
-                    if (svcLower.includes('velg') && ctx.isPreviouslyPainted === null) { missingQuestion = "Tanyakan apakah velg masih cat ori pabrik atau sudah pernah repaint (infokan senggol tipis kalau sudah bawaan repaint/cat numpuk biasanya ada tambahan biaya ngerok)"; break; }
+                    if (svcLower.includes('velg') && ctx.isPreviouslyPainted === null) { missingQuestion = "Tanyakan apakah velg masih cat ori pabrik atau sudah pernah repaint (karena ada tambahan biaya ngerok jika sudah pernah cat)"; break; }
+                }
+                
+                // Detailing / Coating Flow
+                else if (svcLower.includes('detailing') || svcLower.includes('poles') || svcLower.includes('cuci') || svcLower.includes('coating') || svcLower.includes('complete service')) {
+                    
+                    if (ctx.isBongkarTotal === null && !ctx.detailingFocus) {
+                        missingQuestion = "Tanyakan detail pengerjaan: apakah mau sampai rangka (bongkar total), hanya bodi dan kaki-kaki saja, atau hanya mesin saja?";
+                        break;
+                    }
+
+                    // Jika user pilih mesin saja, kita biarkan lolos dulu (Formatter nanti akan tawarin bodi juga).
+                    const isMesinSaja = ctx.detailingFocus && ctx.detailingFocus.toLowerCase().includes('mesin');
+                    
+                    if (!isMesinSaja && !ctx.paintType) {
+                         missingQuestion = "Tanyakan jenis cat motornya saat ini, apakah Glossy atau Doff? (Karena paket treatment-nya berbeda)";
+                         break;
+                    }
                 }
             }
         }

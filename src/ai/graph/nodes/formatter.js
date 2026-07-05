@@ -32,21 +32,41 @@ async function formatterNode(state) {
     // Detect gender dari nama customer
     const customerName = customer.name || 'Kak';
 
-    // Upselling suggestions based on service type
-    const upsellMap = {
-        'repaint': 'Cuci Komplit',
-        'detailing': 'Coating Ceramic',
-        'coating': 'Complete Service',
-        'cuci': 'Full Detailing',
-        'poles': 'Coating Ceramic',
-    };
+    // Detailing & Repaint Package Suggester (Decision Tree)
     let upsellSuggestion = '';
+    let packageExplanation = '';
     if (context.serviceTypes?.length === 1) {
         const primarySvc = context.serviceTypes[0].toLowerCase();
-        for (const [key, val] of Object.entries(upsellMap)) {
-            if (primarySvc.includes(key)) {
-                upsellSuggestion = val;
-                break;
+        const paint = (context.paintType || '').toLowerCase();
+        const focus = (context.detailingFocus || '').toLowerCase();
+        const bongkar = context.isBongkarTotal;
+
+        if (primarySvc.includes('detailing') || primarySvc.includes('poles') || primarySvc.includes('cuci')) {
+            if (bongkar) {
+                if (paint === 'doff') {
+                    upsellSuggestion = 'Cuci Komplit';
+                    packageExplanation = '(Jelaskan singkat: Cuci komplit ini bongkar total, sangat cocok buat cat doff biar bersih sampai ke rangka).';
+                } else {
+                    upsellSuggestion = 'Full Detailing';
+                    packageExplanation = '(Jelaskan singkat: Full detailing bongkar total, bikin bodi glossy kilap lagi dan rangka bersih dari kotoran).';
+                }
+            } else if (focus.includes('mesin')) {
+                upsellSuggestion = 'Detailing Bodi juga';
+                packageExplanation = '(Tawarkan sekalian detailing bodi karena mesin sudah bersih, sayang kalau bodinya masih kusam).';
+            } else {
+                // Bodi & Kaki-kaki
+                if (paint === 'doff') {
+                    upsellSuggestion = 'Coating Doff';
+                    packageExplanation = '(Jelaskan singkat: Coating doff bikin cat awet, anti kusam, dan udah termasuk bersihin kaki-kaki juga).';
+                } else {
+                    upsellSuggestion = 'Coating Glossy atau Poles Bodi';
+                    packageExplanation = '(Jelaskan singkat: Poles bodi bikin kilap, kalau mau yang proteksinya lebih tahan lama bisa ambil Coating Glossy).';
+                }
+            }
+        } else if (primarySvc.includes('repaint')) {
+            if (primarySvc.includes('halus')) {
+                upsellSuggestion = 'Cuci Komplit';
+                packageExplanation = '(Tawarkan cuci komplit saja. Jelaskan singkat: Repaint bodi sudah otomatis dapat poles bodi. Cat baru belum bisa dicoating, harus nunggu 1 bulan biar cat matang).';
             }
         }
     }
@@ -59,6 +79,7 @@ async function formatterNode(state) {
         comboOfferInstruction = `
 PROMOSI COMBO (WAJIB ditawarkan secara natural di akhir pesan):
 Setelah kasih estimasi harga, tawarkan layanan tambahan ini secara santai: "${upsellSuggestion || 'Coating Ceramic'}".
+Catatan Paket: ${packageExplanation || 'Jelaskan benefit intinya secara ringkas.'}
 Info Promo: "${promoMsg}"
 Contoh natural: "Oiya, biar sekalian maksimal, mau ditambah ${upsellSuggestion || 'Coating Ceramic'} juga nggak kak? ${promoMsg}"
 JANGAN bilang ini "promo combo" secara kaku. Sampaikan secara conversational.`;
@@ -140,7 +161,9 @@ Mode GREET: "pagi juga kak! kenalin aku zoya 🎨✨\n\nbiar aku bisa bantu, mot
 Mode INFORM: "siapp mas! untuk *nmax bodi halus* estimasi harganya *rp1.200.000* ya. ✨"
 
 # ATURAN EMAS
-- **Mobil Constraint**: Jika user tanya soal *repaint* atau *detailing mobil*, katakan bahwa Zoya perlu tanya/konfirmasi ke bos/admin dulu (karena ${studioMetadata.shortName} biasanya fokus ke motor). JANGAN langsung tolak, tapi bilang akan ditanyakan dulu.
+- **Multi-Motor**: Jika user menyebutkan 2 motor berbeda di satu pesan (misal: "mau repaint aerox dan coating nmax"), sampaikan bahwa kita bahas SATU per SATU. Gunakan kalimat santai seperti: "Wah dua motor nih, kita bahas yang [Sebut Motor 1] dulu ya kak biar gak pusing 😆".
+- **Alamat & Booking**: Jika user menanyakan alamat/lokasi, BERIKAN informasinya, TAPI pastikan selalu MENYARANKAN untuk booking jadwal terlebih dahulu atau kabari jika ingin datang langsung hari ini.
+- **Tanya Bosmat (Harga Kosong/Mobil/Datang Sekarang)**: Jika \`toolResult.needBosmat\` bernilai true, ATAU user tanya layanan mobil, ATAU user bilang mau datang sekarang, katakan: "Sebentar ya kak, Zoya tanyakan Bosmat dulu 🙏", dan chat ini akan diserahkan ke admin (JANGAN ngarang harga sendiri).
 - **Studio Photo**: Jika \`toolResult\` mengandung \`studioPhoto\`, sebutkan dengan santai bahwa kamu sudah mengirimkan foto depan studio agar mas/kak tidak bingung carinya. 
 - Sapaan (\`greeting\`) hanya diberikan jika ini awal diskusi atau perpindahan topik yang butuh "lem" percakapan. Kosongkan jika sedang diskusi intens.
 - Selalu akhiri dengan Call-to-Action (CTA) yang jelas.
