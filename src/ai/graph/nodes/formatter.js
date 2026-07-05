@@ -40,12 +40,14 @@ async function formatterNode(state) {
         const paint = String(context.paintType || '').toLowerCase();
         const focus = String(context.detailingFocus || '').toLowerCase();
         const bongkar = context.isBongkarTotal;
+        const isImplicitBongkar = primarySvc.includes('cuci komplit') || primarySvc.includes('full detailing') || primarySvc.includes('complete service');
+        const effectiveBongkar = bongkar || isImplicitBongkar;
 
         if (primarySvc.includes('detailing') || primarySvc.includes('poles') || primarySvc.includes('cuci') || primarySvc.includes('complete service') || primarySvc.includes('coating')) {
             const isAlreadyCoating = primarySvc.includes('coating') || primarySvc.includes('complete service');
 
             if (isAlreadyCoating) {
-                if (bongkar) {
+                if (effectiveBongkar) {
                     if (paint === 'doff') {
                         upsellSuggestion = 'Repaint Bodi Kasar';
                         packageExplanation = '(Tawarkan Repaint Bodi Kasar karena motor sudah dibongkar dan sudah ambil Complete Service, mumpung sekalian biar bodi kasar yang kusam jadi baru lagi).';
@@ -59,7 +61,7 @@ async function formatterNode(state) {
                 }
             } else {
                 // Belum coating, tawarkan upgrade ke Coating / Complete Service
-                if (bongkar) {
+                if (effectiveBongkar) {
                     if (paint === 'doff') {
                         upsellSuggestion = 'Complete Service Doff';
                         packageExplanation = '(Tawarkan upgrade ke Complete Service Doff. Karena user ambil bongkar total, tanggung kalau nggak sekalian di-coating keramik doff biar warna makin pekat dan terlindungi lama).';
