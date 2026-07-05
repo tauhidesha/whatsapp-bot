@@ -78,7 +78,7 @@ Dukung penuh analisis gambar! Jika user mengirim foto motor/mobil:
 - **CONSULTATION**: Tanya promo atau tanya saran umum tanpa detail motor.
 - **BOOKING_SERVICE**: Niat servis, tanya harga layanan tertentu, atau menjawab pertanyaan teknis AI.
 - **GENERAL_INQUIRY**: Tanya lokasi, jam buka, kontak studio, atau kebingungan mencari lokasi (misal: "saya sudah di depan", "patokannya apa?", "sebelah mana?", "nyasar").
-- **HUMAN_HANDOVER**: Minta bicara dengan admin manusia.
+- **HUMAN_HANDOVER**: Minta bicara dengan admin manusia, konsultasi konsep motor/warna custom, atau meminta warna spesial (Bunglon, Chrome, Hologram).
 - **OTHER**: Di luar kategori di atas.
 
 # EXTRACTION RULES
@@ -297,6 +297,23 @@ Output: {
         };
     }
 
+    // --- AUTO-RESOLVE CONFLICT (Repaint + Poles/Coating) ---
+    const hasRepaintHalus = ctx.serviceTypes.some(s => s.toLowerCase().includes('repaint bodi halus'));
+    if (hasRepaintHalus) {
+        const conflictServices = ctx.serviceTypes.filter(s => {
+            const low = s.toLowerCase();
+            return low.includes('poles') || low.includes('coating') || low.includes('full detailing') || low.includes('complete service');
+        });
+        if (conflictServices.length > 0) {
+            console.log(`[INFO_COLLECTOR_NODE] Conflict detected: Repaint Halus + ${conflictServices.join(', ')}. Removing conflicts and adding Cuci Komplit.`);
+            ctx.serviceTypes = ctx.serviceTypes.filter(s => !conflictServices.includes(s));
+            if (!ctx.serviceTypes.some(s => s.toLowerCase() === 'cuci komplit')) {
+                ctx.serviceTypes.push('Cuci Komplit');
+            }
+            ctx.curingWarning = true;
+        }
+    }
+
     // --- DECISION TREE (MISSING QUESTIONS) ---
     let missingQuestion = null;
     const lastMsgLower = lastMessageText.toLowerCase();
@@ -338,7 +355,11 @@ Output: {
                     ctx.serviceTypes[i] = `Detailing ${ctx.detailingFocus}`;
                     continue;
                 } else if (ctx.isBongkarTotal === false) {
-                    ctx.serviceTypes[i] = "Detailing Bodi & Kaki-kaki";
+                    if (ctx.paintType && (ctx.paintType.toLowerCase() === 'doff' || ctx.paintType.toLowerCase() === 'matte')) {
+                        ctx.serviceTypes[i] = "Coating Motor Doff";
+                    } else {
+                        ctx.serviceTypes[i] = "Detailing Bodi & Kaki-kaki";
+                    }
                     continue;
                 } else {
                     missingQuestion = "Tanya secara santai: 'detailingnya mau sampai rangka apa nggak kak? atau cuma bodi dan kaki-kaki aja?'";
@@ -363,9 +384,9 @@ Output: {
                 
                 // Repaint Flow
                 if (svcLower.includes('repaint')) {
-                    if (svcLower.includes('halus') && !ctx.colorChoice) { missingQuestion = "Tanyakan rencana warna baru untuk bodi halusnya"; break; }
-                    if (svcLower.includes('velg') && !ctx.velgColorChoice) { missingQuestion = "Tanyakan pilihan warna untuk repaint velgnya"; break; }
-                    if (svcLower.includes('velg') && ctx.isPreviouslyPainted === null) { missingQuestion = "Tanyakan apakah velg masih cat ori pabrik atau sudah pernah repaint (karena ada tambahan biaya ngerok jika sudah pernah cat)"; break; }
+                    if (svcLower.includes('halus') && !ctx.colorChoice) { missingQuestion = "Tanyakan rencana warna baru untuk bodi halusnya (Info: Beritahu santai kalau warna spesial seperti Candy/Stabilo ada tambahan biaya)"; break; }
+                    if (svcLower.includes('velg') && !ctx.velgColorChoice) { missingQuestion = "Tanyakan pilihan warna untuk repaint velgnya (Info: Beritahu santai kalau warna Two-Tone/Polish ada tambahan biaya)"; break; }
+                    if (svcLower.includes('velg') && ctx.isPreviouslyPainted === null) { missingQuestion = "Tanyakan apakah velg masih cat ori pabrik atau sudah pernah repaint (Info: Kasih tahu ada biaya remover 50-100rb kalau velg udah pernah dicat)"; break; }
                 }
                 
                 // Detailing / Coating Flow

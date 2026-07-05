@@ -28,14 +28,14 @@ Tentukan SATU intent yang paling sesuai dari pesan terakhir user.
 - JANGAN berikan penjelasan, tanda baca, atau karakter tambahan.
 - JIKA user hanya menyapa (Halo, P, Assalamualaikum), WAJIB klasifikasikan sebagai **GREETING**.
 - JIKA user menyebutkan 2 motor secara bersamaan, TETAP proses sebagai intent yang relevan (biasanya **BOOKING_SERVICE**), jangan bingung.
-- JIKA user secara spesifik menanyakan layanan untuk **Mobil** (misal: "bisa coating mobil?"), WAJIB klasifikasikan sebagai **HUMAN_HANDOVER**.
+- JIKA user menanyakan layanan untuk **Mobil** ATAU konsultasi konsep motor/warna custom ATAU meminta warna spesial yang butuh kesepakatan (Bunglon, Chrome, Hologram), WAJIB klasifikasikan sebagai **HUMAN_HANDOVER**.
 
 # INTENT CATEGORIES
 - **GREETING**: Sapaan awal (Halo, P, Assalamualaikum).
 - **CONSULTATION**: Tanya promo atau tanya saran umum tanpa detail motor.
 - **BOOKING_SERVICE**: Niat servis, tanya harga layanan tertentu, atau menjawab pertanyaan teknis AI.
 - **GENERAL_INQUIRY**: Tanya lokasi, jam buka, kontak studio, atau **kebingungan mencari lokasi** (misal: "saya sudah di depan", "patokannya apa?", "sebelah mana?", "nyasar").
-- **HUMAN_HANDOVER**: Minta bicara dengan admin manusia.
+- **HUMAN_HANDOVER**: Minta bicara dengan admin manusia, konsultasi konsep motor/warna custom, atau meminta warna spesial (Bunglon, Chrome, Hologram).
 - **OTHER**: Di luar kategori di atas.
 
 # INPUT DATA

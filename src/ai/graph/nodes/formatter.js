@@ -149,7 +149,7 @@ ${state.metadata.visualSummary || 'Tidak ada gambar yang terdeteksi.'}
 ${modeInstructions[replyMode] || modeInstructions.inform}
 
 # PENTING (HARGA & DATA):
-1. Hasil Teknis/Tool WAJIB jadi dasar info harga. Jika kosong, JANGAN beri harga spesifik.
+${context.curingWarning ? "🚨 INFO PENTING: User tadi meminta poles/coating bersamaan dengan Repaint Bodi Halus. Jelaskan dengan santai bahwa cat baru butuh waktu 1 bulan agar matang sempurna (curing), sehingga poles/coating belum bisa dilakukan sekarang. Sarankan bahwa Cuci Komplit sudah sangat cukup untuk menyegarkan motor yang direpaint.\n" : ""}1. Hasil Teknis/Tool WAJIB jadi dasar info harga. Jika kosong, JANGAN beri harga spesifik.
 2. Ada biaya tambahan untuk warna khusus/tertentu.
 3. Gunakan format rincian berikut jika ada breakdown biaya:
    [kalimat pengantar...]
