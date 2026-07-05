@@ -464,17 +464,20 @@ Output: {
     }
 
     // Determine readiness for tool execution
-    // Determine readiness for tool execution
     const hasGenericService = ctx.serviceTypes.some(s => ['repaint', 'detailing', 'coating', 'poles', 'cuci'].includes(s.toLowerCase()));
     const isHumanHandoff = classifiedIntent === 'HUMAN_HANDOVER' || ctx.vehicleType === 'Mobil';
 
+    // Check if this is the very first service request turn
+    const isFirstTurn = (!context.serviceTypes || context.serviceTypes.length === 0);
+    const forceAskBeforeTools = isFirstTurn && (ctx.missingQuestions.length > 0);
+
     // Ready if:
     // 1. Human handoff
-    // 2. Booking flow has enough data (even if there are missing questions, we can fetch base prices!)
+    // 2. Booking flow has enough data (even if there are missing questions, we can fetch base prices!) -> EXCEPT on first turn!
     // 3. General inquiry (Location/Studio info)
-    const isReady = isHumanHandoff ||
+    const isReady = !forceAskBeforeTools && (isHumanHandoff ||
         (classifiedIntent === 'GENERAL_INQUIRY' || studioKeywords) ||
-        (classifiedIntent === 'BOOKING_SERVICE' && !!ctx.vehicleType && ctx.serviceTypes.length > 0 && !hasGenericService);
+        (classifiedIntent === 'BOOKING_SERVICE' && !!ctx.vehicleType && ctx.serviceTypes.length > 0 && !hasGenericService));
 
     ctx.isReadyForTools = Boolean(isReady);
 
