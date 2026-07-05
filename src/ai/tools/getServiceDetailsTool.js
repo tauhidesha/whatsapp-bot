@@ -366,10 +366,19 @@ async function processSingleService(parsedServiceName, input, promoText) {
 
         // 4. Bongkar Total
         if (extraContext.isBongkarTotal === true) {
-            const bongkarFee = 150000; // Fixed fee for disassembly
-            finalPrice += bongkarFee;
-            breakdown.push(`+Rp${bongkarFee.toLocaleString('id-ID')} (Bongkar Pasang)`);
-            console.log(`[applyAllSurcharges] Disassembly fee applied: ${bongkarFee}`);
+            const svcLower = serviceName.toLowerCase();
+            const inherentlyIncludesBongkar = svcLower.includes('cuci komplit') || 
+                                              svcLower.includes('full detailing') || 
+                                              svcLower.includes('complete service');
+                                              
+            if (!inherentlyIncludesBongkar) {
+                const bongkarFee = 150000; // Fixed fee for disassembly
+                finalPrice += bongkarFee;
+                breakdown.push(`+Rp${bongkarFee.toLocaleString('id-ID')} (Bongkar Pasang)`);
+                console.log(`[applyAllSurcharges] Disassembly fee applied: ${bongkarFee}`);
+            } else {
+                console.log(`[applyAllSurcharges] Disassembly fee SKIPPED - already included in ${serviceName}`);
+            }
         }
 
         // 5. Specific Add-ons (CVT, Behel, Arm, Shock)
