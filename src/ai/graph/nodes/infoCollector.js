@@ -264,9 +264,11 @@ Output: {
 
         // --- AUTO-RESOLVE generic "Repaint" using detailing_focus ---
         const genericRepaintIdx = ctx.serviceTypes.findIndex(s => s.toLowerCase() === 'repaint');
+        const hasRepaintKeyword = ctx.serviceTypes.some(s => s.toLowerCase().includes('repaint')) || extractedServices.some(s => s.toLowerCase().includes('repaint'));
         const focusRaw = ctx.detailingFocus;
         const focusStr = typeof focusRaw === 'string' ? focusRaw : (Array.isArray(focusRaw) ? focusRaw.join(' ') : String(focusRaw || ''));
-        if (genericRepaintIdx !== -1 && focusStr) {
+        
+        if (hasRepaintKeyword && focusStr) {
             const focus = focusStr.toLowerCase();
             const resolvedServices = [];
 
@@ -294,9 +296,13 @@ Output: {
             }
 
             if (resolvedServices.length > 0) {
-                ctx.serviceTypes.splice(genericRepaintIdx, 1, ...resolvedServices);
+                if (genericRepaintIdx !== -1) {
+                    ctx.serviceTypes.splice(genericRepaintIdx, 1, ...resolvedServices);
+                } else {
+                    ctx.serviceTypes.push(...resolvedServices);
+                }
                 ctx.serviceTypes = [...new Set(ctx.serviceTypes)];
-                console.log(`[INFO_COLLECTOR_NODE] Resolved "Repaint" → [${resolvedServices.join(', ')}] from detailing_focus="${ctx.detailingFocus}"`);
+                console.log(`[INFO_COLLECTOR_NODE] Resolved "Repaint" focus → [${resolvedServices.join(', ')}] from detailing_focus="${ctx.detailingFocus}"`);
             }
         }
 
