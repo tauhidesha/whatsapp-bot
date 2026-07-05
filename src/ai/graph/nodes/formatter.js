@@ -38,7 +38,7 @@ async function formatterNode(state) {
     let packageExplanation = '';
     let benefitText = '';
     let effectiveBongkar = false;
-    
+
     if (context.serviceTypes?.length === 1) {
         const primarySvc = context.serviceTypes[0].toLowerCase();
         const paint = String(context.paintType || '').toLowerCase();
@@ -93,10 +93,10 @@ async function formatterNode(state) {
             } else if (primarySvc.includes('kasar') || primarySvc.includes('velg')) {
                 upsellSuggestion = 'Repaint Bodi Halus';
                 benefitText = 'karena kalau ambil paket Repaint Bodi Halus sekalian, paket bodi halusnya otomatis dapet diskon 15%';
-                packageExplanation = '(Infoin santai: Kalau mau sekalian Repaint Bodi Halus juga mumpung lagi ada promo diskon 15% untuk paket bodi halusnya, jadi motornya bisa fresh luar dalam.)';
+                packageExplanation = '(Infoin santai: Kalau mau sekalian Repaint Bodi Halus juga mumpung lagi ada promo diskon 15% untuk paket bodi halusnya, jadi motornya bisa fresh kayak baru lagi.)';
             }
         }
-        
+
         console.log(`[FORMATTER_NODE] Upsell Logic - primarySvc: "${primarySvc}", effectiveBongkar: ${effectiveBongkar}, paint: "${paint}" -> Suggestion: "${upsellSuggestion}", Benefit: "${benefitText}"`);
     }
 
@@ -106,13 +106,13 @@ async function formatterNode(state) {
         const pct = Math.round(comboPromo.comboDiscount * 100);
         let upsellPriceStr = "";
         let primarySvcTitle = toolResult?.results?.[0]?.name || toolResult?.results?.[0]?.service_name || context.serviceTypes[0];
-        
+
         try {
             const upsellDetails = await getServiceDetailsTool.implementation({
                 service_name: [upsellSuggestion],
                 motor_model: context.vehicleType
             });
-            
+
             if (upsellDetails?.results?.length > 0) {
                 const res = upsellDetails.results[0];
                 let rawPrice = res.final_price || res.price || 0;
@@ -305,19 +305,19 @@ Mode INFORM: "siapp mas! untuk *nmax bodi halus* estimasi harganya *rp1.200.000*
         const finalPrompt = `TRANSKIP PERCAKAPAN TERAKHIR:\n\n${transcript}\n\n(Tuliskan balasan AI selanjutnya sesuai arahan sistem)`;
 
         console.log(`[FORMATTER_NODE] Invoking model (manual parse mode)...`);
-        
+
         // Timeout wrapper for safety
         const invokePromise = withRetry(() => model.invoke([
             new SystemMessage(systemPrompt),
             new HumanMessage(finalPrompt)
         ]), { maxRetries: 3, baseDelayMs: 1500 });
 
-        const timeoutPromise = new Promise((_, reject) => 
+        const timeoutPromise = new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Formatter timeout after 120s')), 120000)
         );
 
         const response = await Promise.race([invokePromise, timeoutPromise]);
-        
+
         console.log(`[FORMATTER_NODE] Response received: ${response ? 'OK' : 'NULL'}`);
 
         // Handle manual JSON parsing
