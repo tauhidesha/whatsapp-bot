@@ -2060,11 +2060,30 @@ function start(client) {
         return await client.sendMessage(to, { text: text });
     });
     client.sendFile = wrapSafe(async (to, dataUri, filename, caption) => {
-        // Parse data uri: data:image/jpeg;base64,...
-        const match = dataUri.match(/^data:(.*?);base64,(.*)$/);
-        if (!match) throw new Error('Invalid data URI format');
-        const mimetype = match[1];
-        const buffer = Buffer.from(match[2], 'base64');
+        let buffer;
+        let mimetype;
+
+        if (typeof dataUri === 'string' && dataUri.startsWith('data:')) {
+            const match = dataUri.match(/^data:(.*?);base64,(.*)$/);
+            if (!match) throw new Error('Invalid data URI format');
+            mimetype = match[1];
+            buffer = Buffer.from(match[2], 'base64');
+        } else {
+            // Assume it's a file path
+            const fs = require('fs');
+            const path = require('path');
+            if (!fs.existsSync(dataUri)) {
+                throw new Error('File not found or invalid data URI: ' + dataUri);
+            }
+            buffer = fs.readFileSync(dataUri);
+            const ext = path.extname(dataUri).toLowerCase();
+            if (ext === '.jpg' || ext === '.jpeg') mimetype = 'image/jpeg';
+            else if (ext === '.png') mimetype = 'image/png';
+            else if (ext === '.mp4') mimetype = 'video/mp4';
+            else if (ext === '.pdf') mimetype = 'application/pdf';
+            else mimetype = 'application/octet-stream';
+        }
+
         const isImage = mimetype.startsWith('image/');
         const isVideo = mimetype.startsWith('video/');
 
