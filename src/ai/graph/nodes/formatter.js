@@ -220,14 +220,15 @@ ${dateInfo}
         
         if (hasCandidates && !context.packageChoice) {
             informCTAInstruction = `
-# ATURAN MUTLAK (INFORM MODE)
-Karena user BELUM memilih paket yang spesifik (misal: Paket Standar/Premium/Ekonomis), KALIMAT PALING TERAKHIR dari \`main_content\` WAJIB berupa CTA yang meminta user untuk memilih paket mana yang paling sesuai dengan kebutuhannya. Contoh: "Gimana kak, dari pilihan paket di atas kira-kira ada gambaran mau pilih yang mana?". JANGAN menanyakan jadwal booking sebelum user memilih paketnya!`;
+# PENUTUP PESAN (WAJIB ADA)
+Karena user BELUM memilih paket yang spesifik, KALIMAT PALING TERAKHIR dari \`main_content\` WAJIB SEKALI berupa pertanyaan (CTA) yang menanyakan paket mana yang mau dipilih. 
+Contoh: "Gimana kak, dari pilihan paket di atas kira-kira ada gambaran mau pilih yang mana?". 
+(JANGAN menanyakan jadwal booking/eksekusi sebelum user memilih paketnya!)`;
         } else if (context.packageChoice || !hasCandidates) {
             informCTAInstruction = `
-# ATURAN MUTLAK (INFORM MODE)
-Karena user SUDAH menentukan pilihan layanan/paket, kamu WAJIB melakukan hal berikut:
-1. Rekap semua layanan yang dipilih beserta total biayanya (termasuk diskon jika ada).
-2. KALIMAT PALING TERAKHIR dari \`main_content\` WAJIB menanyakan kapan motornya mau dieksekusi/dibawa ke bengkel. Contoh: "Jadi totalnya segini ya kak, gimana mau dieksekusi hari apa nih?".`;
+# PENUTUP PESAN (WAJIB ADA)
+Karena user SUDAH menentukan pilihan layanan/paket, KALIMAT PALING TERAKHIR dari \`main_content\` WAJIB menanyakan kapan jadwal eksekusinya. 
+Contoh: "Jadi totalnya segini ya kak, gimana mau dieksekusi hari apa nih?".`;
         }
     }
 
@@ -309,11 +310,11 @@ Kamu WAJIB membalas DALAM FORMAT JSON MURNI (tanpa markdown blocks, tanpa teks p
 Struktur JSON yang diwajibkan:
 {
   "greeting": "sapaan pendek (max 5 kata) jika di awal/pindah topik, kosongkan jika diskusi intens",
-  "main_content": "isi pesan utama, gunakan double-newline antar paragraf",
+  "main_content": "isi pesan utama, gunakan double-newline antar paragraf. WAJIB AKHIRI DENGAN KALIMAT TANYA/CTA SESUAI INSTRUKSI!",
   "internal_thought": "analisis singkat pemilihan pesan"
 }`;
 
-    console.log(`[FORMATTER_NODE] missingQ detected: "${missingQ}"`);
+    console.log("SYSTEM_PROMPT:", systemPrompt); console.log(`[FORMATTER_NODE] missingQ detected: "${missingQ}"`);
 
     try {
         // --- Step 2: Build transcript ---
