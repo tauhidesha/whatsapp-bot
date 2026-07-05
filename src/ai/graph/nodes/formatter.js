@@ -155,13 +155,22 @@ ATURAN BAHASA PENAWARAN PROMO:
         });
         const alreadyGotHalusCombo = hasHalus && comboPartners?.length > 0;
         
-        let promoInstruction4 = `4. WAJIB sampaikan dengan jelas bahwa Promo Diskon 15% ini HANYA BERLAKU jika kakak sekalian mengambil layanan ${upsellSuggestion || 'Cuci Komplit, Repaint Velg, atau Repaint Bodi Kasar'}.`;
-        
+        let statusPromoCombo = '';
         if (alreadyGotHalusCombo) {
-            promoInstruction4 = `4. WAJIB konfirmasi dengan antusias bahwa kakak BERHAK MENDAPATKAN promo diskon 15% untuk paket Repaint Bodi Halus ini karena kakak sudah mengambil layanan kombinasi (${comboPartners.join(', ')}). JANGAN sebutkan syarat promo lagi karena sudah terpenuhi!`;
+            statusPromoCombo = `
+# STATUS PROMO COMBO (WAJIB DISAMPAIKAN)
+Kakak sudah mengambil kombinasi layanan: Bodi Halus + ${comboPartners.join(', ')}. 
+Maka kakak otomatis BERHAK MENDAPATKAN DISKON 15% untuk Repaint Bodi Halus!
+-> Kamu WAJIB menyampaikannya secara eksplisit dan antusias SEBELUM membeberkan rincian harga paket di bawah ini.
+`;
+        } else {
+            statusPromoCombo = `
+# SYARAT PROMO DISKON 15% (WAJIB DISAMPAIKAN)
+Sampaikan dengan jelas bahwa Promo Diskon 15% Repaint Bodi Halus ini HANYA BERLAKU jika kakak sekalian mengambil layanan kombinasi (${upsellSuggestion || 'Cuci Komplit, Repaint Velg, atau Repaint Bodi Kasar'}).
+`;
         }
 
-        repaintBodiHalusInstruction = `
+        repaintBodiHalusInstruction = `${statusPromoCombo}
 INSTRUKSI KHUSUS 4 PAKET REPAINT BODI HALUS:
 Kamu harus langsung menampilkan ke-4 pilihan paket ini ke user (Ekonomis, Basic, Standar, Premium).
 Aturan penyajian:
@@ -170,9 +179,8 @@ Aturan penyajian:
 1b. DESKRIPSI PAKET: WAJIB sertakan deskripsi/penjelasan singkat untuk setiap paket persis seperti yang tertera pada hasil tool JSON. Jangan hilangkan deskripsi paket.
 2. TAMPILKAN PROMO CORET: Untuk paket Premium, Standar, dan Basic, kalikan harga dasar dengan 0.85 (diskon 15%), lalu coret harga asli dan tampilkan harga diskonnya. (Contoh: ~Rp1.000.000~ jadi Rp850.000).
 3. Paket Ekonomis TIDAK MENDAPAT DISKON (jangan dicoret).
-${promoInstruction4}
-5. WAJIB NUDGE PAKET STANDAR: Setelah menampilkan harga, kamu WAJIB menuliskan kalimat rekomendasi untuk memilih "Paket Standar". Contoh: "Dari 4 paket di atas, Zoya paling saranin kakak ambil Paket Standar ya! Hasilnya udah mantap mirror finish dan dapet garansi 1 tahun lho." (JANGAN SAMPAI LUPA BAGIAN INI!).
-6. TAMPILKAN LAYANAN LAIN: JIKA ada layanan lain selain Bodi Halus di dalam TOOL RESULT JSON (misalnya Repaint Bodi Kasar, Cuci Komplit, dll), WAJIB berikan juga harga layanan tersebut. Jangan pernah bilang "harga akan diinfokan nanti", harganya sudah ada di JSON!
+4. WAJIB NUDGE PAKET STANDAR: Setelah menampilkan harga, kamu WAJIB menuliskan kalimat rekomendasi untuk memilih "Paket Standar". Contoh: "Dari 4 paket di atas, Zoya paling saranin kakak ambil Paket Standar ya! Hasilnya udah mantap mirror finish dan dapet garansi 1 tahun lho." (JANGAN SAMPAI LUPA BAGIAN INI!).
+5. TAMPILKAN LAYANAN LAIN: JIKA ada layanan lain selain Bodi Halus di dalam TOOL RESULT JSON (misalnya Repaint Bodi Kasar, Cuci Komplit, dll), WAJIB berikan juga harga layanan tersebut. Jangan pernah bilang "harga akan diinfokan nanti", harganya sudah ada di JSON!
 `;
     }
 
