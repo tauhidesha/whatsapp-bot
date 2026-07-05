@@ -304,7 +304,7 @@ Output: {
     if (hasRepaintHalus) {
         const conflictServices = ctx.serviceTypes.filter(s => {
             const low = s.toLowerCase();
-            return low.includes('poles') || low.includes('coating') || low.includes('full detailing') || low.includes('complete service');
+            return low.includes('poles') || low.includes('coating') || (low.includes('detailing') && !low.includes('mesin') && !low.includes('velg')) || low.includes('complete service');
         });
         if (conflictServices.length > 0) {
             console.log(`[INFO_COLLECTOR_NODE] Conflict detected: Repaint Halus + ${conflictServices.join(', ')}. Removing conflicts and adding Cuci Komplit.`);
