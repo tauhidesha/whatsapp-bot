@@ -1748,14 +1748,23 @@ async function processBufferedMessages(senderNumber, client) {
                 console.log(`[LangGraph] State is empty for ${senderNumber}. Hydrating from DB...`);
                 try {
                     const prisma = require('./src/lib/prisma');
-                    let cid = docId;
-                    if (isLid) {
-                        const existingLid = await prisma.customer.findFirst({ where: { whatsappLid: senderNumber }});
-                        if (existingLid) cid = existingLid.id;
-                    }
-                    if (cid) {
+                    
+                    const { normalizedAddress } = require('./src/ai/utils/whatsappHelper').parseSenderIdentity(senderNumber);
+                    
+                    const existingCustomer = await prisma.customer.findFirst({
+                        where: {
+                            OR: [
+                                { phone: senderNumber },
+                                { whatsappLid: senderNumber },
+                                { phone: normalizedAddress },
+                                { whatsappLid: normalizedAddress }
+                            ]
+                        }
+                    });
+                    
+                    if (existingCustomer) {
                         const history = await prisma.directMessage.findMany({
-                            where: { customerId: cid },
+                            where: { customerId: existingCustomer.id },
                             orderBy: { createdAt: 'desc' },
                             take: 10
                         });
