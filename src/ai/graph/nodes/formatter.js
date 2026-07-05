@@ -37,13 +37,15 @@ async function formatterNode(state) {
     let upsellSuggestion = '';
     let packageExplanation = '';
     let benefitText = '';
+    let effectiveBongkar = false;
+    
     if (context.serviceTypes?.length === 1) {
         const primarySvc = context.serviceTypes[0].toLowerCase();
         const paint = String(context.paintType || '').toLowerCase();
         const focus = String(context.detailingFocus || '').toLowerCase();
         const bongkar = context.isBongkarTotal;
         const isImplicitBongkar = primarySvc.includes('cuci komplit') || primarySvc.includes('full detailing') || primarySvc.includes('complete service');
-        const effectiveBongkar = bongkar || isImplicitBongkar;
+        effectiveBongkar = bongkar || isImplicitBongkar;
 
         if (primarySvc.includes('detailing') || primarySvc.includes('poles') || primarySvc.includes('cuci') || primarySvc.includes('complete service') || primarySvc.includes('coating')) {
             const isAlreadyCoating = primarySvc.includes('coating') || primarySvc.includes('complete service');
