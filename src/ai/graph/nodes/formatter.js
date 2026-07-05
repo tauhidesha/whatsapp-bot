@@ -102,7 +102,7 @@ async function formatterNode(state) {
 
     // Build combo offer text for formatter
     let comboOfferInstruction = '';
-    if (replyMode === 'inform' && comboPromo && context.serviceTypes?.length === 1 && !context.comboOffered && upsellSuggestion) {
+    if ((replyMode === 'inform' || replyMode === 'ask') && comboPromo && context.serviceTypes?.length === 1 && !context.comboOffered && upsellSuggestion) {
         const pct = Math.round(comboPromo.comboDiscount * 100);
         let upsellPriceStr = "";
         let primarySvcTitle = toolResult?.results?.[0]?.name || toolResult?.results?.[0]?.service_name || context.serviceTypes[0];
@@ -146,7 +146,7 @@ ATURAN BAHASA PENAWARAN PROMO:
 
     // Custom Instruction for 4 Paket Repaint Bodi Halus
     let repaintBodiHalusInstruction = '';
-    if (replyMode === 'inform' && (toolResult?.category === 'repaint_bodi_halus' || toolResult?.results?.[0]?.category === 'repaint_bodi_halus') && (toolResult?.candidates || toolResult?.results?.[0]?.candidates)) {
+    if ((replyMode === 'inform' || replyMode === 'ask') && (toolResult?.category === 'repaint_bodi_halus' || toolResult?.results?.[0]?.category === 'repaint_bodi_halus') && (toolResult?.candidates || toolResult?.results?.[0]?.candidates)) {
         repaintBodiHalusInstruction = `
 INSTRUKSI KHUSUS 4 PAKET REPAINT BODI HALUS:
 Kamu harus langsung menampilkan ke-4 pilihan paket ini ke user (Ekonomis, Basic, Standar, Premium).
@@ -164,7 +164,7 @@ Aturan penyajian:
 
     let coatingDiscountInstruction = '';
     const isCoatingFlow = context.serviceTypes?.some(s => s.toLowerCase().includes('coating') || s.toLowerCase().includes('complete service'));
-    if (replyMode === 'inform' && comboPromo && isCoatingFlow) {
+    if ((replyMode === 'inform' || replyMode === 'ask') && comboPromo && isCoatingFlow) {
         const pct = Math.round(comboPromo.comboDiscount * 100);
         coatingDiscountInstruction = `
 INSTRUKSI KHUSUS COATING:
@@ -179,7 +179,7 @@ Karena ada promo khusus Coating diskon ${pct}%, kamu WAJIB mematuhinya:
 
     // Pass combo data without hardcoding visual display rules
     let comboResultInstruction = '';
-    if (replyMode === 'inform' && toolResult?.combo?.applied) {
+    if ((replyMode === 'inform' || replyMode === 'ask') && toolResult?.combo?.applied) {
         comboResultInstruction = `
 HASIL COMBO DATA (Terapkan pada rincian harga sesuai Aturan Emas #2):
 ${JSON.stringify(toolResult.combo)}`;
@@ -345,7 +345,7 @@ Mode INFORM: "siapp mas! untuk *nmax bodi halus* estimasi harganya *rp1.200.000*
 
         // Track combo offered state
         const contextUpdate = {};
-        if (replyMode === 'inform' && comboPromo && context.serviceTypes?.length === 1) {
+        if ((replyMode === 'inform' || replyMode === 'ask') && comboPromo && context.serviceTypes?.length === 1) {
             contextUpdate.comboOffered = true;
         }
 
