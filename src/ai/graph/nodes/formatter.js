@@ -41,14 +41,14 @@ async function formatterNode(state) {
         const focus = String(context.detailingFocus || '').toLowerCase();
         const bongkar = context.isBongkarTotal;
 
-        if (primarySvc.includes('detailing') || primarySvc.includes('poles') || primarySvc.includes('cuci')) {
+        if (primarySvc.includes('detailing') || primarySvc.includes('poles') || primarySvc.includes('cuci') || primarySvc.includes('complete service')) {
             if (bongkar) {
                 if (paint === 'doff') {
-                    upsellSuggestion = 'Cuci Komplit';
-                    packageExplanation = '(Jelaskan singkat: Cuci komplit ini bongkar total, sangat cocok buat cat doff biar bersih sampai ke rangka).';
+                    upsellSuggestion = 'Repaint Bodi Kasar';
+                    packageExplanation = '(Tawarkan Repaint Bodi Kasar karena motor sudah dibongkar, mumpung sekalian biar bodi kasar yang kusam jadi baru lagi).';
                 } else {
-                    upsellSuggestion = 'Full Detailing';
-                    packageExplanation = '(Jelaskan singkat: Full detailing bongkar total, bikin bodi glossy kilap lagi dan rangka bersih dari kotoran).';
+                    upsellSuggestion = 'Repaint Bodi Halus atau Kasar';
+                    packageExplanation = '(Tawarkan Repaint Bodi karena motor sudah dibongkar, mumpung sekalian biar warna makin fresh).';
                 }
             } else if (focus.includes('mesin')) {
                 upsellSuggestion = 'Detailing Bodi juga';

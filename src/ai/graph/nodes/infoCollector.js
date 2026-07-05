@@ -87,8 +87,8 @@ Ekstrak data ke dalam format JSON dengan field berikut:
 2. **internal_thought**: (Chain-of-Thought) Analisis singkat: Apa yang user mau? Apa yang kamu lihat di foto? Data apa yang baru didapat?
 3. **motor_model**: Jenis motor (Nmax, Scoopy, dll). Jika user menyebut *Mobil*, masukkan "Mobil".
 4. **service_types**: Array layanan (Repaint, Detailing, Coating, Cuci).
-5. **paint_type**: Jenis cat (Glossy / Doff).
-6. **is_bongkar_total**: (Boolean/null) Jika user sebut "bongkar total", "bongkar mesin", atau "full" (untuk detailing).
+5. **paint_type**: (JANGAN TEBAK! Wajib diisi HANYA JIKA user secara eksplisit menyebut "glossy", "doff", atau "matte" di teks. Jika tidak disebut, biarkan null).
+6. **is_bongkar_total**: (Boolean/null) Jika user sebut "bongkar total", "bongkar mesin", "sampai rangka", atau "full" (untuk detailing).
 7. **detailing_focus**: Fokus area (Bodi Halus, Bodi Kasar, Velg, Mesin). (Jika "full", akan diproses ke is_bongkar_total).
 8. **color_choice**: Warna bodi yang diinginkan.
 9. **velg_color_choice**: Warna velg (SERINGKALI berbeda dengan bodi).
@@ -317,10 +317,29 @@ Output: {
                 missingQuestion = "Tanyakan detail bagian yang mau di-repaint (Bodi Halus, Kasar, Velg, atau CVT)";
                 break;
             }
-            if (svc === 'detailing') {
-                if (ctx.detailingFocus || ctx.isBongkarTotal !== null) {
-                    ctx.serviceTypes[i] = ctx.isBongkarTotal ? "Full Detailing" : `Detailing ${ctx.detailingFocus || 'Bodi & Kaki-kaki'}`;
-                    continue; // Skip generic missing question since we auto-resolved it
+            // Detailing generic check
+            if (svc === 'detailing' || svc === 'full detailing') {
+                if (ctx.isBongkarTotal) {
+                    if (ctx.paintType) {
+                        const isDoff = ctx.paintType.toLowerCase() === 'doff' || ctx.paintType.toLowerCase() === 'matte';
+                        // User request: glossy = "Full Detailing" & "Complete Service Glossy", doff = "Cuci Komplit" & "Complete Service Doff"
+                        if (isDoff) {
+                            ctx.serviceTypes[i] = "Complete Service Doff"; 
+                            // Kita pakai 'Complete Service Doff' agar executor cari ini.
+                        } else {
+                            ctx.serviceTypes[i] = "Full Detailing Glossy";
+                        }
+                        continue; // Skip generic missing question
+                    } else {
+                        // Keep as detailing but missingQuestion will catch it below
+                        ctx.serviceTypes[i] = "Full Detailing";
+                    }
+                } else if (ctx.detailingFocus) {
+                    ctx.serviceTypes[i] = `Detailing ${ctx.detailingFocus}`;
+                    continue;
+                } else if (ctx.isBongkarTotal === false) {
+                    ctx.serviceTypes[i] = "Detailing Bodi & Kaki-kaki";
+                    continue;
                 } else {
                     missingQuestion = "Tanya secara santai: 'detailingnya mau sampai rangka apa nggak kak? atau cuma bodi dan kaki-kaki aja?'";
                     break;
@@ -386,7 +405,7 @@ Output: {
     // 3. General inquiry (Location/Studio info)
     const isReady = isHumanHandoff ||
         (classifiedIntent === 'GENERAL_INQUIRY' || studioKeywords) ||
-        (classifiedIntent === 'BOOKING_SERVICE' && !!ctx.vehicleType && ctx.serviceTypes.length > 0 && !hasGenericService);
+        (classifiedIntent === 'BOOKING_SERVICE' && !!ctx.vehicleType && ctx.serviceTypes.length > 0 && !hasGenericService && ctx.missingQuestions.length === 0);
 
     ctx.isReadyForTools = Boolean(isReady);
 
