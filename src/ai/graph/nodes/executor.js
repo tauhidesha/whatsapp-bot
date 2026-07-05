@@ -125,6 +125,7 @@ async function toolExecutorNode(state) {
 
                             let totalBefore = 0;
                             let totalAfter = 0;
+                            console.log(`[executorNode] Checking Combo Promo. Pattern: ${promo.discountEligiblePattern || 'repaint bodi halus'}`);
 
                             const breakdown = uniqueResults.map(r => {
                                 const price = getPrice(r);
@@ -132,6 +133,7 @@ async function toolExecutorNode(state) {
                                 const rName = r.name || r.service_name || '';
                                 const isEligible = eligiblePattern.test(rName);
                                 const discountAmount = isEligible ? Math.round(price * promo.comboDiscount) : 0;
+                                console.log(`[executorNode] Item: "${rName}", Price: ${price}, isEligible: ${isEligible}, Discount: ${discountAmount}`);
                                 const finalPrice = price - discountAmount;
                                 totalAfter += finalPrice;
                                 return {
