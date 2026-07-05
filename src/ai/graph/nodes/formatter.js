@@ -63,8 +63,8 @@ async function formatterNode(state) {
                     }
                 } else {
                     upsellSuggestion = 'Detailing Mesin';
-                    benefitText = 'biar kinclong total dari bodi sampai ke ruang mesin';
-                    packageExplanation = '(Tawarkan sekalian detailing mesin biar kinclong total dari bodi sampai ke ruang mesin).';
+                    benefitText = 'biar kinclong total dari bodi sampai ke ruang mesin. Nanti velg belakangnya kita buka juga jadi mesin bersih banget';
+                    packageExplanation = '(Tawarkan sekalian detailing mesin biar kinclong total dari bodi sampai ke ruang mesin. Jelaskan juga nanti velg belakangnya dibuka biar mesin bersih maksimal).';
                 }
             } else {
                 // Belum coating, tawarkan upgrade ke Coating / Complete Service
@@ -111,6 +111,7 @@ async function formatterNode(state) {
     if (replyMode === 'inform' && comboPromo && context.serviceTypes?.length === 1 && !context.comboOffered && upsellSuggestion) {
         const pct = Math.round(comboPromo.comboDiscount * 100);
         let upsellPriceStr = "";
+        let primarySvcTitle = toolResult?.results?.[0]?.name || toolResult?.results?.[0]?.service_name || context.serviceTypes[0];
         
         try {
             const upsellDetails = await getServiceDetailsTool.implementation({
@@ -125,8 +126,8 @@ async function formatterNode(state) {
                     rawPrice = res.candidates[0].final_price || res.candidates[0].price || 0;
                 }
                 if (rawPrice > 0) {
-                    const discountedPrice = Math.round(rawPrice * (1 - comboPromo.comboDiscount));
-                    upsellPriceStr = `Rp${discountedPrice.toLocaleString('id-ID')}`;
+                    // Karena diskon memotong harga layanan UTAMA, tampilkan harga asli untuk upsell
+                    upsellPriceStr = `Rp${rawPrice.toLocaleString('id-ID')}`;
                 }
             }
         } catch (err) {
@@ -141,9 +142,9 @@ Catatan Paket: ${packageExplanation || 'Jelaskan benefit intinya secara ringkas.
 Detail Promo Asli: "${promoMsg}"
 ATURAN BAHASA PENAWARAN PROMO:
 - JANGAN copy-paste syarat promo mentah-mentah (hindari kata kaku seperti "paket ekonomis tidak diskon", "khusus 10 motor", dll).
-- WAJIB SEBUT NAMA PAKET SPESIFIKNYA: "${upsellSuggestion}". Jangan digeneralisir menjadi "layanan coating" atau "layanan repaint".
-- Sampaikan info intinya saja (diskon ${pct}%) dengan sangat santai, seperti gaya ngobrol.
-- Contoh kalimat santai: "Oiya kak buat info kita lagi ada diskon ${pct}% lho buat paket ${upsellSuggestion}. ${effectiveBongkar ? 'Isi paketnya sudah detailing sampai rangka dengan tambahan di coating juga. ' : ''}${benefitText ? (benefitText.charAt(0).toUpperCase() + benefitText.slice(1)) + '. ' : ''}Mau sekalian ambil paket ${upsellSuggestion} nggak kak? ${upsellPriceStr ? `Harga paketnya setelah diskon jadi ${upsellPriceStr}.` : ''}"`;
+- WAJIB SEBUT NAMA PAKET SPESIFIKNYA: "${upsellSuggestion}".
+- Sampaikan bahwa JIKA ambil paket ${upsellSuggestion} sekalian, maka paket ${primarySvcTitle} akan dapat diskon ${pct}%.
+- Contoh kalimat santai: "Oiya kak buat info kalau ambil ${upsellSuggestion} sekalian, nanti paket ${primarySvcTitle} kakak dapet diskon ${pct}%. ${effectiveBongkar ? 'Isi paketnya sudah detailing sampai rangka dengan tambahan di coating juga. ' : ''}${benefitText ? (benefitText.charAt(0).toUpperCase() + benefitText.slice(1)) + '. ' : ''}Mau sekalian tambah ${upsellSuggestion} nggak kak? ${upsellPriceStr ? `Harga ${upsellSuggestion} normalnya ${upsellPriceStr}, tapi lumayan dapet diskon di ${primarySvcTitle}-nya.` : ''}"`;
     }
 
     // Pass combo data without hardcoding visual display rules
