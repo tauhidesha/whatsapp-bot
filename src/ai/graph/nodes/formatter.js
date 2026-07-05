@@ -78,11 +78,13 @@ async function formatterNode(state) {
         const promoMsg = comboPromo.promoText ? comboPromo.promoText : `Lagi ada promo diskon ${pct}% nih kalau ambil ${comboPromo.comboMinServices} layanan sekaligus`;
         comboOfferInstruction = `
 PROMOSI COMBO (WAJIB ditawarkan secara natural di akhir pesan):
-Setelah kasih estimasi harga, tawarkan layanan tambahan ini secara santai: "${upsellSuggestion || 'Coating Ceramic'}".
+Setelah kasih estimasi harga, tawarkan layanan tambahan: "${upsellSuggestion || 'Coating Ceramic'}".
 Catatan Paket: ${packageExplanation || 'Jelaskan benefit intinya secara ringkas.'}
-Info Promo: "${promoMsg}"
-Contoh natural: "Oiya, biar sekalian maksimal, mau ditambah ${upsellSuggestion || 'Coating Ceramic'} juga nggak kak? ${promoMsg}"
-JANGAN bilang ini "promo combo" secara kaku. Sampaikan secara conversational.`;
+Detail Promo Asli: "${promoMsg}"
+ATURAN BAHASA PENAWARAN PROMO:
+- JANGAN copy-paste syarat promo mentah-mentah (hindari kata kaku seperti "paket ekonomis tidak diskon", "khusus 10 motor", dll).
+- Sampaikan info intinya saja (diskon ${pct}%) dengan sangat santai, seperti gaya ngobrol.
+- Contoh kalimat santai: "Oiya kak buat info kita lagi ada diskon ${pct}% lho buat ${upsellSuggestion || 'Coating Ceramic'} kalau sekalian diambil bareng layanan tadi. Mau sekalian nggak kak?"`;
     }
 
     // Pass combo data without hardcoding visual display rules
