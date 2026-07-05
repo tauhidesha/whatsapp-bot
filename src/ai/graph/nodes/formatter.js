@@ -148,12 +148,19 @@ ATURAN BAHASA PENAWARAN PROMO:
     let repaintBodiHalusInstruction = '';
     if ((replyMode === 'inform' || replyMode === 'ask') && (toolResult?.category === 'repaint_bodi_halus' || toolResult?.results?.[0]?.category === 'repaint_bodi_halus') && (toolResult?.candidates || toolResult?.results?.[0]?.candidates)) {
         
-        const hasHalus = context.serviceTypes?.some(s => s.toLowerCase().includes('bodi halus'));
+        const isFullBodi = context.detailingFocus && context.detailingFocus.toLowerCase().includes('full bodi');
+        const hasHalus = isFullBodi || context.serviceTypes?.some(s => s.toLowerCase().includes('bodi halus'));
         const comboPartners = context.serviceTypes?.filter(s => {
             const lower = s.toLowerCase();
             return lower.includes('velg') || lower.includes('kasar') || lower.includes('cuci');
-        });
-        const alreadyGotHalusCombo = hasHalus && comboPartners?.length > 0;
+        }) || [];
+        
+        if (isFullBodi) {
+            const kasarIncluded = comboPartners.some(p => p.toLowerCase().includes('kasar'));
+            if (!kasarIncluded) comboPartners.push('Repaint Bodi Kasar');
+        }
+
+        const alreadyGotHalusCombo = hasHalus && comboPartners.length > 0;
         
         let statusPromoCombo = '';
         if (alreadyGotHalusCombo) {
