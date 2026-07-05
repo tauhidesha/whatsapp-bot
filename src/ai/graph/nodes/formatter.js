@@ -44,6 +44,8 @@ async function formatterNode(state) {
         const isImplicitBongkar = primarySvc.includes('cuci komplit') || primarySvc.includes('full detailing') || primarySvc.includes('complete service');
         const effectiveBongkar = bongkar || isImplicitBongkar;
 
+        let benefitText = '';
+
         if (primarySvc.includes('detailing') || primarySvc.includes('poles') || primarySvc.includes('cuci') || primarySvc.includes('complete service') || primarySvc.includes('coating')) {
             const isAlreadyCoating = primarySvc.includes('coating') || primarySvc.includes('complete service');
 
@@ -51,13 +53,16 @@ async function formatterNode(state) {
                 if (effectiveBongkar) {
                     if (paint === 'doff') {
                         upsellSuggestion = 'Repaint Bodi Kasar';
+                        benefitText = 'biar bodi kasar yang kusam jadi baru lagi mumpung motornya dibongkar';
                         packageExplanation = '(Tawarkan Repaint Bodi Kasar karena motor sudah dibongkar dan sudah ambil Complete Service, mumpung sekalian biar bodi kasar yang kusam jadi baru lagi).';
                     } else {
                         upsellSuggestion = 'Repaint Bodi Halus atau Kasar';
+                        benefitText = 'biar warna bodi makin fresh mumpung motornya lagi dibongkar';
                         packageExplanation = '(Tawarkan Repaint Bodi karena motor sudah dibongkar dan sudah ambil Complete Service, mumpung sekalian biar warna makin fresh).';
                     }
                 } else {
                     upsellSuggestion = 'Detailing Mesin';
+                    benefitText = 'biar kinclong total dari bodi sampai ke ruang mesin';
                     packageExplanation = '(Tawarkan sekalian detailing mesin biar kinclong total dari bodi sampai ke ruang mesin).';
                 }
             } else {
@@ -65,21 +70,26 @@ async function formatterNode(state) {
                 if (effectiveBongkar) {
                     if (paint === 'doff') {
                         upsellSuggestion = 'Complete Service Doff';
+                        benefitText = 'biar warnanya makin pekat dan terlindungi lama';
                         packageExplanation = '(Jelaskan bahwa isi paket Complete Service Doff ini sudah termasuk Full Detailing sampai rangka dengan tambahan di-coating juga. Cocok banget biar warnanya makin pekat dan terlindungi lama).';
                     } else {
                         upsellSuggestion = 'Complete Service Glossy';
+                        benefitText = 'biar dapat efek daun talas dan kilap kaca yang tahan lama';
                         packageExplanation = '(Jelaskan bahwa isi paket Complete Service Glossy ini sudah termasuk Full Detailing sampai rangka dengan tambahan di-coating juga. Biar dapat efek daun talas dan kilap kaca).';
                     }
                 } else if (focus.includes('mesin')) {
                     upsellSuggestion = 'Detailing Bodi juga';
+                    benefitText = 'sayang kalau mesin bersih tapi bodinya masih kusam';
                     packageExplanation = '(Tawarkan sekalian poles bodi/coating karena mesin sudah bersih, sayang kalau bodinya masih kusam).';
                 } else {
                     // Bodi & Kaki-kaki
                     if (paint === 'doff') {
                         upsellSuggestion = 'Coating Motor Doff';
+                        benefitText = 'bikin cat awet, anti kusam, dan udah sekalian bersihin kaki-kaki juga';
                         packageExplanation = '(Tawarkan upgrade ke Coating Motor Doff. Bikin cat awet, anti kusam, dan udah termasuk bersihin kaki-kaki juga).';
                     } else {
                         upsellSuggestion = 'Coating Motor Glossy';
+                        benefitText = 'biar proteksinya lebih tahan lama, kilap kaca, dan efek daun talas';
                         packageExplanation = '(Tawarkan upgrade ke Coating Motor Glossy biar proteksinya lebih tahan lama, kilap kaca, dan efek daun talas).';
                     }
                 }
@@ -87,11 +97,12 @@ async function formatterNode(state) {
         } else if (primarySvc.includes('repaint')) {
             if (primarySvc.includes('halus')) {
                 upsellSuggestion = 'Cuci Komplit';
+                benefitText = 'biar ruang mesin dan rangka ikut kinclong mengimbangi bodi barunya';
                 packageExplanation = '(Tawarkan cuci komplit saja. Jelaskan singkat: Repaint bodi sudah otomatis dapat poles bodi. Cat baru belum bisa dicoating, harus nunggu 1 bulan biar cat matang).';
             }
         }
         
-        console.log(`[FORMATTER_NODE] Upsell Logic - primarySvc: "${primarySvc}", effectiveBongkar: ${effectiveBongkar}, paint: "${paint}" -> Suggestion: "${upsellSuggestion}"`);
+        console.log(`[FORMATTER_NODE] Upsell Logic - primarySvc: "${primarySvc}", effectiveBongkar: ${effectiveBongkar}, paint: "${paint}" -> Suggestion: "${upsellSuggestion}", Benefit: "${benefitText}"`);
     }
 
     // Build combo offer text for formatter
@@ -131,7 +142,7 @@ ATURAN BAHASA PENAWARAN PROMO:
 - JANGAN copy-paste syarat promo mentah-mentah (hindari kata kaku seperti "paket ekonomis tidak diskon", "khusus 10 motor", dll).
 - WAJIB SEBUT NAMA PAKET SPESIFIKNYA: "${upsellSuggestion}". Jangan digeneralisir menjadi "layanan coating" atau "layanan repaint".
 - Sampaikan info intinya saja (diskon ${pct}%) dengan sangat santai, seperti gaya ngobrol.
-- Contoh kalimat santai: "Oiya kak buat info kita lagi ada diskon ${pct}% lho buat paket ${upsellSuggestion}. ${effectiveBongkar ? 'Isi paketnya sudah detailing sampai rangka dengan tambahan di coating juga. ' : ''}Mau sekalian ambil paket ${upsellSuggestion} nggak kak? ${upsellPriceStr ? `Harga paketnya setelah diskon jadi ${upsellPriceStr}.` : ''}"`;
+- Contoh kalimat santai: "Oiya kak buat info kita lagi ada diskon ${pct}% lho buat paket ${upsellSuggestion}. ${effectiveBongkar ? 'Isi paketnya sudah detailing sampai rangka dengan tambahan di coating juga. ' : ''}${benefitText ? (benefitText.charAt(0).toUpperCase() + benefitText.slice(1)) + '. ' : ''}Mau sekalian ambil paket ${upsellSuggestion} nggak kak? ${upsellPriceStr ? `Harga paketnya setelah diskon jadi ${upsellPriceStr}.` : ''}"`;
     }
 
     // Pass combo data without hardcoding visual display rules
