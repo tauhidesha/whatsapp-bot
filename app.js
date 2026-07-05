@@ -1749,7 +1749,7 @@ async function processBufferedMessages(senderNumber, client) {
                 try {
                     const prisma = require('./src/lib/prisma');
                     
-                    const { normalizedAddress } = require('./src/ai/utils/whatsappHelper').parseSenderIdentity(senderNumber);
+                    const { normalizedAddress } = parseSenderIdentity(senderNumber);
                     
                     const existingCustomer = await prisma.customer.findFirst({
                         where: {
