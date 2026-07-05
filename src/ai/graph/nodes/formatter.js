@@ -7,7 +7,7 @@ const { sanitizeMessagesForGemini, extractTextFromContent, getMessageType } = re
 const { getServiceDetailsTool } = require('../../tools/getServiceDetailsTool');
 
 const model = new ChatGoogleGenerativeAI({
-    model: process.env.AI_MODEL || 'gemini-flash-lite-latest',
+    model: process.env.AI_MODEL || "gemini-1.5-flash",
     maxOutputTokens: 2048,
     temperature: 0,
 });
