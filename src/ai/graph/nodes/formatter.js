@@ -160,6 +160,7 @@ Aturan penyajian:
 3. Paket Ekonomis TIDAK MENDAPAT DISKON (jangan dicoret).
 4. WAJIB sampaikan dengan jelas bahwa Promo Diskon 15% ini HANYA BERLAKU jika kakak sekalian mengambil layanan ${upsellSuggestion || 'Cuci Komplit, Repaint Velg, atau Repaint Bodi Kasar'}.
 5. WAJIB NUDGE PAKET STANDAR: Setelah menampilkan harga, kamu WAJIB menuliskan kalimat rekomendasi untuk memilih "Paket Standar". Contoh: "Dari 4 paket di atas, Zoya paling saranin kakak ambil Paket Standar ya! Hasilnya udah mantap mirror finish dan dapet garansi 1 tahun lho." (JANGAN SAMPAI LUPA BAGIAN INI!).
+6. TAMPILKAN LAYANAN LAIN: JIKA ada layanan lain selain Bodi Halus di dalam TOOL RESULT JSON (misalnya Repaint Bodi Kasar, Cuci Komplit, dll), WAJIB berikan juga harga layanan tersebut. Jangan pernah bilang "harga akan diinfokan nanti", harganya sudah ada di JSON!
 `;
     }
 
@@ -230,6 +231,7 @@ ${modeInstructions[replyMode] || modeInstructions.inform}
 # PENTING (HARGA & DATA):
 ${context.curingWarning ? `🚨 INFO PENTING REKOMENDASI PAKET: User awalnya meminta ${context.conflictServices?.join(', ') || 'poles/coating/detailing'} bersamaan dengan Repaint Bodi Halus. Sistem telah otomatis menggantinya menjadi "Cuci Komplit". Jelaskan ke user dengan santai (sesuaikan bahasamu): "Kebetulan tadi kakak mau ambil detailing/poles, ini langsung saya rekomendasikan ambil Cuci Komplit aja untuk pembersihan area rangka, kaki-kaki, dan mesin mumpung bodinya lagi dibongkar. Nah untuk bodinya sendiri, poles bodi sudah otomatis termasuk dalam paket repaint ya kak." JIKA user tadi secara spesifik meminta "Coating" (cek layanannya), TAMBAHKAN penjelasan ini: "Untuk Coating-nya belum bisa sekarang ya kak, karena cat baru butuh waktu 1 bulan biar matang sempurna (curing)."\n` : ""}1. Hasil Teknis/Tool WAJIB jadi dasar info harga. Jika kosong, JANGAN beri harga spesifik.
 2. Ada biaya tambahan untuk warna khusus/tertentu.
+3. KHUSUS "Repaint Bodi Kasar": TIDAK PERLU menanyakan pilihan warna. Bodi kasar selalu direpaint ke warna original pabrik (hitam plastik/doff). JANGAN PERNAH bertanya "Bodi kasarnya mau warna apa?"
 3. Gunakan format rincian berikut jika ada breakdown biaya:
    [kalimat pengantar...]
    • [layanan]: rp...
