@@ -131,7 +131,7 @@ ATURAN BAHASA PENAWARAN PROMO:
 - JANGAN copy-paste syarat promo mentah-mentah (hindari kata kaku seperti "paket ekonomis tidak diskon", "khusus 10 motor", dll).
 - WAJIB SEBUT NAMA PAKET SPESIFIKNYA: "${upsellSuggestion}". Jangan digeneralisir menjadi "layanan coating" atau "layanan repaint".
 - Sampaikan info intinya saja (diskon ${pct}%) dengan sangat santai, seperti gaya ngobrol.
-- Contoh kalimat santai: "Oiya kak buat info kita lagi ada diskon ${pct}% lho buat paket ${upsellSuggestion}. ${primarySvc.includes('detailing') ? 'Isi paketnya sudah detailing sampai rangka dengan tambahan di coating juga. ' : ''}Mau sekalian ambil paket ${upsellSuggestion} nggak kak? ${upsellPriceStr ? `Harga paketnya setelah diskon jadi ${upsellPriceStr}.` : ''}"`;
+- Contoh kalimat santai: "Oiya kak buat info kita lagi ada diskon ${pct}% lho buat paket ${upsellSuggestion}. ${effectiveBongkar ? 'Isi paketnya sudah detailing sampai rangka dengan tambahan di coating juga. ' : ''}Mau sekalian ambil paket ${upsellSuggestion} nggak kak? ${upsellPriceStr ? `Harga paketnya setelah diskon jadi ${upsellPriceStr}.` : ''}"`;
     }
 
     // Pass combo data without hardcoding visual display rules
