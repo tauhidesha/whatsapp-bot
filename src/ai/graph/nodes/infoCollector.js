@@ -353,7 +353,7 @@ Output: {
                         ctx.serviceTypes[i] = "Full Detailing";
                     }
                 } else if (ctx.detailingFocus) {
-                    const focusLower = ctx.detailingFocus.toLowerCase();
+                    const focusLower = (Array.isArray(ctx.detailingFocus) ? ctx.detailingFocus.join(' ') : String(ctx.detailingFocus)).toLowerCase();
                     if (focusLower.includes('mesin')) {
                         ctx.serviceTypes[i] = "Detailing Mesin";
                         continue;
