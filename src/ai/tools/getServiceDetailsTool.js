@@ -312,8 +312,8 @@ async function processSingleService(parsedServiceName, input, promoText) {
         console.log(`[applyAllSurcharges] Processing "${serviceName}" (Size ${guess}) for ${motor_model}`);
         console.log(`[applyAllSurcharges] ExtraContext:`, JSON.stringify(extraContext));
 
-        // 1. Color Surcharge (for Repaint services excluding Velg)
-        if (serviceName.toLowerCase().includes('repaint') && !serviceName.toLowerCase().includes('velg')) {
+        // 1. Color Surcharge (ONLY for Repaint Bodi Halus)
+        if (serviceName.toLowerCase().includes('bodi halus')) {
             const colorType = extraContext.colorChoice || extraContext.paintType;
             if (colorType) {
                 const colorSurcharge = await getColorSurcharge(colorType, guess);
