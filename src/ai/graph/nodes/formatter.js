@@ -90,6 +90,10 @@ async function formatterNode(state) {
                 upsellSuggestion = 'Cuci Komplit, Repaint Velg, atau Repaint Bodi Kasar';
                 benefitText = 'biar tampilan motor makin maksimal secara keseluruhan';
                 packageExplanation = '(Tawarkan 3 opsi pilihan: cuci komplit, repaint velg, atau repaint bodi kasar. Jelaskan singkat: Ambil salah satu dari opsi itu aja, Repaint Bodi Halus-nya udah otomatis dapet diskon 15%. Info juga kalau cat baru belum bisa dicoating, harus nunggu 1 bulan biar cat matang.)';
+            } else if (primarySvc.includes('kasar') || primarySvc.includes('velg')) {
+                upsellSuggestion = 'Repaint Bodi Halus';
+                benefitText = 'karena kalau ambil paket Repaint Bodi Halus sekalian, paket bodi halusnya otomatis dapet diskon 15%';
+                packageExplanation = '(Infoin santai: Kalau mau sekalian Repaint Bodi Halus juga mumpung lagi ada promo diskon 15% untuk paket bodi halusnya, jadi motornya bisa fresh luar dalam.)';
             }
         }
         
@@ -124,6 +128,9 @@ async function formatterNode(state) {
             console.error("[FORMATTER_NODE] Failed to fetch upsell price:", err);
         }
 
+        const isUpsellHalus = upsellSuggestion.includes('Repaint Bodi Halus');
+        const discountedService = isUpsellHalus ? upsellSuggestion : primarySvcTitle;
+
         const promoMsg = comboPromo.promoText ? comboPromo.promoText : `Lagi ada promo diskon ${pct}% nih kalau ambil ${comboPromo.comboMinServices} layanan sekaligus`;
         comboOfferInstruction = `
 PROMOSI COMBO (WAJIB ditawarkan secara natural di akhir pesan):
@@ -133,8 +140,8 @@ Detail Promo Asli: "${promoMsg}"
 ATURAN BAHASA PENAWARAN PROMO:
 - JANGAN copy-paste syarat promo mentah-mentah (hindari kata kaku seperti "paket ekonomis tidak diskon", "khusus 10 motor", dll).
 - WAJIB SEBUT NAMA PAKET SPESIFIKNYA: "${upsellSuggestion}".
-- Sampaikan bahwa JIKA ambil paket ${upsellSuggestion} sekalian, maka paket ${primarySvcTitle} akan dapat diskon ${pct}%.
-- Contoh kalimat santai: "Oiya kak buat info kalau ambil ${upsellSuggestion} sekalian, nanti paket ${primarySvcTitle} kakak dapet diskon ${pct}%. ${effectiveBongkar ? 'Isi paketnya sudah detailing sampai rangka dengan tambahan di coating juga. ' : ''}${benefitText ? (benefitText.charAt(0).toUpperCase() + benefitText.slice(1)) + '. ' : ''}Mau sekalian tambah ${upsellSuggestion} nggak kak? ${upsellPriceStr ? `Harga ${upsellSuggestion} normalnya ${upsellPriceStr}, tapi lumayan dapet diskon di ${primarySvcTitle}-nya.` : ''}"`;
+- Sampaikan bahwa JIKA ambil paket ${upsellSuggestion} sekalian, maka paket ${discountedService} akan dapat diskon ${pct}%.
+- Contoh kalimat santai: "Oiya kak buat info kalau ambil ${upsellSuggestion} sekalian, nanti paket ${discountedService} kakak dapet diskon ${pct}%. ${effectiveBongkar ? 'Isi paketnya sudah detailing sampai rangka dengan tambahan di coating juga. ' : ''}${benefitText ? (benefitText.charAt(0).toUpperCase() + benefitText.slice(1)) + '. ' : ''}Mau sekalian tambah ${upsellSuggestion} nggak kak?"`;
     }
 
     // Custom Instruction for 4 Paket Repaint Bodi Halus
