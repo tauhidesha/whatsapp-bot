@@ -94,7 +94,8 @@ Ekstrak data ke dalam format JSON dengan field berikut:
 8. **color_choice**: Warna bodi yang diinginkan.
 9. **velg_color_choice**: Warna velg (SERINGKALI berbeda dengan bodi).
 10. **is_previously_painted**: (Boolean/null) Jika motor/velg sudah pernah dicat ulang (terlihat di foto atau disebut user).
-11. **visual_summary**: Deskripsi singkat apa yang terlihat di gambar.
+11. **is_confirming_visit**: (Boolean/null) Jika user secara eksplisit setuju untuk datang, booking, atau mengonfirmasi kedatangan (misal: "iya", "boleh dibooking", "nanti sore saya ke sana", "otw").
+12. **visual_summary**: Deskripsi singkat apa yang terlihat di gambar.
 
 # INTENT RULES
 - JIKA user hanya menyapa (Halo, P, Assalamualaikum), WAJIB intent = "GREETING".
@@ -251,7 +252,12 @@ Output: {
         }
         if (extracted.color_choice) ctx.colorChoice = extracted.color_choice;
         if (extracted.velg_color_choice) ctx.velgColorChoice = extracted.velg_color_choice;
-        if (extracted.is_previously_painted !== null && extracted.is_previously_painted !== undefined) ctx.isPreviouslyPainted = extracted.is_previously_painted;
+        if (extracted.is_previously_painted !== null && extracted.is_previously_painted !== undefined) {
+            ctx.isPreviouslyPainted = extracted.is_previously_painted;
+        }
+        if (extracted.is_confirming_visit === true) {
+            ctx.isConfirmingVisit = true;
+        }
         if (extracted.booking_date) ctx.bookingDate = extracted.booking_date;
         if (extracted.booking_time) ctx.bookingTime = extracted.booking_time;
 

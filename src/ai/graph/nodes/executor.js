@@ -276,13 +276,30 @@ async function toolExecutorNode(state) {
                 }
 
                 const locationConfusionKeywords = /bingung|nyasar|depan|dimananya|patokan/i.test(lastMsgTextForPrice);
-                if (locationConfusionKeywords) {
+                
+                // Trigger sending photo & notify admin if user is confused OR explicitly confirming they will visit
+                if (locationConfusionKeywords || context.isConfirmingVisit) {
                     const photoTool = toolsByName['sendStudioPhoto'];
+                    const notifyTool = toolsByName['notifyVisitIntent'];
+                    
                     if (photoTool) {
                         try {
                             toolResult.studioPhoto = await photoTool({ senderNumber: state.metadata?.phoneReal || '' });
                         } catch (err) {
                             console.error('[executorNode] sendStudioPhoto failed:', err.message);
+                        }
+                    }
+                    
+                    if (notifyTool && context.isConfirmingVisit) {
+                        try {
+                            toolResult.visitIntentNotified = await notifyTool({
+                                senderNumber: state.metadata?.phoneReal || '',
+                                senderName: customer?.name || 'Customer',
+                                purpose: context.serviceTypes?.join(', ') || 'Konsultasi/Booking',
+                                additionalNotes: lastMsgTextForPrice
+                            });
+                        } catch (err) {
+                            console.error('[executorNode] notifyVisitIntent failed:', err.message);
                         }
                     }
                 }
