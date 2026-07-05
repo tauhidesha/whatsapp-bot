@@ -149,7 +149,7 @@ ${state.metadata.visualSummary || 'Tidak ada gambar yang terdeteksi.'}
 ${modeInstructions[replyMode] || modeInstructions.inform}
 
 # PENTING (HARGA & DATA):
-${context.curingWarning ? "🚨 INFO PENTING: User tadi meminta poles/coating bersamaan dengan Repaint Bodi Halus. Jelaskan dengan santai bahwa cat baru butuh waktu 1 bulan agar matang sempurna (curing), sehingga poles/coating belum bisa dilakukan sekarang. Sarankan bahwa Cuci Komplit sudah sangat cukup untuk menyegarkan motor yang direpaint.\n" : ""}1. Hasil Teknis/Tool WAJIB jadi dasar info harga. Jika kosong, JANGAN beri harga spesifik.
+${context.curingWarning ? `🚨 INFO PENTING REKOMENDASI PAKET: User awalnya meminta ${context.conflictServices?.join(', ') || 'poles/coating/detailing'} bersamaan dengan Repaint Bodi Halus. Sistem telah otomatis menggantinya menjadi "Cuci Komplit". Jelaskan ke user dengan santai (sesuaikan bahasamu): "Kebetulan tadi kakak mau ambil detailing/poles, ini langsung saya rekomendasikan ambil Cuci Komplit aja untuk pembersihan area rangka, kaki-kaki, dan mesin mumpung bodinya lagi dibongkar. Nah untuk bodinya sendiri, poles bodi sudah otomatis termasuk dalam paket repaint ya kak." JIKA user tadi secara spesifik meminta "Coating" (cek layanannya), TAMBAHKAN penjelasan ini: "Untuk Coating-nya belum bisa sekarang ya kak, karena cat baru butuh waktu 1 bulan biar matang sempurna (curing)."\n` : ""}1. Hasil Teknis/Tool WAJIB jadi dasar info harga. Jika kosong, JANGAN beri harga spesifik.
 2. Ada biaya tambahan untuk warna khusus/tertentu.
 3. Gunakan format rincian berikut jika ada breakdown biaya:
    [kalimat pengantar...]

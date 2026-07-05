@@ -313,6 +313,7 @@ Output: {
                 ctx.serviceTypes.push('Cuci Komplit');
             }
             ctx.curingWarning = true;
+            ctx.conflictServices = conflictServices;
         }
     }
 
