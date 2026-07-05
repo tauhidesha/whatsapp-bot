@@ -214,6 +214,22 @@ ${dateInfo}
 - Warna Velg: ${context.velgColorChoice || 'Belum ditentukan'}
 `.trim();
 
+    let informCTAInstruction = '';
+    if (!missingQ && replyMode === 'inform' && !comboOfferInstruction) {
+        const hasCandidates = toolResult?.candidates?.length > 1 || toolResult?.results?.some(r => r.candidates?.length > 1);
+        
+        if (hasCandidates && !context.packageChoice) {
+            informCTAInstruction = `
+# ATURAN MUTLAK (INFORM MODE)
+Karena user BELUM memilih paket yang spesifik (misal: Paket Standar/Premium/Ekonomis), KALIMAT PALING TERAKHIR dari \`main_content\` WAJIB berupa CTA yang meminta user untuk memilih paket mana yang paling sesuai dengan kebutuhannya. Contoh: "Gimana kak, dari pilihan paket di atas kira-kira ada gambaran mau pilih yang mana?". JANGAN menanyakan jadwal booking sebelum user memilih paketnya!`;
+        } else if (context.packageChoice || !hasCandidates) {
+            informCTAInstruction = `
+# ATURAN MUTLAK (INFORM MODE)
+Karena user SUDAH menentukan pilihan layanan/paket, kamu WAJIB melakukan hal berikut:
+1. Rekap semua layanan yang dipilih beserta total biayanya (termasuk diskon jika ada).
+2. KALIMAT PALING TERAKHIR dari \`main_content\` WAJIB menanyakan kapan motornya mau dieksekusi/dibawa ke bengkel. Contoh: "Jadi totalnya segini ya kak, gimana mau dieksekusi hari apa nih?".`;
+        }
+    }
 
     const modeInstructions = {
         greet: "Mode PERKENALAN. Sapa user dengan sangat ramah, kenalkan dirimu sebagai Zoya, dan tanyakan apa yang bisa dibantu hari ini.",
