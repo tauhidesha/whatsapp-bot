@@ -36,6 +36,7 @@ async function formatterNode(state) {
     // Detailing & Repaint Package Suggester (Decision Tree)
     let upsellSuggestion = '';
     let packageExplanation = '';
+    let benefitText = '';
     if (context.serviceTypes?.length === 1) {
         const primarySvc = context.serviceTypes[0].toLowerCase();
         const paint = String(context.paintType || '').toLowerCase();
@@ -43,8 +44,6 @@ async function formatterNode(state) {
         const bongkar = context.isBongkarTotal;
         const isImplicitBongkar = primarySvc.includes('cuci komplit') || primarySvc.includes('full detailing') || primarySvc.includes('complete service');
         const effectiveBongkar = bongkar || isImplicitBongkar;
-
-        let benefitText = '';
 
         if (primarySvc.includes('detailing') || primarySvc.includes('poles') || primarySvc.includes('cuci') || primarySvc.includes('complete service') || primarySvc.includes('coating')) {
             const isAlreadyCoating = primarySvc.includes('coating') || primarySvc.includes('complete service');
