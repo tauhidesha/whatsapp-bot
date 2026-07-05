@@ -1736,7 +1736,39 @@ async function processBufferedMessages(senderNumber, client) {
         try {
             console.log(`[LangGraph] Invoking ZoyaAgent for ${senderNumber} (${isAdmin ? 'ADMIN' : 'CUSTOMER'})...`);
             
-            const { HumanMessage } = require('@langchain/core/messages');
+            const { HumanMessage, AIMessage } = require('@langchain/core/messages');
+            
+            const config = { configurable: { thread_id: senderNumber } };
+            const currentState = await zoyaAgent.getState(config);
+            
+            let messageList = [];
+            
+            // Hydrate memory if server restarted (MemorySaver is empty)
+            if (!currentState?.values?.messages || currentState.values.messages.length === 0) {
+                console.log(`[LangGraph] State is empty for ${senderNumber}. Hydrating from DB...`);
+                try {
+                    const prisma = require('./src/lib/prisma');
+                    let cid = docId;
+                    if (isLid) {
+                        const existingLid = await prisma.customer.findFirst({ where: { whatsappLid: senderNumber }});
+                        if (existingLid) cid = existingLid.id;
+                    }
+                    if (cid) {
+                        const history = await prisma.directMessage.findMany({
+                            where: { customerId: cid },
+                            orderBy: { createdAt: 'desc' },
+                            take: 10
+                        });
+                        history.reverse().forEach(msg => {
+                            if (msg.role === 'user') messageList.push(new HumanMessage({ content: msg.content }));
+                            if (msg.role === 'ai' || msg.role === 'system') messageList.push(new AIMessage({ content: msg.content }));
+                        });
+                        console.log(`[LangGraph] Hydrated ${history.length} messages.`);
+                    }
+                } catch (e) {
+                    console.error('[LangGraph] Failed to hydrate messages:', e);
+                }
+            }
             
             // Format input untuk Graph (Dukung Gambar/Media lewat content array)
             const messageContent = [];
@@ -1757,8 +1789,10 @@ async function processBufferedMessages(senderNumber, client) {
                 messageContent.push({ type: 'text', text: '[Pesan Kosong]' });
             }
 
+            messageList.push(new HumanMessage({ content: messageContent }));
+
             const input = {
-                messages: [new HumanMessage({ content: messageContent })],
+                messages: messageList,
                 metadata: {
                     phoneReal: senderNumber,
                     senderName: senderName,
@@ -1888,7 +1922,34 @@ async function processBufferedMetaMessages(normalizedSenderId, queue) {
         // Invoke AI (using LangGraph)
         console.log(`[LangGraph] Invoking ZoyaAgent for ${normalizedSenderId} (Meta)...`);
         
-        const { HumanMessage } = require('@langchain/core/messages');
+        const { HumanMessage, AIMessage } = require('@langchain/core/messages');
+        
+        const config = { configurable: { thread_id: normalizedSenderId } };
+        const currentState = await zoyaAgent.getState(config);
+        
+        let messageList = [];
+        
+        if (!currentState?.values?.messages || currentState.values.messages.length === 0) {
+            console.log(`[LangGraph] State is empty for ${normalizedSenderId}. Hydrating from DB...`);
+            try {
+                const prisma = require('./src/lib/prisma');
+                const customer = await prisma.customer.findUnique({ where: { phone: normalizedSenderId }});
+                if (customer) {
+                    const history = await prisma.directMessage.findMany({
+                        where: { customerId: customer.id },
+                        orderBy: { createdAt: 'desc' },
+                        take: 10
+                    });
+                    history.reverse().forEach(msg => {
+                        if (msg.role === 'user') messageList.push(new HumanMessage({ content: msg.content }));
+                        if (msg.role === 'ai' || msg.role === 'system') messageList.push(new AIMessage({ content: msg.content }));
+                    });
+                    console.log(`[LangGraph] Hydrated ${history.length} messages.`);
+                }
+            } catch (e) {
+                console.error('[LangGraph] Failed to hydrate messages:', e);
+            }
+        }
         
         const messageContent = [];
         if (combinedMessage) {
@@ -1897,8 +1958,10 @@ async function processBufferedMetaMessages(normalizedSenderId, queue) {
             messageContent.push({ type: 'text', text: '[Pesan Kosong]' });
         }
 
+        messageList.push(new HumanMessage({ content: messageContent }));
+
         const input = {
-            messages: [new HumanMessage({ content: messageContent })],
+            messages: messageList,
             metadata: {
                 phoneReal: normalizedSenderId,
                 senderName: displayName,
