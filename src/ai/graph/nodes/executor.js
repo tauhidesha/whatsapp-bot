@@ -78,7 +78,8 @@ async function toolExecutorNode(state) {
                                     // Response bertingkat (repaint dengan pilihan paket)
                                     const candidates = item.candidates.map(c => {
                                         const price = c.final_price || c.price || 0;
-                                        const eligible = eligiblePattern.test(c.name || '');
+                                        const cName = c.name || c.service_name || '';
+                                        const eligible = eligiblePattern.test(cName);
                                         return {
                                             ...c,
                                             original_price: price,
@@ -90,7 +91,8 @@ async function toolExecutorNode(state) {
                                 }
                                 // Response flat (satu harga langsung)
                                 const price = item.final_price || item.price || 0;
-                                const eligible = eligiblePattern.test(item.name || '');
+                                const iName = item.name || item.service_name || '';
+                                const eligible = eligiblePattern.test(iName);
                                 return {
                                     ...item,
                                     original_price: price,
@@ -127,12 +129,13 @@ async function toolExecutorNode(state) {
                             const breakdown = uniqueResults.map(r => {
                                 const price = getPrice(r);
                                 totalBefore += price;
-                                const isEligible = eligiblePattern.test(r.name || '');
+                                const rName = r.name || r.service_name || '';
+                                const isEligible = eligiblePattern.test(rName);
                                 const discountAmount = isEligible ? Math.round(price * promo.comboDiscount) : 0;
                                 const finalPrice = price - discountAmount;
                                 totalAfter += finalPrice;
                                 return {
-                                    name: r.name,
+                                    name: rName,
                                     originalPrice: price,
                                     discountPercent: isEligible ? promo.comboDiscount * 100 : 0,
                                     discountAmount,
@@ -161,7 +164,8 @@ async function toolExecutorNode(state) {
                     function isChoosingPaketTier(results) {
                         const groups = {};
                         for (const r of results) {
-                            const base = (r.name || '').replace(/\s*-\s*Paket\s+(Premium|Standar|Basic|Ekonomis)/i, '').trim();
+                            const rName = r.name || r.service_name || '';
+                            const base = rName.replace(/\s*-\s*Paket\s+(Premium|Standar|Basic|Ekonomis)/i, '').trim();
                             (groups[base] ||= []).push(r);
                         }
                         return Object.values(groups).some(g => g.length > 1);
