@@ -2,6 +2,7 @@
 // Logic for generating follow-up messages based on customer context and AI personality.
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const prisma = require('../../../lib/prisma');
 
 /**
  * Calculate days passed since a given date.
@@ -142,6 +143,38 @@ async function generateFollowUpMessage(customerData, strategy, promoData = null)
             ? `# PROMO AKTIF SAAT INI\n- Info Promo: ${promoData.promoText}\n`
             : '';
 
+        let chatHistorySection = '';
+        const phone = customerData.docId || context.phone;
+        if (phone) {
+            try {
+                const customerRecord = await prisma.customer.findUnique({
+                    where: { phone: phone },
+                    include: {
+                        messages: {
+                            orderBy: { createdAt: 'desc' },
+                            take: 5
+                        }
+                    }
+                });
+
+                if (customerRecord && customerRecord.messages && customerRecord.messages.length > 0) {
+                    const recentMessages = customerRecord.messages.reverse();
+                    const historyText = recentMessages.map(m => {
+                        const role = m.role === 'user' ? 'Customer' : 'Zoya';
+                        return `[${role}]: ${m.content}`;
+                    }).join('\n');
+                    
+                    chatHistorySection = `
+# RIWAYAT CHAT TERAKHIR (PENTING)
+Berikut adalah riwayat chat terakhir dengan pelanggan ini. Gunakan konteks ini AGAR sapaan follow-up terasa sangat personal dan melanjutkan obrolan sebelumnya secara natural. JANGAN mengulang chat Zoya sebelumnya mentah-mentah, jadikan sebagai background context.
+${historyText}
+`;
+                }
+            } catch (err) {
+                console.warn('[MessageGenerator] Failed to fetch chat history:', err.message);
+            }
+        }
+
         const prompt = `
 # PERSONALITY: ZOYA
 - Nama: Zoya (Customer Relations @ Bosmat Repaint Detailing Studio)
@@ -165,6 +198,8 @@ ${promoSection}
 - Warna motor: ${context.motorColor || 'tidak diketahui'}
 - Layanan diminati: ${context.targetServices && context.targetServices.length > 0 ? context.targetServices.join(', ') : 'tidak diketahui'}
 - Terakhir chat: ${daysSinceChat !== null ? daysSinceChat + ' hari lalu' : 'tidak diketahui'}
+
+${chatHistorySection}
 
 # STRATEGIC CONTEXT
 - Follow-up Ke: ${followUpCount + 1}
