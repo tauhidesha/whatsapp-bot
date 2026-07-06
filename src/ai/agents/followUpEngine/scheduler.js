@@ -371,9 +371,14 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
             errors++;
         }
 
-        // Jeda 2 menit di antara pengiriman agar terhindar dari spam list (HANYA JIKA BUKAN DRY RUN)
+        // Jeda random 7-10 menit di antara pengiriman agar terhindar dari spam/restrict
         if (i < queue.length - 1 && !dryRun) {
-            await delay(2 * 60 * 1000);
+            const minMs = 7 * 60 * 1000;
+            const maxMs = 10 * 60 * 1000;
+            const randomDelay = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
+            const minutes = (randomDelay / 60000).toFixed(1);
+            console.log(`[Scheduler] Waiting ${minutes} minutes before next message...`);
+            await delay(randomDelay);
         }
     }
 
