@@ -73,15 +73,16 @@ async function saveMessageToPrisma(senderNumber, message, senderType) {
 
     // Use unified identity parser to handle @lid and @c.us correctly
     const { parseSenderIdentity } = require('../../../lib/utils');
-    const { docId, isLid } = parseSenderIdentity(senderNumber);
+    const { docId, normalizedPhone, isLid } = parseSenderIdentity(senderNumber);
     if (!docId) return;
 
     const customer = await prisma.customer.findFirst({
         where: {
             OR: [
                 { whatsappLid: senderNumber },
-                { phone: docId },
-                { phone: senderNumber },
+                { phone: normalizedPhone },   // bare number (no suffix) — matches DB format
+                { phone: docId },             // with @c.us — fallback
+                { phone: senderNumber },      // raw input — last resort
             ]
         }
     });

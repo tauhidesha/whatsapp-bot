@@ -21,6 +21,7 @@ function parseSenderIdentity(rawValue) {
     return {
         docId: fullId, 
         numericId: fullId.replace(/@c\.us$|@lid$/, '').replace(/\D/g, ''),
+        normalizedPhone: fullId.replace(/@c\.us$|@lid$/, ''), // bare phone number, no suffix
         channel: 'whatsapp',
         platformId: fullId,
         normalizedAddress: fullId,
