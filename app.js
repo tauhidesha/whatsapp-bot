@@ -100,7 +100,10 @@ const allowedOrigins = [
     'https://admin-ui-bosmat.vercel.app',
     'http://localhost:3000',
     'http://localhost:3001',
-];
+    'http://localhost:5173',
+    'http://localhost:5174',
+    process.env.LANDING_PAGE_ORIGIN,
+].filter(Boolean);
 app.use(cors({
     origin: (origin, callback) => {
         // Allow requests with no origin (mobile apps, curl, webhooks)
@@ -146,6 +149,11 @@ if (rateLimit) {
     app.use('/send-media', messageLimiter);
     app.use('/generate-invoice', messageLimiter);
     app.use('/test-ai', aiLimiter);
+
+    // Public endpoints: stricter rate limit (30 req/min per IP)
+    const publicLimiter = rateLimit({ windowMs: 60 * 1000, max: 30 });
+    app.use('/public', publicLimiter);
+
     console.log('🛡️ [SECURITY] Rate limiting enabled on sensitive endpoints');
 }
 
@@ -2825,6 +2833,100 @@ app.get('/ping', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// ─── PUBLIC API ENDPOINTS (Landing Page) ────────────────────────────
+// No auth required. Rate limited (30 req/min per IP).
+// In-memory cache to minimize DB hits.
+
+const _publicCache = { vehicleModels: null, vehicleModelsAt: 0, services: null, servicesAt: 0 };
+const PUBLIC_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// GET /public/vehicle-models?search=nmax
+// Returns list of vehicle models for autocomplete
+app.get('/public/vehicle-models', async (req, res) => {
+    try {
+        const now = Date.now();
+        // Refresh cache if stale
+        if (!_publicCache.vehicleModels || now - _publicCache.vehicleModelsAt > PUBLIC_CACHE_TTL) {
+            _publicCache.vehicleModels = await prisma.vehicleModel.findMany({
+                select: { id: true, brand: true, modelName: true, serviceSize: true, repaintSize: true, aliases: true },
+                orderBy: { modelName: 'asc' },
+            });
+            _publicCache.vehicleModelsAt = now;
+        }
+
+        const search = (req.query.search || '').toString().trim().toLowerCase();
+        let results = _publicCache.vehicleModels;
+
+        if (search.length >= 2) {
+            results = results.filter(m => {
+                const nameMatch = m.modelName.toLowerCase().includes(search);
+                const aliasMatch = (m.aliases || []).some(a => a.toLowerCase().includes(search));
+                const brandMatch = m.brand.toLowerCase().includes(search);
+                return nameMatch || aliasMatch || brandMatch;
+            });
+        }
+
+        res.json({ success: true, models: results.slice(0, 20) });
+    } catch (err) {
+        console.error('[PUBLIC] vehicle-models error:', err.message);
+        res.status(500).json({ success: false, error: 'Internal error' });
+    }
+});
+
+// GET /public/pricing?motor=NMax&service=Complete+Service+Glossy
+// Returns price for a specific motor + service combo
+app.get('/public/pricing', async (req, res) => {
+    try {
+        const motorQuery = (req.query.motor || '').toString().trim();
+        const serviceQuery = (req.query.service || '').toString().trim();
+
+        if (!motorQuery || !serviceQuery) {
+            return res.status(400).json({ success: false, error: 'motor and service params required' });
+        }
+
+        // Use the existing getServiceDetails tool implementation (reuse, don't duplicate)
+        const result = await getServiceDetailsTool.implementation({
+            service_name: serviceQuery,
+            motor_model: motorQuery,
+        });
+
+        // Sanitize: only return pricing data, not internal details
+        if (result.success && result.results) {
+            // Multi-service response
+            const sanitized = result.results.map(r => ({
+                success: r.success,
+                service_name: r.service_name || r.category,
+                price: r.price,
+                price_formatted: r.price_formatted,
+                motor_model: r.motor_model,
+                motor_size: r.motor_size,
+                estimated_duration: r.estimated_duration,
+                candidates: r.candidates,
+                needs_clarification: r.needs_clarification,
+                message: r.message,
+            }));
+            return res.json({ success: true, results: sanitized });
+        }
+
+        // Single service response
+        return res.json({
+            success: result.success,
+            service_name: result.service_name,
+            price: result.price,
+            price_formatted: result.price_formatted,
+            motor_model: result.motor_model,
+            motor_size: result.motor_size,
+            estimated_duration: result.estimated_duration,
+            candidates: result.candidates,
+            needs_clarification: result.needs_clarification,
+            message: result.message,
+        });
+    } catch (err) {
+        console.error('[PUBLIC] pricing error:', err.message);
+        res.status(500).json({ success: false, error: 'Internal error' });
+    }
+});
+
 app.get('/conversations', requireAuth, async (req, res) => {
     try {
         const limit = req.query.limit ? parseInt(req.query.limit, 10) : 100;
@@ -3186,10 +3288,32 @@ app.post('/send-media', requireAuth, async (req, res) => {
             throw new Error('WhatsApp client not initialized.');
         }
 
-        const targetNumber = toSenderNumberWithSuffix(number);
+        // Auto-detect if it's a @lid from database to avoid sending to wrong JID
+        let targetNumber = number;
+        const prisma = require('./src/lib/prisma');
+        const cleanNumber = number.replace(/\D/g, '');
+        const customer = await prisma.customer.findFirst({
+            where: {
+                OR: [
+                    { phone: cleanNumber },
+                    { whatsappLid: number },
+                    { whatsappLid: { endsWith: number } }
+                ]
+            },
+            select: { whatsappLid: true }
+        });
+
+        if (customer && customer.whatsappLid) {
+            targetNumber = customer.whatsappLid;
+        } else {
+            const { toSenderNumberWithSuffix } = require('./src/lib/utils'); // fallback if somehow needed
+            // Actually, we can just use the existing function if no customer found
+            targetNumber = number.includes('@') ? number : (number.length >= 14 && ['1', '2'].includes(number[0])) ? `${number}@lid` : `${number}@c.us`;
+        }
+
         const dataUri = `data:${mimetype};base64,${base64}`;
         await global.whatsappClient.sendFile(targetNumber, dataUri, filename || 'file', caption || '');
-        console.log(`[API] Successfully sent media to ${number}`);
+        console.log(`[API] Successfully sent media to ${targetNumber} (original: ${number})`);
         res.status(200).json({ success: true });
     } catch (e) {
         console.error('[API] Error sending media:', e);
