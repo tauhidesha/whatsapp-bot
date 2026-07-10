@@ -69,7 +69,7 @@ module.exports = function generateInvoiceHTML(data) {
     .invoice-container * { margin: 0; padding: 0; box-sizing: border-box; color: inherit; }
     @page { margin: 0; size: A4; }
     .margin-top, .margin-bottom {
-      height: 10px;
+      height: 40px;
       background: #131313;
     }
     
