@@ -401,13 +401,14 @@ const generateDocumentTool = {
             fileCaption = `Halo Kak ${customerName}, berikut rincian tagihan (Invoice) untuk treatment kendaraannya. Jika ada yang ingin ditanyakan, jangan ragu untuk balas pesan ini ya! 📋`;
             break;
           case 'bukti_bayar': {
-            const displayAmount = (amountPaid || downPayment || 0).toLocaleString('id-ID');
-            fileCaption = `*PEMBAYARAN DIVALIDASI* ✅\n\nHalo Kak ${customerName}! Kami telah menerima pembayaran sebesar *Rp${displayAmount}* via *${paymentMethod || 'Transfer'}*. Status tagihan Anda telah diperbarui.\n\nTerima kasih! 🙏`;
+            fileCaption = `Halo Kak ${customerName}! ✨\n\nPembayaran untuk treatment motor ${motorDetails}-nya sudah Zoya terima ya. Berikut Zoya lampirkan Bukti Pembayaran resminya.\n\nTerima kasih banyak ya Kak udah mempercayakan kendaraannya di boS Mat Studio! 🙏`;
             break;
           }
           case 'garansi_repaint':
           case 'garansi_coating':
-            fileCaption = `Treatment selesai! ✨ Berikut perlindungan ekstra berupa Dokumen ${title} resmi dari boS Mat Studio. Simpan baik-baik ya Kak ${customerName}! 🛡️`;
+            const garansiType = documentType === 'garansi_repaint' ? 'Repaint' : 'Coating';
+            const maintenanceText = documentType === 'garansi_coating' ? ' dan jangan lupa jadwal maintenance berkalanya' : '';
+            fileCaption = `Treatment selesai! ✨ Berikut perlindungan ekstra berupa Dokumen Garansi Resmi ${garansiType} dari boS Mat Studio. Simpan baik-baik${maintenanceText} ya Kak ${customerName}! 🛡️`;
             break;
         }
         // Mark before sending so onAnyMessage doesn't treat it as admin-from-HP
