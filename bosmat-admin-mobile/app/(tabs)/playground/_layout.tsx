@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import { Colors, FontSize } from '@/lib/theme';
 
-export default function ConversationsLayout() {
+export default function PlaygroundLayout() {
   return (
     <Stack
       screenOptions={{
@@ -11,8 +11,7 @@ export default function ConversationsLayout() {
         headerShadowVisible: false,
       }}
     >
-      <Stack.Screen name="index" options={{ title: 'INBOX CONTROL', headerShown: false }} />
-      <Stack.Screen name="[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="index" options={{ title: 'AI PLAYGROUND', headerShown: false }} />
     </Stack>
   );
 }

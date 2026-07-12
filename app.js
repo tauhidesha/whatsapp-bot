@@ -1737,6 +1737,14 @@ async function processBufferedMessages(senderNumber, client) {
                 console.log(`[ADMIN] 🚀 Model Override Triggered: ${modelOverride}`);
             }
         }
+        
+        const isAiCustomerReplyEnabled = process.env.AI_CUSTOMER_REPLY_ENABLED !== 'false';
+        if (!isAdmin && !isAiCustomerReplyEnabled) {
+            console.log(`[DEBOUNCED] 🤖 AI customer reply disabled via ENV. Skipping AI generation for ${senderNumber}.`);
+            await client.stopTyping(senderNumber);
+            return;
+        }
+
         // --- PENTING: Ekstrak Context SEBELUM Minta AI Merespons ---
         let systemInstruction = '';
 
@@ -1933,6 +1941,12 @@ async function processBufferedMetaMessages(normalizedSenderId, queue) {
         // Check for Snooze/Handover using normalized address
         if (await isSnoozeActive(normalizedSenderId)) {
             console.log(`[MetaDebounce] 👋 AI skipped for ${normalizedSenderId} (handover active).`);
+            return;
+        }
+
+        const isAiCustomerReplyEnabled = process.env.AI_CUSTOMER_REPLY_ENABLED !== 'false';
+        if (!isAiCustomerReplyEnabled) {
+            console.log(`[MetaDebounce] 🤖 AI customer reply disabled via ENV. Skipping AI generation for ${normalizedSenderId}.`);
             return;
         }
 
