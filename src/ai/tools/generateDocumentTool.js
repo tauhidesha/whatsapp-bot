@@ -401,7 +401,11 @@ const generateDocumentTool = {
             fileCaption = `Halo Kak ${customerName}, berikut rincian tagihan (Invoice) untuk treatment kendaraannya. Jika ada yang ingin ditanyakan, jangan ragu untuk balas pesan ini ya! 📋`;
             break;
           case 'bukti_bayar': {
-            fileCaption = `Halo Kak ${customerName}! ✨\n\nPembayaran untuk treatment motor ${motorDetails}-nya sudah Zoya terima ya. Berikut Zoya lampirkan Bukti Pembayaran resminya.\n\nTerima kasih banyak ya Kak udah mempercayakan kendaraannya di boS Mat Studio! 🙏`;
+            fileCaption = `Halo Kak ${customerName}! ✨
+
+Pembayaran untuk treatment motor ${motorDetails}-nya sudah Zoya terima ya. Berikut Zoya lampirkan Bukti Pembayaran resminya.
+
+Terima kasih banyak ya Kak udah mempercayakan kendaraannya di boS Mat Studio! 🙏`;
             break;
           }
           case 'garansi_repaint':

@@ -342,8 +342,8 @@ Output: {
     const lastMsgLower = lastMessageText.toLowerCase();
     const studioKeywords = /lokasi|alamat|dimana|buka|tutup|istirahat|jam berapa|kontak|wa|map|maps|koordinat/i.test(lastMsgLower);
 
-    // Only force motor model if we are in booking/consultation flow and don't have it
-    const needsMotorModel = (classifiedIntent === 'BOOKING_SERVICE' || classifiedIntent === 'CONSULTATION');
+    // Only force motor model if we are in booking flow and don't have it
+    const needsMotorModel = (classifiedIntent === 'BOOKING_SERVICE');
 
     if (needsMotorModel && !ctx.vehicleType) {
         missingQuestion = "Tanyakan tipe motor user (contoh: Nmax, Scoopy, Vario)";
@@ -425,7 +425,7 @@ Output: {
         }
 
         // Service-specific questions
-        if (!missingQuestion) {
+        if (!missingQuestion && classifiedIntent === 'BOOKING_SERVICE') {
             for (const svc of ctx.serviceTypes) {
                 const svcLower = svc.toLowerCase();
                 
