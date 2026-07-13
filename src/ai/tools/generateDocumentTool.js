@@ -405,7 +405,7 @@ const generateDocumentTool = {
 
 Pembayaran untuk treatment motor ${motorDetails}-nya sudah Zoya terima ya. Berikut Zoya lampirkan Bukti Pembayaran resminya.
 
-Terima kasih banyak ya Kak udah mempercayakan kendaraannya di boS Mat Studio! 🙏`;
+Terima kasih banyak ya Kak udah mempercayakan kendaraannya di bosmat studio! 🙏`;
             break;
           }
           case 'garansi_repaint':

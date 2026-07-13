@@ -2,23 +2,23 @@
 
 ## DAFTAR HARGA REPAINT BODI HALUS
 - Motor: SCOOPY (Alias: honda scoopy, scoopy prestige, scoopy sporty, scoopy stylish, scoopy fi, scoopy injection)
-  Harga: Rp 900.000
+  Harga: Rp 1.000.000
   Note: Full Body Halus
 
 - Motor: GENIO (Alias: honda genio)
-  Harga: Rp 900.000
+  Harga: Rp 800.000
   Note: Full Body Halus
 
 - Motor: FINO (Alias: yamaha fino)
-  Harga: Rp 900.000
+  Harga: Rp 1.000.000
   Note: Full Body Halus
 
 - Motor: FAZZIO (Alias: yamaha fazzio, fazio, grand filano, filano)
-  Harga: Rp 900.000
+  Harga: Rp 1.000.000
   Note: Full Body Halus
 
 - Motor: NOUVO (Alias: yamaha nouvo, nouvo z, nouvo elegance)
-  Harga: Rp 900.000
+  Harga: Rp 800.000
   Note: Full Body Halus
 
 - Motor: VARIO 110 (Alias: honda vario 110, vario karbu, vario techno 110)
@@ -26,7 +26,7 @@
   Note: Full Body Halus
 
 - Motor: VARIO 125/150/160 (Alias: honda vario, vario 125, vario 150, vario 160)
-  Harga: Rp 900.000
+  Harga: Rp 800.000
   Note: Full Body Halus
 
 - Motor: MIO (Alias: yamaha mio, mio sporty, mio j, mio m3)
@@ -106,15 +106,15 @@
   Note: Full Body Halus
 
 - Motor: POLYTRON EVO (Alias: polytron fox)
-  Harga: Rp 850.000
+  Harga: Rp 800.000
   Note: Full Body Halus
 
 - Motor: SELIS E-MAX (Alias: selis emax)
-  Harga: Rp 850.000
+  Harga: Rp 800.000
   Note: Full Body Halus
 
 - Motor: SMOOT TEMPUR (Alias: smoot)
-  Harga: Rp 850.000
+  Harga: Rp 800.000
   Note: Full Body Halus
 
 - Motor: JUPITER Z (Alias: yamaha jupiter z, jupiter)
@@ -130,11 +130,11 @@
   Note: Full Body Halus
 
 - Motor: PCX (Alias: honda pcx, pcx 150, pcx 160)
-  Harga: Rp 1.100.000
+  Harga: Rp 1.200.000
   Note: Full Body Halus
 
 - Motor: ADV (Alias: honda adv, adv 150, adv 160)
-  Harga: Rp 1.100.000
+  Harga: Rp 1.200.000
   Note: Full Body Halus
 
 - Motor: AEROX (Alias: yamaha aerox)
@@ -142,31 +142,31 @@
   Note: Full Body Halus
 
 - Motor: SATRIA FU (Alias: suzuki satria f150, satria f)
-  Harga: Rp 900.000
+  Harga: Rp 800.000
   Note: Full Body Halus
 
 - Motor: MX KING (Alias: yamaha mx king, mx king 150)
-  Harga: Rp 800.000
+  Harga: Rp 2.500.000
   Note: Full Body Halus
 
 - Motor: LEXI (Alias: yamaha lexi)
-  Harga: Rp 900.000
+  Harga: Rp 1.000.000
   Note: Full Body Halus
 
 - Motor: JUPITER MX (Alias: yamaha jupiter mx, mx 135)
-  Harga: Rp 800.000
+  Harga: Rp 2.500.000
   Note: Full Body Halus
 
 - Motor: VESPA (Alias: vespa lx, vespa s, vespa sprint, vespa primavera, vespa gts, vespa klasik, vespa px)
-  Harga: Rp 1.500.000
+  Harga: Rp 2.500.000
   Note: Full Body Halus
 
 - Motor: SONIC (Alias: honda sonic, sonic 150r)
-  Harga: Rp 900.000
+  Harga: Rp 800.000
   Note: Full Body Halus
 
 - Motor: SUPRA GTR 150 (Alias: honda supra gtr, gtr 150)
-  Harga: Rp 900.000
+  Harga: Rp 2.500.000
   Note: Full Body Halus
 
 - Motor: GESITS (Alias: gesits g1)
@@ -174,95 +174,95 @@
   Note: Full Body Halus
 
 - Motor: ALVA ONE (Alias: alva)
-  Harga: Rp 1.100.000
+  Harga: Rp 1.200.000
   Note: Full Body Halus
 
 - Motor: ALVA CERVO (Alias: )
-  Harga: Rp 1.100.000
+  Harga: Rp 1.200.000
   Note: Full Body Halus
 
 - Motor: UNITED T1800 (Alias: united)
-  Harga: Rp 1.100.000
+  Harga: Rp 1.000.000
   Note: Full Body Halus
 
 - Motor: POLYTRON T-REX (Alias: polytron fox r)
-  Harga: Rp 1.100.000
+  Harga: Rp 1.200.000
   Note: Full Body Halus
 
 - Motor: VIAR E-CROSS (Alias: viar ecross)
-  Harga: Rp 1.000.000
+  Harga: Rp 1.200.000
   Note: Full Body Halus
 
 - Motor: W175 (Alias: kawasaki w175)
-  Harga: Rp 1.000.000
+  Harga: Rp 2.500.000
   Note: Full Body Halus
 
 - Motor: CBR (Alias: honda cbr, cbr 150r, cbr150r, cbr 250rr, cbr250rr)
-  Harga: Rp 1.200.000
+  Harga: Rp 800.000
   Note: Full Body Halus
 
 - Motor: VIXION (Alias: yamaha vixion, v-ixion)
-  Harga: Rp 1.200.000
+  Harga: Rp 2.500.000
   Note: Full Body Halus
 
 - Motor: R15 (Alias: yamaha r15)
-  Harga: Rp 1.200.000
+  Harga: Rp 2.500.000
   Note: Full Body Halus
 
 - Motor: R25 (Alias: yamaha r25)
-  Harga: Rp 1.400.000
+  Harga: Rp 2.500.000
   Note: Full Body Halus
 
 - Motor: MT-15 (Alias: yamaha mt-15, mt15)
-  Harga: Rp 1.200.000
+  Harga: Rp 2.500.000
   Note: Full Body Halus
 
 - Motor: MT-25 (Alias: yamaha mt-25, mt25)
-  Harga: Rp 1.300.000
+  Harga: Rp 2.500.000
   Note: Full Body Halus
 
 - Motor: XABRE (Alias: yamaha xabre)
-  Harga: Rp 1.200.000
+  Harga: Rp 800.000
   Note: Full Body Halus
 
 - Motor: GSX-R150 (Alias: suzuki gsx-r150, gsxr150)
-  Harga: Rp 1.200.000
+  Harga: Rp 2.500.000
   Note: Full Body Halus
 
 - Motor: GSX-S150 (Alias: suzuki gsx-s150, gsxs150)
-  Harga: Rp 1.200.000
+  Harga: Rp 2.500.000
   Note: Full Body Halus
 
 - Motor: NINJA (Alias: kawasaki ninja, ninja 250, ninja fi, ninja karbu, ninja 250 sl, ninja rr mono, zx25r)
-  Harga: Rp 1.500.000
+  Harga: Rp 800.000
   Note: Full Body Halus
 
 - Motor: TIGER (Alias: honda tiger, tiger revo, gl pro, gl max)
-  Harga: Rp 1.200.000
+  Harga: Rp 800.000
   Note: Full Body Halus (Termasuk Tangki)
 
 - Motor: THUNDER 125 (Alias: suzuki thunder)
-  Harga: Rp 1.200.000
+  Harga: Rp 2.500.000
   Note: Full Body Halus (Termasuk Tangki)
 
 - Motor: XSR 155 (Alias: yamaha xsr)
-  Harga: Rp 1.200.000
+  Harga: Rp 800.000
   Note: Full Body Halus
 
 - Motor: CB 150R (Alias: honda cb 150r, cb150r, cb150 streetfire)
-  Harga: Rp 1.000.000
+  Harga: Rp 2.500.000
   Note: Full Body Halus
 
 - Motor: VERZA (Alias: honda verza, cb150 verza)
-  Harga: Rp 1.000.000
+  Harga: Rp 2.500.000
   Note: Full Body Halus
 
 - Motor: MEGAPRO (Alias: honda megapro, mega pro)
-  Harga: Rp 1.200.000
+  Harga: Rp 800.000
   Note: Full Body Halus
 
 - Motor: BYSON (Alias: yamaha byson)
-  Harga: Rp 1.100.000
+  Harga: Rp 2.500.000
   Note: Full Body Halus
 
 - Motor: RX-KING (Alias: yamaha rx-king, rx king)
@@ -270,23 +270,23 @@
   Note: Full Body Restorasi
 
 - Motor: F1ZR (Alias: fizr, yamaha f1zr)
-  Harga: Rp 2.125.000
+  Harga: Rp 1.000.000
   Note: Full Body Restorasi
 
 - Motor: C70 (Alias: honda pitung, bekjul)
-  Harga: Rp 1.700.000
+  Harga: Rp 1.200.000
   Note: Restorasi Klasik
 
 - Motor: CB 100 (Alias: cb gelatik, honda cb)
-  Harga: Rp 1.700.000
+  Harga: Rp 2.500.000
   Note: Restorasi Klasik
 
 - Motor: ASTREA GRAND (Alias: honda grand, bulus)
-  Harga: Rp 1.000.000
+  Harga: Rp 1.200.000
   Note: Restorasi Bodi
 
 - Motor: WIN 100 (Alias: honda win)
-  Harga: Rp 1.500.000
+  Harga: Rp 2.500.000
   Note: Restorasi Bodi
 
 - Motor: NINJA 650 (Alias: kawasaki ninja 650)
@@ -369,10 +369,34 @@
 - Biaya Remover Velg (bekas cat/jamur) +50rb s/d 100rb.
 
 ## MASTER LAYANAN (DETAILING & COATING)
-### Repaint Bodi Halus
-- Ringkasan: Cat ulang bodi motor pakai bahan premium (PU & HS) untuk hasil mulus seperti pabrikan.
-- Deskripsi: - Bahan cat menggunakan full PU - Untuk clear coat menggunakan clearcoat jenis HS - Harga untuk warna solid/metalik. Candy, bunglon, moonlight dikenakan tambahan 125–210rb tergantung jenis warna. - Repaint hasil kulit jeruk tipis ala pabrik (bisa lebih halus dengan tambahan poles) - Estimasi pengerjaan repaint: 3–4 hari kerja tergantung kondisi dan antrian - Harga bervariasi per model motor, lihat daftar harga terbaru.
+### Pilihan Paket Repaint Bodi Halus
+Bengkel Bosmat menyediakan 4 pilihan paket untuk Repaint Bodi Halus. Tiap paket ditujukan untuk kebutuhan yang berbeda, mulai dari sekadar penyegaran warna hingga hasil maksimal standar kontes.
 
+**1. Paket Ekonomis (Harga Dasar)**
+- Ringkasan: Cocok untuk yang prioritaskan budget (Motor harian, pelajar, sering ganti warna).
+- Deskripsi: Menggunakan Basecoat PU & Clear MS. Hasil finish kulit jeruk ringan seperti cat pabrikan. Tidak mendapatkan diskon promo.
+- Garansi: Tanpa Garansi.
+- Estimasi Pengerjaan: 3-4 hari kerja.
+
+**2. Paket Basic (Harga Dasar + 20%)**
+- Ringkasan: Upgrade dari cat pabrikan, lebih kinclong (Cocok untuk daily premium).
+- Deskripsi: Menggunakan Basecoat PU & Clear HS. Gloss lebih tinggi dan lebih tahan baret dibanding paket ekonomis. Finish kulit jeruk ringan seperti pabrikan.
+- Garansi: 1 Tahun.
+- Estimasi Pengerjaan: 3-4 hari kerja.
+
+**3. Paket Standar (Harga Dasar + 30%)** (🔥 PALING DISARANKAN OLEH ZOYA)
+- Ringkasan: Sweet spot antara kualitas dan harga (Cocok untuk enthusiast, motor kontes).
+- Deskripsi: Menggunakan Basecoat PU & Clear HS (Keras dan tahan baret). Ditambah proses Polishing (Orange peel removal) untuk hasil *mirror look* / *mirror finish*.
+- Garansi: 1 Tahun.
+- Estimasi Pengerjaan: 3-4 hari kerja.
+
+**4. Paket Premium (Harga Dasar + 50%)**
+- Ringkasan: Level tertinggi untuk hasil maksimal (Cocok untuk kolektor, restorasi).
+- Deskripsi: Menggunakan Basecoat PU & Clear HS (di-clear 2x / flowcoat). Lapisan cat lebih tebal, depth warna lebih dalam, dan durability lebih tinggi. Termasuk Orange peel removal.
+- Garansi: 2 Tahun.
+- Estimasi Pengerjaan: 5-6 hari kerja.
+
+*(Catatan: Harga untuk warna solid/metalik. Candy, bunglon, moonlight dikenakan tambahan sesuai daftar. Paket Premium, Standar, dan Basic bisa mendapatkan "Promo Coret" / diskon tertentu).*
 ### Repaint Bodi Kasar
 - Ringkasan: Hitamkan kembali dek dan bodi kasar motormu yang sudah kusam atau tergores.
 - Deskripsi: Pengecatan ulang bagian bodi kasar atau dek motor. Menggunakan cat khusus PP Primer & Texture Paint.
