@@ -166,9 +166,13 @@ function isEligible(context, metadata) {
     const now = new Date();
 
     if (lastFollowUp) {
-        // Already followed up before — check intervalDays since last follow-up
+        // Already followed up before — use secondIntervalDays for FU3, intervalDays for FU2
+        const followUpCount = context.followUpCount || 0;
+        const interval = followUpCount >= 2
+            ? (strategy.secondIntervalDays || strategy.intervalDays)
+            : (strategy.intervalDays || strategy.waitDays);
         const daysSinceLastFollowUp = Math.floor((now - lastFollowUp) / (1000 * 60 * 60 * 24));
-        if (daysSinceLastFollowUp < (strategy.intervalDays || strategy.waitDays)) return false;
+        if (daysSinceLastFollowUp < interval) return false;
     } else {
         // First follow-up — check waitDays since last message or last service
         const referenceDate = (label === 'existing_customer' || label === 'loyal_customer')

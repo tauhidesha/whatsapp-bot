@@ -3,56 +3,65 @@
 
 /**
  * Strategy Config: Defines the behavior for each customer label.
+ *
+ * Timing logic:
+ *   - waitDays    = jeda sebelum FU pertama (dari last message)
+ *   - intervalDays = jeda antara FU berikutnya (dari last follow-up)
+ *   - maxFollowUps = total max follow-up yang dikirim
+ *
+ * Skema umum (semua label):
+ *   FU 1 → waitDays setelah last message
+ *   FU 2 → intervalDays (3 hari) setelah FU 1
+ *   FU 3 → intervalDays (7 hari) setelah FU 2  ← pakai secondIntervalDays
  */
 const STRATEGY_CONFIG = {
-    // Brand new customer (e.g., from ad, first message ever) - follow up after 3 days
+    // Brand new customer (first message, no context)
     stranger: {
         action: 'follow_up',
-        waitDays: 3,
-        intervalDays: 7,
-        maxFollowUps: 2,
+        waitDays: 1,
+        intervalDays: 3,
+        secondIntervalDays: 7,
+        maxFollowUps: 3,
         angle: 'value',
     },
     // Fresh lead: chatted but no strong purchase signal yet
     lead: {
         action: 'follow_up',
-        waitDays: 3,
-        intervalDays: 10,
-        maxFollowUps: 2,
+        waitDays: 1,
+        intervalDays: 3,
+        secondIntervalDays: 7,
+        maxFollowUps: 3,
         angle: 'value',
     },
     hot_lead: {
         action: 'follow_up',
         waitDays: 1,
         intervalDays: 3,
-        maxFollowUps: 2,
+        secondIntervalDays: 7,
+        maxFollowUps: 3,
         angle: 'urgency',
     },
     warm_lead: {
         action: 'follow_up',
-        waitDays: 2,
-        intervalDays: 7,
-        maxFollowUps: 2,
-        angle: 'value',
-    },
-    lead: {
-        action: 'follow_up',
-        waitDays: 3,
-        intervalDays: 10,
-        maxFollowUps: 2,
+        waitDays: 1,
+        intervalDays: 3,
+        secondIntervalDays: 7,
+        maxFollowUps: 3,
         angle: 'value',
     },
     window_shopper: {
         action: 'follow_up',
-        waitDays: 7,
-        intervalDays: 14,
-        maxFollowUps: 1,
+        waitDays: 1,
+        intervalDays: 3,
+        secondIntervalDays: 7,
+        maxFollowUps: 3,
         angle: 'promo',
     },
     existing_customer: {
         action: 'follow_up',
         waitDays: 45,
         intervalDays: 30,
+        secondIntervalDays: 60,
         maxFollowUps: 3,
         angle: 'maintenance',
     },
@@ -60,14 +69,16 @@ const STRATEGY_CONFIG = {
         action: 'follow_up',
         waitDays: 60,
         intervalDays: 30,
-        maxFollowUps: 2,
+        secondIntervalDays: 60,
+        maxFollowUps: 3,
         angle: 'exclusive',
     },
     churned: {
         action: 'follow_up',
-        waitDays: 0,
-        intervalDays: 30,
-        maxFollowUps: 2,
+        waitDays: 1,
+        intervalDays: 7,
+        secondIntervalDays: 14,
+        maxFollowUps: 3,
         angle: 'winback',
     },
     dormant_lead: { action: 'stop' },
