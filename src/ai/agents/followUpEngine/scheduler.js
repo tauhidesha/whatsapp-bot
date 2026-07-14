@@ -164,8 +164,16 @@ function isEligible(context, metadata) {
 
     // Check wait days
     if (lastFollowUp) {
+        // Already followed up before — check intervalDays since last follow-up
         const daysSinceLastFollowUp = Math.floor((now - lastFollowUp) / (1000 * 60 * 60 * 24));
         if (daysSinceLastFollowUp < (strategy.intervalDays || strategy.waitDays)) return false;
+    } else {
+        // First follow-up — check waitDays since last message or last service
+        const referenceDate = (label === 'existing_customer' || label === 'loyal_customer')
+            ? (context.lastServiceAt ? new Date(context.lastServiceAt) : lastMessage)
+            : lastMessage;
+        const daysSinceReference = Math.floor((now - referenceDate) / (1000 * 60 * 60 * 24));
+        if (daysSinceReference < strategy.waitDays) return false;
     }
 
     // Check max follow-ups
@@ -174,6 +182,7 @@ function isEligible(context, metadata) {
 
     return true;
 }
+
 
 // ─── Delay Helper ────────────────────────────────────────────────────────────
 
