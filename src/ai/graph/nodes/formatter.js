@@ -208,8 +208,11 @@ Karena ada promo khusus Coating diskon ${pct}%, kamu WAJIB mematuhinya:
     }
 
     // Pass combo data without hardcoding visual display rules
+    const hasCandidates = toolResult?.candidates?.length > 1 || toolResult?.results?.some(r => r.candidates?.length > 1);
+    
     let comboResultInstruction = '';
-    if ((replyMode === 'inform' || replyMode === 'ask') && toolResult?.combo?.applied) {
+    // JANGAN berikan hasil total combo jika masih ada pilihan paket yang belum dipilih
+    if ((replyMode === 'inform' || replyMode === 'ask') && toolResult?.combo?.applied && !hasCandidates) {
         comboResultInstruction = `
 HASIL COMBO DATA (Terapkan pada rincian harga sesuai Aturan Emas #2):
 ${JSON.stringify(toolResult.combo)}`;
@@ -232,7 +235,6 @@ ${dateInfo}
 
     let informCTAInstruction = '';
     if (!missingQ && replyMode === 'inform' && !comboOfferInstruction) {
-        const hasCandidates = toolResult?.candidates?.length > 1 || toolResult?.results?.some(r => r.candidates?.length > 1);
         
         if (hasCandidates && !context.packageChoice) {
             informCTAInstruction = `
