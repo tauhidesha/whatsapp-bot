@@ -601,23 +601,16 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
         }
 
         if (queueItem && itemStrategy) {
-            try {
-                const generatedMessage = await generateFollowUpMessage(queueItem, itemStrategy, promoData);
-                if (generatedMessage) {
-                    queue.push({
-                        docId: context.id,
-                        senderNumber,
-                        name,
-                        customerLabel: context.customerLabel || null,
-                        type: itemType,
-                        strategy: itemStrategy,
-                        metadata, // Added metadata for sorting
-                        generatedMessage,
-                    });
-                }
-            } catch (err) {
-                console.warn(`[Scheduler][DryRun] Failed to generate preview for ${context.id}:`, err.message);
-            }
+            queue.push({
+                docId: context.id,
+                senderNumber,
+                name,
+                customerLabel: context.customerLabel || null,
+                type: itemType,
+                strategy: itemStrategy,
+                metadata, // Added metadata for sorting
+                queueItem // temporary reference for generation later
+            });
         } else if (!isReviewEligible && !isRebookingEligible && !isNurtureEligible) {
             // Already logged above via debug
         }
@@ -637,10 +630,25 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
     }
 
     console.log(`[Scheduler][DryRun] Preview queue built: ${queue.length} items (Max 20/day)`);
-    queue.forEach((q, idx) => {
+    
+    // Now generate messages ONLY for the final sliced queue to save API limits
+    for (let i = 0; i < queue.length; i++) {
+        const q = queue[i];
+        try {
+            const generatedMessage = await generateFollowUpMessage(q.queueItem, q.strategy, promoData);
+            q.generatedMessage = generatedMessage || `[No message generated]`;
+        } catch (err) {
+            console.warn(`[Scheduler][DryRun] Failed to generate preview for ${q.docId}:`, err.message);
+            q.generatedMessage = `[Error generating message: ${err.message}]`;
+        }
+        
+        // Clean up temporary object before returning
+        delete q.queueItem;
+        
         const dSince = q.metadata?.lastMessageAt ? Math.floor((now - new Date(q.metadata.lastMessageAt)) / (1000 * 60 * 60 * 24)) : 'N/A';
-        console.log(`  ${idx+1}. ${q.name} (${q.customerLabel}) → type: ${q.type}, daysSinceMsg: ${dSince}`);
-    });
+        console.log(`  ${i+1}. ${q.name} (${q.customerLabel}) → type: ${q.type}, daysSinceMsg: ${dSince}`);
+    }
+    
     return queue;
 }
 
