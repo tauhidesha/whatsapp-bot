@@ -548,19 +548,11 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
         const daysSince = lastMsg ? Math.floor((now - lastMsg) / (1000 * 60 * 60 * 24)) : 'N/A';
         const followUpCount = context.followUpCount || 0;
         if (!strategy) {
-            console.log(`[DryRun][Skip] ${customer.name} (${label}) → no strategy config`);
-        } else if (!lastMsg) {
-            const fallbackDate = context.updatedAt ? new Date(context.updatedAt) : null;
-            if (fallbackDate) {
-                const daysSinceFallback = Math.floor((now - fallbackDate) / (1000 * 60 * 60 * 24));
-                console.log(`[DryRun][Fallback] ${customer.name} (${label}) → no lastMessageAt, using context.updatedAt daysSince=${daysSinceFallback}`);
-            } else {
-                console.log(`[DryRun][Skip] ${customer.name} (${label}) → no lastMessageAt, no fallback`);
-            }
+            // console.log(`[DryRun][Skip] ${customer.name} (${label}) → no strategy config`);
+        } else if (!lastMsg && !context.updatedAt) {
+            // console.log(`[DryRun][Skip] ${customer.name} (${label}) → no lastMessageAt, no fallback`);
         } else if (!isNurtureEligible) {
-            console.log(`[DryRun][Skip] ${customer.name} (${label}) → daysSince=${daysSince} waitDays=${strategy.waitDays} followUps=${followUpCount}/${strategy.maxFollowUps}`);
-        } else {
-            console.log(`[DryRun][OK]   ${customer.name} (${label}) → daysSince=${daysSince} ELIGIBLE`);
+            // console.log(`[DryRun][Skip] ${customer.name} (${label}) → daysSince=${daysSince} waitDays=${strategy.waitDays} followUps=${followUpCount}/${strategy.maxFollowUps}`);
         }
 
         let isReviewEligible = false;
@@ -637,11 +629,6 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
     if (queue.length > finalLimit) {
         // Sort by newest lastMessageAt first before slicing
         queue.sort((a, b) => {
-            // Note: in _buildDryRunQueue, the structure is slightly different (no .metadata sometimes if we check the object, wait, queueItem had metadata but queue output is flattened)
-            // Let's use context.customer.lastMessageAt directly since we pushed it as metadata into the queue generation loop, but wait, looking at _buildDryRunQueue:
-            // queue.push({ docId, senderNumber, name, customerLabel, type, strategy, generatedMessage, metadata (wait, was metadata pushed?) })
-            // Actually, metadata isn't explicitly pushed in dry run queue. Let's sort by generatedMessage presence then? No, we need metadata.lastMessageAt.
-            // Let's modify the queue.push in _buildDryRunQueue to include metadata.
             const dateA = a.metadata?.lastMessageAt ? new Date(a.metadata.lastMessageAt) : new Date(0);
             const dateB = b.metadata?.lastMessageAt ? new Date(b.metadata.lastMessageAt) : new Date(0);
             return dateB - dateA;
@@ -649,7 +636,11 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
         queue.splice(finalLimit);
     }
 
-    console.log(`[Scheduler][DryRun] Preview queue built: ${queue.length} items`);
+    console.log(`[Scheduler][DryRun] Preview queue built: ${queue.length} items (Max 20/day)`);
+    queue.forEach((q, idx) => {
+        const dSince = q.metadata?.lastMessageAt ? Math.floor((now - new Date(q.metadata.lastMessageAt)) / (1000 * 60 * 60 * 24)) : 'N/A';
+        console.log(`  ${idx+1}. ${q.name} (${q.customerLabel}) → type: ${q.type}, daysSinceMsg: ${dSince}`);
+    });
     return queue;
 }
 
