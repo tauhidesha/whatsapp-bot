@@ -156,13 +156,15 @@ function isEligible(context, metadata) {
     if (!strategy || strategy.action === 'stop') return false;
 
     const lastFollowUp = context.lastFollowUpAt ? new Date(context.lastFollowUpAt) : null;
-    const lastMessage = metadata?.lastMessageAt ? new Date(metadata.lastMessageAt) : null;
-    const now = new Date();
+    // Must have messaged before (fall back to context updatedAt for newly created records)
+    const lastMessage = metadata?.lastMessageAt
+        ? new Date(metadata.lastMessageAt)
+        : (context.updatedAt ? new Date(context.updatedAt) : null);
 
-    // Must have messaged before
     if (!lastMessage) return false;
 
-    // Check wait days
+    const now = new Date();
+
     if (lastFollowUp) {
         // Already followed up before — check intervalDays since last follow-up
         const daysSinceLastFollowUp = Math.floor((now - lastFollowUp) / (1000 * 60 * 60 * 24));
@@ -536,7 +538,13 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
         if (!strategy) {
             console.log(`[DryRun][Skip] ${customer.name} (${label}) → no strategy config`);
         } else if (!lastMsg) {
-            console.log(`[DryRun][Skip] ${customer.name} (${label}) → no lastMessageAt`);
+            const fallbackDate = context.updatedAt ? new Date(context.updatedAt) : null;
+            if (fallbackDate) {
+                const daysSinceFallback = Math.floor((now - fallbackDate) / (1000 * 60 * 60 * 24));
+                console.log(`[DryRun][Fallback] ${customer.name} (${label}) → no lastMessageAt, using context.updatedAt daysSince=${daysSinceFallback}`);
+            } else {
+                console.log(`[DryRun][Skip] ${customer.name} (${label}) → no lastMessageAt, no fallback`);
+            }
         } else if (!isNurtureEligible) {
             console.log(`[DryRun][Skip] ${customer.name} (${label}) → daysSince=${daysSince} waitDays=${strategy.waitDays} followUps=${followUpCount}/${strategy.maxFollowUps}`);
         } else {

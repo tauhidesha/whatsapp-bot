@@ -280,7 +280,7 @@ async function classifyAndSaveCustomer(senderNumber) {
         // Ensure customer exists before creating context (FK constraint)
         await prisma.customer.upsert({
             where: { phone: docId },
-            create: { phone: docId, name: customerName || 'New Customer' },
+            create: { phone: docId, name: customerName || 'New Customer', lastMessageAt: new Date() },
             update: {}
         });
 
