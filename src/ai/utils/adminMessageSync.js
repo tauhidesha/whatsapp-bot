@@ -119,6 +119,15 @@ async function handleAdminHpMessage(msg) {
     const recipientNumber = msg.to;
     if (!recipientNumber) return;
 
+    // Pengecualian untuk template auto-reply Iklan (FAQ) agar tidak mematikan AI (Snooze)
+    if (messageText && typeof messageText === 'string') {
+        const isAdAutoReply = /Bosmat Studio berlokasi di area Depok|Silakan balas pesan ini dengan kata "Shareloc"/i.test(messageText);
+        if (isAdAutoReply) {
+            console.log(`[AdminSync] Skip FAQ Auto-reply message to ${recipientNumber}`);
+            return;
+        }
+    }
+
     if (isBotMessage(recipientNumber, messageText)) {
         console.log(`[AdminSync] Skip bot message to ${recipientNumber}`);
         return;
