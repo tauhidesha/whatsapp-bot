@@ -351,10 +351,12 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
         return { sent: 0, skipped: 0, errors: 0, downgrades: downgradeCount };
     }
 
-    // Apply limit if provided
-    if (limit && queue.length > limit) {
-        console.log(`[Scheduler] Limiting queue from ${queue.length} to ${limit} for testing.`);
-        queue.splice(limit);
+    // Apply limit to prevent bans (max 20 per day)
+    const MAX_DAILY_FOLLOW_UPS = 20;
+    const finalLimit = limit ? Math.min(limit, MAX_DAILY_FOLLOW_UPS) : MAX_DAILY_FOLLOW_UPS;
+    if (queue.length > finalLimit) {
+        console.log(`[Scheduler] Limiting queue from ${queue.length} to ${finalLimit} to prevent bans.`);
+        queue.splice(finalLimit);
     }
 
     // Fetch active promo once per daily run
@@ -622,7 +624,12 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
         }
     }
 
-    if (limit && queue.length > limit) queue.splice(limit);
+    // Apply limit to prevent bans (max 20 per day)
+    const MAX_DAILY_FOLLOW_UPS = 20;
+    const finalLimit = limit ? Math.min(limit, MAX_DAILY_FOLLOW_UPS) : MAX_DAILY_FOLLOW_UPS;
+    if (queue.length > finalLimit) {
+        queue.splice(finalLimit);
+    }
 
     console.log(`[Scheduler][DryRun] Preview queue built: ${queue.length} items`);
     return queue;
