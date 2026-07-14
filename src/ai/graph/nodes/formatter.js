@@ -148,7 +148,8 @@ ATURAN BAHASA PENAWARAN PROMO:
     let repaintBodiHalusInstruction = '';
     if ((replyMode === 'inform' || replyMode === 'ask') && (toolResult?.category === 'repaint_bodi_halus' || toolResult?.results?.[0]?.category === 'repaint_bodi_halus') && (toolResult?.candidates || toolResult?.results?.[0]?.candidates)) {
 
-        const isFullBodi = context.detailingFocus && context.detailingFocus.toLowerCase().includes('full bodi');
+        const focusStr = context.detailingFocus ? context.detailingFocus.toLowerCase() : '';
+        const isFullBodi = focusStr.includes('full bodi') && !focusStr.includes('halus') && !focusStr.includes('kasar');
         const hasHalus = isFullBodi || context.serviceTypes?.some(s => s.toLowerCase().includes('bodi halus'));
         const comboPartners = context.serviceTypes?.filter(s => {
             const lower = s.toLowerCase();

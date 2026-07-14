@@ -279,7 +279,7 @@ Output: {
             const hasFull = focus.includes('full');
             const hasBodi = focus.includes('bodi') || focus.includes('body');
 
-            if (hasFull) {
+            if (hasFull && !hasHalus && !hasKasar) {
                 if (!resolvedServices.includes('Repaint Bodi Halus')) resolvedServices.push('Repaint Bodi Halus');
                 if (!resolvedServices.includes('Repaint Bodi Kasar')) resolvedServices.push('Repaint Bodi Kasar');
             } else {
