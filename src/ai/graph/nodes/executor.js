@@ -308,16 +308,27 @@ async function toolExecutorNode(state) {
 
         // Standalone Human Handover
         const isCar = context.vehicleType === 'Mobil';
-        if ((intent === 'HUMAN_HANDOVER' || isCar) && !toolResult?.handoff) {
+        
+        // Deteksi pertanyaan konsultasi warna / minta contoh warna
+        const lastUserMsgRecord = state.messages.slice().reverse().find(m => m.type === 'human' || m.role === 'user');
+        const lastUserMsg = lastUserMsgRecord ? extractTextFromContent(lastUserMsgRecord.content) : '';
+        const lastUserMsgLower = lastUserMsg.toLowerCase();
+        const askColorConsultation = /warna apa|saran warna|cocok warna|contoh warna|lihat warna|warna yang bagus|rekomendasi warna|bingung warna|minta foto warna/i.test(lastUserMsgLower);
+
+        if ((intent === 'HUMAN_HANDOVER' || isCar || askColorConsultation) && !toolResult?.handoff) {
             const handoverTool = toolsByName['triggerBosMatTool'];
             if (handoverTool) {
-                const lastUserMsgRecord = state.messages.slice().reverse().find(m => m.type === 'human' || m.role === 'user');
-                const lastUserMsg = lastUserMsgRecord ? extractTextFromContent(lastUserMsgRecord.content) : 'No text found';
+                let reason = 'User request handover';
+                if (isCar) reason = 'Tanya servis Mobil (luar scope utama)';
+                else if (askColorConsultation) reason = 'Konsultasi / Minta contoh warna';
+                
                 toolResult.handoff = await handoverTool({
-                    reason: isCar ? 'Tanya servis Mobil (luar scope utama)' : 'User request handover',
-                    customerQuestion: lastUserMsg,
+                    reason: reason,
+                    customerQuestion: lastUserMsg || 'No text found',
                     senderNumber: state.metadata?.phoneReal || ''
                 });
+                toolResult.needBosmat = true;
+                newIntent = 'HUMAN_HANDOVER';
             }
         }
 
