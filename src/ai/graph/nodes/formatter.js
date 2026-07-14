@@ -253,10 +253,20 @@ Contoh: "Jadi totalnya segini ya kak, gimana mau dieksekusi hari apa nih?".`;
 
     let studioInfoInstruction = '';
     if (toolResult?.studioInfo) {
-        studioInfoInstruction = `
+        const hasVehicleAndService = context.vehicleType && context.vehicleType !== 'Belum diketahui' && context.serviceTypes && context.serviceTypes.length > 0;
+        
+        if (!hasVehicleAndService) {
+            studioInfoInstruction = `
+INSTRUKSI INFO LOKASI STUDIO:
+Kamu harus memberikan informasi alamat / Google Maps studio berdasarkan Tool Result.
+PENTING: JANGAN sebutkan patokan/ancer-ancer studio. Cukup berikan alamat atau link maps-nya saja.
+PENTING: Karena tipe motor pelanggan masih belum diketahui, KALIMAT PALING TERAKHIR WAJIB HANYA menanyakan tipe motor pelanggan. (contoh: "Btw, motor apa nih kak yang mau digantengin?").`;
+        } else {
+            studioInfoInstruction = `
 INSTRUKSI INFO LOKASI STUDIO:
 Kamu harus memberikan informasi lokasi studio berdasarkan Tool Result. 
-PENTING: JIKA pada konteks di bawah Tipe Motor tertulis 'Belum diketahui', KALIMAT PALING TERAKHIR WAJIB HANYA menanyakan tipe motor pelanggan. (contoh: "Btw, motor apa nih kak yang mau digantengin?").`;
+PENTING: Pastikan untuk menyebutkan alamat lengkap, link Google Maps, DAN JUGA patokan/ancer-ancer lokasi studio agar user tidak nyasar.`;
+        }
     }
 
     const modeInstructions = {

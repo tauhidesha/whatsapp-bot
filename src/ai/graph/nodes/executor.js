@@ -276,9 +276,10 @@ async function toolExecutorNode(state) {
                 }
 
                 const locationConfusionKeywords = /bingung|nyasar|depan|dimananya|patokan/i.test(lastMsgTextForPrice);
+                const hasVehicleAndService = context.vehicleType && context.vehicleType !== 'Belum diketahui' && context.serviceTypes && context.serviceTypes.length > 0;
                 
-                // Trigger sending photo & notify admin if user is confused OR explicitly confirming they will visit
-                if (locationConfusionKeywords || context.isConfirmingVisit) {
+                // Trigger sending photo & notify admin if user is confused OR explicitly confirming they will visit OR already gave full context
+                if (locationConfusionKeywords || context.isConfirmingVisit || hasVehicleAndService) {
                     const photoTool = toolsByName['sendStudioPhoto'];
                     const notifyTool = toolsByName['notifyVisitIntent'];
                     
