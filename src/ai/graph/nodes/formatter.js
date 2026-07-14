@@ -225,6 +225,7 @@ ${JSON.stringify(toolResult.combo)}`;
     // Build context summary for the model
     const contextInfo = `
 ${dateInfo}
+- Nama Pelanggan: ${customerName}
 - Motor: ${context.vehicleType || 'Belum diketahui'}
 - Layanan yang dipilih: ${context.serviceTypes?.join(', ') || 'Belum ada'}
 - Detail/Fokus: ${context.detailingFocus || 'Belum ditentukan'}
