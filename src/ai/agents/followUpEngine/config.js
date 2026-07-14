@@ -5,6 +5,22 @@
  * Strategy Config: Defines the behavior for each customer label.
  */
 const STRATEGY_CONFIG = {
+    // Brand new customer (e.g., from ad, first message ever) - follow up after 3 days
+    stranger: {
+        action: 'follow_up',
+        waitDays: 3,
+        intervalDays: 7,
+        maxFollowUps: 2,
+        angle: 'value',
+    },
+    // Fresh lead: chatted but no strong purchase signal yet
+    lead: {
+        action: 'follow_up',
+        waitDays: 3,
+        intervalDays: 10,
+        maxFollowUps: 2,
+        angle: 'value',
+    },
     hot_lead: {
         action: 'follow_up',
         waitDays: 1,

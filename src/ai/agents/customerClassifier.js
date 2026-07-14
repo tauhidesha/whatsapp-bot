@@ -7,6 +7,8 @@ const prisma = require('../../lib/prisma');
 const { syncLabelToDirectMessages, getGhostedCount, updateGhostedCountInContext, normalizePhone } = require('../utils/mergeCustomerContext.js');
 
 const STRATEGY_MAP = {
+    stranger: 'minimal',
+    lead: 'nurture',
     window_shopper: 'minimal',
     warm_lead: 'nurture',
     hot_lead: 'aggressive',
@@ -101,6 +103,7 @@ async function updateGhostedCount(docId, currentContext, metadata) {
 
 function scoreCustomer(context, metadata, transactions) {
     const scores = {
+        lead: 0,
         window_shopper: 0,
         warm_lead: 0,
         hot_lead: 0,
@@ -179,7 +182,12 @@ function scoreCustomer(context, metadata, transactions) {
         const budgetSignal = context.budgetSignal || context.budget_signal;
         if (saidExpensive) scores.window_shopper += 60;
         if (budgetSignal === 'ketat') scores.window_shopper += 30;
-        if (intents.length === 0 || (intents.includes('tanya_lokasi') && !intents.includes('tanya_harga'))) {
+
+        // New customer from ad: only asked location (no price/booking signal yet) → label as 'lead'
+        const isNewCustomer = !context.customerLabel || context.customerLabel === 'stranger';
+        if (isNewCustomer && (intents.length === 0 || (intents.includes('tanya_lokasi') && !intents.includes('tanya_harga')))) {
+            scores.lead += 30; // Treat as a fresh lead, not a window shopper
+        } else if (!isNewCustomer && (intents.length === 0 || (intents.includes('tanya_lokasi') && !intents.includes('tanya_harga')))) {
             scores.window_shopper += 20;
         }
         if (ghosted && ghostedTimes === 1) scores.window_shopper += 40;
