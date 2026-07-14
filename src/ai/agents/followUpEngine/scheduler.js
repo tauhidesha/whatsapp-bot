@@ -355,6 +355,12 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
     const MAX_DAILY_FOLLOW_UPS = 20;
     const finalLimit = limit ? Math.min(limit, MAX_DAILY_FOLLOW_UPS) : MAX_DAILY_FOLLOW_UPS;
     if (queue.length > finalLimit) {
+        // Sort by newest lastMessageAt first before slicing
+        queue.sort((a, b) => {
+            const dateA = a.metadata?.lastMessageAt ? new Date(a.metadata.lastMessageAt) : new Date(0);
+            const dateB = b.metadata?.lastMessageAt ? new Date(b.metadata.lastMessageAt) : new Date(0);
+            return dateB - dateA; // Descending
+        });
         console.log(`[Scheduler] Limiting queue from ${queue.length} to ${finalLimit} to prevent bans.`);
         queue.splice(finalLimit);
     }
@@ -613,6 +619,7 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
                         customerLabel: context.customerLabel || null,
                         type: itemType,
                         strategy: itemStrategy,
+                        metadata, // Added metadata for sorting
                         generatedMessage,
                     });
                 }
@@ -628,6 +635,17 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
     const MAX_DAILY_FOLLOW_UPS = 20;
     const finalLimit = limit ? Math.min(limit, MAX_DAILY_FOLLOW_UPS) : MAX_DAILY_FOLLOW_UPS;
     if (queue.length > finalLimit) {
+        // Sort by newest lastMessageAt first before slicing
+        queue.sort((a, b) => {
+            // Note: in _buildDryRunQueue, the structure is slightly different (no .metadata sometimes if we check the object, wait, queueItem had metadata but queue output is flattened)
+            // Let's use context.customer.lastMessageAt directly since we pushed it as metadata into the queue generation loop, but wait, looking at _buildDryRunQueue:
+            // queue.push({ docId, senderNumber, name, customerLabel, type, strategy, generatedMessage, metadata (wait, was metadata pushed?) })
+            // Actually, metadata isn't explicitly pushed in dry run queue. Let's sort by generatedMessage presence then? No, we need metadata.lastMessageAt.
+            // Let's modify the queue.push in _buildDryRunQueue to include metadata.
+            const dateA = a.metadata?.lastMessageAt ? new Date(a.metadata.lastMessageAt) : new Date(0);
+            const dateB = b.metadata?.lastMessageAt ? new Date(b.metadata.lastMessageAt) : new Date(0);
+            return dateB - dateA;
+        });
         queue.splice(finalLimit);
     }
 
