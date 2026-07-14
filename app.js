@@ -1741,6 +1741,8 @@ async function processBufferedMessages(senderNumber, client) {
         const isAiCustomerReplyEnabled = process.env.AI_CUSTOMER_REPLY_ENABLED !== 'false';
         if (!isAdmin && !isAiCustomerReplyEnabled) {
             console.log(`[DEBOUNCED] 🤖 AI customer reply disabled via ENV. Skipping AI generation for ${senderNumber}.`);
+            // Still classify customer so follow-up engine can pick them up later
+            classifyAndSaveCustomer(senderNumber).catch(err => console.warn('[Classifier] Failed:', err.message));
             await client.stopTyping(senderNumber);
             return;
         }
