@@ -391,7 +391,17 @@ Struktur JSON yang diwajibkan:
             ? parsed.greeting.trim() + "\n\n" + parsed.main_content
             : parsed.main_content;
 
-        console.log(`[FORMATTER_NODE] Reply formulated: "${finalReply.substring(0, 50).replace(/\n/g, ' ')}..."`);
+        // Konversi ke huruf kecil (lowercase) untuk gaya chat santai
+        // Formatting WhatsApp (*, _, ~, •) otomatis aman karena tidak memiliki case
+        // URL/Link tetap dipertahankan huruf aslinya agar tidak rusak
+        finalReply = finalReply.split(/(https?:\/\/[^\s]+)/g).map(part => {
+            if (part.startsWith('http')) {
+                return part;
+            }
+            return part.toLowerCase();
+        }).join('');
+
+        console.log(`[FORMATTER_NODE] Reply formulated: "${finalReply.substring(0, 50).replace(/\\n/g, ' ')}..."`);
 
         // Track combo offered state
         const contextUpdate = {};
