@@ -147,21 +147,21 @@ ATURAN BAHASA PENAWARAN PROMO:
     // Custom Instruction for 4 Paket Repaint Bodi Halus
     let repaintBodiHalusInstruction = '';
     if ((replyMode === 'inform' || replyMode === 'ask') && (toolResult?.category === 'repaint_bodi_halus' || toolResult?.results?.[0]?.category === 'repaint_bodi_halus') && (toolResult?.candidates || toolResult?.results?.[0]?.candidates)) {
-        
+
         const isFullBodi = context.detailingFocus && context.detailingFocus.toLowerCase().includes('full bodi');
         const hasHalus = isFullBodi || context.serviceTypes?.some(s => s.toLowerCase().includes('bodi halus'));
         const comboPartners = context.serviceTypes?.filter(s => {
             const lower = s.toLowerCase();
             return lower.includes('velg') || lower.includes('kasar') || lower.includes('cuci');
         }) || [];
-        
+
         if (isFullBodi) {
             const kasarIncluded = comboPartners.some(p => p.toLowerCase().includes('kasar'));
             if (!kasarIncluded) comboPartners.push('Repaint Bodi Kasar');
         }
 
         const alreadyGotHalusCombo = hasHalus && comboPartners.length > 0;
-        
+
         let statusPromoCombo = '';
         if (alreadyGotHalusCombo) {
             statusPromoCombo = `
@@ -209,7 +209,7 @@ Karena ada promo khusus Coating diskon ${pct}%, kamu WAJIB mematuhinya:
 
     // Pass combo data without hardcoding visual display rules
     const hasCandidates = toolResult?.candidates?.length > 1 || toolResult?.results?.some(r => r.candidates?.length > 1);
-    
+
     let comboResultInstruction = '';
     // JANGAN berikan hasil total combo jika masih ada pilihan paket yang belum dipilih
     if ((replyMode === 'inform' || replyMode === 'ask') && toolResult?.combo?.applied && !hasCandidates) {
@@ -236,7 +236,7 @@ ${dateInfo}
 
     let informCTAInstruction = '';
     if (!missingQ && replyMode === 'inform' && !comboOfferInstruction) {
-        
+
         if (hasCandidates && !context.packageChoice) {
             informCTAInstruction = `
 # PENUTUP PESAN (WAJIB ADA)
@@ -256,7 +256,7 @@ Contoh: "Jadi totalnya segini ya kak, gimana mau dieksekusi hari apa nih?".`;
         studioInfoInstruction = `
 INSTRUKSI INFO LOKASI STUDIO:
 Kamu harus memberikan informasi lokasi studio berdasarkan Tool Result. 
-PENTING: JIKA pada konteks di bawah Tipe Motor tertulis 'Belum diketahui', KALIMAT PALING TERAKHIR WAJIB HANYA menanyakan tipe motor pelanggan. (contoh: "Btw, ini buat motor apa nih kak yang mau digantengin?").`;
+PENTING: JIKA pada konteks di bawah Tipe Motor tertulis 'Belum diketahui', KALIMAT PALING TERAKHIR WAJIB HANYA menanyakan tipe motor pelanggan. (contoh: "Btw, motor apa nih kak yang mau digantengin?").`;
     }
 
     const modeInstructions = {
