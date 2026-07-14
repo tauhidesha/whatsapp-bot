@@ -13,7 +13,7 @@
 
 const repaintBodiHalus = [
     // ─── BODY 1: Matic Kecil & Bebek ───
-    { model: "scoopy", aliases: ["honda scoopy", "scoopy prestige", "scoopy sporty", "scoopy stylish", "scoopy fi", "scoopy injection"], price: 900000, note: "Full Body Halus", brand: "honda" },
+    { model: "scoopy", aliases: ["honda scoopy", "scoopy prestige", "scoopy sporty", "scoopy stylish", "scoopy fi", "scoopy injection"], price: 1100000, note: "Full Body Halus", brand: "honda" },
     { model: "genio", aliases: ["honda genio"], price: 900000, note: "Full Body Halus", brand: "honda" },
     { model: "fino", aliases: ["yamaha fino"], price: 900000, note: "Full Body Halus", brand: "yamaha" },
     { model: "fazzio", aliases: ["yamaha fazzio", "fazio", "grand filano", "filano"], price: 900000, note: "Full Body Halus", brand: "yamaha" },

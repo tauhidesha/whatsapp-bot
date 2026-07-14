@@ -351,7 +351,7 @@ Output: {
         missingQuestion = "Tanyakan rencana layanan yang diinginkan (Repaint, Coating, atau Detailing)";
     } else if (classifiedIntent === 'BOOKING_SERVICE') {
         // Resolve generic service names first
-        for (let i = 0; i < ctx.serviceTypes.length; i++) {
+        for (let i = ctx.serviceTypes.length - 1; i >= 0; i--) {
             const svc = ctx.serviceTypes[i].toLowerCase();
             if (svc === 'repaint') {
                 missingQuestion = "Tanyakan detail bagian yang mau di-repaint (Bodi Halus, Kasar, Velg, atau CVT)";
@@ -426,7 +426,8 @@ Output: {
 
         // Service-specific questions
         if (!missingQuestion && classifiedIntent === 'BOOKING_SERVICE') {
-            for (const svc of ctx.serviceTypes) {
+            for (let i = ctx.serviceTypes.length - 1; i >= 0; i--) {
+                const svc = ctx.serviceTypes[i];
                 const svcLower = svc.toLowerCase();
                 
                 // Repaint Flow

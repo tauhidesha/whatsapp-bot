@@ -8,8 +8,8 @@ const { getServiceDetailsTool } = require('../../tools/getServiceDetailsTool');
 
 const model = new ChatGoogleGenerativeAI({
     model: process.env.AI_MODEL || "gemini-1.5-flash",
-    maxOutputTokens: 2048,
-    temperature: 0,
+    maxOutputTokens: 500,
+    temperature: 0.7,
 });
 
 /**
@@ -133,13 +133,13 @@ async function formatterNode(state) {
 
         const promoMsg = comboPromo.promoText ? comboPromo.promoText : `Lagi ada promo diskon ${pct}% nih kalau ambil ${comboPromo.comboMinServices} layanan sekaligus`;
         comboOfferInstruction = `
-PROMOSI COMBO (WAJIB ditawarkan secara natural di akhir pesan):
+PROMOSI COMBO (Tawarkan secara natural di akhir pesan):
 Setelah kasih estimasi harga, tawarkan layanan tambahan: "${upsellSuggestion}".
 Catatan Paket: ${packageExplanation || 'Jelaskan benefit intinya secara ringkas.'}
 Detail Promo Asli: "${promoMsg}"
 ATURAN BAHASA PENAWARAN PROMO:
-- JANGAN copy-paste syarat promo mentah-mentah (hindari kata kaku seperti "paket ekonomis tidak diskon", "khusus 10 motor", dll).
-- WAJIB SEBUT NAMA PAKET SPESIFIKNYA: "${upsellSuggestion}".
+- Hindari copy-paste syarat promo mentah-mentah (hindari kata kaku seperti "paket ekonomis tidak diskon", "khusus 10 motor", dll).
+- Pastikan menyebut nama paket spesifiknya: "${upsellSuggestion}".
 - Sampaikan bahwa JIKA ambil paket ${upsellSuggestion} sekalian, maka paket ${discountedService} akan dapat diskon ${pct}%.
 - Contoh kalimat santai: "Oiya kak buat info kalau ambil ${upsellSuggestion} sekalian, nanti paket ${discountedService} kakak dapet diskon ${pct}%. ${effectiveBongkar ? 'Isi paketnya sudah detailing sampai rangka dengan tambahan di coating juga. ' : ''}${benefitText ? (benefitText.charAt(0).toUpperCase() + benefitText.slice(1)) + '. ' : ''}Mau sekalian tambah ${upsellSuggestion} nggak kak?"`;
     }
@@ -166,14 +166,14 @@ ATURAN BAHASA PENAWARAN PROMO:
         let statusPromoCombo = '';
         if (alreadyGotHalusCombo) {
             statusPromoCombo = `
-# STATUS PROMO COMBO (WAJIB DISAMPAIKAN)
+# STATUS PROMO COMBO (Info untuk User)
 Kakak sudah mengambil kombinasi layanan: Bodi Halus + ${comboPartners.join(', ')}. 
-Maka kakak otomatis BERHAK MENDAPATKAN DISKON 10% untuk Repaint Bodi Halus!
--> Kamu WAJIB menyampaikannya secara eksplisit dan antusias SEBELUM membeberkan rincian harga paket di bawah ini.
+Maka kakak otomatis berhak mendapatkan diskon 10% untuk Repaint Bodi Halus!
+-> Sampaikan kabar baik ini secara eksplisit dan antusias SEBELUM membeberkan rincian harga paket di bawah ini.
 `;
         } else {
             statusPromoCombo = `
-# SYARAT PROMO DISKON 10% (WAJIB DISAMPAIKAN)
+# SYARAT PROMO DISKON 10% (Info untuk User)
 Sampaikan dengan jelas bahwa Promo Diskon 10% Repaint Bodi Halus ini HANYA BERLAKU jika kakak sekalian mengambil layanan kombinasi (${upsellSuggestion || 'Cuci Komplit, Repaint Velg, atau Repaint Bodi Kasar'}).
 `;
         }
@@ -183,13 +183,13 @@ INSTRUKSI KHUSUS 4 PAKET REPAINT BODI HALUS:
 Kamu harus langsung menampilkan ke-4 pilihan paket ini ke user (Ekonomis, Basic, Standar, Premium).
 Aturan penyajian:
 1. Urutkan dari yang Termahal (Premium) sampai yang Termurah (Ekonomis).
-1a. FORMATTING (SANGAT PENTING): Kamu WAJIB menggunakan karakter bulat (•) sebagai bullet point (JANGAN gunakan * atau - untuk list). Jika ingin menebalkan tulisan, apit HANYA teks tersebut dengan satu bintang WhatsApp (contoh: • *Paket Standar*: ~Rp1.000.000~ jadi Rp900.000). Jangan pernah menggunakan dobel bintang (**). Pastikan baris baru antar paket agar rapi.
-1b. DESKRIPSI PAKET: WAJIB sertakan deskripsi/penjelasan singkat untuk setiap paket persis seperti yang tertera pada hasil tool JSON. Jangan hilangkan deskripsi paket.
+1a. FORMATTING (SANGAT PENTING): Gunakan karakter bulat (•) sebagai bullet point (jangan gunakan * atau - untuk list). Jika ingin menebalkan tulisan, apit HANYA teks tersebut dengan satu bintang WhatsApp (contoh: • *Paket Standar*: ~Rp1.000.000~ jadi Rp900.000). Jangan pernah menggunakan dobel bintang (**). Pastikan baris baru antar paket agar rapi.
+1b. DESKRIPSI PAKET: Sertakan deskripsi/penjelasan singkat untuk setiap paket persis seperti yang tertera pada hasil tool JSON.
 2. TAMPILKAN PROMO CORET: Untuk paket Premium, Standar, dan Basic, kalikan harga dasar dengan 0.9 (diskon 10%), lalu coret harga asli dan tampilkan harga diskonnya. (Contoh: ~Rp1.000.000~ jadi Rp900.000).
 3. Paket Ekonomis TIDAK MENDAPAT DISKON (jangan dicoret).
-4. WAJIB NUDGE PAKET STANDAR: Setelah menampilkan harga, kamu WAJIB menuliskan kalimat rekomendasi untuk memilih "Paket Standar". Contoh: "Dari 4 paket di atas, Zoya paling saranin kakak ambil Paket Standar ya! Hasilnya udah mantap mirror finish dan dapet garansi 1 tahun lho." (JANGAN SAMPAI LUPA BAGIAN INI!).
-5. TAMPILKAN LAYANAN LAIN: JIKA ada layanan lain selain Bodi Halus di dalam TOOL RESULT JSON (misalnya Repaint Bodi Kasar, Cuci Komplit, dll), WAJIB berikan juga harga layanan tersebut. Jangan pernah bilang "harga akan diinfokan nanti", harganya sudah ada di JSON!
-6. PENUTUP PESAN (WAJIB): Karena user BELUM memilih 1 dari 4 paket di atas, JANGAN PERNAH menotal seluruh harga dan JANGAN menanyakan jadwal eksekusi. KALIMAT PALING TERAKHIR WAJIB HANYA menanyakan paket Bodi Halus mana yang mau dipilih. Contoh: "Kira-kira dari 4 paket di atas, kakak mau ambil yang mana nih biar Zoya hitung totalnya?".
+4. REKOMENDASIKAN PAKET STANDAR: Setelah menampilkan harga, disarankan untuk menuliskan kalimat rekomendasi untuk memilih "Paket Standar". Contoh: "Dari 4 paket di atas, Zoya paling saranin kakak ambil Paket Standar ya! Hasilnya udah mantap mirror finish dan dapet garansi 1 tahun lho."
+5. TAMPILKAN LAYANAN LAIN: JIKA ada layanan lain selain Bodi Halus di dalam TOOL RESULT JSON (misalnya Repaint Bodi Kasar, Cuci Komplit, dll), berikan juga harga layanan tersebut.
+6. PENUTUP PESAN: Karena user BELUM memilih 1 dari 4 paket di atas, arahkan pembicaraan untuk menanyakan paket Bodi Halus mana yang mau dipilih. Contoh: "Kira-kira dari 4 paket di atas, kakak mau ambil yang mana nih biar Zoya hitung totalnya?".
 `;
     }
 
@@ -200,11 +200,11 @@ Aturan penyajian:
         coatingDiscountInstruction = `
 INSTRUKSI KHUSUS COATING:
 User SUDAH memilih paket Coating / Complete Service. 
-Karena ada promo khusus Coating diskon ${pct}%, kamu WAJIB mematuhinya:
+Karena ada promo khusus Coating diskon ${pct}%, terapkan aturan berikut:
 1. Potong harga dasar Coating sebesar ${pct}%, lalu coret harga asli dan tampilkan harga diskonnya. (Contoh: ~Rp1.000.000~ jadi Rp850.000).
-2. JANGAN PERNAH menawarkan/upsell layanan lain lagi.
-3. Langsung tanyakan kapan jadwal motor mau dibawa ke studio (Jam buka studio: Senin-Sabtu jam 08.00-17.00, Minggu Tutup).
-4. JIKA ada hasil layanan Detailing/Poles dalam JSON yang muncul BERSAMAAN dengan Coating, ABAIKAN SAJA (jangan ditampilkan harganya), karena Coating sudah mencakup semuanya.
+2. Jangan menawarkan/upsell layanan lain lagi.
+3. Arahkan pembicaraan untuk menanyakan jadwal motor mau dibawa ke studio (Jam buka studio: Senin-Sabtu jam 08.00-17.00, Minggu Tutup).
+4. Jika ada hasil layanan Detailing/Poles dalam JSON yang muncul BERSAMAAN dengan Coating, abaikan saja harganya, karena Coating sudah mencakup semuanya.
 `;
     }
 
@@ -240,14 +240,13 @@ ${dateInfo}
 
         if (hasCandidates && !context.packageChoice) {
             informCTAInstruction = `
-# PENUTUP PESAN (WAJIB ADA)
-Karena user BELUM memilih paket yang spesifik, KALIMAT PALING TERAKHIR dari \`main_content\` WAJIB SEKALI berupa pertanyaan (CTA) yang menanyakan paket mana yang mau dipilih. 
-Contoh: "Gimana kak, dari pilihan paket di atas kira-kira ada gambaran mau pilih yang mana?". 
-(JANGAN menanyakan jadwal booking/eksekusi sebelum user memilih paketnya!)`;
+# PANDUAN PENUTUP PESAN
+Karena user BELUM memilih paket yang spesifik, arahkan pembicaraan di kalimat terakhir untuk menanyakan paket mana yang mau dipilih. 
+Contoh: "Gimana kak, dari pilihan paket di atas kira-kira ada gambaran mau pilih yang mana?".`;
         } else if (context.packageChoice || !hasCandidates) {
             informCTAInstruction = `
-# PENUTUP PESAN (WAJIB ADA)
-Karena user SUDAH menentukan pilihan layanan/paket, KALIMAT PALING TERAKHIR dari \`main_content\` WAJIB menanyakan kapan jadwal eksekusinya. 
+# PANDUAN PENUTUP PESAN
+Karena user SUDAH menentukan pilihan layanan/paket, arahkan pembicaraan di kalimat terakhir untuk menanyakan kapan jadwal eksekusinya. 
 Contoh: "Jadi totalnya segini ya kak, gimana mau dieksekusi hari apa nih?".`;
         }
     }
@@ -255,13 +254,13 @@ Contoh: "Jadi totalnya segini ya kak, gimana mau dieksekusi hari apa nih?".`;
     let studioInfoInstruction = '';
     if (toolResult?.studioInfo) {
         const hasVehicleAndService = context.vehicleType && context.vehicleType !== 'Belum diketahui' && context.serviceTypes && context.serviceTypes.length > 0;
-        
+
         if (!hasVehicleAndService) {
             studioInfoInstruction = `
 INSTRUKSI INFO LOKASI STUDIO:
 Kamu harus memberikan informasi alamat / Google Maps studio berdasarkan Tool Result.
-PENTING: JANGAN sebutkan patokan/ancer-ancer studio. Cukup berikan alamat atau link maps-nya saja.
-PENTING: Karena tipe motor pelanggan masih belum diketahui, KALIMAT PALING TERAKHIR WAJIB HANYA menanyakan tipe motor pelanggan. (contoh: "Btw, motor apa nih kak yang mau digantengin?").`;
+PENTING: Jangan sebutkan patokan/ancer-ancer studio. Cukup berikan alamat atau link maps-nya saja.
+PENTING: Karena tipe motor pelanggan masih belum diketahui, akhiri pesan dengan santai menanyakan tipe motor pelanggan. (contoh: "Btw, motor apa nih kak yang mau digantengin?").`;
         } else {
             studioInfoInstruction = `
 INSTRUKSI INFO LOKASI STUDIO:
@@ -339,8 +338,8 @@ Mode INFORM: "siapp mas! untuk *nmax bodi halus* estimasi harganya *rp1.200.000*
 - Contoh BURUK: "Kenalin aku Zoya 🎨✨ Biar aku bisa kasih info yang pas... boleh kasih tahu motornya apa? Atau mungkin ada bagian tertentu? Kalau ada foto boleh kirim juga ya! Oh ya kita buka jam 08.00-17.00..."
 - Contoh BAGUS: "Halo kak! Aku Zoya dari Bosmat 🎨 Tertarik sama hasil repaint Vario yang di postingan ya? Motornya apa nih kak?"
 ${missingQ && replyMode === 'ask' ? `
-# ATURAN MUTLAK (ASK MODE)
-Karena ada info yang masih kurang, KALIMAT PALING TERAKHIR dari \`main_content\` WAJIB berupa pertanyaan santai untuk menanyakan hal ini: "${missingQ}". JANGAN TUTUP PESAN TANPA BERTANYA!
+# PANDUAN BERTANYA (ASK MODE)
+Arahkan percakapan secara santai dan natural untuk menanyakan hal ini: "${missingQ}". Pastikan kamu mengakhiri pesan dengan pertanyaan tersebut.
 ` : ''}
 ${informCTAInstruction}
 # OUTPUT FORMAT

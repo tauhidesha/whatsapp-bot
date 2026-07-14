@@ -12,8 +12,6 @@ Spesifikasi:
 
 Cocok untuk: Motor harian, ganti warna budget, pelajar, sering ganti warna
 
-Estimasi pengerjaan: 3–4 hari kerja tergantung kondisi dan antrian.
-Harga bervariasi per model motor.
 - **Estimasi Pengerjaan:** 3-4 hari kerja
 
 ### Repaint Bodi Halus - Paket Basic
@@ -29,8 +27,6 @@ Spesifikasi:
 
 Cocok untuk: Daily premium, ingin hasil lebih kinclong, upgrade dari cat standar pabrik
 
-Estimasi pengerjaan: 3–4 hari kerja tergantung kondisi dan antrian.
-Harga bervariasi per model motor.
 - **Estimasi Pengerjaan:** 3-4 hari kerja
 
 ### Repaint Bodi Halus - Paket Standar
@@ -46,8 +42,6 @@ Spesifikasi:
 
 Cocok untuk: Enthusiast, motor kontes, tampilan maksimal
 
-Estimasi pengerjaan: 3–4 hari kerja tergantung kondisi dan antrian.
-Harga bervariasi per model motor.
 - **Estimasi Pengerjaan:** 3-4 hari kerja
 
 ### Repaint Bodi Halus - Paket Premium
@@ -64,8 +58,6 @@ Spesifikasi:
 
 Cocok untuk: Kolektor, motor restorasi, hasil maksimal
 
-Estimasi pengerjaan: 3–4 hari kerja tergantung kondisi dan antrian.
-Harga bervariasi per model motor.
 - **Estimasi Pengerjaan:** 5-6 hari kerja
 
 ## HARGA BERDASARKAN MODEL MOTOR
@@ -504,10 +496,10 @@ Harga bervariasi per model motor.
   - Paket Premium: Rp 1.350.000
 
 - **Motor:** HONDA SCOOPY (Alias: honda scoopy, scoopy prestige, scoopy sporty, scoopy stylish, scoopy fi, scoopy injection)
-  - Paket Ekonomis: Rp 900.000
-  - Paket Basic: Rp 1.080.000
-  - Paket Standar: Rp 1.170.000
-  - Paket Premium: Rp 1.350.000
+  - Paket Ekonomis: Rp 1.100.000
+  - Paket Basic: Rp 1.320.000
+  - Paket Standar: Rp 1.430.000
+  - Paket Premium: Rp 1.650.000
 
 - **Motor:** SELIS SELIS E-MAX (Alias: selis emax)
   - Paket Ekonomis: Rp 850.000
