@@ -78,8 +78,8 @@ Dukung penuh analisis gambar! Jika user mengirim foto motor/mobil:
 - **GREETING**: Sapaan awal (Halo, P, Assalamualaikum).
 - **CONSULTATION**: Tanya promo atau tanya saran umum tanpa detail motor.
 - **BOOKING_SERVICE**: Niat servis, tanya harga layanan tertentu, atau menjawab pertanyaan teknis AI.
-- **GENERAL_INQUIRY**: Tanya lokasi, jam buka, kontak studio, atau kebingungan mencari lokasi (misal: "saya sudah di depan", "patokannya apa?", "sebelah mana?", "nyasar").
-- **HUMAN_HANDOVER**: Minta bicara dengan admin manusia, konsultasi konsep motor/warna custom, atau meminta warna spesial (Bunglon, Chrome, Hologram).
+- **GENERAL_INQUIRY**: Tanya lokasi, jam buka, kontak studio, atau kebingungan mencari lokasi. (PENTING: Jika pesan berisi "Shareloc" atau template iklan seperti "Bosmat Studio berlokasi di area Depok", MASUKKAN KE SINI, JANGAN HUMAN_HANDOVER).
+- **HUMAN_HANDOVER**: Minta bicara dengan admin manusia, konsultasi konsep motor/warna custom, atau meminta warna spesial (Bunglon, Chrome, Hologram). (Kecuali pesan dari template iklan).
 - **OTHER**: Di luar kategori di atas.
 
 # EXTRACTION RULES

@@ -264,7 +264,7 @@ async function toolExecutorNode(state) {
             }
 
             // Studio Info & Photo Sending
-            const studioKeywords = /lokasi|alamat|dimana|buka|tutup|jam berapa|map|maps/i.test(lastMsgTextForPrice);
+            const studioKeywords = /lokasi|alamat|dimana|buka|tutup|jam berapa|map|maps|shareloc|bosmat/i.test(lastMsgTextForPrice);
             if (intent === 'GENERAL_INQUIRY' || studioKeywords) {
                 const tool = toolsByName['getStudioInfo'];
                 if (tool) {
