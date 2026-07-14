@@ -526,6 +526,23 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
 
         const isNurtureEligible = isEligible(context, metadata);
 
+        // [DEBUG] Log why customer is or isn't eligible
+        const label = context.customerLabel;
+        const strategy = STRATEGY_CONFIG[label];
+        const lastFollowUp = context.lastFollowUpAt ? new Date(context.lastFollowUpAt) : null;
+        const lastMsg = metadata.lastMessageAt ? new Date(metadata.lastMessageAt) : null;
+        const daysSince = lastMsg ? Math.floor((now - lastMsg) / (1000 * 60 * 60 * 24)) : 'N/A';
+        const followUpCount = context.followUpCount || 0;
+        if (!strategy) {
+            console.log(`[DryRun][Skip] ${customer.name} (${label}) → no strategy config`);
+        } else if (!lastMsg) {
+            console.log(`[DryRun][Skip] ${customer.name} (${label}) → no lastMessageAt`);
+        } else if (!isNurtureEligible) {
+            console.log(`[DryRun][Skip] ${customer.name} (${label}) → daysSince=${daysSince} waitDays=${strategy.waitDays} followUps=${followUpCount}/${strategy.maxFollowUps}`);
+        } else {
+            console.log(`[DryRun][OK]   ${customer.name} (${label}) → daysSince=${daysSince} ELIGIBLE`);
+        }
+
         let isReviewEligible = false;
         const lastService = customer.lastService ? new Date(customer.lastService) : null;
         const hasActiveBooking = (customer.bookings || []).length > 0;
@@ -588,6 +605,8 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
             } catch (err) {
                 console.warn(`[Scheduler][DryRun] Failed to generate preview for ${context.id}:`, err.message);
             }
+        } else if (!isReviewEligible && !isRebookingEligible && !isNurtureEligible) {
+            // Already logged above via debug
         }
     }
 
