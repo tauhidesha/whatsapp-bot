@@ -121,7 +121,7 @@ async function handleAdminHpMessage(msg) {
 
     // Pengecualian untuk template auto-reply Iklan (FAQ) agar tidak mematikan AI (Snooze)
     if (messageText && typeof messageText === 'string') {
-        const isAdAutoReply = /Bosmat Studio berlokasi di area Depok|Silakan balas pesan ini dengan kata "Shareloc"/i.test(messageText);
+        const isAdAutoReply = /Bosmat Studio berlokasi di area Depok|Silakan balas pesan ini dengan kata "Shareloc"|Harga repaint bodi halus mulai dari Rp 800.000|Bisa banget! Kami menggunakan material PU Premium yang warnanya/i.test(messageText);
         if (isAdAutoReply) {
             console.log(`[AdminSync] Skip FAQ Auto-reply message to ${recipientNumber}`);
             return;
