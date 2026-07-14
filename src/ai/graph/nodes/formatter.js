@@ -52,7 +52,7 @@ async function formatterNode(state) {
 
             if (isAlreadyCoating) {
                 // DO NOT UPSELL for Coating/Complete Service. 
-                // They already get the 15% discount automatically, and we should just book them.
+                // They already get the 10% discount automatically, and we should just book them.
                 upsellSuggestion = null;
                 benefitText = null;
                 packageExplanation = null;
@@ -89,11 +89,11 @@ async function formatterNode(state) {
             if (primarySvc.includes('halus')) {
                 upsellSuggestion = 'Cuci Komplit, Repaint Velg, atau Repaint Bodi Kasar';
                 benefitText = 'biar tampilan motor makin maksimal secara keseluruhan';
-                packageExplanation = '(Tawarkan 3 opsi pilihan: cuci komplit, repaint velg, atau repaint bodi kasar. Jelaskan singkat: Ambil salah satu dari opsi itu aja, Repaint Bodi Halus-nya udah otomatis dapet diskon 15%. Info juga kalau cat baru belum bisa dicoating, harus nunggu 1 bulan biar cat matang.)';
+                packageExplanation = '(Tawarkan 3 opsi pilihan: cuci komplit, repaint velg, atau repaint bodi kasar. Jelaskan singkat: Ambil salah satu dari opsi itu aja, Repaint Bodi Halus-nya udah otomatis dapet diskon 10%. Info juga kalau cat baru belum bisa dicoating, harus nunggu 1 bulan biar cat matang.)';
             } else if (primarySvc.includes('kasar') || primarySvc.includes('velg')) {
                 upsellSuggestion = 'Repaint Bodi Halus';
-                benefitText = 'karena kalau ambil paket Repaint Bodi Halus sekalian, paket bodi halusnya otomatis dapet diskon 15%';
-                packageExplanation = '(Infoin santai: Kalau mau sekalian Repaint Bodi Halus juga mumpung lagi ada promo diskon 15% untuk paket bodi halusnya, jadi motornya bisa fresh kayak baru lagi.)';
+                benefitText = 'karena kalau ambil paket Repaint Bodi Halus sekalian, paket bodi halusnya otomatis dapet diskon 10%';
+                packageExplanation = '(Infoin santai: Kalau mau sekalian Repaint Bodi Halus juga mumpung lagi ada promo diskon 10% untuk paket bodi halusnya, jadi motornya bisa fresh kayak baru lagi.)';
             }
         }
 
@@ -167,13 +167,13 @@ ATURAN BAHASA PENAWARAN PROMO:
             statusPromoCombo = `
 # STATUS PROMO COMBO (WAJIB DISAMPAIKAN)
 Kakak sudah mengambil kombinasi layanan: Bodi Halus + ${comboPartners.join(', ')}. 
-Maka kakak otomatis BERHAK MENDAPATKAN DISKON 15% untuk Repaint Bodi Halus!
+Maka kakak otomatis BERHAK MENDAPATKAN DISKON 10% untuk Repaint Bodi Halus!
 -> Kamu WAJIB menyampaikannya secara eksplisit dan antusias SEBELUM membeberkan rincian harga paket di bawah ini.
 `;
         } else {
             statusPromoCombo = `
-# SYARAT PROMO DISKON 15% (WAJIB DISAMPAIKAN)
-Sampaikan dengan jelas bahwa Promo Diskon 15% Repaint Bodi Halus ini HANYA BERLAKU jika kakak sekalian mengambil layanan kombinasi (${upsellSuggestion || 'Cuci Komplit, Repaint Velg, atau Repaint Bodi Kasar'}).
+# SYARAT PROMO DISKON 10% (WAJIB DISAMPAIKAN)
+Sampaikan dengan jelas bahwa Promo Diskon 10% Repaint Bodi Halus ini HANYA BERLAKU jika kakak sekalian mengambil layanan kombinasi (${upsellSuggestion || 'Cuci Komplit, Repaint Velg, atau Repaint Bodi Kasar'}).
 `;
         }
 
@@ -182,9 +182,9 @@ INSTRUKSI KHUSUS 4 PAKET REPAINT BODI HALUS:
 Kamu harus langsung menampilkan ke-4 pilihan paket ini ke user (Ekonomis, Basic, Standar, Premium).
 Aturan penyajian:
 1. Urutkan dari yang Termahal (Premium) sampai yang Termurah (Ekonomis).
-1a. FORMATTING (SANGAT PENTING): Kamu WAJIB menggunakan karakter bulat (•) sebagai bullet point (JANGAN gunakan * atau - untuk list). Jika ingin menebalkan tulisan, apit HANYA teks tersebut dengan satu bintang WhatsApp (contoh: • *Paket Standar*: ~Rp1.000.000~ jadi Rp850.000). Jangan pernah menggunakan dobel bintang (**). Pastikan baris baru antar paket agar rapi.
+1a. FORMATTING (SANGAT PENTING): Kamu WAJIB menggunakan karakter bulat (•) sebagai bullet point (JANGAN gunakan * atau - untuk list). Jika ingin menebalkan tulisan, apit HANYA teks tersebut dengan satu bintang WhatsApp (contoh: • *Paket Standar*: ~Rp1.000.000~ jadi Rp900.000). Jangan pernah menggunakan dobel bintang (**). Pastikan baris baru antar paket agar rapi.
 1b. DESKRIPSI PAKET: WAJIB sertakan deskripsi/penjelasan singkat untuk setiap paket persis seperti yang tertera pada hasil tool JSON. Jangan hilangkan deskripsi paket.
-2. TAMPILKAN PROMO CORET: Untuk paket Premium, Standar, dan Basic, kalikan harga dasar dengan 0.85 (diskon 15%), lalu coret harga asli dan tampilkan harga diskonnya. (Contoh: ~Rp1.000.000~ jadi Rp850.000).
+2. TAMPILKAN PROMO CORET: Untuk paket Premium, Standar, dan Basic, kalikan harga dasar dengan 0.9 (diskon 10%), lalu coret harga asli dan tampilkan harga diskonnya. (Contoh: ~Rp1.000.000~ jadi Rp900.000).
 3. Paket Ekonomis TIDAK MENDAPAT DISKON (jangan dicoret).
 4. WAJIB NUDGE PAKET STANDAR: Setelah menampilkan harga, kamu WAJIB menuliskan kalimat rekomendasi untuk memilih "Paket Standar". Contoh: "Dari 4 paket di atas, Zoya paling saranin kakak ambil Paket Standar ya! Hasilnya udah mantap mirror finish dan dapet garansi 1 tahun lho." (JANGAN SAMPAI LUPA BAGIAN INI!).
 5. TAMPILKAN LAYANAN LAIN: JIKA ada layanan lain selain Bodi Halus di dalam TOOL RESULT JSON (misalnya Repaint Bodi Kasar, Cuci Komplit, dll), WAJIB berikan juga harga layanan tersebut. Jangan pernah bilang "harga akan diinfokan nanti", harganya sudah ada di JSON!
