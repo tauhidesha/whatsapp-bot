@@ -45,7 +45,7 @@ async function sendBookingReminders(force = false, dryRun = false) {
       },
       include: {
         customer: {
-          select: { phone: true, name: true }
+          select: { phone: true, name: true, whatsappLid: true }
         }
       }
     });
@@ -55,9 +55,15 @@ async function sendBookingReminders(force = false, dryRun = false) {
     console.log(`[bookingReminders] Menemukan ${bookings.length} booking SQL untuk diingatkan oleh Zoya`);
 
     for (const booking of bookings) {
-      const target = booking.customerPhone || (booking.customer && booking.customer.phone);
+      // Prioritize customer.phone (has @lid/@c.us suffix) over booking.customerPhone (raw digits)
+      const target = (booking.customer && booking.customer.phone) || booking.customerPhone;
       let normalizedTarget = getIdentifier(target);
       if (!normalizedTarget) continue;
+
+      // If getIdentifier defaulted to @c.us but customer has a LID, use the LID
+      if (normalizedTarget.endsWith('@c.us') && booking.customer?.whatsappLid) {
+        normalizedTarget = booking.customer.whatsappLid;
+      }
 
       const bookingTime = DateTime.fromJSDate(booking.bookingDate).setZone(TIMEZONE).toFormat('HH:mm');
       
