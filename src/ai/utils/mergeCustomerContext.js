@@ -291,20 +291,20 @@ async function syncGraphStateToCRM(senderNumber, state) {
     if (!docId) return;
 
     try {
-        const { context, metadata, intent } = state;
+        const { vehicle, services, consultation, memory, conversation } = state;
         
         // Map LangGraph context back to snake_case for the existing merger
         const extractorData = {
-            motor_model: context.vehicleType,
-            motor_color: context.colorChoice,
-            target_services: context.serviceTypes,
-            service_detail: context.serviceDetail,
-            paint_type: context.paintType,
-            is_bongkar_total: context.isBongkarTotal,
-            visual_summary: metadata.visualSummary || context.visualSummary,
-            detected_intents: [intent],
-            conversation_stage: context.isReadyForTools ? 'ready' : 'collecting',
-            shared_photo: !!(metadata.visualSummary || context.visualSummary)
+            motor_model: vehicle?.model || memory?.identity?.motor,
+            motor_color: vehicle?.paintType,
+            target_services: services?.targetServices,
+            service_detail: consultation?.problemDescription,
+            paint_type: vehicle?.paintType,
+            is_bongkar_total: false,
+            visual_summary: memory?.identity?.visual_summary,
+            detected_intents: [],
+            conversation_stage: conversation?.status,
+            shared_photo: false
         };
 
         // Merge and Save
