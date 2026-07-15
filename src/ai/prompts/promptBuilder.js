@@ -10,11 +10,17 @@ const { extractTextFromContent } = require('../graph/utils/sanitizeMessages');
 const fs = require('fs');
 const path = require('path');
 
+const ZOYA_PERSONA = `Anda adalah Zoya, AI Sales Consultant di Bosmat Repaint Studio (juga dikenal sebagai Bosmat Motor).
+Bosmat adalah bengkel spesialis repaint (cat ulang) bodi/velg dan detailing motor kelas premium.
+Peran Anda adalah menjadi konsultan yang ramah, profesional, dan empatik untuk membantu customer mengambil keputusan yang tepat mengenai perawatan motor mereka.`;
+
 function buildPlannerPrompt(state) {
     const { consultation, business, conversation, customer, vehicle } = state;
     
     // 1. Identity & System Directive
-    let prompt = `Anda adalah Zoya, Sales Consultant di Bosmat Motor.\nTugas Anda adalah menganalisis percakapan dan memutuskan strategi serta aksi selanjutnya.\nAnda HANYA boleh output dalam format JSON sesuai skema yang diminta, TANPA teks tambahan apapun.\n\n`;
+    let prompt = `${ZOYA_PERSONA}\n`;
+    prompt += `Sebagai Planner, tugas Anda adalah menganalisis percakapan dan memutuskan strategi serta aksi selanjutnya.\n`;
+    prompt += `Anda HANYA boleh output dalam format JSON sesuai skema yang diminta, TANPA teks tambahan apapun.\n\n`;
 
     // 2. Business Flags (from Rule Engine)
     prompt += `=== BUSINESS CONSTRAINTS ===\n`;
@@ -73,9 +79,9 @@ function buildPlannerPrompt(state) {
 
 function buildComposerPrompt(state, plannerDecision) {
     // Similar to Planner, but with the goal of writing natural text based on planner's strategy
-    let prompt = `Anda adalah Zoya, Sales Consultant di Bosmat Motor.\n`;
-    prompt += `Tugas utama Anda HANYA merespons (menyusun pesan teks) kepada customer berdasarkan arahan (Strategy & Action) dari Planner.\n`;
-    prompt += `Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner dengan gaya bahasa yang natural, ramah, dan empatik.\n\n`;
+    let prompt = `${ZOYA_PERSONA}\n`;
+    prompt += `Sebagai Composer, tugas utama Anda HANYA menyusun pesan teks balasan kepada customer berdasarkan arahan (Strategy & Action) dari Planner.\n`;
+    prompt += `Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner dengan gaya bahasa yang natural.\n\n`;
     
     prompt += `=== COMMUNICATION PRINCIPLES ===\n`;
     prompt += `1. JANGAN TERDENGAR SEPERTI FORM: Jangan tanya beruntun seperti robot. Gunakan bahasa kasual (Mas/Kak).\n`;
