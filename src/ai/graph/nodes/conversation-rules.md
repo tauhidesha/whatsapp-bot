@@ -70,3 +70,5 @@ Repaint + Detailing: Jika customer mau repaint bodi halus sekaligus detailing, c
 Alasan yang disampaikan ke customer: Paket repaint sudah otomatis termasuk poles bodi. Untuk coating, belum bisa dilakukan karena cat baru butuh waktu curing (kering sempurna) selama 1 bulan.
 
 Promo Bundling (Ambil 2 Layanan): Jika ada promo diskon untuk pengambilan 2 layanan sekaligus, ingat bahwa diskon tersebut hanya memotong harga Repaint Bodi Halus-nya saja, bukan layanan lainnya.
+
+Menangani Penolakan / Alasan Customer: JIKA customer menyampaikan alasan atau kendala (misalnya: "rumahnya jauh mas", "belom gajian", "nanti dulu ya", dll), JANGAN PERNAH menanyakan "kapan mau eksekusi". Tunjukkan empati dan berikan kenyamanan. Contoh: "Oh gitu ya mas, jauh juga ternyata. Oke santai aja mas, kabari aja kalau udah luang atau kalau lagi main-main ke daerah Depok ya!". Biarkan percakapan menggantung secara positif tanpa paksaan booking.

@@ -5,6 +5,11 @@ const studioMetadata = require('../../constants/studioMetadata');
 const { withRetry } = require('../../utils/retry');
 const { sanitizeMessagesForGemini, extractTextFromContent, getMessageType } = require('../utils/sanitizeMessages');
 const { getServiceDetailsTool } = require('../../tools/getServiceDetailsTool');
+const fs = require('fs');
+const path = require('path');
+
+const rulesPath = path.join(__dirname, 'conversation-rules.md');
+const conversationRules = fs.existsSync(rulesPath) ? fs.readFileSync(rulesPath, 'utf8') : '';
 
 const model = new ChatGoogleGenerativeAI({
     model: process.env.AI_MODEL || "gemini-1.5-flash",
@@ -246,8 +251,8 @@ Contoh: "Gimana kak, dari pilihan paket di atas kira-kira ada gambaran mau pilih
         } else if (context.packageChoice || !hasCandidates) {
             informCTAInstruction = `
 # PANDUAN PENUTUP PESAN
-Karena user SUDAH menentukan pilihan layanan/paket, arahkan pembicaraan di kalimat terakhir untuk menanyakan kapan jadwal eksekusinya. 
-Contoh: "Jadi totalnya segini ya kak, gimana mau dieksekusi hari apa nih?".`;
+Karena user SUDAH menentukan pilihan layanan/paket, berikan arahan untuk langkah selanjutnya (misal: menanyakan kapan eksekusi atau memberikan link booking).
+PENTING: JIKA user sedang menyampaikan kendala/alasan (misal: rumah jauh, belum gajian, masih ragu, dll), JANGAN pernah bertanya "kapan mau eksekusi". Tunjukkan empati, berikan solusi jika ada, atau cukup katakan "Oke santai aja kak, kabari aja kalau udah siap".`;
         }
     }
 
@@ -321,6 +326,9 @@ ${context.curingWarning ? `🚨 INFO PENTING REKOMENDASI PAKET: User awalnya mem
 # EXAMPLE
 Mode GREET: "pagi juga kak! kenalin aku zoya 🎨✨\n\nbiar aku bisa bantu, motornya apa ya kak?"
 Mode INFORM: "siapp mas! untuk *nmax bodi halus* estimasi harganya *rp1.200.000* ya. ✨"
+
+# BISNIS RULES (BACA DAN PATUHI)
+${conversationRules}
 
 # ATURAN EMAS
 - **Multi-Motor**: Jika user menyebutkan 2 motor berbeda di satu pesan (misal: "mau repaint aerox dan coating nmax"), sampaikan bahwa kita bahas SATU per SATU. Gunakan kalimat santai seperti: "Wah dua motor nih, kita bahas yang [Sebut Motor 1] dulu ya kak biar gak pusing 😆".
