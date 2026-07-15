@@ -140,8 +140,8 @@ const createBookingTool = {
       if (workingArgs.motor_plate && !workingArgs.motorPlate) workingArgs.motorPlate = workingArgs.motor_plate;
 
       if (!workingArgs.customerPhone && typeof workingArgs.senderNumber === 'string') {
-        const cleaned = workingArgs.senderNumber.replace(/@c\.us$/i, '').replace(/[^0-9+]/g, '');
-        workingArgs.customerPhone = cleaned || workingArgs.senderNumber;
+        // Keep the suffix (@lid or @c.us) intact — don't strip to raw digits
+        workingArgs.customerPhone = workingArgs.senderNumber;
       }
 
       if (!workingArgs.customerName && typeof workingArgs.senderName === 'string') {
@@ -249,11 +249,17 @@ const createBookingTool = {
       }
 
       // Get or create customer (consistent with admin dashboard)
+      // Search by all known phone formats to prevent duplicate records
+      const rawDigits = normalizedPhone.replace(/@c\.us$|@lid$/i, '');
       const existingCustomer = await prisma.customer.findFirst({
         where: {
           OR: [
             { phone: normalizedPhone },
-            { phoneReal: normalizedPhone }
+            { phoneReal: normalizedPhone },
+            { whatsappLid: normalizedPhone },
+            // Also try raw digits in case stored without suffix
+            { phone: rawDigits },
+            { phoneReal: rawDigits }
           ]
         }
       });

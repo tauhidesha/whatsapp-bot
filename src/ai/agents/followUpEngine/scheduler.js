@@ -10,6 +10,16 @@ const { withRetry } = require('../../utils/retry');
 const { sendTextDirect } = require('../../utils/whatsappHelper');
 
 /**
+ * Resolve the best WhatsApp ID for sending messages.
+ * Priority: whatsappLid > phone (with suffix) > phone + @c.us fallback
+ */
+function resolveWhatsappId(customer) {
+    if (customer.whatsappLid) return customer.whatsappLid;
+    if (customer.phone && customer.phone.includes('@')) return customer.phone;
+    return customer.phone ? customer.phone + '@c.us' : null;
+}
+
+/**
  * Clean AI response from common reasoning, preambles, or thought blocks.
  * @param {string} text 
  * @returns {string}
@@ -246,7 +256,7 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
         const metadata = {
             lastMessageAt: customer.lastMessageAt,
             name: customer.name,
-            fullSenderId: customer.phone.includes('@') ? customer.phone : customer.phone + '@c.us'
+            fullSenderId: resolveWhatsappId(customer)
         };
 
         // 2. Label downgrade check
@@ -309,7 +319,7 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
             }
         }
 
-        const senderNumber = customer.phone.includes('@') ? customer.phone : customer.phone + '@c.us';
+        const senderNumber = resolveWhatsappId(customer);
 
         if (isReviewEligible) {
             // Priority 1: Review
@@ -535,7 +545,7 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
         const metadata = {
             lastMessageAt: customer.lastMessageAt,
             name: customer.name,
-            fullSenderId: customer.phone.includes('@') ? customer.phone : customer.phone + '@c.us'
+            fullSenderId: resolveWhatsappId(customer)
         };
 
         const isNurtureEligible = isEligible(context, metadata);
@@ -578,7 +588,7 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
             }
         }
 
-        const senderNumber = customer.phone.includes('@') ? customer.phone : customer.phone + '@c.us';
+        const senderNumber = resolveWhatsappId(customer);
         const name = customer.name || 'Mas';
 
 
