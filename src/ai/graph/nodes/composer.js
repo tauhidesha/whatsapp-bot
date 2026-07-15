@@ -1,4 +1,5 @@
 const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
+const { AIMessage } = require('@langchain/core/messages');
 const { buildComposerPrompt } = require('../../prompts/promptBuilder');
 
 /**
@@ -37,6 +38,7 @@ async function composerNode(state) {
         };
 
         return {
+            messages: [new AIMessage(responseText)],
             conversation: conversationUpdate,
             analytics: {
                 responseCount: (state.analytics?.responseCount || 0) + 1
@@ -44,9 +46,11 @@ async function composerNode(state) {
         };
     } catch (error) {
         console.error('[Composer Node] LLM Error:', error);
+        const fallbackText = 'Aduh maaf mas, sistem saya lagi gangguan sedikit 🙏. Boleh ditunggu sebentar ya.';
         return {
+            messages: [new AIMessage(fallbackText)],
             conversation: {
-                lastMessages: [...(state.conversation?.lastMessages || []), 'Aduh maaf mas, sistem saya lagi gangguan sedikit 🙏. Boleh ditunggu sebentar ya.']
+                lastMessages: [...(state.conversation?.lastMessages || []), fallbackText]
             }
         };
     }
