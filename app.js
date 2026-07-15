@@ -53,6 +53,7 @@ const { saveCustomerLocation } = require('./src/ai/utils/customerLocations.js');
 const { parseSenderIdentity } = require('./src/lib/utils.js');
 const { getState } = require('./src/ai/utils/conversationState.js');
 const { extractAndSaveContext } = require('./src/ai/agents/contextExtractor.js');
+const { extractTextFromContent } = require('./src/ai/graph/utils/sanitizeMessages.js');
 const { classifyAndSaveCustomer } = require('./src/ai/agents/customerClassifier.js');
 const { getCustomerContext, normalizePhone, syncGraphStateToCRM } = require('./src/ai/utils/mergeCustomerContext.js');
 const masterLayanan = require('./src/data/masterLayanan.js');
@@ -1130,7 +1131,7 @@ async function processBufferedMessages(senderNumber, client) {
             });
 
             const lastMessage = result.messages[result.messages.length - 1];
-            const aiResponse = lastMessage ? lastMessage.content : null;
+            const aiResponse = lastMessage ? extractTextFromContent(lastMessage.content) : null;
 
 
 
@@ -2520,7 +2521,7 @@ app.post('/test-ai', requireAuth, async (req, res) => {
         });
 
         const lastMessage = aiResult.messages[aiResult.messages.length - 1];
-        const response = lastMessage ? lastMessage.content : "No response";
+        const response = lastMessage ? extractTextFromContent(lastMessage.content) : "No response";
         const runId = aiResult.runId || null;
 
         // Save messages to history AFTER processing to avoid doubling in history
