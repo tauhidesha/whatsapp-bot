@@ -26,6 +26,18 @@ function buildPlannerPrompt(state) {
             prompt += `- RESTRIKSI (${r.service}): ${r.reason}. Solusi: ${r.suggestedAction}\n`;
         });
     }
+    if (business?.guidelines?.length > 0) {
+        prompt += `\n=== CONVERSATION GUIDELINES ===\n`;
+        business.guidelines.forEach(g => {
+            prompt += `- ${g.directive}\n`;
+        });
+    }
+    if (business?.upsells?.length > 0) {
+        prompt += `\n=== UPSELL OPPORTUNITIES ===\n`;
+        business.upsells.forEach(u => {
+            prompt += `- Tawarkan ${u.service}: ${u.reason}\n`;
+        });
+    }
     prompt += `\n`;
 
     // 3. Relevant Knowledge (Service Models)

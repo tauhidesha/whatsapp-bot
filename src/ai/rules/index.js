@@ -1,6 +1,8 @@
 const { evaluateCoatingRestriction } = require('./coatingRules');
 const { evaluateEscalation } = require('./escalationRules');
 const { evaluateConversationRules } = require('./conversationRules');
+const { evaluateDetailingRules } = require('./detailingRules');
+const { evaluateRepaintRules } = require('./repaintRules');
 
 /**
  * Business Rule Engine
@@ -38,8 +40,23 @@ function executeRules(state) {
         flags.guidelines.push(...guidelines);
     }
 
-    // 4. Evaluate other rules here (e.g. Booking validation, pricing rules)
-    // ...
+    // 4. Evaluate Detailing Rules
+    const detailingRules = evaluateDetailingRules(state);
+    if (detailingRules) {
+        detailingRules.forEach(rule => {
+            if (rule.type === 'CONVERSATION_GUIDELINE') flags.guidelines.push(rule);
+            if (rule.type === 'UPSELL') flags.upsells.push(rule);
+        });
+    }
+
+    // 5. Evaluate Repaint Rules
+    const repaintRules = evaluateRepaintRules(state);
+    if (repaintRules) {
+        repaintRules.forEach(rule => {
+            if (rule.type === 'CONVERSATION_GUIDELINE') flags.guidelines.push(rule);
+            if (rule.type === 'UPSELL') flags.upsells.push(rule);
+        });
+    }
 
     return flags;
 }

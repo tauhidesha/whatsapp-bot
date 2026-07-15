@@ -13,7 +13,7 @@ function evaluateCoatingRestriction(state) {
             service: 'coating',
             status: 'DISABLED',
             reason: 'Cat baru butuh curing 1 bulan agar solvent menguap sempurna. Coating menutup pori-pori dan merusak cat.',
-            suggestedAction: 'Tawarkan paket perlindungan sealant sementara'
+            suggestedAction: 'Tawarkan Cuci Komplit saja. Jangan tawarkan poles/coating.'
         };
     }
     
