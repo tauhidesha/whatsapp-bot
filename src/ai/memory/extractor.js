@@ -1,41 +1,69 @@
+const { z } = require('zod');
+const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
+
 /**
  * Memory Extractor for Zoya V2
- * Simulates extracting Identity, Relationship, and Sales memory from messages.
+ * Uses Gemini to extract Identity, Relationship, and Sales memory from messages.
  */
 
-function extractMemory(state) {
-    console.log('[Memory Extractor] Extracting memory features...');
-    
-    // In full implementation, this calls an LLM to summarize/extract info
-    // For Sprint 3, we use a simple heuristic mock
+const MemorySchema = z.object({
+    motor: z.string().optional().describe("Merek atau model motor yang disebut kustomer (misal: NMax, Beat, PCX). Jika tidak ada, kosongi."),
+    color: z.string().optional().describe("Warna yang disebut kustomer. Jika tidak ada, kosongi."),
+    objection: z.string().optional().describe("Keberatan atau komplain yang disebut kustomer (misal: 'belum gajian', 'mahal', 'jauh'). Jika tidak ada, kosongi.")
+});
+
+async function extractMemory(state) {
+    console.log('[Memory Extractor] Extracting memory features with LLM...');
     
     const messages = state.messages || [];
-    const lastUserMessage = messages.findLast(m => m.role === 'user')?.content?.toLowerCase() || '';
+    const lastUserMessage = messages.findLast(m => m.role === 'user')?.content || '';
 
-    const newSalesMemory = {};
-    const newIdentityMemory = {};
-
-    // Mock extraction: Catching "belum gajian" as an objection
-    if (lastUserMessage.includes('belum gajian') || lastUserMessage.includes('mahal') || lastUserMessage.includes('jauh')) {
-        newSalesMemory.common_objection = lastUserMessage;
+    if (!lastUserMessage) {
+        return state.memory || {};
     }
 
-    if (lastUserMessage.includes('beat') || lastUserMessage.includes('vario')) {
-        newIdentityMemory.motor = lastUserMessage.includes('beat') ? 'Beat' : 'Vario';
-    }
+    const llm = new ChatGoogleGenerativeAI({
+        model: 'gemini-2.5-flash',
+        temperature: 0,
+        maxOutputTokens: 256,
+        apiKey: process.env.GOOGLE_API_KEY
+    }).withStructuredOutput(MemorySchema);
 
-    // Merge with existing state memory
-    return {
-        identity: {
-            ...state.memory?.identity,
-            ...newIdentityMemory
-        },
-        salesMemory: {
-            ...state.memory?.salesMemory,
-            ...newSalesMemory
-        },
-        relationship: state.memory?.relationship || {}
-    };
+    try {
+        const extraction = await llm.invoke([
+            ['system', 'Anda adalah sistem ekstraksi memori. Ekstrak data relevan dari pesan kustomer terakhir.'],
+            ['human', lastUserMessage]
+        ]);
+        
+        const newSalesMemory = {};
+        const newIdentityMemory = {};
+
+        if (extraction.objection) {
+            newSalesMemory.common_objection = extraction.objection;
+        }
+
+        if (extraction.motor) {
+            newIdentityMemory.motor = extraction.motor;
+        }
+        if (extraction.color) {
+            newIdentityMemory.color = extraction.color;
+        }
+
+        return {
+            identity: {
+                ...state.memory?.identity,
+                ...newIdentityMemory
+            },
+            salesMemory: {
+                ...state.memory?.salesMemory,
+                ...newSalesMemory
+            },
+            relationship: state.memory?.relationship || {}
+        };
+    } catch (error) {
+        console.error('[Memory Extractor] LLM Error:', error);
+        return state.memory || {};
+    }
 }
 
 module.exports = {

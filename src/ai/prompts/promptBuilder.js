@@ -39,6 +39,17 @@ function buildPlannerPrompt(state) {
     prompt += `Known Facts: ${JSON.stringify(consultation?.knownFacts || {})}\n`;
     prompt += `Conversation Status: ${conversation?.status}\n\n`;
 
+    // 5. Conversation History
+    prompt += `=== CONVERSATION HISTORY ===\n`;
+    if (state.messages && state.messages.length > 0) {
+        state.messages.forEach(msg => {
+            prompt += `${msg.role.toUpperCase()}: ${msg.content}\n`;
+        });
+    } else {
+        prompt += `(No conversation yet)\n`;
+    }
+    prompt += `\n`;
+
     return prompt;
 }
 
@@ -63,8 +74,14 @@ function buildComposerPrompt(state, plannerDecision) {
     }
 
     prompt += `=== CONVERSATION HISTORY ===\n`;
-    // We would append actual chat history here in full implementation
-    prompt += `(History appended here)\n`;
+    if (state.messages && state.messages.length > 0) {
+        state.messages.forEach(msg => {
+            prompt += `${msg.role.toUpperCase()}: ${msg.content}\n`;
+        });
+    } else {
+        prompt += `(No conversation yet)\n`;
+    }
+    prompt += `\n`;
 
     return prompt;
 }

@@ -43,7 +43,6 @@ const { updateSystemPromptTool } = require('./src/ai/tools/updateSystemPromptToo
 const { getSystemPromptTool } = require('./src/ai/tools/getSystemPromptTool.js');
 const { updatePromoOfTheMonthTool } = require('./src/ai/tools/updatePromoOfTheMonthTool.js');
 // updateCustomerContextTool REMOVED — digantikan oleh background context extractor agent
-const { createMetaWebhookRouter } = require('./src/server/metaWebhook.js');
 const { sendMetaMessage } = require('./src/server/metaClient.js');
 const { startFollowUpScheduler, updateSignalsOnIncomingMessage } = require('./src/ai/agents/followUpEngine/index.js');
 const { isSnoozeActive, setSnoozeMode, clearSnoozeMode, getSnoozeInfo } = require('./src/ai/utils/humanHandover.js');
@@ -56,7 +55,6 @@ const { parseSenderIdentity } = require('./src/lib/utils.js');
 const { getState } = require('./src/ai/utils/conversationState.js');
 const { extractAndSaveContext } = require('./src/ai/agents/contextExtractor.js');
 const { classifyAndSaveCustomer } = require('./src/ai/agents/customerClassifier.js');
-const { startAudit, handleAuditResponse, handleResumeAudit, hasActiveSession } = require('./src/ai/agents/customerAudit.js');
 const { getCustomerContext, normalizePhone, syncGraphStateToCRM } = require('./src/ai/utils/mergeCustomerContext.js');
 const masterLayanan = require('./src/data/masterLayanan.js');
 const daftarUkuranMotor = require('./src/data/daftarUkuranMotor.js');
@@ -495,10 +493,6 @@ function getTracingConfig(label, options = {}) {
 
 // --- Message Buffering & Debouncing ---
 const { DebounceQueue } = require('./src/ai/utils/debounceQueue.js');
-const metaDebounceQueue = new DebounceQueue(DEBOUNCE_DELAY_MS, async (normalizedSenderId, queue) => {
-    await processBufferedMetaMessages(normalizedSenderId, queue);
-});
-
 const pendingMessages = new Map();
 const { getChromiumPath, DEFAULT_CHROME_ARGS } = require('./src/ai/utils/browser');
 
@@ -911,640 +905,6 @@ async function analyzeMediaWithGemini(mediaBuffer, mimeType, caption = '', sende
     return `${mediaTypeLabel} diterima, namun analisis otomatis gagal dilakukan.`;
 }
 
-async function getAIResponse(userMessage, senderName = "User", senderNumber = null, context = "", mediaItems = [], modelOverride = null, providedHistory = []) {
-    try {
-        console.log('\n🤖 [AI_PROCESSING] ===== STARTING AI PROCESSING =====');
-        console.log(`📝[AI_PROCESSING] User Message: "${userMessage}"`);
-        console.log(`👤[AI_PROCESSING] Sender: ${senderName} `);
-        console.log(`📱[AI_PROCESSING] Sender Number: ${senderNumber || 'N/A'} `);
-
-
-        // Cek apakah pengirim adalah admin (Untuk penentuan history & prompt)
-        const adminNumbers = [
-            process.env.BOSMAT_ADMIN_NUMBER,
-            process.env.ADMIN_WHATSAPP_NUMBER
-        ].filter(Boolean);
-
-        /* normalize replaced by normalizePhone in mergeCustomerContext.js */
-        const senderNormalized = normalizePhone(senderNumber);
-        const isAdmin = adminNumbers.some(num => normalizePhone(num) === senderNormalized);
-
-        // --- 4. FULL CONVERSATION HISTORY ---
-        let conversationHistoryMessages = [];
-
-        if (senderNumber && prisma) {
-            console.log(`🧠 [AI_PROCESSING] Memuat histori percakapan lengkap...`);
-            try {
-                // Ambil 6 pesan untuk Admin, 10 pesan untuk Customer
-                const historyLimit = isAdmin ? 6 : 10;
-                const history = await getConversationHistory(senderNumber, historyLimit);
-
-                if (history && history.length > 0) {
-                    conversationHistoryMessages = buildLangChainHistory(history);
-                    console.log(`🧠 [AI_PROCESSING] Berhasil memuat ${history.length} pesan terakhir untuk konteks`);
-                }
-            } catch (err) {
-                console.warn(`⚠️ [AI_PROCESSING] Gagal mengambil history: ${err.message}`);
-            }
-        }
-
-        const userTextContent = context
-            ? `${userMessage} \n\n[Context Internal]\n${context} `
-            : userMessage;
-
-        let humanMessageContent;
-
-        if (mediaItems && mediaItems.length > 0) {
-            console.log(`🖼️[AI_PROCESSING] Using multimodal input with ${mediaItems.length} media items`);
-            humanMessageContent = [
-                { type: "text", text: userTextContent }
-            ];
-
-            for (const item of mediaItems) {
-                if (item.type === 'image') {
-                    humanMessageContent.push({
-                        type: "media",
-                        mimeType: item.mimetype,
-                        data: item.buffer.toString('base64')
-                    });
-                } else if (item.type === 'video') {
-                    humanMessageContent.push({
-                        type: "media",
-                        mimeType: item.mimetype,
-                        data: item.buffer.toString('base64')
-                    });
-                }
-            }
-        } else {
-            humanMessageContent = userTextContent;
-        }
-
-        // isAdmin sudah dicek di awal fungsi
-
-        let effectiveSystemPrompt = currentSystemPrompt;
-        if (isAdmin) {
-            console.log(`👮[AI_PROCESSING] Admin detected: ${senderNumber}. Using ADMIN_SYSTEM_PROMPT.`);
-            effectiveSystemPrompt = ADMIN_SYSTEM_PROMPT;
-        }
-
-        // Persistent Memory Injection (getState + customerContext)
-        let memoryPart = "";
-        let customerCtx = null; // Declare at block scope to pass to router later
-        let state = null;
-        if (senderNumber) {
-            try {
-                // Gunakan destructuring array karena Promise.all membalas dalam array
-                [state, customerCtx] = await Promise.all([
-                    getState(senderNumber),
-                    getCustomerContext(senderNumber),
-                ]);
-
-                // --- FAST IN-FLIGHT EXTRACTOR ---
-                // Mengekstrak motor dan layanan langsung dari pesan saat ini secara instan (0 ms)
-                // untuk mengatasi delay background context extractor (1-2s).
-                customerCtx = customerCtx || {};
-                customerCtx.target_services = customerCtx.target_services || [];
-                try {
-                    const { findMotorSize, findService } = require('./src/ai/utils/priceCalculator.js');
-                    
-                    // Pastikan input ke extractor adalah string
-                    const extractInput = Array.isArray(humanMessageContent) 
-                        ? humanMessageContent.find(c => c.type === 'text')?.text || ''
-                        : humanMessageContent;
-
-                    if (!customerCtx.motor_model && extractInput) {
-                        const foundMotor = await findMotorSize(extractInput.toString());
-                        if (foundMotor && foundMotor.modelName) {
-                            customerCtx.motor_model = foundMotor.modelName;
-                            console.log(`⚡ [FAST_EXTRACT] Motor terdeteksi saat ini: ${foundMotor.modelName}`);
-                        }
-                    }
-
-                    // Multi-service fast extract
-                    if (extractInput) {
-                        const foundService = await findService(extractInput.toString());
-                        if (foundService && foundService.name && !customerCtx.target_services.includes(foundService.name)) {
-                            customerCtx.target_services.push(foundService.name);
-                            console.log(`⚡ [FAST_EXTRACT] Layanan baru ditambahkan ke cart: ${foundService.name}`);
-                        }
-                    }
-                } catch (err) {
-                    console.warn('[FAST_EXTRACT] Failed:', err.message);
-                }
-
-                const parts = [];
-
-                // Prioritas 1: customerContext (dari background extractor, lebih reliable)
-                if (Object.keys(customerCtx).length > 0) {
-                    if (customerCtx.conversation_summary) {
-                        parts.push(`[RINGKASAN OBROLAN SEBELUMNYA]`);
-                        parts.push(customerCtx.conversation_summary);
-                        parts.push(`---------------------------`);
-                    }
-
-                    // Motor identity (with plate number)
-                    if (customerCtx.motor_model) {
-                        let motorInfo = `- Motor: ${customerCtx.motor_model}`;
-                        if (customerCtx.motor_plate) {
-                            motorInfo += ` (Plat: ${customerCtx.motor_plate})`;
-                        }
-                        parts.push(motorInfo);
-                    }
-                    if (customerCtx.motor_plate && !customerCtx.motor_model) {
-                        parts.push(`- Plat Nomor: ${customerCtx.motor_plate}`);
-                    }
-                    if (customerCtx.motor_year) parts.push(`- Tahun motor: ${customerCtx.motor_year}`);
-                    if (customerCtx.motor_color) parts.push(`- Warna motor: ${customerCtx.motor_color}`);
-                    if (customerCtx.motor_condition) parts.push(`- Kondisi: ${customerCtx.motor_condition}`);
-
-                    // Service needs
-                    if (customerCtx.target_services?.length > 0) parts.push(`- Layanan diminati (Cart): ${customerCtx.target_services.join(', ')}`);
-                    else if (customerCtx.target_service) parts.push(`- Layanan diminati: ${customerCtx.target_service}`);
-                    if (customerCtx.service_detail) parts.push(`- Detail layanan: ${customerCtx.service_detail}`);
-                    if (customerCtx.budget_signal) parts.push(`- Sinyal budget: ${customerCtx.budget_signal}`);
-
-                    // Intent signals
-                    if (customerCtx.detected_intents?.length > 0) parts.push(`- Intents terdeteksi: ${customerCtx.detected_intents.join(', ')}`);
-                    if (customerCtx.said_expensive === true) parts.push(`- ⚠️ Pernah bilang mahal`);
-                    if (customerCtx.asked_price === true) parts.push(`- Sudah tanya harga`);
-                    if (customerCtx.asked_availability === true) parts.push(`- Sudah tanya jadwal`);
-                    if (customerCtx.shared_photo === true) parts.push(`- Sudah kirim foto motor`);
-
-                    // Logistics
-                    if (customerCtx.preferred_day) parts.push(`- Preferensi hari: ${customerCtx.preferred_day}`);
-                    if (customerCtx.location_hint) parts.push(`- Lokasi: ${customerCtx.location_hint}`);
-
-                    // Price memory
-                    if (customerCtx.quoted_services?.length > 0) {
-                        const serviceList = customerCtx.quoted_services
-                            .map(s => `${s.name}: Rp${s.price?.toLocaleString('id-ID') || '?'}`)
-                            .join(', ');
-                        parts.push(`- Harga sudah dikutip: ${serviceList}`);
-                    }
-                    if (customerCtx.quoted_total_bundling) {
-                        parts.push(`- Total bundling (diskon): Rp${customerCtx.quoted_total_bundling.toLocaleString('id-ID')}`);
-                    }
-                    if (customerCtx.quoted_at) {
-                        parts.push(`- Penawaran terakhir: ${customerCtx.quoted_at}`);
-                    }
-
-                    // Stage signals
-                    if (customerCtx.conversation_stage) {
-                        parts.push(`- Stage percakapan: ${customerCtx.conversation_stage}`);
-                    }
-                    if (customerCtx.last_ai_action) {
-                        parts.push(`- Aksi AI terakhir: ${customerCtx.last_ai_action}`);
-                    }
-                    if (customerCtx.upsell_offered === true) {
-                        parts.push(`- ⚠️ Upsell sudah ditawarkan, JANGAN tawarkan lagi`);
-                    }
-
-                    // --- DYNAMIC FLOW CONTROLLER (Tanpa Token Bengkak) ---
-                    // Mengarahkan AI sesuai alur obrolan: Kualifikasi -> Konsultasi -> Upsell -> Booking
-                    const intents = customerCtx.detected_intents || [];
-                    let actionDirective = "";
-                    const m_model = customerCtx.motor_model || (state && state.motor_model);
-                    const m_plate = customerCtx.motor_plate;
-                    const t_services = (customerCtx.target_services?.length > 0) ? customerCtx.target_services : (customerCtx.target_service ? [customerCtx.target_service] : (state && state.target_service ? [state.target_service] : []));
-                    const t_service_display = t_services.join(', ');
-
-                    const m_cond = customerCtx.motor_condition;
-                    const m_color = customerCtx.motor_color;
-                    const isRepaint = t_services.some(s => s.toLowerCase().includes('repaint'));
-                    const isRepaintVelg = t_services.some(s => s.toLowerCase().includes('velg'));
-                    const isDetailing = t_services.some(s => s.toLowerCase().includes('detailing') || s.toLowerCase().includes('cuci'));
-
-                    if (!m_model) {
-                        actionDirective = `\n🎯 TARGET SAAT INI (KUALIFIKASI): Kamu belum tahu *jenis/tipe motor* user. Tanyakan tipe motornya secara natural, termasuk plat nomornya jika memungkinkan. JANGAN bahas harga atau jadwal dulu.`;
-                    } else if (t_services.length === 0) {
-                        actionDirective = `\n🎯 TARGET SAAT INI (KUALIFIKASI): Kamu sudah tahu motornya (${m_model}), tapi belum tahu *layanan yang dibutuhkan* (Repaint/Detailing/Coating). Tanyakan kebutuhannya apa.`;
-                    } else if (isRepaint && !m_color) {
-                        actionDirective = `\n🎯 TARGET SAAT INI (KONSULTASI WARNA): User butuh Repaint untuk ${m_model}. Tanyakan *warna yang diinginkan* (Standar/Candy/Stabilo/Bunglon/Chrome) karena ada biaya tambahan (surcharge) untuk warna spesial.`;
-                    } else if (isRepaint && !m_cond) {
-                        actionDirective = `\n🎯 TARGET SAAT INI (KONSULTASI KONDISI BODI): User butuh Repaint. Tanyakan *kondisi bodi saat ini* (apakah ada lecet parah, pecah, atau butuh repair bodi kasar) karena bisa ada biaya tambahan perbaikan.`;
-                    } else if (isRepaintVelg && !customerCtx.upsell_offered && !customerCtx.quoted_services?.length) {
-                        actionDirective = `\n🎯 TARGET SAAT INI (KONSULTASI KONDISI VELG): User butuh Repaint Velg. Tanyakan apakah velg *pernah dicat ulang* atau *banyak jamur/kerak*, karena ada biaya tambahan remover (+50rb s/d 100rb). Boleh juga tawarkan sekalian cat Behel/Arm (+50rb) atau CVT (+100rb).`;
-                    } else if (isDetailing && !m_cond) {
-                        actionDirective = `\n🎯 TARGET SAAT INI (KONSULTASI KONDISI MOTOR): User butuh Detailing/Cuci untuk ${m_model}. Tanyakan dulu *kondisi motornya saat ini* (apakah banyak kerak oli, jamur, kusam, atau sekadar kotor debu) supaya kamu bisa merekomendasikan paket Detailing yang paling pas.`;
-                    } else if (intents.includes('tanya_teknis')) {
-                        actionDirective = `\n🎯 TARGET SAAT INI (KONSULTASI TEKNIS): User bertanya seputar hal teknis otomotif/perawatan. Jawab pertanyaannya dengan luwes dan asik (seperti Sales Advisor). Selipkan promosi atau rekomendasi layanan Bosmat yang relevan dengan pertanyaannya jika memungkinkan.`;
-                    } else if (!customerCtx.quoted_services || customerCtx.quoted_services.length === 0) {
-                        actionDirective = `\n🎯 TARGET SAAT INI (KONSULTASI HARGA): Sebutkan rincian harga dari [HARGA SPESIFIK] secara TO THE POINT. Gunakan Bullet Points. JANGAN nulis paragraf panjang. Tanya ke user: "Mau pakai warna apa untuk repaint-nya?" dan "Ada lecet parah di bagian mana?"`;
-                    } else if (!customerCtx.upsell_offered && !(customerCtx.detected_intents || []).includes('mulai_booking')) {
-                        actionDirective = `\n🎯 TARGET SAAT INI (EDUKASI & UPSELL): Kamu sudah mengutip harga. Jelaskan kelebihan layanan ini dengan santai, lalu tawarkan *upsell ringan 1x* (misal: "sekalian cuci komplit rangka mumpung dibongkar mas?").`;
-                    } else if (!customerCtx.preferred_day && !customerCtx.asked_availability) {
-                        actionDirective = `\n🎯 TARGET SAAT INI (CLOSING): User sudah setuju dengan harga/promo. Giring perlahan untuk booking dengan bertanya "Rencana mau dikerjakan hari apa Mas/Kak?". JANGAN menanyakan nama lengkap, karena sudah ada di [USER IDENTITY]!`;
-                    } else if (customerCtx.conversation_stage === 'closing') {
-                        actionDirective = `\n🎯 TARGET SAAT INI (CLOSING FINAL): User sudah setuju jadwal. LANGSUNG panggil \`checkBookingAvailability\` atau \`createBooking\`. STOP tanya hal lain dan JANGAN tanya nama.`;
-                    }
-
-                    if (actionDirective) {
-                        parts.push(actionDirective);
-                    }
-                }
-
-                // Prioritas 2: Legacy state (fallback, hanya jika customerCtx belum punya)
-                if (state) {
-                    if (state.motor_model && !customerCtx?.motor_model) parts.push(`- Motor: ${state.motor_model}`);
-                    if (state.target_service && !customerCtx?.target_service) parts.push(`- Layanan dituju: ${state.target_service}`);
-                    if (state.important_notes) parts.push(`- Catatan: ${state.important_notes}`);
-                }
-
-                if (parts.length > 0) {
-                    memoryPart = `\n\n[PERSISTENT CONTEXT]\nInformasi yang sudah diketahui tentang pelanggan ini:\n${parts.join('\n')}\n(Gunakan informasi ini jika relevan, jangan tanya ulang hal yang sudah diketahui).`;
-                }
-            } catch (error) {
-                console.warn('[AI_PROCESSING] Gagal mengambil persistent state:', error.message);
-            }
-        }
-
-        // STEP 2: Hitung harga otomatis dari context pelanggan (CART-BASED)
-        let specificPriceInjection = "";
-        let cartServices = customerCtx?.target_services || (customerCtx?.target_service ? [customerCtx.target_service] : []);
-
-        if (customerCtx && customerCtx.motor_model && cartServices.length > 0) {
-            try {
-                // --- 1. AUTO-CONVERT BUSINESS RULE ---
-                // Pastikan semua layanan adalah string dan ada nilainya
-                cartServices = cartServices.filter(s => typeof s === 'string' && s.length > 0);
-
-                // Jika ada 'Repaint' di keranjang, OTOMATIS tambahkan/ubah Detailing jadi 'Cuci Komplit'
-                const hasRepaint = cartServices.some(s => s.toLowerCase().includes('repaint'));
-                if (hasRepaint) {
-                    // Hapus 'Detailing' umum atau 'Detailing Mesin' agar tidak dobel
-                    cartServices = cartServices.filter(s => !s.toLowerCase().includes('detailing'));
-
-                    // Paksa masukkan 'Cuci Komplit'
-                    if (!cartServices.includes('Cuci Komplit')) {
-                        cartServices.push('Cuci Komplit');
-                        console.log('🛠️ [BUSINESS RULE] Repaint detected, auto-adding Cuci Komplit');
-                    }
-                }
-
-                // --- 2. DEDUPLIKASI & CLEANUP ---
-                cartServices = [...new Set(cartServices)];
-
-                // --- 3. HARGA & INSTRUKSI SINGKAT ---
-                const { prompt: exactPricePrompt, isAmbiguous } = await getSpecificPriceContext(customerCtx.motor_model, cartServices.join(', '));
-                
-                // Save ambiguity state for tool routing later
-                customerCtx._isPriceAmbiguous = isAmbiguous;
-
-                if (exactPricePrompt) {
-                    // Kita tambahkan instruksi 'SINGKAT' langsung di sini agar Agent 2 nggak cerewet
-                    specificPriceInjection = `\n[HARGA SPESIFIK]:\n${exactPricePrompt}\n\n` +
-                        `⚠️ INSTRUKSI PENTING: Balas dengan SINGKAT & PADAT (Max 3-4 kalimat). ` +
-                        `Jangan yapping soal promo kepanjangan. Fokus beri tahu harga dan tanya konfirmasi warna/kondisi bodi.`;
-
-                    console.log(`💰[PRICE_CALC] Harga otomatis dihitung (with business rules).`);
-                } else if (isAmbiguous) {
-                    console.log(`💰[PRICE_CALC] Ambigu (Kategori Umum) untuk: ${customerCtx.motor_model} + ${cartServices.join(', ')}. Menunggu klarifikasi.`);
-                } else {
-                    console.log(`💰[PRICE_CALC] Gagal hitung otomatis untuk: ${customerCtx.motor_model} + ${cartServices.join(', ')} → fallback ke tool`);
-                }
-            } catch (err) {
-                console.warn('[PRICE_CALC] Error:', err.message);
-            }
-        }
-
-        // Inject tanggal & waktu langsung ke prompt (hemat 1 tool call)
-        const now = DateTime.now().setZone('Asia/Jakarta').setLocale('id');
-        let dateTimePart = `\n\n[TIME_CONTEXT]\nSekarang adalah: ${now.toFormat("cccc, dd MMMM yyyy HH:mm")} WIB. Gunakan ini untuk memahami "hari ini", "besok", atau "minggu depan" secara akurat dalam percakapan.`;
-
-        // Inject User Identity
-        const identityPart = `\n\n[USER IDENTITY]\n- Nama Pengirim: ${senderName || 'Tidak Diketahui'}\n- Nomor WhatsApp: ${senderNumber || 'Tidak Diketahui'}\n(Sapa pelanggan dengan nama ini jika tersedia dan terlihat natural untuk sapaan awal).`;
-
-        // Mengubah masterLayanan menjadi string katalog harga dasar untuk konteks AI
-        let catalogContext = "";
-        try {
-            // Ambil promo aktif dari Firestore secara dinamis (satu-satunya sumber promo)
-            const activePromo = await getActivePromo();
-            if (activePromo) {
-                // Sanitize: ganti **double asterisk** Markdown → *single asterisk* WhatsApp
-                const sanitizedPromo = activePromo.replace(/\*\*([^*]+)\*\*/g, '*$1*');
-                catalogContext = `\n\n[PROMO BULAN INI]\n${sanitizedPromo}\n(Tawarkan promo ini secara natural jika relevan).`;
-            }
-        } catch (err) {
-            console.warn('[AI_PROCESSING] Gagal render catalogContext:', err.message);
-        }
-
-        // Optimasi: Hanya gunakan prompt sistem, konteks dari extractor (termasuk ringkasan terbaru),
-        // CONDITIONAL HISTORY (hanya jika pesan pendek), dan pesan user saat ini.
-        const messages = [
-            new SystemMessage(effectiveSystemPrompt + dateTimePart + identityPart + memoryPart + catalogContext + specificPriceInjection),
-            ...conversationHistoryMessages,
-            new HumanMessage(humanMessageContent)
-        ].filter(msg => !!msg); // Filter out null/undefined messages
-
-        // --- DYNAMIC INTENT ROUTER ---
-        let activeModel;
-        let activeToolDefs;
-
-        if (isAdmin) {
-            activeModel = adminModel;
-            activeToolDefs = toolDefinitions;
-        } else {
-            // Function to route tools dynamically based on context and user message
-            const routeCustomerTools = (ctx, userMsg) => {
-                const routedTools = [];
-                // Handle if userMsg is an array (multimodal content)
-                const msgText = Array.isArray(userMsg)
-                    ? (userMsg.find(p => p.type === 'text')?.text || '')
-                    : (userMsg || '');
-                const msgLower = msgText.toLowerCase();
-                const intents = ctx?.detected_intents || [];
-
-                // 1. Always included baseline tools
-                routedTools.push(notifyVisitIntentTool);
-
-                // 2. Info Studio (Only when asked about location/hours)
-                if (msgLower.includes('alamat') || msgLower.includes('lokasi') ||
-                    msgLower.includes('dimana') || msgLower.includes('jam') ||
-                    msgLower.includes('buka') || msgLower.includes('tutup') ||
-                    msgLower.includes('maps')) {
-                    routedTools.push(getStudioInfoTool);
-                }
-
-                // 3. Pricing & Service Info
-                // Deteksi intent tanya harga diperlebar
-                const isAskingPrice =
-                    msgLower.includes('harga') || msgLower.includes('biaya') ||
-                    msgLower.includes('berapa') || msgLower.includes('brp') ||
-                    msgLower.includes('kisaran') || msgLower.includes('ongkos') ||
-                    msgLower.includes('budget') || (ctx && ctx.asked_price === true);
-
-                const isAskingService =
-                    msgLower.includes('jasa') || msgLower.includes('layanan') ||
-                    msgLower.includes('repaint') || msgLower.includes('coating') || msgLower.includes('detailing');
-
-                // Hanya bind getServiceDetails jika harga BELUM dihitung otomatis DAN TIDAK AMBIGU
-                if (intents.length === 0 || intents.includes('tanya_harga') || intents.includes('tanya_layanan') || isAskingPrice || isAskingService) {
-                    if (!specificPriceInjection && !ctx?._isPriceAmbiguous) {
-                        routedTools.push(getServiceDetailsTool);
-                    }
-                }
-
-                // 4. Onsite Service
-                // Include if location data exists or explicitly mentioned
-                if ((ctx && ctx.location_hint) || msgLower.includes('home service') || msgLower.includes('rumah') || msgLower.includes('jemput')) {
-                    routedTools.push(calculateHomeServiceFeeTool);
-                }
-
-                // 6. Visual Analysis
-                if (msgLower.includes('foto') || msgLower.includes('lihat') || msgLower.includes('gambar')) {
-                    routedTools.push(sendStudioPhotoTool);
-                }
-
-                return routedTools;
-            };
-
-            const routedCustomerTools = routeCustomerTools(customerCtx, humanMessageContent);
-            activeToolDefs = routedCustomerTools;
-            const routedToolSpecs = prepareToolSpecs(routedCustomerTools);
-            activeModel = baseModel.bindTools(routedToolSpecs);
-        }
-
-        console.log(`🔧[AI_PROCESSING] Tools routed (${isAdmin ? 'ADMIN' : 'CUSTOMER'}, ${activeToolDefs.length} tools): ${activeToolDefs.map(t => t.toolDefinition?.function?.name || t.name || t.function?.name || 'UnknownTool').join(', ')} `);
-        let iteration = 0;
-        const MAX_ITERATIONS = 8;
-
-        let response;
-        while (iteration < MAX_ITERATIONS) {
-            iteration++;
-            console.log(`\n⏳ Iteration ${iteration} of ${MAX_ITERATIONS}...`);
-
-            try {
-                let lastError = null;
-                let responseReceived = false;
-
-                // Try each API key in sequence
-                for (let apiKeyIndex = 0; apiKeyIndex < API_KEYS.length; apiKeyIndex++) {
-                    const currentApiKey = API_KEYS[apiKeyIndex];
-                    const isFirstKey = apiKeyIndex === 0;
-                    const apiKeyLabel = isFirstKey ? 'primary' : `fallback #${apiKeyIndex}`;
-
-                    try {
-                        if (!isFirstKey) {
-                            console.log(`🔄[AI_PROCESSING] Trying ${apiKeyLabel} API key...`);
-                        }
-
-                        // Create model instance with current API key
-                        const targetModel = modelOverride || ACTIVE_AI_MODEL;
-                        const currentModel = new ChatGoogleGenerativeAI({
-                            model: targetModel,
-                            temperature: ACTIVE_AI_TEMPERATURE,
-                            apiKey: currentApiKey
-                        });
-
-                        // Bind the active tools to the current model
-                        const currentBoundModel = currentModel.bindTools(isAdmin ? adminToolSpecs : prepareToolSpecs(activeToolDefs));
-                        // Set runName explicitly for tracking
-                        response = await currentBoundModel.invoke(messages, getTracingConfig(isAdmin ? 'AdminResponse' : 'CustomerResponse', {
-                            runName: isAdmin ? 'AdminResponse' : 'CustomerResponse',
-                            metadata: {
-                                sender_number: senderNumber || 'anonymous',
-                                sender_name: senderName || 'User',
-                                iteration,
-                                model: targetModel,
-                                api_key_index: apiKeyIndex
-                            },
-                            tags: [isAdmin ? 'admin' : 'customer', targetModel]
-                        }));
-
-                        // Validate response
-                        const hasToolCalls = getToolCallsFromResponse(response).length > 0;
-                        if (!response || ((response.content === null || response.content === undefined) && !hasToolCalls)) {
-                            console.error('❌ [AI_PROCESSING] Invalid response structure:', response ? Object.keys(response) : 'null');
-                            throw new Error('Invalid response from AI model: empty or undefined content');
-                        }
-
-                        if (!isFirstKey) {
-                            console.log(`✅[AI_PROCESSING] ${apiKeyLabel} API key succeeded!`);
-                        }
-
-                        responseReceived = true;
-                        break; // Success - exit API key retry loop
-
-                    } catch (error) {
-                        lastError = error;
-
-                        // Check if this is a retryable error
-                        const isQuotaError = error?.message?.includes('Quota exceeded') ||
-                            error?.message?.includes('429') ||
-                            error?.message?.includes('quota') ||
-                            error?.message?.includes('RESOURCE_EXHAUSTED');
-
-                        const isAuthError = error?.message?.includes('API key not valid') ||
-                            error?.message?.includes('authentication') ||
-                            error?.message?.includes('401');
-
-                        const isResponseError = error?.message?.includes('Cannot read properties') ||
-                            error?.message?.includes('undefined');
-
-                        const isRetryableError = isQuotaError || isResponseError || isAuthError;
-
-                        console.error(`❌[AI_PROCESSING] Error with ${apiKeyLabel} API key: `, error.message);
-
-                        // If this is the last API key or non-retryable error, try model fallback
-                        if (apiKeyIndex === API_KEYS.length - 1 || !isRetryableError) {
-                            if (isRetryableError && (isQuotaError || isResponseError)) {
-                                console.error(`❌[AI_PROCESSING] All API keys exhausted, trying model fallback...`);
-                                const fallbackModel = 'gemini-2.0-flash';
-
-                                if (fallbackModel === ACTIVE_AI_MODEL) {
-                                    break; // No point in model fallback
-                                }
-
-                                try {
-                                    console.log(`🔄[AI_PROCESSING] Trying fallback model: ${fallbackModel} with primary API key`);
-                                    const fallbackModelInstance = new ChatGoogleGenerativeAI({
-                                        model: fallbackModel,
-                                        temperature: ACTIVE_AI_TEMPERATURE,
-                                        apiKey: API_KEYS[0]
-                                    });
-
-                                    response = await fallbackModelInstance.invoke(messages, getTracingConfig(isAdmin ? 'AdminResponse' : 'CustomerResponse'));
-
-                                    // Validate fallback response
-                                    const hasFallbackToolCalls = getToolCallsFromResponse(response).length > 0;
-                                    // Relaxed validation: Allow empty string content. Only fail if strictly null/undefined.
-                                    if (!response || ((response.content === null || response.content === undefined) && !hasFallbackToolCalls)) {
-                                        console.error('❌ [AI_PROCESSING] Invalid fallback response structure:', response ? Object.keys(response) : 'null');
-                                        throw new Error('Invalid response from fallback model');
-                                    }
-
-                                    console.log(`✅[AI_PROCESSING] Fallback model ${fallbackModel} succeeded!`);
-                                    responseReceived = true;
-                                    break;
-                                } catch (fallbackError) {
-                                    console.error(`❌[AI_PROCESSING] Fallback model ${fallbackModel} also failed: `, fallbackError.message);
-                                    lastError = fallbackError;
-                                }
-                            }
-                            break; // Exit API key retry loop
-                        }
-
-                        // Continue to next API key
-                        continue;
-                    }
-                }
-
-                // If we still don't have a response after trying all options, throw error
-                if (!responseReceived) {
-                    console.error(`❌[AI_PROCESSING] All retry attempts failed`);
-                    throw lastError || new Error('Failed to get AI response after all retry attempts');
-                }
-
-                const toolCalls = getToolCallsFromResponse(response);
-
-                if (toolCalls.length === 0) {
-                    const finalTextRaw = extractTextFromAIContent(response.content);
-                    const finalText = typeof finalTextRaw === 'string' ? finalTextRaw.trim() : '';
-
-                    console.log(`📥[AI_PROCESSING] AI Response received`);
-                    console.log(`📥[AI_PROCESSING] Response type: ${typeof response.content} `);
-                    console.log(`📥[AI_PROCESSING] Response content: "${finalText}"`);
-
-                    const directive = parseToolDirectiveFromText(finalText);
-                    if (directive) {
-                        const { toolName, args } = directive;
-                        console.log(`[AI_PROCESSING] Detected textual tool directive: ${toolName} `);
-
-                        if (!availableTools[toolName]) {
-                            const safeText = sanitizeToolDirectiveOutput(finalText);
-                            console.log(`🎯[AI_PROCESSING] ===== AI PROCESSING COMPLETED =====\n`);
-                            return {
-                                content: safeText || 'Baik mas, Zoya akan bantu cek ke tim Bosmat.',
-                                id: response.id
-                            };
-                        }
-
-                        messages.push(response);
-
-                        const enrichedArgs = { ...args };
-                        if (senderNumber && !enrichedArgs.senderNumber) {
-                            enrichedArgs.senderNumber = senderNumber;
-                        }
-                        if (senderName && !enrichedArgs.senderName) {
-                            enrichedArgs.senderName = senderName;
-                        }
-
-                        const toolCallId = `${toolName} -directive - ${Date.now()} `;
-                        console.log(`⚡[AI_PROCESSING] Executing directive tool ${toolName} dengan args: ${JSON.stringify(enrichedArgs, null, 2)} `);
-                        const toolResult = await executeToolCall(toolName, enrichedArgs, {
-                            senderNumber,
-                            senderName,
-                        });
-                        console.log(`✅[AI_PROCESSING] Directive tool ${toolName} completed`);
-                        console.log(`📊[AI_PROCESSING] Directive tool result: ${JSON.stringify(toolResult, null, 2)} `);
-
-                        messages.push(new ToolMessage({
-                            tool_call_id: toolCallId,
-                            content: JSON.stringify(toolResult),
-                        }));
-
-                        iteration += 1;
-                        continue;
-                    }
-
-                    console.log(`🎯[AI_PROCESSING] ===== AI PROCESSING COMPLETED =====\n`);
-                    return {
-                        content: finalText || 'Maaf, saya belum bisa memberikan jawaban.',
-                        id: response.id
-                    };
-                }
-
-                iteration += 1;
-                console.log(`🔧[AI_PROCESSING] ===== TOOL CALLS DETECTED(iteration ${iteration}) ===== `);
-                console.log(`🔧[AI_PROCESSING] Number of tool calls: ${toolCalls.length} `);
-
-                messages.push(response);
-
-                for (let i = 0; i < toolCalls.length; i++) {
-                    const toolCall = toolCalls[i];
-                    const toolName = toolCall.name;
-                    let toolArgs = toolCall.args || {};
-                    if (typeof toolArgs === 'string') {
-                        try {
-                            toolArgs = JSON.parse(toolArgs);
-                        } catch (err) {
-                            console.warn(`⚠️[AI_PROCESSING] Failed to parse tool args string for ${toolName}: `, err.message);
-                            toolArgs = {};
-                        }
-                    }
-                    const toolCallId = toolCall.id || toolCall.tool_call_id || `${toolName} -${Date.now()} -${i} `;
-
-                    console.log(`⚡[AI_PROCESSING] Executing tool ${i + 1}/${toolCalls.length}: ${toolName}`);
-                    console.log(`   📝 Args: ${JSON.stringify(toolArgs, null, 2)}`);
-
-                    const toolResult = await executeToolCall(toolName, toolArgs, {
-                        senderNumber,
-                        senderName,
-                    });
-
-                    console.log(`✅ [AI_PROCESSING] Tool ${toolName} completed`);
-                    console.log(`📊 [AI_PROCESSING] Tool result: ${JSON.stringify(toolResult, null, 2)}`);
-
-                    messages.push(new ToolMessage({
-                        tool_call_id: toolCallId,
-                        content: JSON.stringify(toolResult)
-                    }));
-                } // End of tool calls loop
-            } catch (error) {
-                console.error(`❌[AI_PROCESSING] Error parsing tool arguments: `, error);
-                throw error;
-            }
-        } // End of while loop
-
-        console.warn('⚠️ [AI_PROCESSING] Maximum iteration reached without final response.');
-        return { content: 'Maaf, saya belum bisa memberikan jawaban.', id: null };
-    } catch (error) {
-        console.error('❌ [AI_PROCESSING] Error getting AI response:', error);
-        console.error('❌ [AI_PROCESSING] Error stack:', error.stack);
-        return { content: "Maaf, terjadi kesalahan. Silakan coba lagi.", id: null };
-    }
-}
-
 async function rewriteAdminMessage(originalMessage, senderNumber) {
     if (!ADMIN_MESSAGE_REWRITE_ENABLED) {
         return {
@@ -1674,69 +1034,6 @@ async function processBufferedMessages(senderNumber, client) {
             return normalizedAddress && normalizedAddress.includes(cleanNum);
         });
 
-        if (isAdmin) {
-            const lowerMsg = combinedMessage.toLowerCase().trim();
-
-            // ─── Audit Customer Trigger ─────────────────────────────────
-            const AUDIT_TRIGGERS = ['audit customer', 'mulai audit', 'audit'];
-            const RESUME_TRIGGERS = ['lanjut audit', 'resume audit'];
-            const NEW_AUDIT_TRIGGER = 'audit baru';
-
-            if (lowerMsg === NEW_AUDIT_TRIGGER || AUDIT_TRIGGERS.includes(lowerMsg)) {
-                console.log(`[ADMIN] 📋 Audit trigger detected: "${lowerMsg}"`);
-                const targetNumber = toSenderNumberWithSuffix(senderNumber);
-                const auditResponse = await startAudit(normalizedAddress);
-                markBotMessage(targetNumber, auditResponse);
-                await client.sendText(targetNumber, auditResponse);
-                if (prisma) {
-                    await saveMessageToPrisma(senderNumber, combinedMessage, 'user');
-                    await saveMessageToPrisma(senderNumber, auditResponse, 'ai');
-                }
-                await client.stopTyping(senderNumber);
-                return;
-            }
-
-            if (RESUME_TRIGGERS.includes(lowerMsg)) {
-                console.log(`[ADMIN] 📋 Audit resume trigger detected`);
-                const targetNumber = toSenderNumberWithSuffix(senderNumber);
-                const auditResponse = await handleResumeAudit(normalizedAddress);
-                markBotMessage(targetNumber, auditResponse);
-                await client.sendText(targetNumber, auditResponse);
-                if (prisma) {
-                    await saveMessageToPrisma(senderNumber, combinedMessage, 'user');
-                    await saveMessageToPrisma(senderNumber, auditResponse, 'ai');
-                }
-                await client.stopTyping(senderNumber);
-                return;
-            }
-
-            // Check if admin has active audit session
-            if (await hasActiveSession(normalizedAddress)) {
-                console.log(`[ADMIN] 📋 Active audit session, routing to audit handler`);
-                const auditResponse = await handleAuditResponse(normalizedAddress, combinedMessage);
-                if (auditResponse !== null) {
-                    // Audit handled the message
-                    const targetNumber = toSenderNumberWithSuffix(senderNumber);
-                    markBotMessage(targetNumber, auditResponse);
-                    await client.sendText(targetNumber, auditResponse);
-                    if (prisma) {
-                        await saveMessageToPrisma(senderNumber, combinedMessage, 'user');
-                        await saveMessageToPrisma(senderNumber, auditResponse, 'ai');
-                    }
-                    await client.stopTyping(senderNumber);
-                    return;
-                }
-                // auditResponse === null → escape hatch, proceed to getAIResponse
-                console.log(`[ADMIN] 📋 Audit escape hatch triggered, forwarding to AI`);
-            }
-
-            // ─── Model Override (#pro / !pro) ───────────────────────────
-            if (lowerMsg.startsWith('#pro ') || lowerMsg.startsWith('!pro ')) {
-                modelOverride = 'gemini-3-pro-preview';
-                combinedMessage = combinedMessage.substring(5).trim();
-                console.log(`[ADMIN] 🚀 Model Override Triggered: ${modelOverride}`);
-            }
-        }
         
         const isAiCustomerReplyEnabled = process.env.AI_CUSTOMER_REPLY_ENABLED !== 'false';
         if (!isAdmin && !isAiCustomerReplyEnabled) {
@@ -1916,142 +1213,6 @@ async function processBufferedMessages(senderNumber, client) {
     } catch (err) {
         console.error(`[ERROR] Handler error for ${senderNumber}:`, err);
         await client.stopTyping(senderNumber);
-    }
-}
-
-/**
- * Process aggregated messages from Meta Messenger/Instagram
- * @param {string} normalizedSenderId - e.g. "instagram:123"
- * @param {Array} queue - Array of message objects from DebounceQueue
- */
-async function processBufferedMetaMessages(normalizedSenderId, queue) {
-    if (!queue || queue.length === 0) return;
-
-    try {
-        const firstEntry = queue[0];
-        const { displayName, channel, senderId } = firstEntry;
-
-        const messageParts = queue
-            .map(m => (m.text || '').trim())
-            .filter(part => part.length > 0);
-
-        const combinedMessage = messageParts.join('\n').trim();
-        if (!combinedMessage) return;
-
-        console.log(`[MetaDebounce] 📥 Buffered message for ${displayName}: "${combinedMessage}"`);
-
-        // Check for Snooze/Handover using normalized address
-        if (await isSnoozeActive(normalizedSenderId)) {
-            console.log(`[MetaDebounce] 👋 AI skipped for ${normalizedSenderId} (handover active).`);
-            return;
-        }
-
-        const isAiCustomerReplyEnabled = process.env.AI_CUSTOMER_REPLY_ENABLED !== 'false';
-        if (!isAiCustomerReplyEnabled) {
-            console.log(`[MetaDebounce] 🤖 AI customer reply disabled via ENV. Skipping AI generation for ${normalizedSenderId}.`);
-            return;
-        }
-
-        // Invoke AI (using LangGraph)
-        console.log(`[LangGraph] Invoking ZoyaAgent for ${normalizedSenderId} (Meta)...`);
-        
-        const { HumanMessage, AIMessage } = require('@langchain/core/messages');
-        
-        const config = { configurable: { thread_id: normalizedSenderId } };
-        const currentState = await zoyaAgent.getState(config);
-        
-        let messageList = [];
-        
-        if (!currentState?.values?.messages || currentState.values.messages.length === 0) {
-            console.log(`[LangGraph] State is empty for ${normalizedSenderId}. Hydrating from DB...`);
-            try {
-                const prisma = require('./src/lib/prisma');
-                const customer = await prisma.customer.findUnique({ where: { phone: normalizedSenderId }});
-                if (customer) {
-                    const history = await prisma.directMessage.findMany({
-                        where: { customerId: customer.id },
-                        orderBy: { createdAt: 'desc' },
-                        take: 10
-                    });
-                    history.reverse().forEach(msg => {
-                        if (msg.role === 'user') messageList.push(new HumanMessage({ content: msg.content }));
-                        if (msg.role === 'ai' || msg.role === 'system') messageList.push(new AIMessage({ content: msg.content }));
-                    });
-                    console.log(`[LangGraph] Hydrated ${history.length} messages.`);
-                }
-            } catch (e) {
-                console.error('[LangGraph] Failed to hydrate messages:', e);
-            }
-        }
-        
-        const messageContent = [];
-        if (combinedMessage) {
-            messageContent.push({ type: 'text', text: combinedMessage });
-        } else {
-            messageContent.push({ type: 'text', text: '[Pesan Kosong]' });
-        }
-
-        messageList.push(new HumanMessage({ content: messageContent }));
-
-        const input = {
-            messages: messageList,
-            metadata: {
-                phoneReal: normalizedSenderId,
-                senderName: displayName,
-                mediaItems: [],
-                isAdmin: false
-            }
-        };
-
-        const result = await zoyaAgent.invoke(input, {
-            configurable: { thread_id: normalizedSenderId }
-        });
-
-        const lastMessage = result.messages[result.messages.length - 1];
-        let aiResponseRaw = lastMessage ? lastMessage.content : null;
-
-        // Handle HUMAN_HANDOVER
-        if (result.intent === 'HUMAN_HANDOVER') {
-            console.log(`🚨 [LangGraph] Escalation detected for ${normalizedSenderId}. Triggering Human Handover.`);
-            await setSnoozeMode(normalizedSenderId, 60, { reason: 'eskalasi_otomatis' });
-            
-            await syncGraphStateToCRM(normalizedSenderId, result).catch(() => {});
-            await triggerBosMatTool.implementation({
-                senderNumber: normalizedSenderId,
-                reason: 'User meminta bantuan admin atau terdeteksi emosi tinggi (via Meta).',
-                customerQuestion: combinedMessage
-            });
-            
-            aiResponseRaw = aiResponseRaw || "Wah, pertanyaan Kakak cukup teknis nih. Zoya panggilin Admin dulu ya biar dibantu langsung! 🙏";
-        }
-
-        let aiResponse = '';
-        if (aiResponseRaw) {
-            if (typeof aiResponseRaw === 'string') {
-                aiResponse = aiResponseRaw;
-            } else if (Array.isArray(aiResponseRaw)) {
-                aiResponse = aiResponseRaw
-                    .map(c => typeof c === 'string' ? c : (c.text || ''))
-                    .filter(Boolean)
-                    .join('\n');
-            } else {
-                aiResponse = String(aiResponseRaw || '');
-            }
-            aiResponse = aiResponse.trim();
-        }
-
-        if (aiResponse) {
-            const { sendMetaMessage } = require('./src/server/metaClient.js');
-            console.log(`[MetaDebounce] 📤 Outbound to ${channel}: "${aiResponse.substring(0, 50)}..."`);
-            
-            await sendMetaMessage(channel, senderId, aiResponse);
-            
-            if (typeof saveMessageToFirestore === 'function') {
-                await saveMessageToFirestore(normalizedSenderId, aiResponse, 'ai');
-            }
-        }
-    } catch (error) {
-        console.error(`❌ [MetaDebounce] Error processing ${normalizedSenderId}:`, error);
     }
 }
 
@@ -2743,38 +1904,6 @@ async function listConversations(limit = 100) {
 }
 
 // --- API Endpoints ---
-const metaWebhookRouter = createMetaWebhookRouter({
-    zoyaAgent,
-    saveMessageToFirestore,
-    saveSenderMeta,
-    debounceQueue: metaDebounceQueue,
-    logger: console,
-});
-
-// Explicitly handle Meta Webhook Verification (GET)
-// Ini memastikan verifikasi berjalan lancar terlepas dari logika di dalam router
-app.get('/webhooks/meta', (req, res) => {
-    const mode = req.query['hub.mode'];
-    const token = req.query['hub.verify_token'];
-    const challenge = req.query['hub.challenge'];
-
-    const VERIFY_TOKEN = process.env.META_WEBHOOK_VERIFY_TOKEN;
-
-    if (mode && token) {
-        if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-            console.log('[Meta Webhook] Verified successfully!');
-            res.status(200).send(challenge);
-        } else {
-            console.error(`[Meta Webhook] Verification failed. Token mismatch. Expected: ${VERIFY_TOKEN}, Got: ${token}`);
-            res.sendStatus(403);
-        }
-    } else {
-        res.status(200).send('Meta Webhook is active');
-    }
-});
-
-app.use('/webhooks/meta', metaWebhookRouter);
-
 // --- Admin Utility Routes ---
 app.get('/trigger-scheduler-manual', async (req, res) => {
     // Basic secret key check via query param for safety
@@ -3342,7 +2471,7 @@ app.post('/test-ai', requireAuth, async (req, res) => {
         const { message, senderNumber, mode, model_override, history, media } = req.body;
         const testMessage = message || "Hello, test message";
 
-        // Convert base64 media to Buffer format for getAIResponse
+        // Convert base64 media to Buffer format
         let mediaItems = [];
         if (media && Array.isArray(media)) {
             mediaItems = media.map(item => ({
@@ -3352,7 +2481,7 @@ app.post('/test-ai', requireAuth, async (req, res) => {
             }));
         }
 
-        // If mode is 'admin', use the admin number so getAIResponse picks up the ADMIN_SYSTEM_PROMPT
+        // If mode is 'admin', force the admin sender number
         let effectiveSenderNumber = senderNumber || null;
         let senderName = "Test User";
         let isAdmin = false;
@@ -3430,10 +2559,25 @@ app.post('/test-ai', requireAuth, async (req, res) => {
 
 app.delete('/test-ai/clear', requireAuth, async (req, res) => {
     try {
-        const thread_id = "test_user_playground";
+        const mode = req.body?.mode || req.query?.mode || 'customer';
+        let thread_id = "test_user_playground";
+        
+        if (mode === 'admin') {
+            thread_id = process.env.BOSMAT_ADMIN_NUMBER || process.env.ADMIN_WHATSAPP_NUMBER || thread_id;
+        }
         
         // Clear LangGraph memory for test user
         if (checkpointer) {
+            // If using PrismaCheckpointer, delete from keyValueStore
+            if (prisma) {
+                await prisma.keyValueStore.deleteMany({
+                    where: {
+                        collection: 'langgraph_checkpoints',
+                        key: thread_id
+                    }
+                }).catch(e => console.log('Checkpointer clear error:', e.message));
+            }
+            // Fallback for MemorySaver just in case
             if (checkpointer.storage && checkpointer.storage[thread_id]) {
                 delete checkpointer.storage[thread_id];
             }
@@ -3453,7 +2597,7 @@ app.delete('/test-ai/clear', requireAuth, async (req, res) => {
             }
         }
 
-        res.json({ success: true, message: "Playground memory cleared" });
+        res.json({ success: true, message: `Playground memory cleared for ${thread_id}` });
     } catch (e) {
         console.error('[API] Error clearing test-ai memory:', e);
         res.status(500).json({ error: e.message });
@@ -4190,7 +3334,6 @@ async function connectToWhatsApp() {
 connectToWhatsApp().catch(err => console.log("unexpected error: " + err));
 
 module.exports = { 
-    getAIResponse, 
     saveMessageToPrisma, 
     saveMessageToFirestore 
 };

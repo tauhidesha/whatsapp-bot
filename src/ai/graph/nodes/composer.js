@@ -1,56 +1,55 @@
+const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
 const { buildComposerPrompt } = require('../../prompts/promptBuilder');
 
 /**
  * Response Composer Node for Zoya V2
- * Formulates natural responses based on the strategy chosen by the Planner,
- * factoring in any Rule flags and Tool results.
+ * Uses Gemini to compose a natural language response based on the planner strategy and tool results.
  */
 
 async function composerNode(state) {
-    console.log('[Composer Node] Composing natural response...');
+    console.log('[Composer Node] Composing natural response with LLM...');
     
-    const strategy = state.planner?.strategy || 'BUILD_TRUST';
-    const nextAction = state.planner?.nextAction || 'WAIT';
+    const promptText = buildComposerPrompt(state, state.planner || {});
     
-    // In full implementation, we pass this prompt to an LLM
-    const _compiledPrompt = buildComposerPrompt(state, state.planner || {});
+    // Inisialisasi model
+    const llm = new ChatGoogleGenerativeAI({
+        model: 'gemini-2.5-flash',
+        temperature: 0.7,
+        maxOutputTokens: 512,
+        apiKey: process.env.GOOGLE_API_KEY
+    });
 
-    let responseText = '';
+    try {
+        const response = await llm.invoke([
+            ['system', 'Anda adalah Zoya, konsultan sales dari Bosmat Garage. Anda ramah, profesional, menggunakan bahasa Indonesia santai (mas/kak), dan penuh empati. Jangan pernah terdengar seperti bot.'],
+            ['human', promptText]
+        ]);
+        
+        let responseText = response.content;
+        
+        // Trim standard quotes if generated
+        responseText = responseText.replace(/^["']|["']$/g, '');
 
-    // Mocking the LLM behavior based on state logic
-    if (state.business?.restrictions?.length > 0) {
-        // If there's a restriction, the composer should naturally explain it
-        const restriction = state.business.restrictions[0];
-        responseText = `Hehe maaf ya mas 🙏\nUntuk ${restriction.service}, ${restriction.reason.toLowerCase()}\nBiar aman, mending kita ${restriction.suggestedAction.toLowerCase()} dulu aja ya 😊`;
-    } 
-    else if (strategy === 'EDUCATE' && state.tool?.lastCapability === 'pricing') {
-        const result = state.tool.lastResult;
-        responseText = `Siap mas 🙌\nKalau untuk ${result?.service || 'layanan ini'} harganya Rp${result?.price?.toLocaleString('id-ID') || '800.000'} ya.\nSudah termasuk poles finishing juga. Kalau sekalian mau dibersihkan, bisa tambah Cuci Komplit biar hasilnya makin maksimal 😊`;
-    } 
-    else if (strategy === 'EMPATHIZE' && nextAction === 'WAIT') {
-        // Empathizing with objections (e.g., "belum gajian")
-        responseText = `Oh siap mas, santai aja kok 😊\nKalau nanti sudah pas waktunya atau mau nanya-nanya lagi, tinggal chat aja ya. Nanti saya bantu hitungkan lagi.`;
-    } 
-    else if (strategy === 'BUILD_TRUST' && nextAction === 'BOOK') {
-        responseText = `Kalau sudah cocok nanti saya bantu booking ya 🙌\nBisa diinfokan mau jadwalkan hari apa mas?`;
-    } 
-    else if (strategy === 'CLARIFY' && nextAction === 'ASK') {
-        responseText = `Siap mas 🙌\nBiar hitungannya pas, motornya jenis apa ya mas?`;
-    } 
-    else {
-        responseText = `Siap mas, dicatat. Ada lagi yang mau ditanyain mas?`;
+        console.log('[Composer Node] Generated text:', responseText);
+
+        const conversationUpdate = {
+            lastMessages: [...(state.conversation?.lastMessages || []), responseText]
+        };
+
+        return {
+            conversation: conversationUpdate,
+            analytics: {
+                responseCount: (state.analytics?.responseCount || 0) + 1
+            }
+        };
+    } catch (error) {
+        console.error('[Composer Node] LLM Error:', error);
+        return {
+            conversation: {
+                lastMessages: [...(state.conversation?.lastMessages || []), 'Aduh maaf mas, sistem saya lagi gangguan sedikit 🙏. Boleh ditunggu sebentar ya.']
+            }
+        };
     }
-
-    const conversationUpdate = {
-        lastMessages: [...(state.conversation?.lastMessages || []), responseText]
-    };
-
-    return {
-        conversation: conversationUpdate,
-        analytics: {
-            responseCount: (state.analytics?.responseCount || 0) + 1
-        }
-    };
 }
 
 module.exports = {
