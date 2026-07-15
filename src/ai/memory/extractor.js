@@ -1,7 +1,6 @@
 const { z } = require('zod');
 const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
-const { extractTextFromContent } = require('../graph/utils/sanitizeMessages');
-
+const { extractTextFromContent, getMessageType } = require('../graph/utils/sanitizeMessages');
 /**
  * Memory Extractor for Zoya V2
  * Uses Gemini to extract Identity, Relationship, and Sales memory from messages.
@@ -18,10 +17,11 @@ async function extractMemory(state) {
     
     const messages = state.messages || [];
     const lastUserMessageObj = [...messages].reverse().find(m => {
-        const type = m._getType ? m._getType() : (m.type || m.role);
+        const type = getMessageType(m) || 'user';
         return type === 'human' || type === 'user';
     });
-    const lastUserMessage = lastUserMessageObj ? extractTextFromContent(lastUserMessageObj.content) : '';
+    const lastUserContent = lastUserMessageObj ? (lastUserMessageObj.kwargs?.content || lastUserMessageObj.content) : null;
+    const lastUserMessage = lastUserContent ? extractTextFromContent(lastUserContent) : '';
 
     if (!lastUserMessage) {
         return {};

@@ -74,17 +74,17 @@ function sanitizeMessagesForGemini(messages) {
 
         const isAI = getMessageType(safeMsg) === 'ai';
         if (isAI && Array.isArray(safeMsg.content)) {
-            const filtered = msg.content.filter(c => c.type !== 'thinking');
-            if (filtered.length !== msg.content.length) {
+            const filtered = safeMsg.content.filter(c => c.type !== 'thinking');
+            if (filtered.length !== safeMsg.content.length) {
                 // Return a new instance with the same class but cleaned content
-                return msg.constructor !== Object 
-                    ? msg.lc_kwargs 
-                        ? new msg.constructor({ ...msg.lc_kwargs, content: filtered })
-                        : new AIMessage({ ...msg, content: filtered })
-                    : { ...msg, content: filtered };
+                return safeMsg.constructor !== Object 
+                    ? safeMsg.lc_kwargs 
+                        ? new safeMsg.constructor({ ...safeMsg.lc_kwargs, content: filtered })
+                        : new AIMessage({ ...safeMsg, content: filtered })
+                    : { ...safeMsg, content: filtered };
             }
         }
-        return msg;
+        return safeMsg;
     });
 
     // --- Step 1: Trim from front until first HumanMessage ---

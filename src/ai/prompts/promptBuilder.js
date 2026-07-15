@@ -1,6 +1,5 @@
 const { getRelevantKnowledge } = require('../knowledge/index');
-const { extractTextFromContent } = require('../graph/utils/sanitizeMessages');
-
+const { extractTextFromContent, getMessageType } = require('../graph/utils/sanitizeMessages');
 /**
  * Prompt Compiler for Zoya V2
  * Dynamically assembles the context for the LLM based on current state,
@@ -65,8 +64,10 @@ function buildPlannerPrompt(state) {
     prompt += `=== CONVERSATION HISTORY ===\n`;
     if (state.messages && state.messages.length > 0) {
         state.messages.forEach(msg => {
-            const role = msg._getType ? msg._getType() : (msg.role || 'user');
-            const textContent = extractTextFromContent(msg.content);
+            const roleType = getMessageType(msg) || 'user';
+            const role = roleType === 'human' ? 'user' : roleType;
+            const content = msg.kwargs?.content || msg.content;
+            const textContent = extractTextFromContent(content);
             prompt += `${role.toUpperCase()}: ${textContent}\n`;
         });
     } else {
@@ -120,8 +121,10 @@ function buildComposerPrompt(state, plannerDecision) {
     prompt += `=== CONVERSATION HISTORY ===\n`;
     if (state.messages && state.messages.length > 0) {
         state.messages.forEach(msg => {
-            const role = msg._getType ? msg._getType() : (msg.role || 'user');
-            const textContent = extractTextFromContent(msg.content);
+            const roleType = getMessageType(msg) || 'user';
+            const role = roleType === 'human' ? 'user' : roleType;
+            const content = msg.kwargs?.content || msg.content;
+            const textContent = extractTextFromContent(content);
             prompt += `${role.toUpperCase()}: ${textContent}\n`;
         });
     } else {
