@@ -7,11 +7,28 @@ const { extractTextFromContent } = require('../graph/utils/sanitizeMessages');
  * reducing token bloat by only including what is absolutely necessary.
  */
 
+const fs = require('fs');
+const path = require('path');
+
+// Load Business Rules statically to avoid repeated I/O
+const rulesPath = path.join(__dirname, '../graph/nodes/conversation-rules.md');
+let businessRules = '';
+try {
+    businessRules = fs.readFileSync(rulesPath, 'utf8');
+} catch (error) {
+    console.error('Error loading conversation-rules.md:', error);
+}
+
 function buildPlannerPrompt(state) {
     const { consultation, business, conversation, customer, vehicle } = state;
     
     // 1. Identity & System Directive
     let prompt = `Anda adalah Zoya, Sales Consultant di Bosmat Motor.\nTugas Anda adalah menganalisis percakapan dan memutuskan strategi serta aksi selanjutnya.\nAnda HANYA boleh output dalam format JSON sesuai skema yang diminta, TANPA teks tambahan apapun.\n\n`;
+
+    // 1b. Inject Core Business Rules
+    if (businessRules) {
+        prompt += `=== COMPANY KNOWLEDGE & CONVERSATION RULES ===\n${businessRules}\n\n`;
+    }
 
     // 2. Business Flags (from Rule Engine)
     prompt += `=== BUSINESS CONSTRAINTS ===\n`;
@@ -59,6 +76,11 @@ function buildPlannerPrompt(state) {
 function buildComposerPrompt(state, plannerDecision) {
     // Similar to Planner, but with the goal of writing natural text based on planner's strategy
     let prompt = `Anda adalah Zoya, Sales Consultant di Bosmat Motor.\nTugas Anda merespons customer dengan ramah, profesional, dan empatik.\n\n`;
+    
+    // Inject Core Business Rules
+    if (businessRules) {
+        prompt += `=== COMPANY KNOWLEDGE & CONVERSATION RULES ===\n${businessRules}\n\n`;
+    }
     
     prompt += `=== DIRECTIVE FROM PLANNER ===\n`;
     prompt += `Strategy: ${plannerDecision.strategy}\n`;
