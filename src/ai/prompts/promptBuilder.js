@@ -94,6 +94,15 @@ function buildComposerPrompt(state, plannerDecision) {
     }
     prompt += `\n`;
 
+    const activeServices = state.consultation?.requestedServices || [];
+    if (activeServices.length > 0) {
+        const { getRelevantKnowledge } = require('../knowledge/index');
+        const knowledge = getRelevantKnowledge(activeServices);
+        prompt += `=== SERVICE KNOWLEDGE (CATATAN HARGA & FASILITAS) ===\n`;
+        prompt += `Gunakan data ini jika Anda perlu menyebutkan harga atau menjelaskan fasilitas layanan.\n`;
+        prompt += JSON.stringify(knowledge, null, 2) + `\n\n`;
+    }
+
     if (state.business?.restrictions?.length > 0) {
         prompt += `=== BUSINESS CONSTRAINTS ===\n`;
         state.business.restrictions.forEach(r => {
