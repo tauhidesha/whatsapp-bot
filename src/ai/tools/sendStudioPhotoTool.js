@@ -4,7 +4,6 @@
 const path = require('path');
 const fs = require('fs');
 const { z } = require('zod');
-const { sendMetaAttachment } = require('../../server/metaClient.js');
 const { markBotMessage } = require('../utils/adminMessageSync.js');
 
 const studioMetadata = require('../constants/studioMetadata.js');
@@ -96,32 +95,6 @@ async function implementation(input = {}) {
       data: {
         senderNumber: identity.recipientId,
         channel: 'whatsapp',
-        caption,
-        imagePath: STUDIO_PHOTO_PATH,
-      },
-    };
-  }
-
-  if (SUPPORTED_META_CHANNELS.has(identity.channel)) {
-    await sendMetaAttachment(
-      identity.channel,
-      identity.recipientId,
-      STUDIO_PHOTO_PATH,
-      {
-        caption,
-        filename: STUDIO_PHOTO_FILENAME,
-        mimetype: 'image/png',
-        type: 'image',
-      },
-      console,
-    );
-
-    return {
-      success: true,
-      message: 'Foto studio berhasil dikirim.',
-      data: {
-        senderNumber: `${identity.channel}:${identity.recipientId}`,
-        channel: identity.channel,
         caption,
         imagePath: STUDIO_PHOTO_PATH,
       },
