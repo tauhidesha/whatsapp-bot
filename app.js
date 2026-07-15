@@ -43,7 +43,6 @@ const { updateSystemPromptTool } = require('./src/ai/tools/updateSystemPromptToo
 const { getSystemPromptTool } = require('./src/ai/tools/getSystemPromptTool.js');
 const { updatePromoOfTheMonthTool } = require('./src/ai/tools/updatePromoOfTheMonthTool.js');
 // updateCustomerContextTool REMOVED — digantikan oleh background context extractor agent
-const { sendMetaMessage } = require('./src/server/metaClient.js');
 const { startFollowUpScheduler, updateSignalsOnIncomingMessage } = require('./src/ai/agents/followUpEngine/index.js');
 const { isSnoozeActive, setSnoozeMode, clearSnoozeMode, getSnoozeInfo } = require('./src/ai/utils/humanHandover.js');
 const { handleAdminHpMessage, markBotMessage } = require('./src/ai/utils/adminMessageSync.js');
@@ -2408,14 +2407,7 @@ app.post('/send-message', requireAuth, async (req, res) => {
             return res.status(200).json({ success: true, channel: 'whatsapp', rewritten });
         }
 
-        if (!platformId) {
-            throw new Error(`Platform ID is required to send ${channel} messages.`);
-        }
-
-        await sendMetaMessage(channel, platformId, finalMessage, console);
-        await saveMessageToPrisma(identity.docId, finalMessage, 'admin');
-        console.log(`[API] Successfully sent ${channel} message to ${platformId}`);
-        return res.status(200).json({ success: true, channel, rewritten });
+        throw new Error(`Channel ${channel} is no longer supported.`);
     } catch (e) {
         console.error('[API] Error sending message:', e);
         res.status(500).json({ error: e.message });
