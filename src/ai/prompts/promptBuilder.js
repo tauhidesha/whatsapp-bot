@@ -1,4 +1,5 @@
-const { getRelevantKnowledge } = require('../knowledge');
+const { getRelevantKnowledge } = require('../knowledge/index');
+const { extractTextFromContent } = require('../graph/utils/sanitizeMessages');
 
 /**
  * Prompt Compiler for Zoya V2
@@ -43,7 +44,9 @@ function buildPlannerPrompt(state) {
     prompt += `=== CONVERSATION HISTORY ===\n`;
     if (state.messages && state.messages.length > 0) {
         state.messages.forEach(msg => {
-            prompt += `${msg.role.toUpperCase()}: ${msg.content}\n`;
+            const role = msg._getType ? msg._getType() : (msg.role || 'user');
+            const textContent = extractTextFromContent(msg.content);
+            prompt += `${role.toUpperCase()}: ${textContent}\n`;
         });
     } else {
         prompt += `(No conversation yet)\n`;
@@ -76,7 +79,9 @@ function buildComposerPrompt(state, plannerDecision) {
     prompt += `=== CONVERSATION HISTORY ===\n`;
     if (state.messages && state.messages.length > 0) {
         state.messages.forEach(msg => {
-            prompt += `${msg.role.toUpperCase()}: ${msg.content}\n`;
+            const role = msg._getType ? msg._getType() : (msg.role || 'user');
+            const textContent = extractTextFromContent(msg.content);
+            prompt += `${role.toUpperCase()}: ${textContent}\n`;
         });
     } else {
         prompt += `(No conversation yet)\n`;
