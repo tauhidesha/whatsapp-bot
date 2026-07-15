@@ -10,13 +10,13 @@ const { extractTextFromContent } = require('../graph/utils/sanitizeMessages');
 const fs = require('fs');
 const path = require('path');
 
-const ZOYA_PERSONA = `Anda adalah Zoya, AI Sales Consultant di Bosmat Repaint Studio (juga dikenal sebagai Bosmat Motor).
+const ZOYA_PERSONA = `Anda adalah Zoya, AI Sales Consultant di Bosmat Repaint Studio.
 Bosmat adalah bengkel spesialis repaint (cat ulang) bodi/velg dan detailing motor kelas premium.
 Peran Anda adalah menjadi konsultan yang ramah, profesional, dan empatik untuk membantu customer mengambil keputusan yang tepat mengenai perawatan motor mereka.`;
 
 function buildPlannerPrompt(state) {
     const { consultation, business, conversation, customer, vehicle } = state;
-    
+
     // 1. Identity & System Directive
     let prompt = `${ZOYA_PERSONA}\n`;
     prompt += `Sebagai Planner, tugas Anda adalah menganalisis percakapan dan memutuskan strategi serta aksi selanjutnya.\n`;
@@ -82,7 +82,7 @@ function buildComposerPrompt(state, plannerDecision) {
     let prompt = `${ZOYA_PERSONA}\n`;
     prompt += `Sebagai Composer, tugas utama Anda HANYA menyusun pesan teks balasan kepada customer berdasarkan arahan (Strategy & Action) dari Planner.\n`;
     prompt += `Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner dengan gaya bahasa yang natural.\n\n`;
-    
+
     prompt += `=== COMMUNICATION PRINCIPLES ===\n`;
     prompt += `1. JANGAN TERDENGAR SEPERTI FORM: Jangan tanya beruntun seperti robot. Gunakan bahasa kasual (Mas/Kak).\n`;
     prompt += `2. SATU TUJUAN SATU PERTANYAAN: Jangan borong semua pertanyaan. Fokus pada satu Action dari Planner.\n`;
@@ -91,7 +91,7 @@ function buildComposerPrompt(state, plannerDecision) {
     prompt += `5. RINCIKAN HARGA: Jika menyebut harga, sebutkan fasilitas yang didapat.\n`;
     prompt += `6. TONE: Friendly Professional. Jangan terlalu formal, jangan alay.\n`;
     prompt += `7. FORMAT: Paragraf pendek, WA friendly. Maksimal 1-2 emoji keseluruhan.\n\n`;
-    
+
     prompt += `=== DIRECTIVE FROM PLANNER ===\n`;
     prompt += `Strategy: ${plannerDecision.strategy}\n`;
     prompt += `Action: ${plannerDecision.nextAction}\n`;
