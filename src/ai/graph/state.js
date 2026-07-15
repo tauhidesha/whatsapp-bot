@@ -1,22 +1,172 @@
 const { Annotation } = require('@langchain/langgraph');
-const { BaseMessage } = require('@langchain/core/messages');
 
 /**
- * Definisi State Zoya
- * Menggunakan Annotation.Root untuk validasi dan manajemen state otomatis oleh LangGraph.
+ * ZOYA V2 State Schema
+ * Single Source of Truth
  */
 const ZoyaState = Annotation.Root({
-    // Riwayat pesan (akumulatif menggunakan reducer)
+    // 1. Conversation
+    conversation: Annotation({
+        reducer: (old, updated) => ({ ...old, ...updated }),
+        default: () => ({
+            id: null,
+            startedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            status: 'active', // active, waiting_customer, completed, handover
+            language: 'id',
+            summary: null,
+            messages: []
+        })
+    }),
+
+    // 2. Customer
+    customer: Annotation({
+        reducer: (old, updated) => ({ ...old, ...updated }),
+        default: () => ({
+            id: null,
+            name: null,
+            phone: null,
+            isReturning: false,
+            tags: [],
+            notes: null,
+            trustLevel: 0,
+            relationshipScore: 0
+        })
+    }),
+
+    // 3. Vehicle
+    vehicle: Annotation({
+        reducer: (old, updated) => ({ ...old, ...updated }),
+        default: () => ({
+            brand: null,
+            model: null,
+            year: null,
+            paintType: null, // Glossy, Doff, Unknown
+            currentCondition: null // Original, Repainted, Unknown
+        })
+    }),
+
+    // 4. Consultation
+    consultation: Annotation({
+        reducer: (old, updated) => ({ ...old, ...updated }),
+        default: () => ({
+            goal: null, // e.g., "Customer ingin repaint body halus"
+            stage: 'DISCOVERING', // DISCOVERING, CLARIFYING, CONSULTING, RECOMMENDING, PRICING, OBJECTION, BOOKING, DONE
+            requestedServices: [],
+            recommendedServices: [],
+            knownFacts: {},
+            missingFacts: []
+        })
+    }),
+
+    // 5. Pricing
+    pricing: Annotation({
+        reducer: (old, updated) => ({ ...old, ...updated }),
+        default: () => ({
+            estimatedPrice: null,
+            discount: 0,
+            promotion: null,
+            priceSource: null, // database, manual, bosmat
+            isFinal: false
+        })
+    }),
+
+    // 6. Booking
+    booking: Annotation({
+        reducer: (old, updated) => ({ ...old, ...updated }),
+        default: () => ({
+            status: 'none', // none, asking, confirmed, completed, cancelled
+            preferredDate: null,
+            preferredTime: null,
+            bookingId: null
+        })
+    }),
+
+    // 7. Sales
+    sales: Annotation({
+        reducer: (old, updated) => ({ ...old, ...updated }),
+        default: () => ({
+            buyerStage: 'Exploring', // Exploring, Comparing, Ready to Buy, Hesitating, Cooling Down
+            interestLevel: null, // high, medium, low
+            budget: null,
+            urgency: null,
+            objection: null,
+            sentiment: null,
+            closingProbability: 0
+        })
+    }),
+
+    // 8. Planner
+    planner: Annotation({
+        reducer: (old, updated) => ({ ...old, ...updated }),
+        default: () => ({
+            goal: null,
+            reason: null,
+            nextAction: null, // ASK, RECOMMEND, PRICE, BOOK, HANDOVER, WAIT
+            capability: null,
+            confidence: 0,
+            strategy: null
+        })
+    }),
+
+    // 9. Tool
+    tool: Annotation({
+        reducer: (old, updated) => ({ ...old, ...updated }),
+        default: () => ({
+            lastCapability: null,
+            lastTool: null,
+            lastResult: null,
+            executionHistory: []
+        })
+    }),
+
+    // 10. Memory
+    memory: Annotation({
+        reducer: (old, updated) => ({ ...old, ...updated }),
+        default: () => ({
+            customerPreference: null,
+            favoriteColor: null,
+            favoriteService: null,
+            previousMotor: null,
+            lastRecommendation: null,
+            summary: null
+        })
+    }),
+
+    // 11. Business
+    business: Annotation({
+        reducer: (old, updated) => ({ ...old, ...updated }),
+        default: () => ({
+            activeRules: [],
+            escalation: false,
+            promotion: null,
+            disabledServices: []
+        })
+    }),
+
+    // 12. Analytics
+    analytics: Annotation({
+        reducer: (old, updated) => ({ ...old, ...updated }),
+        default: () => ({
+            plannerRuns: 0,
+            toolCalls: 0,
+            responseCount: 0,
+            conversationLength: 0,
+            stageHistory: []
+        })
+    }),
+
+    // Messages array used strictly by LangGraph for internal state bridging if needed,
+    // though the v2 schema dictates storing messages in conversation.messages.
+    // Keeping it here for basic LCEL / ToolNode compatibility.
     messages: Annotation({
         reducer: (oldMessages, newMessages) => {
-            // Gabungkan pesan lama dan baru
             let combined = [...oldMessages];
             if (Array.isArray(newMessages)) {
                 combined.push(...newMessages);
             } else {
                 combined.push(newMessages);
             }
-            // Batasi jumlah pesan maksimal (20 terakhir) untuk menghemat DB memory (khususnya payload array image/base64)
             if (combined.length > 20) {
                 combined = combined.slice(-20);
             }
@@ -25,54 +175,10 @@ const ZoyaState = Annotation.Root({
         default: () => []
     }),
 
-    // Data pelanggan dari CRM (Prisma)
-    customer: Annotation({
-        reducer: (old, updated) => ({ ...old, ...updated }),
-        default: () => ({})
-    }),
-
-    // Analisis niat (intent) saat ini
-    intent: Annotation({
-        reducer: (old, next) => next || old,
-        default: () => 'GENERAL_INQUIRY'
-    }),
-
-    // Konteks teknis yang diekstrak (Motor, Layanan, dll)
-    context: Annotation({
-        reducer: (old, updated) => ({ ...old, ...updated }),
-        default: () => ({
-            vehicleType: null,
-            serviceTypes: [], // Array of service names (e.g. ["Repaint Bodi Halus", "Detailing Mesin"])
-            paintType: null, // 'glossy' | 'doff'
-            isBongkarTotal: null, // boolean
-            detailingFocus: null, // 'baret' | 'mesin' | 'kerangka'
-            colorChoice: null, // string (warna untuk Repaint Bodi)
-            velgColorChoice: null, // string (warna untuk Repaint Velg)
-            isPreviouslyPainted: null, // boolean (for Velg)
-            bookingDate: null, // 'YYYY-MM-DD' or natural language 'besok'
-            bookingTime: null, // 'HH:mm' or natural language 'jam 2'
-            comboOffered: false, // Track apakah promo combo sudah ditawarkan
-            missingQuestions: [], // Daftar pertanyaan yang harus diajukan Zoya
-            isReadyForTools: false
-        })
-    }),
-
-    // Flag untuk Human-in-the-loop (HITL)
-    requiresAdmin: Annotation({
-        reducer: (old, next) => next,
-        default: () => false
-    }),
-
-    // Flag untuk Admin Mode (Personal Assistant Flow)
+    // Legacy flag for admin routing, kept for backward compatibility with v1
     isAdmin: Annotation({
         reducer: (old, next) => next,
         default: () => false
-    }),
-
-    // Metadata untuk tracking
-    metadata: Annotation({
-        reducer: (old, updated) => ({ ...old, ...updated }),
-        default: () => ({})
     })
 });
 

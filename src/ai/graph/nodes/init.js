@@ -10,7 +10,7 @@ const studioMetadata = require('../../constants/studioMetadata');
  */
 async function initNode(state) {
     console.log('--- [INIT_NODE] Starting ---');
-    const { messages, metadata, context } = state;
+    const { messages, metadata } = state;
     const phoneReal = metadata?.phoneReal;
     
     // Admin Detection (Always check at start)
@@ -86,19 +86,20 @@ async function initNode(state) {
                     plate: v.plateNumber
                 }))
             },
-            // Push CRM context into LangGraph context if state is currently empty for those fields
-            context: {
-                ...context,
-                vehicleType: context.vehicleType || dbCtx.motorModel || null,
-                visualSummary: context.visualSummary || dbCtx.visualSummary || null,
-                customerLabel: dbCtx.customerLabel || 'stranger',
-                explicitlyRejected: dbCtx.explicitlyRejected || false,
-                serviceTypes: context.serviceTypes?.length > 0 ? context.serviceTypes : (dbCtx.targetServices || []),
-                colorChoice: context.colorChoice || dbCtx.motorColor || null,
-                paintType: context.paintType || dbCtx.paintType || null,
-                isBongkarTotal: context.isBongkarTotal !== null ? context.isBongkarTotal : (dbCtx.isBongkarTotal ?? null),
-                serviceDetail: context.serviceDetail || dbCtx.serviceDetail || null,
-                isReadyForTools: context.isReadyForTools || (dbCtx.conversationStage === 'ready')
+            // Push CRM context into LangGraph V2 State
+            vehicle: {
+                brand: dbCtx.motorBrand || null,
+                model: dbCtx.motorModel || null,
+                paintType: dbCtx.paintType || null,
+                currentCondition: null // We don't have this in dbCtx yet
+            },
+            consultation: {
+                requestedServices: dbCtx.targetServices || [],
+                knownFacts: {
+                    colorChoice: dbCtx.motorColor || null,
+                    isBongkarTotal: dbCtx.isBongkarTotal ?? null,
+                    serviceDetail: dbCtx.serviceDetail || null
+                }
             },
             metadata: {
                 ...metadata,
