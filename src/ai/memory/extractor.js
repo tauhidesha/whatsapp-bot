@@ -23,7 +23,7 @@ async function extractMemory(state) {
     }
 
     const llm = new ChatGoogleGenerativeAI({
-        model: 'gemini-2.5-flash',
+        model: process.env.AI_MODEL || 'gemini-2.5-flash-lite',
         temperature: 0,
         maxOutputTokens: 256,
         apiKey: process.env.GOOGLE_API_KEY

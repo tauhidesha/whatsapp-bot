@@ -5,7 +5,7 @@ const { withRetry } = require('../../utils/retry');
 const { sanitizeMessagesForGemini, extractTextFromContent } = require('../utils/sanitizeMessages');
 
 const model = new ChatGoogleGenerativeAI({
-    model: process.env.VISION_MODEL || process.env.AI_MODEL || "gemini-1.5-flash",
+    model: process.env.VISION_MODEL || process.env.AI_MODEL || 'gemini-2.5-flash-lite',
     maxOutputTokens: 2048,
     temperature: 0,
     responseMimeType: "application/json",

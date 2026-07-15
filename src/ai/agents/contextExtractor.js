@@ -10,7 +10,7 @@ const { getLangSmithCallbacks } = require('../utils/langsmith.js');
 const { extractTextFromContent } = require('../graph/utils/sanitizeMessages');
 
 // Model ringan untuk extraction — cepat dan murah
-const EXTRACTOR_MODEL = 'gemini-flash-lite-latest';
+const EXTRACTOR_MODEL = process.env.AI_MODEL || 'gemini-2.5-flash-lite';
 
 const EXTRACTOR_PROMPT = `Kamu adalah data extractor untuk sistem CRM bengkel motor.
 Tugasmu ada dua:
