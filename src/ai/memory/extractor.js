@@ -1,5 +1,6 @@
 const { z } = require('zod');
 const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
+const { extractTextFromContent } = require('../graph/utils/sanitizeMessages');
 
 /**
  * Memory Extractor for Zoya V2
@@ -16,10 +17,14 @@ async function extractMemory(state) {
     console.log('[Memory Extractor] Extracting memory features with LLM...');
     
     const messages = state.messages || [];
-    const lastUserMessage = messages.findLast(m => m.role === 'user')?.content || '';
+    const lastUserMessageObj = [...messages].reverse().find(m => {
+        const type = m._getType ? m._getType() : (m.type || m.role);
+        return type === 'human' || type === 'user';
+    });
+    const lastUserMessage = lastUserMessageObj ? extractTextFromContent(lastUserMessageObj.content) : '';
 
     if (!lastUserMessage) {
-        return state.memory || {};
+        return {};
     }
 
     const llm = new ChatGoogleGenerativeAI({
@@ -35,34 +40,26 @@ async function extractMemory(state) {
             ['human', lastUserMessage]
         ]);
         
-        const newSalesMemory = {};
-        const newIdentityMemory = {};
+        const updates = {};
+
+        if (extraction.motor || extraction.color) {
+            updates.vehicle = { ...state.vehicle };
+            if (extraction.motor) updates.vehicle.brand = extraction.motor; // Simplify logic: just map motor to brand for now
+            if (extraction.color) updates.vehicle.paintType = extraction.color;
+        }
 
         if (extraction.objection) {
-            newSalesMemory.common_objection = extraction.objection;
+            updates.consultation = { ...state.consultation };
+            updates.consultation.knownFacts = {
+                ...(updates.consultation.knownFacts || {}),
+                commonObjection: extraction.objection
+            };
         }
 
-        if (extraction.motor) {
-            newIdentityMemory.motor = extraction.motor;
-        }
-        if (extraction.color) {
-            newIdentityMemory.color = extraction.color;
-        }
-
-        return {
-            identity: {
-                ...state.memory?.identity,
-                ...newIdentityMemory
-            },
-            salesMemory: {
-                ...state.memory?.salesMemory,
-                ...newSalesMemory
-            },
-            relationship: state.memory?.relationship || {}
-        };
+        return updates;
     } catch (error) {
         console.error('[Memory Extractor] LLM Error:', error);
-        return state.memory || {};
+        return {};
     }
 }
 

@@ -7,11 +7,9 @@ const { extractMemory } = require('../../memory/extractor');
 async function memoryNode(state) {
     console.log('[Memory Node] Updating persistent memory...');
 
-    const newMemory = extractMemory(state);
+    const updates = await extractMemory(state);
 
-    return {
-        memory: newMemory
-    };
+    return updates;
 }
 
 module.exports = {

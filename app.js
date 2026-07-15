@@ -1057,6 +1057,8 @@ async function processBufferedMessages(senderNumber, client) {
             const currentState = await zoyaAgent.getState(config);
             
             let messageList = [];
+            let hydratedVehicle = null;
+            let hydratedConsultation = null;
             
             // Hydrate memory if server restarted (MemorySaver is empty)
             if (!currentState?.values?.messages || currentState.values.messages.length === 0) {
@@ -1089,8 +1091,25 @@ async function processBufferedMessages(senderNumber, client) {
                         });
                         console.log(`[LangGraph] Hydrated ${history.length} messages.`);
                     }
+
+                    // Hydrate V2 State from CustomerContext
+                    const { getCustomerContext } = require('./src/ai/utils/mergeCustomerContext.js');
+                    const crmContext = await getCustomerContext(senderNumber);
+                    if (crmContext) {
+                        hydratedVehicle = {
+                            brand: crmContext.motor_model || null,
+                            paintType: crmContext.paint_type || crmContext.motor_color || null
+                        };
+                        hydratedConsultation = {
+                            requestedServices: crmContext.target_services || [],
+                            knownFacts: {
+                                commonObjection: crmContext.budget_signal || crmContext.said_expensive ? 'mahal' : null
+                            }
+                        };
+                        console.log(`[LangGraph] Hydrated vehicle & consultation state from CRM.`);
+                    }
                 } catch (e) {
-                    console.error('[LangGraph] Failed to hydrate messages:', e);
+                    console.error('[LangGraph] Failed to hydrate messages/context:', e);
                 }
             }
             
@@ -1124,6 +1143,9 @@ async function processBufferedMessages(senderNumber, client) {
                     isAdmin: isAdmin // Extra flag for safety
                 }
             };
+
+            if (hydratedVehicle) input.vehicle = hydratedVehicle;
+            if (hydratedConsultation) input.consultation = hydratedConsultation;
 
             // Jalankan Graph dengan thread_id (senderNumber) untuk manajemen state persisten
             const result = await zoyaAgent.invoke(input, {
