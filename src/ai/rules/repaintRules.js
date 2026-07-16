@@ -12,6 +12,7 @@ function evaluateRepaintRules(state) {
         sop: {},
         constraints: [],
         requiredFacts: [],
+        optionalFacts: [],
         upsells: [],
         guidelines: []
     };
@@ -48,14 +49,23 @@ function evaluateRepaintRules(state) {
     const isBodiKasar = requested.some(s => s.toLowerCase().includes('bodi kasar'));
     const isVelg = requested.some(s => s.toLowerCase().includes('velg')) || knownRepaintTarget?.toLowerCase().includes('velg');
     
-    if (isFullBody) {
-        rules.requiredFacts.push(...REPAINT_FLOWS.FULL_BODY.requiredFacts);
-    } else if (isBodiHalus) {
-        rules.requiredFacts.push(...REPAINT_FLOWS.BODY_HALUS.requiredFacts);
-    } else if (isBodiKasar) {
-        rules.requiredFacts.push(...REPAINT_FLOWS.BODY_KASAR.requiredFacts);
-    } else if (isVelg) {
-        rules.requiredFacts.push(...REPAINT_FLOWS.VELG.requiredFacts);
+    let selectedFlow = null;
+
+    if (isFullBody) selectedFlow = REPAINT_FLOWS.FULL_BODY;
+    else if (isBodiHalus) selectedFlow = REPAINT_FLOWS.BODY_HALUS;
+    else if (isBodiKasar) selectedFlow = REPAINT_FLOWS.BODY_KASAR;
+    else if (isVelg) selectedFlow = REPAINT_FLOWS.VELG;
+
+    if (selectedFlow) {
+        if (selectedFlow.requiredFacts) rules.requiredFacts.push(...selectedFlow.requiredFacts);
+        
+        if (selectedFlow.blockedFacts && selectedFlow.blockedFacts.length > 0) {
+            rules.constraints.push(`DILARANG KERAS menanyakan atau mencari informasi mengenai: ${selectedFlow.blockedFacts.join(', ')}.`);
+        }
+        
+        if (selectedFlow.optionalFacts) {
+            rules.optionalFacts.push(...selectedFlow.optionalFacts);
+        }
     } else {
         // Generic repaint, needs clarification
         rules.requiredFacts.push("motorModel", "partToRepaint");

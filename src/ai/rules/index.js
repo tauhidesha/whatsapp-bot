@@ -16,6 +16,7 @@ function executeRules(state) {
         sop: {},
         constraints: [],
         requiredFacts: [],
+        optionalFacts: [],
         upsells: [],
         promotions: [],
         restrictions: [],
@@ -58,6 +59,7 @@ function executeRules(state) {
         if (repaintRules.sop) Object.assign(flags.sop, repaintRules.sop);
         if (repaintRules.constraints) flags.constraints.push(...repaintRules.constraints);
         if (repaintRules.requiredFacts) flags.requiredFacts.push(...repaintRules.requiredFacts);
+        if (repaintRules.optionalFacts) flags.optionalFacts.push(...repaintRules.optionalFacts);
         if (repaintRules.upsells) flags.upsells.push(...repaintRules.upsells);
         if (repaintRules.guidelines) flags.guidelines.push(...repaintRules.guidelines);
     }

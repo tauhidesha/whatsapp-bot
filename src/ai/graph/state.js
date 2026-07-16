@@ -143,6 +143,7 @@ const ZoyaState = Annotation.Root({
             sop: {},
             constraints: [],
             requiredFacts: [],
+            optionalFacts: [],
             upsells: [],
             promotions: [],
             restrictions: [],
