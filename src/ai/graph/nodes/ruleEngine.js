@@ -12,9 +12,11 @@ async function ruleEngineNode(state) {
     const businessFlags = executeRules(state);
 
     // Return the updated state under the `business` channel
-    return {
+    const result = {
         business: businessFlags
     };
+    console.log('[Rule Engine Node] Output:', JSON.stringify(result, null, 2));
+    return result;
 }
 
 module.exports = {

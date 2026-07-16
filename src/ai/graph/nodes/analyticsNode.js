@@ -9,13 +9,15 @@ async function analyticsNode(state) {
     const newAnalytics = trackAnalytics(state);
     
     // We update conversation status if needed, but mainly update analytics
-    return {
+    const result = {
         analytics: newAnalytics,
         conversation: {
             ...state.conversation,
             buyerStage: newAnalytics.buyerStage
         }
     };
+    console.log('[Analytics Node] Output:', JSON.stringify(result, null, 2));
+    return result;
 }
 
 module.exports = {

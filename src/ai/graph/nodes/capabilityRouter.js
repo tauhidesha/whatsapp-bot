@@ -28,12 +28,13 @@ async function capabilityRouterNode(state) {
             conversationId: state.metadata?.thread_id || 'unknown',
             customerId: state.metadata?.phoneReal || 'unknown',
             conversationState: state,
-            // We pass the whole state to the tool, but the tool should extract parameters if it uses an LLM.
             // Since we haven't implemented an LLM extractor for tool parameters yet, 
-            // for Sprint 4 we will mock the parameter extraction based on state.memory
+            // for Sprint 4 we will extract the parameter based on state.consultation
             parameters: {
-                service_name: ['Repaint Bodi Halus'], // Mock for now to test pricing
-                motor_model: state.memory?.identity?.motor || 'NMax',
+                service_name: state.consultation?.requestedServices?.length > 0 
+                    ? state.consultation.requestedServices 
+                    : ['Repaint Bodi Halus'], // Fallback if empty
+                motor_model: state.vehicle?.model || state.memory?.identity?.motor || 'NMax',
                 bookingDate: '2026-07-20',
                 bookingTime: '10:00',
                 estimatedDurationMinutes: 120
@@ -66,12 +67,14 @@ async function capabilityRouterNode(state) {
         };
     }
 
-    return {
+    const result = {
         tool: toolUpdate,
         analytics: {
             toolCalls: (state.analytics?.toolCalls || 0) + 1
         }
     };
+    console.log('[Capability Router Node] Output:', JSON.stringify(result, null, 2));
+    return result;
 }
 
 module.exports = {

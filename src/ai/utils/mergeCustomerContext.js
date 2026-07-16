@@ -297,7 +297,7 @@ async function syncGraphStateToCRM(senderNumber, state) {
         const extractorData = {
             motor_model: vehicle?.model || memory?.identity?.motor,
             motor_color: vehicle?.paintType,
-            target_services: services?.targetServices,
+            target_services: consultation?.requestedServices || [],
             service_detail: consultation?.problemDescription,
             paint_type: vehicle?.paintType,
             is_bongkar_total: false,

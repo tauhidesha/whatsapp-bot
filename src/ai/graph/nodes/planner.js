@@ -35,14 +35,14 @@ async function plannerNode(state) {
             ['human', promptText]
         ]);
         
-        console.log('[Planner Node] Decision:', decision);
-        
-        return {
+        const result = {
             planner: decision,
             analytics: {
                 plannerRuns: (state.analytics?.plannerRuns || 0) + 1
             }
         };
+        console.log('[Planner Node] Output:', JSON.stringify(result, null, 2));
+        return result;
     } catch (error) {
         console.error('[Planner Node] LLM Error:', error);
         // Fallback behavior if LLM fails

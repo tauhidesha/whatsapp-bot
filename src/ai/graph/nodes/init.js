@@ -74,7 +74,7 @@ async function initNode(state) {
         const dbCtx = customer.customerContext || {};
 
         // Return state update
-        return {
+        const result = {
             isAdmin: isAdmin,
             customer: {
                 id: customer.id,
@@ -106,6 +106,8 @@ async function initNode(state) {
                 currentDateTime: currentDateTime
             }
         };
+        console.log('[initNode] Output:', JSON.stringify(result, null, 2));
+        return result;
 
     } catch (error) {
         console.error('[initNode] Error loading customer:', error);

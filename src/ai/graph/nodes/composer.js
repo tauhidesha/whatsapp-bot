@@ -37,13 +37,15 @@ async function composerNode(state) {
             lastMessages: [...(state.conversation?.lastMessages || []), responseText]
         };
 
-        return {
+        const result = {
             messages: [new AIMessage(responseText)],
             conversation: conversationUpdate,
             analytics: {
                 responseCount: (state.analytics?.responseCount || 0) + 1
             }
         };
+        console.log('[Composer Node] Output:', JSON.stringify(result, null, 2));
+        return result;
     } catch (error) {
         console.error('[Composer Node] LLM Error:', error);
         const fallbackText = 'Aduh maaf mas, sistem saya lagi gangguan sedikit 🙏. Boleh ditunggu sebentar ya.';

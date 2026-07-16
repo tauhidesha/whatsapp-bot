@@ -8,6 +8,8 @@ async function memoryNode(state) {
     console.log('[Memory Node] Updating persistent memory...');
 
     const updates = await extractMemory(state);
+    
+    console.log('[Memory Node] Output:', JSON.stringify(updates, null, 2));
 
     return updates;
 }
