@@ -59,8 +59,15 @@ function buildPlannerPrompt(state) {
     prompt += `Vehicle: ${vehicle?.brand || 'Unknown'} ${vehicle?.model || 'Unknown'}\n`;
     prompt += `Known Facts: ${JSON.stringify(consultation?.knownFacts || {})}\n`;
     prompt += `Conversation Status: ${conversation?.status}\n\n`;
+    // 5. Tool Output (for Re-evaluation Pass)
+    if (state.tool?.lastResult) {
+        prompt += `=== CAPABILITY TOOL OUTPUT ===\n`;
+        prompt += `Data berikut didapatkan dari eksekusi tool ${state.tool.lastCapability || 'sebelumnya'}:\n`;
+        prompt += JSON.stringify(state.tool.lastResult, null, 2) + `\n`;
+        prompt += `Gunakan data ini untuk merumuskan aksi selanjutnya (contoh: ubah strategy menjadi EDUCATE/SHOW_PRICE, kosongkan capability).\n\n`;
+    }
 
-    // 5. Conversation History
+    // 6. Conversation History
     prompt += `=== CONVERSATION HISTORY ===\n`;
     if (state.messages && state.messages.length > 0) {
         state.messages.forEach(msg => {

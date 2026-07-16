@@ -70,12 +70,18 @@ workflow.addConditionalEdges(
     'capabilityRouterNode',
     (state) => {
         const capability = state.planner?.capability;
-        // Jika planner meminta tool execution, state sudah diupdate oleh router
-        // Di full V2 implementation, kita akan re-route balik ke planner (re-evaluate)
-        // Untuk Sprint 1, kita asumsikan setelah tool berjalan, atau jika tidak butuh tool, langsung ke composer.
+        const plannerRuns = state.analytics?.plannerRuns || 0;
+        
+        // Di full V2 implementation, kita me-reroute balik ke planner (re-evaluate)
+        // jika tool berjalan (capability !null) dan planner baru berjalan 1 kali
+        if (capability && plannerRuns < 2) {
+            return 'plannerNode';
+        }
+        
         return 'composerNode';
     },
     {
+        'plannerNode': 'plannerNode',
         'composerNode': 'composerNode'
     }
 );
