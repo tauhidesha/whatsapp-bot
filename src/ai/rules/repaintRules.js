@@ -43,10 +43,10 @@ function evaluateRepaintRules(state) {
     // Langkah 3: Tanya pilihan warna (JANGAN JADIKAN BLOCKER UNTUK HARGA)
     // Jika belum ada warna, tetap berikan guideline tapi biarkan logic lanjut ke bawah
     // agar planner bisa memanggil PricingTool dan memaparkan harga
-    if (!hasColorChoice) {
+    if (!hasColorChoice && !vehicle?.paintType) {
         rules.push({
             type: 'CONVERSATION_GUIDELINE',
-            directive: 'JANGAN menahan info harga hanya karena belum tahu warna. Berikan estimasi harga jika belum diberikan. HINDARI pertanyaan warna kecuali sudah sepakat estimasi.'
+            directive: 'Berikan ESTIMASI HARGA DASAR terlebih dahulu. JIKA customer menyatakan bingung/belum tahu warnanya, JANGAN tanyakan warnanya lagi, melainkan beritahu bahwa mereka bisa konsultasi langsung dengan admin di studio. JIKA customer belum ditanya warna sama sekali, tanyakan pilihan warnanya (karena Candy/Xiralic ada biaya tambahan).'
         });
         // Kita HAPUS 'return rules;' di sini agar flow tidak terputus dan PricingTool bisa dipanggil.
     }
