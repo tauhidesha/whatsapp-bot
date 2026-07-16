@@ -16,7 +16,6 @@ function evaluateRepaintRules(state) {
 
     const { vehicle, consultation } = state;
     const knownFacts = consultation?.knownFacts || {};
-    const hasColorChoice = !!knownFacts.paintShade || !!knownFacts.colorChoice;
     const knownMotor = knownFacts.motor || vehicle?.model;
     
     // Langkah 1: Tanya jenis motor
@@ -43,7 +42,7 @@ function evaluateRepaintRules(state) {
     // Langkah 3: Tanya pilihan warna (JANGAN JADIKAN BLOCKER UNTUK HARGA)
     // Jika belum ada warna, tetap berikan guideline tapi biarkan logic lanjut ke bawah
     // agar planner bisa memanggil PricingTool dan memaparkan harga
-    if (!hasColorChoice && !vehicle?.paintType) {
+    if (!vehicle?.paintType) {
         rules.push({
             type: 'CONVERSATION_GUIDELINE',
             directive: 'Berikan ESTIMASI HARGA DASAR terlebih dahulu. JIKA customer menyatakan bingung/belum tahu warnanya, JANGAN tanyakan warnanya lagi, melainkan beritahu bahwa mereka bisa konsultasi langsung dengan admin di studio. JIKA customer belum ditanya warna sama sekali, tanyakan pilihan warnanya (karena Candy/Xiralic ada biaya tambahan).'

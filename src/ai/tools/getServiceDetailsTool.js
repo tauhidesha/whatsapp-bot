@@ -302,8 +302,7 @@ async function processSingleService(parsedServiceName, input, promoText) {
         '').toString().trim() || null;
 
     const extraContext = input.extraContext || {};
-    const colorChoice = extraContext.colorChoice || (input.color_name || input.colorName || '').toString().trim() || null;
-    const velgColorChoice = extraContext.velgColorChoice || null;
+    const paintType = extraContext.paintType || (input.color_name || input.colorName || '').toString().trim() || null;
     const sizeFromArgs = normalizeSizeInput(input.size || input.motorSize || input.motor_size || input.vehicle_size || input.vehicleSize);
 
     const queryLower = parsedServiceName.trim().toLowerCase();
@@ -330,7 +329,7 @@ async function processSingleService(parsedServiceName, input, promoText) {
 
         // 1. Color Surcharge (ONLY for Repaint Bodi Halus)
         if (serviceName.toLowerCase().includes('bodi halus')) {
-            const colorType = extraContext.colorChoice || extraContext.paintType;
+            const colorType = paintType;
             if (colorType) {
                 const colorSurcharge = await getColorSurcharge(colorType, guess);
                 if (colorSurcharge > 0) {
@@ -343,7 +342,7 @@ async function processSingleService(parsedServiceName, input, promoText) {
 
         // 2. Velg Color Surcharge
         if (serviceName.toLowerCase().includes('velg')) {
-            const velgColor = extraContext.velgColorChoice || extraContext.colorChoice;
+            const velgColor = paintType;
             if (velgColor) {
                 const colorLookup = await lookupColorSurcharge(velgColor);
                 if (colorLookup) {

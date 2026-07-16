@@ -5,16 +5,24 @@ async function run() {
     
     // We pass a dummy state that mimics a new message
     const initialState = {
-        messages: [{ role: 'user', content: 'berapa harga balikin ke aslinya nmax full bodi?' }],
+        messages: [{ role: 'user', content: 'mau balik ke warna salinya aja sih. biar mulus lagi' }],
         metadata: {
             phoneReal: '6281234567890',
             isAdmin: false
+        },
+        vehicle: {
+            model: "Vario"
+        },
+        consultation: {
+            stage: "Comparing",
+            requestedServices: ["Repaint Bodi Halus", "Repaint Bodi Kasar"],
+            knownFacts: { partToRepaint: "bodi halus dan kasar" }
         }
     };
 
     const config = {
         configurable: {
-            thread_id: 'test-thread-v2'
+            thread_id: 'test-thread-v7'
         }
     };
 

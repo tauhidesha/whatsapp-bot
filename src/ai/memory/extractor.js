@@ -8,7 +8,7 @@ const { extractTextFromContent, getMessageType } = require('../graph/utils/sanit
 
 const MemorySchema = z.object({
     motor: z.string().optional().describe("Merek atau model motor yang disebut kustomer (misal: NMax, Beat, PCX). Jika tidak ada, kosongi."),
-    color: z.string().optional().describe("Warna atau jenis cat yang disebut kustomer (misal: merah candy, polos, mutiara, standar pabrik, aslinya). Jika tidak ada, kosongi."),
+    color: z.string().optional().describe("Warna atau jenis cat yang disebut kustomer (misal: merah candy, polos, mutiara). JIKA kustomer bilang 'asli', 'aslinya', 'standar', WAJIB isi dengan 'Standar Pabrik/Original'. Jika tidak ada warna, kosongi."),
     part: z.string().optional().describe("Bagian motor yang ingin dikerjakan (misal: full bodi, bodi halus, bodi kasar, velg). Jika tidak ada, kosongi."),
     objection: z.string().optional().describe("Keberatan atau komplain yang disebut kustomer (misal: 'belum gajian', 'mahal', 'jauh'). Jika tidak ada, kosongi."),
     services: z.array(z.string()).optional().describe("Daftar layanan yang di-request kustomer (misal: 'Repaint Bodi Halus', 'Repaint Velg', 'Detailing'). Jika tidak ada, kosongi.")

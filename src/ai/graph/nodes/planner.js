@@ -36,7 +36,7 @@ const PlannerSchema = z.object({
             nextAction: z.number().min(0).max(1)
         }).describe("Tingkat keyakinan Planner terhadap keputusannya."),
         missingFacts: z.array(z.object({
-            field: z.string().describe("Nama field/fakta yang hilang (misal: 'wheelCondition', 'paintShade', 'bookingDate')."),
+            field: z.string().describe("Nama field/fakta yang hilang (misal: 'wheelCondition', 'paintType', 'bookingDate')."),
             reason: z.string().describe("Alasan logis kenapa fakta ini dibutuhkan sekarang."),
             priority: z.number().describe("Prioritas (1 = paling utama, makin besar makin tidak prioritas).")
         })).describe("Daftar fakta yang belum diketahui (belum ada di knownFacts) yang HARUS ditanyakan ke user."),
