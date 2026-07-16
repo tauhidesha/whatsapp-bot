@@ -81,6 +81,7 @@ function buildPlannerPrompt(state) {
     prompt += `- Anda mengendalikan state graph dengan struktur objek JSON: decision, execution, conversation, dan reasoning.\n`;
     prompt += `- [decision.buyerStage]: Evaluasi stage customer saat ini (Exploring, Comparing, Interested, Ready, atau Booking).\n`;
     prompt += `- [execution.toolIntent]: Gunakan intent generik (GET_PRICE, CREATE_BOOKING, CHECK_AVAILABILITY, SEND_NOTIFICATION, ANSWER_FAQ (untuk info alamat studio, jam buka, faq), ESCALATE_HUMAN) jika butuh data eksternal, atau 'NONE' jika tidak. JANGAN mengarang (hallucinate) alamat atau harga, selalu panggil intent yang tepat!\n`;
+    prompt += `- Jika goal adalah mengumpulkan informasi (COLLECT_INFO), set \`nextAction.type\` menjadi \`ASK_MISSING_FACTS\`. Detail mengenai apa yang harus ditanyakan HANYA boleh diletakkan di dalam array \`remainingFacts\` beserta alasannya (\`reason\`).\n`;
     prompt += `- [conversation.informationPriority]: Tentukan prioritas urutan tipe informasi yang harus disusun oleh Composer.\n`;
     prompt += `- BACA "Known Facts" dan bandingkan dengan "REQUIRED FACTS". Hitung status progres dan tuangkan ke dalam "reasoning.goalStatus".\n`;
     prompt += `- Jika "remainingFacts" sudah kosong, Anda BERHAK dan HARUS transisi "goal" ke langkah selanjutnya (misal dari COLLECT_INFO ke PRICE_ESTIMATION) dan set toolIntent yang sesuai.\n\n`;
@@ -137,9 +138,6 @@ function buildComposerPrompt(state, plannerDecision, prioritizedData = null) {
     prompt += `Strategy: ${plannerDecision.decision?.strategy}\n`;
     prompt += `Buyer Stage: ${plannerDecision.decision?.buyerStage}\n`;
     prompt += `Action Type: ${plannerDecision.execution?.nextAction?.type}\n`;
-    if (plannerDecision.execution?.nextAction?.target) {
-        prompt += `Action Target: ${plannerDecision.execution.nextAction.target}\n`;
-    }
     
     if (plannerDecision.conversation?.informationPriority && plannerDecision.conversation.informationPriority.length > 0) {
         prompt += `\n=== INFORMATION PRIORITY ===\n`;
@@ -165,7 +163,7 @@ function buildComposerPrompt(state, plannerDecision, prioritizedData = null) {
     const remainingFacts = plannerDecision.reasoning?.goalStatus?.remainingFacts;
     if (remainingFacts && remainingFacts.length > 0) {
         prompt += `=== MISSING FACTS (PRIORITIZED) ===\n`;
-        prompt += `Berikut adalah fakta yang perlu Anda tanyakan ke customer. Gabungkan gaya bertanya Anda dengan arahan Strategy di atas.\n`;
+        prompt += `Berikut adalah fakta yang perlu Anda tanyakan ke customer. HANYA BACA dari sini untuk mengetahui apa yang harus ditanyakan. Gabungkan gaya bertanya Anda dengan arahan Strategy di atas, dan gunakan 'reason' sebagai konteks empati/natural.\n`;
         prompt += `Pilih SATU fakta prioritas utama untuk ditanyakan secara natural:\n`;
         prompt += JSON.stringify(remainingFacts, null, 2) + `\n\n`;
     }

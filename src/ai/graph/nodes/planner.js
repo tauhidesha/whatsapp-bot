@@ -15,8 +15,7 @@ const PlannerSchema = z.object({
     }),
     execution: z.object({
         nextAction: z.object({
-            type: z.enum(['ASK', 'INFORM', 'CALL_TOOL', 'WAIT', 'END', 'CONFIRM', 'ESCALATE', 'HANDOFF']),
-            target: z.string().optional().describe("Fakta/Topik target (misal: 'wheelCondition')"),
+            type: z.enum(['ASK_MISSING_FACTS', 'EXECUTE_TOOL', 'PROVIDE_INFO', 'CLOSING']),
             priority: z.number().optional()
         }).describe("Aksi berikutnya yang harus diambil."),
         toolIntent: z.enum(['NONE', 'GET_PRICE', 'BOOK', 'CHECK_BOOKING', 'ESCALATE', 'NOTIFY', 'ANSWER']).describe("Intent untuk memanggil external tools. Isi dengan 'NONE' jika tidak butuh.")
@@ -93,8 +92,7 @@ async function plannerNode(state) {
             },
             execution: {
                 nextAction: {
-                    type: 'ASK',
-                    target: 'general',
+                    type: 'ASK_MISSING_FACTS',
                     priority: 1
                 },
                 toolIntent: 'NONE'
