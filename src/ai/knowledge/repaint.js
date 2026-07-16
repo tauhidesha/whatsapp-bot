@@ -12,17 +12,17 @@ const repaintKnowledge = {
             promptAction: "Tanya jenis motornya apa"
         },
         {
-            name: "paintType",
-            description: "Jenis cat (Polos, Mutiara, Xiralic, Candy, Standar Pabrik/Original)",
-            promptAction: "Tanya mau pakai cat jenis apa. Jika customer minta 'kembali ke asli' atau 'standar pabrik', anggap ini sebagai valid paintType."
-        },
-        {
             name: "partToRepaint",
             description: "Bagian motor mana yang ingin di-repaint (Bodi Halus, Bodi Kasar, Velg, Full Bodi)",
             promptAction: "Tanya bagian mana yang ingin di-repaint"
         }
     ],
     optionalSlots: [
+        {
+            name: "paintType",
+            description: "Jenis cat (Polos, Mutiara, Xiralic, Candy, Standar Pabrik/Original)",
+            promptAction: "Tanya mau pakai cat jenis apa. Jika customer minta 'kembali ke asli' atau 'standar pabrik', anggap ini sebagai valid paintType."
+        },
         {
             name: "color",
             description: "Warna spesifik yang diinginkan",
