@@ -1,12 +1,14 @@
-const { getServiceDetailsTool } = require('./src/ai/tools/getServiceDetailsTool');
+const { zoyaAgent } = require('./src/ai/graph/index');
 
 async function run() {
-    const input = {
-        service_name: ["Repaint Bodi Halus", "Repaint Bodi Kasar"],
-        motor_model: "Yamaha Fazzio",
-        size: "M"
-    };
-    const result = await getServiceDetailsTool.implementation(input);
-    console.log(JSON.stringify(result, null, 2));
+    let state = { messages: [] };
+    
+    let userMsg1 = { role: "user", content: "mau repaint velg vario 150 warna gold" };
+    state = await zoyaAgent.invoke({ messages: [userMsg1] }, { configurable: { thread_id: "test-velg-1" } });
+    console.log("AI 1:", state.messages[state.messages.length - 1].content);
+
+    let userMsg2 = { role: "user", content: "udah pernah direpaint om" };
+    state = await zoyaAgent.invoke({ messages: [userMsg2] }, { configurable: { thread_id: "test-velg-1" } });
+    console.log("AI 2:", state.messages[state.messages.length - 1].content);
 }
 run();

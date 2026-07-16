@@ -11,7 +11,8 @@ const MemorySchema = z.object({
     color: z.string().optional().describe("Warna atau jenis cat yang disebut kustomer (misal: merah candy, polos, mutiara). JIKA kustomer bilang 'asli', 'aslinya', 'standar', WAJIB isi dengan 'Standar Pabrik/Original'. Jika tidak ada warna, kosongi."),
     part: z.string().optional().describe("Bagian motor yang ingin dikerjakan (misal: full bodi, bodi halus, bodi kasar, velg). Jika tidak ada, kosongi."),
     objection: z.string().optional().describe("Keberatan atau komplain yang disebut kustomer (misal: 'belum gajian', 'mahal', 'jauh'). Jika tidak ada, kosongi."),
-    services: z.array(z.string()).optional().describe("Daftar layanan yang di-request kustomer (misal: 'Repaint Bodi Halus', 'Repaint Velg', 'Detailing'). Jika tidak ada, kosongi.")
+    services: z.array(z.string()).optional().describe("Daftar layanan yang di-request kustomer (misal: 'Repaint Bodi Halus', 'Repaint Velg', 'Detailing'). Jika tidak ada, kosongi."),
+    velgCondition: z.string().optional().describe("Kondisi velg motor saat ini (misal: 'masih ori', 'udah direpaint', 'banyak baret', 'grepes'). Jika tidak ada, kosongi.")
 });
 
 async function extractMemory(state) {
@@ -50,12 +51,15 @@ async function extractMemory(state) {
             if (extraction.color) updates.vehicle.paintType = extraction.color;
         }
 
-        if (extraction.objection || extraction.part || (extraction.services && extraction.services.length > 0)) {
+        if (extraction.objection || extraction.part || (extraction.services && extraction.services.length > 0) || extraction.velgCondition) {
             updates.consultation = { ...state.consultation };
             updates.consultation.knownFacts = { ...(updates.consultation.knownFacts || {}) };
             
             if (extraction.objection) {
                 updates.consultation.knownFacts.commonObjection = extraction.objection;
+            }
+            if (extraction.velgCondition) {
+                updates.consultation.knownFacts.velgCondition = extraction.velgCondition;
             }
             if (extraction.part) {
                 updates.consultation.knownFacts.partToRepaint = extraction.part;

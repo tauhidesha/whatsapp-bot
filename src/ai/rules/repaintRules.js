@@ -41,6 +41,7 @@ function evaluateRepaintRules(state) {
     // Include paint rules if color or part is discussed
     if (contextKeys.includes('paintColor') || contextKeys.includes('partToRepaint') || isRepaintRequested) {
         rules.sop.paint = businessRules.paint;
+        rules.sop.pricing = businessRules.pricing;
     }
 
     // 2. Identify Flow and Inject Required Facts

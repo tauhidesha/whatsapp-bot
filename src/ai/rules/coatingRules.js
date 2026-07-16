@@ -5,7 +5,7 @@
 
 function evaluateCoatingRestriction(state) {
     const requested = state.consultation?.requestedServices || [];
-    const hasRepaint = requested.includes('repaint');
+    const hasRepaint = requested.some(s => s.toLowerCase().includes('repaint'));
     
     if (hasRepaint) {
         return {

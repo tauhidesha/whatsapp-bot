@@ -31,7 +31,7 @@ const repaintKnowledge = {
         {
             name: "velgCondition",
             description: "Kondisi velg (Masih cat original atau sudah pernah dicat ulang)",
-            promptAction: "Jika pesan Repaint Velg, tanya kondisi velg saat ini"
+            promptAction: "Tanyakan apakah cat velg saat ini masih original pabrik atau sudah pernah direpaint sebelumnya."
         }
     ],
     businessRule: [

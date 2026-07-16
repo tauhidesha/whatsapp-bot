@@ -10,7 +10,8 @@ const businessRules = {
     "Saat menanyakan bagian yang akan di-repaint (partToRepaint), JELASKAN opsinya: bodi halus, bodi kasar, velg, arm, cvt, dll."
   ],
   "pricing": [
-    // Tambahkan aturan harga default di sini jika ada
+    "JIKA tool pricing sudah memberikan harga, WAJIB sebutkan harga tersebut di pesan.",
+    "Jika customer menginformasikan velg sudah pernah direpaint/dicat ulang, WAJIB berikan info bahwa ada biaya tambahan (surcharge) untuk cairan 'Paint Remover' / rontok cat di luar harga dasar."
   ]
 };
 
