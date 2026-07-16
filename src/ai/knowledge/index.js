@@ -25,9 +25,13 @@ function getRelevantKnowledge(requestedServices = []) {
 
     const context = {};
     for (const service of requestedServices) {
-        const key = service.toLowerCase();
-        if (KNOWLEDGE_REGISTRY[key]) {
-            context[key] = KNOWLEDGE_REGISTRY[key];
+        const lowerService = service.toLowerCase();
+        
+        // Cek semua key di registry, jika service dari user mengandung kata tersebut (misal: 'repaint bodi halus' includes 'repaint')
+        for (const [key, knowledge] of Object.entries(KNOWLEDGE_REGISTRY)) {
+            if (lowerService.includes(key) && !context[key]) {
+                context[key] = knowledge;
+            }
         }
     }
 

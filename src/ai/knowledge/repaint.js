@@ -36,6 +36,7 @@ const repaintKnowledge = {
     ],
     businessRule: [
         "Repaint Bodi Halus: Beri info jika ada biaya tambahan untuk warna tertentu.",
+        "Repair & Dempul: Layanan repaint sudah termasuk perbaikan (repair/dempul) ringan untuk bagian yang patah/lecet. Namun, jika perbaikannya berat atau sangat banyak, akan ada biaya tambahan. Estimasi biaya tambahan pasti hanya bisa diberikan setelah mekanik melihat kondisi fisik motor langsung di studio.",
         "Repaint Velg: Ada biaya tambahan jika mau warna Chrome atau Two-Tone dengan Polish.",
         "Repaint Velg: Ada biaya tambahan (paint remover) jika velg sudah pernah dicat ulang.",
         "Repaint Full Bodi: Mencakup Bodi Halus + Bodi Kasar.",
