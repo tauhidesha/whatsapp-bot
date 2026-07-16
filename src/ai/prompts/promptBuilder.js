@@ -51,6 +51,7 @@ function buildPlannerPrompt(state) {
         business.upsells.forEach(u => {
             prompt += `- Tawarkan ${u.service}: ${u.reason}\n`;
         });
+        prompt += `PENTING: Jika Anda memutuskan untuk melakukan upsell, pastikan Anda menambahkan objek { type: 'upsell', priority: [n] } ke dalam conversation.informationPriority.\n`;
     }
     prompt += `\n`;
 

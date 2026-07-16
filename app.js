@@ -2528,10 +2528,13 @@ app.post('/test-ai', requireAuth, async (req, res) => {
             messageContent.push({ type: 'text', text: '[Pesan Kosong]' });
         }
 
+        const customThreadId = req.body?.thread_id || req.query?.thread_id;
+        const finalThreadId = effectiveSenderNumber || customThreadId || "test_user_playground";
+
         const input = {
             messages: [new HumanMessage({ content: messageContent })],
             metadata: {
-                phoneReal: effectiveSenderNumber || "test_user_playground",
+                phoneReal: finalThreadId,
                 senderName: senderName,
                 mediaItems: mediaItems,
                 isAdmin: isAdmin 
@@ -2539,7 +2542,7 @@ app.post('/test-ai', requireAuth, async (req, res) => {
         };
 
         const aiResult = await zoyaAgent.invoke(input, {
-            configurable: { thread_id: effectiveSenderNumber || "test_user_playground" }
+            configurable: { thread_id: finalThreadId }
         });
 
         const lastMessage = aiResult.messages[aiResult.messages.length - 1];
@@ -2575,7 +2578,8 @@ app.post('/test-ai', requireAuth, async (req, res) => {
 app.delete('/test-ai/clear', requireAuth, async (req, res) => {
     try {
         const mode = req.body?.mode || req.query?.mode || 'customer';
-        let thread_id = "test_user_playground";
+        const customThreadId = req.body?.thread_id || req.query?.thread_id;
+        let thread_id = customThreadId || "test_user_playground";
         
         if (mode === 'admin') {
             thread_id = process.env.BOSMAT_ADMIN_NUMBER || process.env.ADMIN_WHATSAPP_NUMBER || thread_id;

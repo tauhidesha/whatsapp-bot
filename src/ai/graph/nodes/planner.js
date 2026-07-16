@@ -15,7 +15,7 @@ const PlannerSchema = z.object({
     }),
     execution: z.object({
         nextAction: z.object({
-            type: z.enum(['ASK_MISSING_FACTS', 'EXECUTE_TOOL', 'PROVIDE_INFO', 'CLOSING']),
+            type: z.enum(['ASK_MISSING_FACTS', 'EXECUTE_TOOL', 'PROVIDE_INFO', 'CLOSING', 'UPSELL']),
             priority: z.number().optional()
         }).describe("Aksi berikutnya yang harus diambil."),
         toolIntent: z.enum(['NONE', 'GET_PRICE', 'BOOK', 'CHECK_BOOKING', 'ESCALATE', 'NOTIFY', 'ANSWER']).describe("Intent untuk memanggil external tools. Isi dengan 'NONE' jika tidak butuh.")
@@ -23,7 +23,7 @@ const PlannerSchema = z.object({
     conversation: z.object({
         responseLength: z.enum(['SHORT', 'MEDIUM', 'LONG']).describe("Panjang balasan yang diinstruksikan ke Composer."),
         informationPriority: z.array(z.object({
-            type: z.enum(['summary', 'price', 'education', 'question', 'empathy']),
+            type: z.enum(['summary', 'price', 'education', 'question', 'empathy', 'upsell']),
             priority: z.number()
         })).describe("Urutan informasi yang harus disampaikan Composer.")
     }),
