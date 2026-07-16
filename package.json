@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node --max-old-space-size=1024 app.js",
     "dev": "nodemon --max-old-space-size=1024 app.js",
-    "test": "node test.js"
+    "test": "node test.js",
+    "test:ai": "testsprite run tests/e2e/zoya-v2-scenarios.yaml"
   },
   "keywords": [
     "whatsapp",
