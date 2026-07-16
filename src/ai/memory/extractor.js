@@ -8,7 +8,8 @@ const { extractTextFromContent, getMessageType } = require('../graph/utils/sanit
 
 const MemorySchema = z.object({
     motor: z.string().optional().describe("Merek atau model motor yang disebut kustomer (misal: NMax, Beat, PCX). Jika tidak ada, kosongi."),
-    color: z.string().optional().describe("Warna yang disebut kustomer. Jika tidak ada, kosongi."),
+    color: z.string().optional().describe("Warna atau jenis cat yang disebut kustomer (misal: merah candy, polos, mutiara). Jika tidak ada, kosongi."),
+    part: z.string().optional().describe("Bagian motor yang ingin dikerjakan (misal: full bodi, bodi halus, bodi kasar, velg). Jika tidak ada, kosongi."),
     objection: z.string().optional().describe("Keberatan atau komplain yang disebut kustomer (misal: 'belum gajian', 'mahal', 'jauh'). Jika tidak ada, kosongi."),
     services: z.array(z.string()).optional().describe("Daftar layanan yang di-request kustomer (misal: 'Repaint Bodi Halus', 'Repaint Velg', 'Detailing'). Jika tidak ada, kosongi.")
 });
@@ -49,14 +50,15 @@ async function extractMemory(state) {
             if (extraction.color) updates.vehicle.paintType = extraction.color;
         }
 
-        if (extraction.objection || (extraction.services && extraction.services.length > 0)) {
+        if (extraction.objection || extraction.part || (extraction.services && extraction.services.length > 0)) {
             updates.consultation = { ...state.consultation };
+            updates.consultation.knownFacts = { ...(updates.consultation.knownFacts || {}) };
             
             if (extraction.objection) {
-                updates.consultation.knownFacts = {
-                    ...(updates.consultation.knownFacts || {}),
-                    commonObjection: extraction.objection
-                };
+                updates.consultation.knownFacts.commonObjection = extraction.objection;
+            }
+            if (extraction.part) {
+                updates.consultation.knownFacts.partToRepaint = extraction.part;
             }
             
             if (extraction.services && extraction.services.length > 0) {

@@ -55,8 +55,16 @@ function buildPlannerPrompt(state) {
     // 4. Current State Snapshot
     prompt += `=== CURRENT STATE ===\n`;
     prompt += `Customer: ${customer?.name} (Status: ${customer?.status})\n`;
-    prompt += `Vehicle: ${vehicle?.brand || 'Unknown'} ${vehicle?.model || 'Unknown'}\n`;
-    prompt += `Known Facts: ${JSON.stringify(consultation?.knownFacts || {})}\n`;
+    
+    // Combine explicit knownFacts with vehicle data so Planner sees them as a single truth
+    const allKnownFacts = {
+        ...(consultation?.knownFacts || {}),
+        ...(vehicle?.brand ? { motorBrand: vehicle.brand } : {}),
+        ...(vehicle?.model ? { motorModel: vehicle.model } : {}),
+        ...(vehicle?.paintType ? { paintType: vehicle.paintType } : {})
+    };
+    
+    prompt += `Known Facts: ${JSON.stringify(allKnownFacts)}\n`;
     prompt += `Conversation Status: ${conversation?.status}\n\n`;
     
     prompt += `=== PLANNER DIRECTIVES ===\n`;
