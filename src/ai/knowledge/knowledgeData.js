@@ -1,7 +1,7 @@
 const serviceKnowledge = {
   "general": "Bosmat Garage adalah spesialis repaint dan detailing motor kelas premium.",
   "services": {
-    "repaint": "Layanan cat ulang menggunakan bahan PU berkualitas.",
+    "repaint": "Layanan cat ulang menggunakan bahan PU berkualitas. Pilihan bagian yang bisa dicat (partToRepaint) meliputi: bodi halus, bodi kasar, velg, arm, cvt, dll.",
     "detailing": "Layanan pembersihan dan proteksi mendalam."
   },
   "faq": {

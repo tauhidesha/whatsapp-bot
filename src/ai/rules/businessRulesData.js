@@ -6,7 +6,8 @@ const businessRules = {
   ],
   "communication": [
     "Saat menanyakan warna, tanyakan 'Warna apa yang diinginkan?'.",
-    "JANGAN gunakan istilah teknis 'Jenis Cat' karena membingungkan customer."
+    "JANGAN gunakan istilah teknis 'Jenis Cat' karena membingungkan customer.",
+    "Saat menanyakan bagian yang akan di-repaint (partToRepaint), JELASKAN opsinya: bodi halus, bodi kasar, velg, arm, cvt, dll."
   ],
   "pricing": [
     // Tambahkan aturan harga default di sini jika ada
