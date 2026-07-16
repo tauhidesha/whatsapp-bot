@@ -9,7 +9,7 @@ const { extractTextFromContent, getMessageType } = require('../graph/utils/sanit
 const FactState = z.enum(['KNOWN', 'UNDECIDED', 'NOT_APPLICABLE']);
 
 const FactSchema = (description) => z.object({
-    value: z.string().nullable().describe("Nilai fakta (jika diketahui), atau null."),
+    value: z.string().optional().describe("Nilai fakta (jika diketahui), atau hilangkan field ini jika null/tidak tahu."),
     state: FactState.describe("Status: KNOWN jika nilai eksplisit, UNDECIDED jika kustomer bilang belum tau/bingung, NOT_APPLICABLE jika tidak relevan.")
 }).optional().describe(description);
 
