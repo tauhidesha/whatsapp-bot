@@ -18,7 +18,7 @@ async function capabilityRouterNode(state) {
 
     // Map generic intent to specific tool implementation
     const intentToToolMap = {
-        'GET_PRICE': 'getRepaintPricing',
+        'GET_PRICE': 'pricing',
         'CREATE_BOOKING': 'createBooking',
         'CHECK_AVAILABILITY': 'booking_availability',
         'SEND_NOTIFICATION': 'notification',

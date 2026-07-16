@@ -13,8 +13,8 @@ const repaintKnowledge = {
         },
         {
             name: "paintType",
-            description: "Jenis cat (Polos, Mutiara, Xiralic, Candy)",
-            promptAction: "Tanya mau pakai cat jenis apa. Jelaskan bedanya jika ditanya."
+            description: "Jenis cat (Polos, Mutiara, Xiralic, Candy, Standar Pabrik/Original)",
+            promptAction: "Tanya mau pakai cat jenis apa. Jika customer minta 'kembali ke asli' atau 'standar pabrik', anggap ini sebagai valid paintType."
         },
         {
             name: "partToRepaint",
