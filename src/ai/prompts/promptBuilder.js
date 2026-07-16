@@ -71,7 +71,7 @@ function buildPlannerPrompt(state) {
         ...(consultation?.knownFacts || {}),
         ...(vehicle?.brand ? { motorBrand: vehicle.brand } : {}),
         ...(vehicle?.model ? { motorModel: vehicle.model } : {}),
-        ...(vehicle?.paintType ? { paintType: vehicle.paintType } : {})
+        ...(vehicle?.paintType ? { paintColor: vehicle.paintType } : {})
     };
     
     prompt += `Known Facts: ${JSON.stringify(allKnownFacts)}\n`;

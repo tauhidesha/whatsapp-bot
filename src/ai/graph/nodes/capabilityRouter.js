@@ -47,6 +47,7 @@ async function capabilityRouterNode(state) {
                     ? state.consultation.requestedServices 
                     : ['Repaint Bodi Halus'], // Fallback if empty
                 motor_model: state.vehicle?.model || state.memory?.identity?.motor || 'NMax',
+                color_name: state.vehicle?.paintType || state.consultation?.knownFacts?.paintColor || null,
                 bookingDate: '2026-07-20',
                 bookingTime: '10:00',
                 estimatedDurationMinutes: 120

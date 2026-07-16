@@ -11,10 +11,10 @@ const REPAINT_FLOWS = {
         requiredFacts: [
             "motorModel",
             "partToRepaint",
-            "paintType"
+            "paintColor"
         ],
         optionalFacts: [
-            "color",
+            "paintType",
             "upsell_cuci_komplit"
         ],
         blockedFacts: []
@@ -23,10 +23,10 @@ const REPAINT_FLOWS = {
         requiredFacts: [
             "motorModel",
             "partToRepaint",
-            "paintType"
+            "paintColor"
         ],
         optionalFacts: [
-            "color",
+            "paintType",
             "upsell_cuci_komplit"
         ],
         blockedFacts: []
@@ -41,6 +41,7 @@ const REPAINT_FLOWS = {
         ],
         blockedFacts: [
             "paintType",
+            "paintColor",
             "color"
         ]
     },
@@ -48,11 +49,11 @@ const REPAINT_FLOWS = {
         requiredFacts: [
             "motorModel",
             "partToRepaint",
-            "paintType",
+            "paintColor",
             "velgCondition"
         ],
         optionalFacts: [
-            "color",
+            "paintType",
             "upsell_cuci_komplit"
         ],
         blockedFacts: []

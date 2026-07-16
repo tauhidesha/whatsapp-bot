@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { evaluateRepaintRules } = require('./src/ai/rules/repaintRules');
 const { plannerNode } = require('./src/ai/graph/nodes/planner');
+const { composerNode } = require('./src/ai/graph/nodes/composer');
 
 async function main() {
     const state = {
@@ -8,7 +9,7 @@ async function main() {
         consultation: {
             stage: 'COLLECT_INFO',
             requestedServices: ['repaint bodi halus vario'],
-            knownFacts: { motor: 'Vario 150', scope: 'bodi halus' }
+            knownFacts: { motorModel: 'Vario 150', partToRepaint: 'bodi halus' }
         },
         vehicle: { model: 'Vario 150' },
         messages: [{ kwargs: { content: 'repaint vario bodi halus aja', type: 'human' } }]
@@ -16,10 +17,12 @@ async function main() {
 
     console.log('--- Rule Engine ---');
     state.business = evaluateRepaintRules(state);
-    console.log(JSON.stringify(state.business, null, 2));
 
     console.log('\n--- Planner ---');
     const plannerResult = await plannerNode(state);
-    console.log(JSON.stringify(plannerResult, null, 2));
+    state.planner = plannerResult.planner;
+
+    console.log('\n--- Composer ---');
+    const composerResult = await composerNode(state);
 }
 main();

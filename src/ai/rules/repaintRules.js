@@ -26,8 +26,9 @@ function evaluateRepaintRules(state) {
     const knownMotor = knownFacts.motor || vehicle?.model;
     const knownRepaintTarget = knownFacts.repaintTarget || knownFacts.scope;
 
-    // 1. SOP: Bodi Kasar Color Constraint
+    // 1. SOP: Bodi Kasar Color Constraint & Communication Guideline
     rules.sop.push("SOP BENGKEL: Warna Bodi Kasar selalu standar Hitam/Original. Pilihan warna khusus (seperti Candy/Mutiara) HANYA berlaku untuk Bodi Halus atau Velg. JANGAN tanyakan alokasi warna untuk Bodi Kasar.");
+    rules.sop.push("KOMUNIKASI: Saat menanyakan warna, tanyakan 'Warna apa yang diinginkan?'. JANGAN gunakan istilah teknis 'Jenis Cat' karena membingungkan customer.");
 
     // 2. Identify Flow and Inject Required Facts
     const isFullBody = requested.some(s => s.toLowerCase().includes('full bodi') && !s.toLowerCase().includes('halus'));
