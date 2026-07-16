@@ -55,7 +55,19 @@ async function capabilityRouterNode(state) {
             metadata: { source: 'capabilityRouter' }
         };
 
-        const response = await tool.execute(toolInput);
+        // Import traceable from langsmith/traceable dynamically
+        const { traceable } = require('langsmith/traceable');
+        
+        // Wrap execution to show up nicely as a 'tool' in LangSmith
+        const tracedToolExecution = traceable(async (input) => {
+            return await tool.execute(input);
+        }, {
+            name: tool.name,
+            run_type: "tool",
+            tags: ["capability", capability]
+        });
+
+        const response = await tracedToolExecution(toolInput);
         
         resultData = response;
         
