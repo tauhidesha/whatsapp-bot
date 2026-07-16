@@ -59,6 +59,21 @@ async function extractMemory(state) {
             }
             if (extraction.part) {
                 updates.consultation.knownFacts.partToRepaint = extraction.part;
+                
+                // Regex fallback to ensure requestedServices captures the specific repaint flow
+                const partLower = extraction.part.toLowerCase();
+                let specificService = null;
+                if (partLower.includes('halus')) specificService = 'Repaint Bodi Halus';
+                else if (partLower.includes('kasar')) specificService = 'Repaint Bodi Kasar';
+                else if (partLower.includes('velg') || partLower.includes('pelg')) specificService = 'Repaint Velg';
+                else if (partLower.includes('full')) specificService = 'Repaint Full Bodi';
+
+                if (specificService) {
+                    extraction.services = extraction.services || [];
+                    if (!extraction.services.includes(specificService)) {
+                        extraction.services.push(specificService);
+                    }
+                }
             }
             
             if (extraction.services && extraction.services.length > 0) {

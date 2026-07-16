@@ -71,11 +71,29 @@ async function capabilityRouterNode(state) {
         
         resultData = response;
         
+        // FORMATTER UNTUK PRICING (Sesuai instruksi User)
+        if (capability === 'pricing' && response.data && Array.isArray(response.data)) {
+            const prices = response.data.map(p => p.price || 0).filter(p => p > 0);
+            if (prices.length > 0) {
+                const min = Math.min(...prices);
+                const max = Math.max(...prices);
+                
+                const formatRp = (num) => 'Rp ' + num.toLocaleString('id-ID');
+                const hargaStr = min === max ? formatRp(min) : `${formatRp(min)} - ${formatRp(max)} (Tergantung Paket)`;
+                
+                resultData = {
+                    data: {
+                        hargaEstimasi: hargaStr
+                    }
+                };
+            }
+        }
+        
         toolUpdate = {
             lastCapability: capability,
             lastTool: tool.name,
-            lastResult: response.data,
-            executionHistory: [...(state.tool?.executionHistory || []), { capability, result: response, time: new Date().toISOString() }]
+            lastResult: resultData.data || resultData,
+            executionHistory: [...(state.tool?.executionHistory || []), { capability, result: resultData, time: new Date().toISOString() }]
         };
 
     } else {
