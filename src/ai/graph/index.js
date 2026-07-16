@@ -38,13 +38,13 @@ const workflow = new StateGraph(ZoyaState)
  */
 workflow.addEdge(START, 'init');
 
-// Admin Router: init → admin (if admin) | ruleEngine (if customer)
+// Admin Router: init → admin (if admin) | memoryNode (if customer)
 workflow.addConditionalEdges(
     'init',
-    (state) => (state.isAdmin ? 'admin' : 'ruleEngineNode'),
+    (state) => (state.isAdmin ? 'admin' : 'memoryNode'),
     {
         'admin': 'admin',
-        'ruleEngineNode': 'ruleEngineNode'
+        'memoryNode': 'memoryNode'
     }
 );
 
@@ -61,6 +61,8 @@ workflow.addConditionalEdges(
 workflow.addEdge('adminExecutor', 'admin');
 
 // Customer Flow V2:
+// Memory Extraction runs FIRST so Rule Engine has the latest facts from the user's message
+workflow.addEdge('memoryNode', 'ruleEngineNode');
 workflow.addEdge('ruleEngineNode', 'plannerNode');
 workflow.addEdge('plannerNode', 'capabilityRouterNode');
 
@@ -78,8 +80,7 @@ workflow.addConditionalEdges(
     }
 );
 
-workflow.addEdge('composerNode', 'memoryNode');
-workflow.addEdge('memoryNode', 'analyticsNode');
+workflow.addEdge('composerNode', 'analyticsNode');
 workflow.addEdge('analyticsNode', END);
 
 /**

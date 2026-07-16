@@ -45,7 +45,7 @@ async function extractMemory(state) {
 
         if (extraction.motor || extraction.color) {
             updates.vehicle = { ...state.vehicle };
-            if (extraction.motor) updates.vehicle.brand = extraction.motor; // Simplify logic: just map motor to brand for now
+            if (extraction.motor) updates.vehicle.model = extraction.motor;
             if (extraction.color) updates.vehicle.paintType = extraction.color;
         }
 
