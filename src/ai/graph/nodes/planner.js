@@ -13,6 +13,7 @@ const PlannerSchema = z.object({
     nextAction: z.string().describe("Aksi berikutnya yang harus diambil. Harus salah satu dari: 'ASK', 'RECOMMEND', 'GET_INFORMATION', 'SHOW_PRICE', 'CREATE_BOOKING', 'UPDATE_BOOKING', 'ESCALATE', 'WAIT', 'FINISH'."),
     capability: z.string().optional().describe("Nama capability tool. HARUS DIPILIH DARI: 'pricing', 'booking_availability', 'create_booking', 'update_booking', 'studio_info', 'promo', 'notification', 'calculate_home_service_fee'. KOSONGI jika tidak butuh."),
     strategy: z.string().describe("Strategi komunikasi untuk composer. Harus salah satu dari: 'EDUCATE', 'BUILD_TRUST', 'EMPATHIZE', 'CLARIFY', 'URGENCY', 'CROSS_SELL'."),
+    responseLength: z.enum(['SHORT', 'MEDIUM', 'LONG']).describe("Panjang balasan yang diinstruksikan ke Composer."),
     confidence: z.number().min(0).max(1).describe("Tingkat keyakinan Planner terhadap keputusannya (0.0 - 1.0).")
 });
 
@@ -53,6 +54,7 @@ async function plannerNode(state) {
                 nextAction: 'ASK',
                 capability: null,
                 strategy: 'CLARIFY',
+                responseLength: 'MEDIUM',
                 confidence: 0
             }
         };

@@ -43,7 +43,7 @@ function evaluateRepaintRules(state) {
     if (!hasColorChoice) {
         rules.push({
             type: 'CONVERSATION_GUIDELINE',
-            directive: 'Kustomer belum memilih warna. JANGAN menahan harga. SEGERA berikan estimasi harga (mulai dari Paket Ekonomis hingga Premium). Setelah memaparkan harga, baru tanyakan apakah harga tersebut masuk budget dan tawarkan rekomendasi warna.'
+            directive: 'JANGAN menahan info harga hanya karena belum tahu warna. Berikan estimasi harga jika belum diberikan. HINDARI pertanyaan warna kecuali sudah sepakat estimasi.'
         });
         // Kita HAPUS 'return rules;' di sini agar flow tidak terputus dan PricingTool bisa dipanggil.
     }
@@ -58,11 +58,20 @@ function evaluateRepaintRules(state) {
         });
     }
 
+    // Pricing step
+    const isShowingPrice = (state.planner?.nextAction === 'SHOW_PRICE' || state.planner?.strategy === 'EDUCATE');
+    if (isShowingPrice) {
+        rules.push({
+            type: 'CONVERSATION_GUIDELINE',
+            directive: 'Pastikan untuk merangkum total harga sebagai range (misal: "estimasi total sekitar 2.2 - 2.5 juta") jika ada banyak layanan. JANGAN tanya "masuk budget nggak?". Tanyakan saja "Bagaimana mas, mau lanjut booking atau ada yang mau ditanyakan soal paketnya?".'
+        });
+    }
+
     const isVelg = requested.some(s => s.toLowerCase().includes('velg'));
     if (isVelg && !consultation?.knownFacts?.velgCondition) {
         rules.push({
             type: 'CONVERSATION_GUIDELINE',
-            directive: 'Tanyakan kondisi velg: Masih cat original atau sudah pernah dicat ulang? (Beri info ada surcharge biaya paint remover jika sudah pernah dicat ulang).'
+            directive: 'Tanyakan secara natural apakah velg masih cat bawaan pabrik atau sudah pernah dicat ulang, karena jika pernah dicat ulang biasanya perlu paint remover dulu sebelum proses repaint.'
         });
     }
 

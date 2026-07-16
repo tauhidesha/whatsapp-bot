@@ -1,6 +1,7 @@
 const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
 const { AIMessage } = require('@langchain/core/messages');
 const { buildComposerPrompt } = require('../../prompts/promptBuilder');
+const { prioritizeInformation } = require('../../response/prioritizer');
 
 /**
  * Response Composer Node for Zoya V2
@@ -10,7 +11,10 @@ const { buildComposerPrompt } = require('../../prompts/promptBuilder');
 async function composerNode(state) {
     console.log('[Composer Node] Composing natural response with LLM...');
     
-    const promptText = buildComposerPrompt(state, state.planner || {});
+    // Pass the state through the Prioritizer middleware
+    const prioritizedData = prioritizeInformation(state);
+    
+    const promptText = buildComposerPrompt(state, state.planner || {}, prioritizedData);
     
     // Inisialisasi model
     const llm = new ChatGoogleGenerativeAI({
