@@ -46,7 +46,7 @@ async function extractMemory(state) {
 
     try {
         const extraction = await llm.invoke([
-            ['system', 'Anda adalah sistem ekstraksi memori. Ekstrak data relevan dari pesan kustomer terakhir. Jika informasi tidak ada sama sekali, jangan output field tersebut (biarkan undefined). Jika kustomer spesifik bilang belum tau/bingung, output state UNDECIDED.'],
+            ['system', 'Anda adalah sistem ekstraksi memori. Ekstrak data relevan dari pesan kustomer terakhir. ATURAN UPDATE STATE: HANYA ekstrak dan output field yang SECARA EKSPLISIT dibahas di pesan terakhir kustomer. Jika suatu informasi (misal: motor atau part) TIDAK DIBAHAS di pesan saat ini, JANGAN masukkan field tersebut ke dalam output JSON sama sekali. Biarkan LLM mengabaikannya agar reducer tidak meniban data lama. Jika kustomer spesifik bilang belum tau/bingung, output state UNDECIDED.'],
             ['human', lastUserMessage]
         ]);
         

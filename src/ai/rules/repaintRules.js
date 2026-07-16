@@ -74,6 +74,14 @@ function evaluateRepaintRules(state) {
         rules.blockingFacts.push("motorModel", "partToRepaint");
     }
 
+    // Bypass logic for UNDECIDED paintColor to prevent Infinite Loop
+    const isColorUndecided = knownFacts.paintColor?.state === 'UNDECIDED' || knownFacts.paintColor === 'Belum Menentukan';
+    if (isColorUndecided) {
+        rules.blockingFacts = rules.blockingFacts.filter(fact => fact !== 'paintColor');
+        rules.requiredFacts = rules.requiredFacts.filter(fact => fact !== 'paintColor');
+        rules.constraints.push("Customer belum menentukan warna. BYPASS syarat warna. DILARANG menanyakan warna kembali. Langsung ubah Goal ke PRICE_ESTIMATION dan berikan RANGE harga dasar/estimasi.");
+    }
+
     // 3. Upsells
     if (isBodiHalus || isFullBody) {
         rules.upsells.push({
