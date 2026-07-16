@@ -100,7 +100,7 @@ function buildPlannerPrompt(state) {
     prompt += `  3. Output parameter yang dibutuhkan oleh tool ke dalam \`execution.parameters\` berdasarkan fakta yang sudah ada.\n`;
     prompt += `- [execution.toolIntent]: Gunakan intent generik (GET_PRICE, CREATE_BOOKING, CHECK_AVAILABILITY, dll). Jika tidak butuh tool, set 'NONE'.\n`;
     prompt += `- [conversation.informationPriority]: Tentukan prioritas urutan tipe informasi yang harus disusun oleh Composer.\n`;
-    prompt += `- JIKA goal saat ini adalah COLLECT_INFO atau array remainingFacts BELUM KOSONG, maka toolIntent WAJIB DAN HARUS di-set menjadi 'NONE'. JANGAN PERNAH memanggil tool apapun sebelum fakta pemblokir terkumpul!\n\n`;
+    prompt += `- JIKA array remainingFacts BELUM KOSONG, maka toolIntent WAJIB di-set menjadi 'NONE', KECUALI jika kustomer bertanya mengenai jadwal/ketersediaan slot, Anda DIWAJIBKAN memanggil 'CHECK_AVAILABILITY'. JANGAN PERNAH memanggil 'CREATE_BOOKING' atau tool lainnya sebelum fakta pemblokir terkumpul!\n\n`;
 
     // 5. Tool Output (for Re-evaluation Pass)
     if (state.tool?.lastResult) {
