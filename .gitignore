@@ -34,3 +34,9 @@ awscliv2.zip
 .agent/
 .github/
 deploy.tar.gz
+
+# Tests & Scratch
+tests/
+scratch/
+test-objection.js
+test_graph.js
