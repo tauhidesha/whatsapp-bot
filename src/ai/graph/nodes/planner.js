@@ -11,10 +11,20 @@ const PlannerSchema = z.object({
     goal: z.string().describe("Tujuan utama percakapan saat ini dari sisi customer."),
     reason: z.string().describe("Alasan kenapa planner mengambil keputusan ini."),
     nextAction: z.string().describe("Aksi berikutnya yang harus diambil. Harus salah satu dari: 'ASK', 'RECOMMEND', 'GET_INFORMATION', 'SHOW_PRICE', 'CREATE_BOOKING', 'UPDATE_BOOKING', 'ESCALATE', 'WAIT', 'FINISH'."),
-    capability: z.string().optional().describe("Nama capability tool. HARUS DIPILIH DARI: 'pricing', 'booking_availability', 'create_booking', 'update_booking', 'studio_info', 'promo', 'notification', 'calculate_home_service_fee'. KOSONGI jika tidak butuh."),
+    capability: z.string().describe("Nama capability tool. HARUS DIPILIH DARI: 'pricing', 'booking_availability', 'create_booking', 'update_booking', 'studio_info', 'promo', 'notification', 'calculate_home_service_fee'. Isi dengan 'NONE' jika tidak butuh."),
     strategy: z.string().describe("Strategi komunikasi untuk composer. Harus salah satu dari: 'EDUCATE', 'BUILD_TRUST', 'EMPATHIZE', 'CLARIFY', 'URGENCY', 'CROSS_SELL'."),
     responseLength: z.enum(['SHORT', 'MEDIUM', 'LONG']).describe("Panjang balasan yang diinstruksikan ke Composer."),
-    confidence: z.number().min(0).max(1).describe("Tingkat keyakinan Planner terhadap keputusannya (0.0 - 1.0).")
+    confidence: z.number().min(0).max(1).describe("Tingkat keyakinan Planner terhadap keputusannya (0.0 - 1.0)."),
+    missingFacts: z.array(z.object({
+        field: z.string().describe("Nama field/fakta yang hilang (misal: 'wheelCondition', 'paintShade', 'bookingDate')."),
+        reason: z.string().describe("Alasan logis kenapa fakta ini dibutuhkan sekarang."),
+        priority: z.number().describe("Prioritas (1 = paling utama, makin besar makin tidak prioritas).")
+    })).describe("Daftar fakta yang belum diketahui (belum ada di knownFacts) yang HARUS ditanyakan ke user."),
+    decisionTrace: z.object({
+        goal: z.string(),
+        usedFacts: z.array(z.string()),
+        missingFacts: z.array(z.string())
+    }).describe("Trace keputudan untuk keperluan debugging engineer (bukan untuk user).")
 });
 
 async function plannerNode(state) {
@@ -52,10 +62,16 @@ async function plannerNode(state) {
                 goal: 'Fallback due to LLM error',
                 reason: error.message,
                 nextAction: 'ASK',
-                capability: null,
+                capability: 'NONE',
                 strategy: 'CLARIFY',
                 responseLength: 'MEDIUM',
-                confidence: 0
+                confidence: 0,
+                missingFacts: [],
+                decisionTrace: {
+                    goal: 'Fallback',
+                    usedFacts: [],
+                    missingFacts: []
+                }
             }
         };
     }

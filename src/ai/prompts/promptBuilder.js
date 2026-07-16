@@ -46,11 +46,10 @@ function buildPlannerPrompt(state) {
     prompt += `\n`;
 
     // 3. Relevant Knowledge (Service Models)
-    const activeServices = consultation?.requestedServices || [];
-    if (activeServices.length > 0) {
-        const knowledge = getRelevantKnowledge(activeServices);
+    if (state.knowledge?.raw) {
+        const knowledgeStr = typeof state.knowledge.raw === 'object' ? JSON.stringify(state.knowledge.raw, null, 2) : state.knowledge.raw;
         prompt += `=== SERVICE KNOWLEDGE ===\n`;
-        prompt += JSON.stringify(knowledge, null, 2) + `\n\n`;
+        prompt += `${knowledgeStr}\n\n`;
     }
 
     // 4. Current State Snapshot
@@ -59,6 +58,11 @@ function buildPlannerPrompt(state) {
     prompt += `Vehicle: ${vehicle?.brand || 'Unknown'} ${vehicle?.model || 'Unknown'}\n`;
     prompt += `Known Facts: ${JSON.stringify(consultation?.knownFacts || {})}\n`;
     prompt += `Conversation Status: ${conversation?.status}\n\n`;
+    
+    prompt += `=== PLANNER DIRECTIVES ===\n`;
+    prompt += `- BACA "Known Facts" di atas. JANGAN meminta Composer untuk menanyakan fakta yang sudah diketahui.\n`;
+    prompt += `- Tentukan fakta apa yang masih kurang dari "Known Facts" untuk mencapai goal, dan tuangkan ke dalam "missingFacts".\n\n`;
+
     // 5. Tool Output (for Re-evaluation Pass)
     if (state.tool?.lastResult) {
         prompt += `=== CAPABILITY TOOL OUTPUT ===\n`;
@@ -118,13 +122,18 @@ function buildComposerPrompt(state, plannerDecision, prioritizedData = null) {
     }
     prompt += `\n`;
 
-    const activeServices = state.consultation?.requestedServices || [];
-    if (activeServices.length > 0) {
-        const { getRelevantKnowledge } = require('../knowledge/index');
-        const knowledge = getRelevantKnowledge(activeServices);
+    if (plannerDecision.missingFacts && plannerDecision.missingFacts.length > 0) {
+        prompt += `=== MISSING FACTS (PRIORITIZED) ===\n`;
+        prompt += `Berikut adalah fakta yang perlu Anda tanyakan ke customer. Gabungkan gaya bertanya Anda dengan arahan Strategy di atas.\n`;
+        prompt += `Pilih SATU fakta prioritas utama untuk ditanyakan secara natural:\n`;
+        prompt += JSON.stringify(plannerDecision.missingFacts, null, 2) + `\n\n`;
+    }
+
+    if (state.knowledge?.raw) {
+        const knowledgeStr = typeof state.knowledge.raw === 'object' ? JSON.stringify(state.knowledge.raw, null, 2) : state.knowledge.raw;
         prompt += `=== SERVICE KNOWLEDGE (CATATAN HARGA & FASILITAS) ===\n`;
         prompt += `Gunakan data ini jika Anda perlu menyebutkan harga atau menjelaskan fasilitas layanan.\n`;
-        prompt += JSON.stringify(knowledge, null, 2) + `\n\n`;
+        prompt += `${knowledgeStr}\n\n`;
     }
 
     if (state.business) {

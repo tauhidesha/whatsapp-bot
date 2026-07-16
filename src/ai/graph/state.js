@@ -156,6 +156,14 @@ const ZoyaState = Annotation.Root({
         })
     }),
 
+    // 13. Knowledge (Loaded once, read-only for Planner and Composer)
+    knowledge: Annotation({
+        reducer: (old, updated) => ({ ...old, ...updated }),
+        default: () => ({
+            raw: ''
+        })
+    }),
+
     // Messages array used strictly by LangGraph for internal state bridging if needed,
     // though the v2 schema dictates storing messages in conversation.messages.
     // Keeping it here for basic LCEL / ToolNode compatibility.

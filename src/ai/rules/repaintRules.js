@@ -15,10 +15,12 @@ function evaluateRepaintRules(state) {
     }
 
     const { vehicle, consultation } = state;
-    const hasColorChoice = !!consultation?.knownFacts?.colorChoice;
+    const knownFacts = consultation?.knownFacts || {};
+    const hasColorChoice = !!knownFacts.paintShade || !!knownFacts.colorChoice;
+    const knownMotor = knownFacts.motor || vehicle?.model;
     
     // Langkah 1: Tanya jenis motor
-    if (!vehicle?.model) {
+    if (!knownMotor) {
         rules.push({
             type: 'CONVERSATION_GUIDELINE',
             directive: 'Tanyakan jenis motor customer (Misal: Nmax, Aerox, dll).'
@@ -29,7 +31,8 @@ function evaluateRepaintRules(state) {
     // Langkah 2: Tanya bagian mana yang ingin di-repaint
     // Cuma 'repaint' umum, belum spesifik (bodi halus, kasar, velg)
     const isSpecificRepaint = requested.some(s => s.toLowerCase().includes('bodi') || s.toLowerCase().includes('velg'));
-    if (!isSpecificRepaint) {
+    const knownRepaintTarget = knownFacts.repaintTarget || knownFacts.scope;
+    if (!isSpecificRepaint && !knownRepaintTarget) {
         rules.push({
             type: 'CONVERSATION_GUIDELINE',
             directive: 'Tanyakan bagian mana yang ingin di-repaint (Bodi Halus, Velg, Bodi Kasar, atau Full Bodi).'
@@ -67,8 +70,8 @@ function evaluateRepaintRules(state) {
         });
     }
 
-    const isVelg = requested.some(s => s.toLowerCase().includes('velg'));
-    if (isVelg && !consultation?.knownFacts?.velgCondition) {
+    const isVelg = requested.some(s => s.toLowerCase().includes('velg')) || knownRepaintTarget?.toLowerCase().includes('velg');
+    if (isVelg && !knownFacts.wheelCondition && !knownFacts.velgCondition) {
         rules.push({
             type: 'CONVERSATION_GUIDELINE',
             directive: 'Tanyakan secara natural apakah velg masih cat bawaan pabrik atau sudah pernah dicat ulang, karena jika pernah dicat ulang biasanya perlu paint remover dulu sebelum proses repaint.'

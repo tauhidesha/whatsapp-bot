@@ -10,8 +10,8 @@ async function capabilityRouterNode(state) {
     
     const capability = state.planner?.capability;
     
-    if (!capability) {
-        console.log('[Capability Router Node] No capability requested by planner. Skipping tool execution.');
+    if (!capability || capability === 'NONE') {
+        console.log(`[Capability Router Node] No tool requested (capability: ${capability}). Skipping tool execution.`);
         // If no capability is needed, we don't update the tool state
         return {};
     }
