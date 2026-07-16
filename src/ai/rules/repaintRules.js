@@ -7,14 +7,16 @@ function evaluateRepaintRules(state) {
     const rules = [];
     const requested = state.consultation?.requestedServices || [];
     
-    if (!requested.includes('repaint')) {
+    // Cek apakah ada layanan repaint yang direquest
+    const isRepaintRequested = requested.some(s => s.toLowerCase().includes('repaint'));
+    
+    if (!isRepaintRequested) {
         return null;
     }
 
     const { vehicle, consultation } = state;
-    const targetParts = consultation?.targetParts || [];
-    const hasColorChoice = !!consultation?.colorChoice;
-
+    const hasColorChoice = !!consultation?.knownFacts?.colorChoice;
+    
     // Langkah 1: Tanya jenis motor
     if (!vehicle?.model) {
         rules.push({
@@ -25,7 +27,9 @@ function evaluateRepaintRules(state) {
     }
 
     // Langkah 2: Tanya bagian mana yang ingin di-repaint
-    if (targetParts.length === 0) {
+    // Cuma 'repaint' umum, belum spesifik (bodi halus, kasar, velg)
+    const isSpecificRepaint = requested.some(s => s.toLowerCase().includes('bodi') || s.toLowerCase().includes('velg'));
+    if (!isSpecificRepaint) {
         rules.push({
             type: 'CONVERSATION_GUIDELINE',
             directive: 'Tanyakan bagian mana yang ingin di-repaint (Bodi Halus, Velg, Bodi Kasar, atau Full Bodi).'
@@ -33,17 +37,20 @@ function evaluateRepaintRules(state) {
         return rules;
     }
 
-    // Langkah 3: Tanya pilihan warna
+    // Langkah 3: Tanya pilihan warna (JANGAN JADIKAN BLOCKER UNTUK HARGA)
+    // Jika belum ada warna, tetap berikan guideline tapi biarkan logic lanjut ke bawah
+    // agar planner bisa memanggil PricingTool dan memaparkan harga
     if (!hasColorChoice) {
         rules.push({
             type: 'CONVERSATION_GUIDELINE',
-            directive: 'Tanyakan pilihan warna yang diinginkan. Beri info jika mungkin ada biaya tambahan (surcharge) untuk warna tertentu (seperti Chrome/Two-Tone).'
+            directive: 'Kustomer belum memilih warna. JANGAN menahan harga. SEGERA berikan estimasi harga (mulai dari Paket Ekonomis hingga Premium). Setelah memaparkan harga, baru tanyakan apakah harga tersebut masuk budget dan tawarkan rekomendasi warna.'
         });
-        return rules;
+        // Kita HAPUS 'return rules;' di sini agar flow tidak terputus dan PricingTool bisa dipanggil.
     }
 
     // Opsi Penawaran (Upsell)
-    if (targetParts.includes('bodi_halus') || targetParts.includes('full_bodi')) {
+    const isBodiHalus = requested.some(s => s.toLowerCase().includes('bodi halus') || s.toLowerCase().includes('full bodi'));
+    if (isBodiHalus) {
         rules.push({
             type: 'UPSELL',
             service: 'Cuci Komplit',
@@ -51,7 +58,8 @@ function evaluateRepaintRules(state) {
         });
     }
 
-    if (targetParts.includes('velg') && !consultation?.knownFacts?.velgCondition) {
+    const isVelg = requested.some(s => s.toLowerCase().includes('velg'));
+    if (isVelg && !consultation?.knownFacts?.velgCondition) {
         rules.push({
             type: 'CONVERSATION_GUIDELINE',
             directive: 'Tanyakan kondisi velg: Masih cat original atau sudah pernah dicat ulang? (Beri info ada surcharge biaya paint remover jika sudah pernah dicat ulang).'
