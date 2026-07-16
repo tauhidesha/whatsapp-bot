@@ -16,7 +16,7 @@ function evaluateEscalation(state) {
     const escalations = [];
 
     // Rule: Mobil (Car)
-    if (knownFacts.vehicleType === 'mobil' || requested.includes('mobil')) {
+    if (knownFacts.vehicleType?.value === 'mobil' || requested.includes('mobil')) {
         escalations.push({
             type: 'ESCALATION',
             reason: 'Customer menanyakan layanan untuk mobil (Bosmat spesialis motor).',
@@ -25,7 +25,7 @@ function evaluateEscalation(state) {
     }
 
     // Rule: Custom Concept
-    if (knownFacts.wantsCustomConcept) {
+    if (knownFacts.wantsCustomConcept?.state === 'KNOWN' || knownFacts.wantsCustomConcept?.value) {
         escalations.push({
             type: 'ESCALATION',
             reason: 'Customer ingin konsultasi konsep motor/warna custom yang butuh arahan langsung dari owner.',

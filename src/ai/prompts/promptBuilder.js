@@ -42,9 +42,17 @@ function buildPlannerPrompt(state) {
             prompt += `- ${c}\n`;
         });
     }
+    if (business?.blockingFacts?.length > 0) {
+        prompt += `\n=== BLOCKING FACTS ===\n`;
+        prompt += `Fakta absolut yang WAJIB ada (state: KNOWN) sebelum pindah goal:\n- ${business.blockingFacts.join('\n- ')}\n`;
+    }
     if (business?.requiredFacts?.length > 0) {
         prompt += `\n=== REQUIRED FACTS ===\n`;
-        prompt += `Fakta yang WAJIB diketahui untuk goal saat ini:\n- ${business.requiredFacts.join('\n- ')}\n`;
+        prompt += `Fakta yang idealnya ada untuk memberikan hasil komprehensif:\n- ${business.requiredFacts.join('\n- ')}\n`;
+    }
+    if (business?.optionalFacts?.length > 0) {
+        prompt += `\n=== OPTIONAL FACTS ===\n`;
+        prompt += `Fakta tambahan yang berguna untuk upsell atau info ekstra:\n- ${business.optionalFacts.join('\n- ')}\n`;
     }
     if (business?.upsells?.length > 0) {
         prompt += `\n=== UPSELL OPPORTUNITIES ===\n`;
@@ -79,13 +87,14 @@ function buildPlannerPrompt(state) {
     
     prompt += `=== PLANNER DIRECTIVES ===\n`;
     prompt += `- Anda mengendalikan state graph dengan struktur objek JSON: decision, execution, conversation, dan reasoning.\n`;
-    prompt += `- [decision.buyerStage]: Evaluasi stage customer saat ini (Exploring, Comparing, Interested, Ready, atau Booking).\n`;
-    prompt += `- [execution.toolIntent]: Gunakan intent generik (GET_PRICE, CREATE_BOOKING, CHECK_AVAILABILITY, SEND_NOTIFICATION, ANSWER_FAQ (untuk info alamat studio, jam buka, faq), ESCALATE_HUMAN) jika butuh data eksternal, atau 'NONE' jika tidak. JANGAN mengarang (hallucinate) alamat atau harga, selalu panggil intent yang tepat!\n`;
-    prompt += `- Jika goal adalah mengumpulkan informasi (COLLECT_INFO), set \`nextAction.type\` menjadi \`ASK_MISSING_FACTS\`. Detail mengenai apa yang harus ditanyakan HANYA boleh diletakkan di dalam array \`remainingFacts\` beserta alasannya (\`reason\`).\n`;
+    prompt += `- Anda adalah *state machine* yang menentukan transisi *Goal* dan *Strategy* berdasarkan perbandingan \`knownFacts\` (yang memiliki state \`KNOWN\`/\`UNDECIDED\`/\`NOT_APPLICABLE\`) dengan kumpulan fakta dari Rule Engine (\`blockingFacts\`, \`requiredFacts\`, \`optionalFacts\`).\n`;
+    prompt += `- Aturan Transisi:\n`;
+    prompt += `  1. Jika masih ada fakta di \`blockingFacts\` yang tidak ada di \`knownFacts\` (implicit UNKNOWN) atau state-nya BUKAN \`KNOWN\`, Anda WAJIB bertanya (\`COLLECT_INFO\`) dan set \`nextAction.type\` menjadi \`ASK_MISSING_FACTS\`. Detail fakta yang ditanyakan letakkan di \`remainingFacts\`.\n`;
+    prompt += `  2. Jika semua \`blockingFacts\` sudah \`KNOWN\`, namun ada \`requiredFacts\` yang state-nya \`UNDECIDED\`, Anda bebas berpindah goal (misal ke \`PRICE_ESTIMATION\`) dan ubah strategi (misal ke \`EDUCATE\`), karena kustomer sudah ditanya tapi belum bisa memutuskan.\n`;
+    prompt += `  3. Output parameter yang dibutuhkan oleh tool ke dalam \`execution.parameters\` berdasarkan fakta yang sudah ada.\n`;
+    prompt += `- [execution.toolIntent]: Gunakan intent generik (GET_PRICE, CREATE_BOOKING, CHECK_AVAILABILITY, dll). Jika tidak butuh tool, set 'NONE'.\n`;
     prompt += `- [conversation.informationPriority]: Tentukan prioritas urutan tipe informasi yang harus disusun oleh Composer.\n`;
-    prompt += `- BACA "Known Facts" dan bandingkan dengan "REQUIRED FACTS". Hitung status progres dan tuangkan ke dalam "reasoning.goalStatus".\n`;
-    prompt += `- JIKA goal saat ini adalah COLLECT_INFO atau array remainingFacts BELUM KOSONG, maka toolIntent WAJIB DAN HARUS di-set menjadi 'NONE'. JANGAN PERNAH memanggil tool apapun sebelum semua fakta terkumpul!\n`;
-    prompt += `- Jika "remainingFacts" sudah kosong, Anda BERHAK dan HARUS transisi "goal" ke langkah selanjutnya (misal dari COLLECT_INFO ke PRICE_ESTIMATION) dan set toolIntent yang sesuai.\n\n`;
+    prompt += `- JIKA goal saat ini adalah COLLECT_INFO atau array remainingFacts BELUM KOSONG, maka toolIntent WAJIB DAN HARUS di-set menjadi 'NONE'. JANGAN PERNAH memanggil tool apapun sebelum fakta pemblokir terkumpul!\n\n`;
 
     // 5. Tool Output (for Re-evaluation Pass)
     if (state.tool?.lastResult) {
@@ -156,16 +165,7 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
     prompt += `Buyer Stage: ${plannerDecision.decision?.buyerStage}\n`;
     prompt += `Action Type: ${plannerDecision.execution?.nextAction?.type}\n`;
     
-    if (plannerDecision.decision?.goal === 'PRICE_ESTIMATION' && (state.vehicle?.paintType === 'Belum Menentukan' || state.consultation?.knownFacts?.paintColor === 'Belum Menentukan')) {
-        prompt += `\n=== CRITICAL FALLBACK RULE: WARNA BELUM MENENTUKAN ===\n`;
-        prompt += `DILARANG KERAS menanyakan warna lagi. Mulailah kalimat respons dengan empati yang mengarahkan konsultasi ke ahlinya (contoh: "Gapapa mas/kak kalo belom tau, nanti bisa konsul langsung sama bosmat soal warnanya."). Setelah itu, langsung berikan estimasi/range harga sesuai SOP yang berlaku.\n`;
-    }
-    
-    if (plannerDecision.decision?.goal === 'PRICE_ESTIMATION' && state.consultation?.knownFacts?.velgCondition === 'Belum Menentukan') {
-        prompt += `\n=== CRITICAL FALLBACK RULE: KONDISI VELG BELUM MENENTUKAN ===\n`;
-        prompt += `DILARANG KERAS menanyakan kondisi velg lagi. Mulailah kalimat respons dengan ramah bahwa tim Bosmat akan mengecek kondisinya langsung di tempat (contoh: "Santai kak, nanti kita cekin aja langsung kondisi velg aslinya di bengkel"). Setelah itu, berikan range harga velg secara umum sesuai SOP.\n`;
-    }
-    
+
     if (plannerDecision.conversation?.informationPriority && plannerDecision.conversation.informationPriority.length > 0) {
         prompt += `\n=== INFORMATION PRIORITY ===\n`;
         prompt += `Gunakan prioritas (urutan) tipe informasi berikut saat merangkai pesan:\n`;

@@ -18,7 +18,7 @@ function evaluateConversationRules(state) {
 
     // Menangani Penolakan
     // If the planner indicates a hesitation or cooling down stage, or if objections were extracted
-    if (state.conversation?.buyerStage === 'Hesitating' || consultation?.knownFacts?.hasObjection) {
+    if (state.conversation?.buyerStage === 'Hesitating' || consultation?.knownFacts?.hasObjection?.state === 'KNOWN' || consultation?.knownFacts?.commonObjection?.state === 'KNOWN' || consultation?.knownFacts?.commonObjection?.value) {
         rules.push({
             type: 'CONVERSATION_GUIDELINE',
             directive: 'JANGAN PERNAH menanyakan "kapan mau eksekusi". Tunjukkan empati dan berikan kenyamanan. Biarkan percakapan menggantung secara positif tanpa paksaan booking.'
@@ -27,7 +27,7 @@ function evaluateConversationRules(state) {
 
     // Alamat & Booking Guideline
     // If planner is providing address
-    if (state.planner?.strategy === 'PROVIDE_INFO' && consultation?.knownFacts?.askedAddress) {
+    if (state.planner?.strategy === 'PROVIDE_INFO' && consultation?.knownFacts?.askedAddress?.state === 'KNOWN') {
         rules.push({
             type: 'CONVERSATION_GUIDELINE',
             directive: 'Berikan alamat lengkap, tapi WAJIB sarankan customer untuk melakukan booking atau setidaknya mengabari terlebih dahulu sebelum datang.'

@@ -6,13 +6,20 @@ const { extractTextFromContent, getMessageType } = require('../graph/utils/sanit
  * Uses Gemini to extract Identity, Relationship, and Sales memory from messages.
  */
 
+const FactState = z.enum(['KNOWN', 'UNDECIDED', 'NOT_APPLICABLE']);
+
+const FactSchema = (description) => z.object({
+    value: z.string().nullable().describe("Nilai fakta (jika diketahui), atau null."),
+    state: FactState.describe("Status: KNOWN jika nilai eksplisit, UNDECIDED jika kustomer bilang belum tau/bingung, NOT_APPLICABLE jika tidak relevan.")
+}).optional().describe(description);
+
 const MemorySchema = z.object({
-    motor: z.string().optional().describe("Merek atau model motor yang disebut kustomer (misal: NMax, Beat, PCX). Jika tidak ada, kosongi."),
-    color: z.string().optional().describe("Warna atau jenis cat yang disebut kustomer (misal: merah candy, polos, mutiara). JIKA kustomer bilang 'asli', 'aslinya', 'standar', WAJIB isi dengan 'Standar Pabrik/Original'. JIKA kustomer menyatakan belum tahu, bingung, atau belum memutuskan warna (contoh: 'belum tau', 'bingung', 'bebas'), WAJIB isi dengan 'Belum Menentukan'. Jika tidak ada warna, kosongi."),
-    part: z.string().optional().describe("Bagian motor yang ingin dikerjakan (misal: full bodi, bodi halus, bodi kasar, velg). Jika tidak ada, kosongi."),
-    objection: z.string().optional().describe("Keberatan atau komplain yang disebut kustomer (misal: 'belum gajian', 'mahal', 'jauh'). Jika tidak ada, kosongi."),
-    services: z.array(z.string()).optional().describe("Daftar layanan yang di-request kustomer (misal: 'Repaint Bodi Halus', 'Repaint Velg', 'Detailing'). Jika tidak ada, kosongi."),
-    velgCondition: z.string().optional().describe("Kondisi velg motor saat ini (misal: 'masih ori', 'udah direpaint', 'banyak baret', 'grepes'). JIKA kustomer menyatakan belum tahu kondisinya, WAJIB isi dengan 'Belum Menentukan'. Jika tidak ada, kosongi.")
+    motor: FactSchema("Merek/model motor (misal: NMax, Beat)."),
+    color: FactSchema("Warna cat (misal: merah candy). JIKA bilang 'asli', isi value 'Standar Pabrik/Original' (KNOWN)."),
+    part: FactSchema("Bagian motor yang dikerjakan (misal: full bodi, bodi halus, velg)."),
+    objection: FactSchema("Keberatan/komplain kustomer (misal: 'mahal', 'jauh')."),
+    services: z.array(z.string()).optional().describe("Daftar layanan (misal: 'Repaint Bodi Halus')."),
+    velgCondition: FactSchema("Kondisi velg (misal: 'masih ori', 'grepes').")
 });
 
 async function extractMemory(state) {
@@ -39,7 +46,7 @@ async function extractMemory(state) {
 
     try {
         const extraction = await llm.invoke([
-            ['system', 'Anda adalah sistem ekstraksi memori. Ekstrak data relevan dari pesan kustomer terakhir.'],
+            ['system', 'Anda adalah sistem ekstraksi memori. Ekstrak data relevan dari pesan kustomer terakhir. Jika informasi tidak ada sama sekali, jangan output field tersebut (biarkan undefined). Jika kustomer spesifik bilang belum tau/bingung, output state UNDECIDED.'],
             ['human', lastUserMessage]
         ]);
         
@@ -65,7 +72,7 @@ async function extractMemory(state) {
                 updates.consultation.knownFacts.partToRepaint = extraction.part;
                 
                 // Regex fallback to ensure requestedServices captures the specific repaint flow
-                const partLower = extraction.part.toLowerCase();
+                const partLower = extraction.part.value ? extraction.part.value.toLowerCase() : '';
                 let specificService = null;
                 if (partLower.includes('halus')) specificService = 'Repaint Bodi Halus';
                 else if (partLower.includes('kasar')) specificService = 'Repaint Bodi Kasar';

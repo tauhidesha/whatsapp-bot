@@ -40,18 +40,8 @@ async function capabilityRouterNode(state) {
             conversationId: state.metadata?.thread_id || 'unknown',
             customerId: state.metadata?.phoneReal || 'unknown',
             conversationState: state,
-            // Since we haven't implemented an LLM extractor for tool parameters yet, 
-            // for Sprint 4 we will extract the parameter based on state.consultation
-            parameters: {
-                service_name: state.consultation?.requestedServices?.length > 0 
-                    ? state.consultation.requestedServices 
-                    : ['Repaint Bodi Halus'], // Fallback if empty
-                motor_model: state.vehicle?.model || state.memory?.identity?.motor || 'NMax',
-                color_name: state.vehicle?.paintType || state.consultation?.knownFacts?.paintColor || null,
-                bookingDate: '2026-07-20',
-                bookingTime: '10:00',
-                estimatedDurationMinutes: 120
-            },
+            // Planner is now responsible for providing the required parameters
+            parameters: state.planner?.execution?.parameters || {},
             metadata: { source: 'capabilityRouter' }
         };
 

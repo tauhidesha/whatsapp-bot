@@ -18,7 +18,8 @@ const PlannerSchema = z.object({
             type: z.enum(['ASK_MISSING_FACTS', 'EXECUTE_TOOL', 'PROVIDE_INFO', 'CLOSING', 'UPSELL']),
             priority: z.number().optional()
         }).describe("Aksi berikutnya yang harus diambil."),
-        toolIntent: z.enum(['NONE', 'GET_PRICE', 'BOOK', 'CHECK_BOOKING', 'ESCALATE', 'NOTIFY', 'ANSWER']).describe("Intent untuk memanggil external tools. Isi dengan 'NONE' jika tidak butuh.")
+        toolIntent: z.enum(['NONE', 'GET_PRICE', 'BOOK', 'CHECK_BOOKING', 'ESCALATE', 'NOTIFY', 'ANSWER']).describe("Intent untuk memanggil external tools. Isi dengan 'NONE' jika tidak butuh."),
+        parameters: z.record(z.any()).optional().describe("Parameter untuk tool (jika toolIntent != NONE). Misalnya motor, scope, paintColor, dll.")
     }),
     conversation: z.object({
         responseLength: z.enum(['SHORT', 'MEDIUM', 'LONG']).describe("Panjang balasan yang diinstruksikan ke Composer."),
@@ -95,7 +96,8 @@ async function plannerNode(state) {
                     type: 'ASK_MISSING_FACTS',
                     priority: 1
                 },
-                toolIntent: 'NONE'
+                toolIntent: 'NONE',
+                parameters: {}
             },
             conversation: {
                 responseLength: 'MEDIUM',

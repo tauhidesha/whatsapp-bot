@@ -11,6 +11,7 @@ function evaluateRepaintRules(state) {
     const rules = {
         sop: {},
         constraints: [],
+        blockingFacts: [],
         requiredFacts: [],
         optionalFacts: [],
         upsells: [],
@@ -26,8 +27,8 @@ function evaluateRepaintRules(state) {
 
     const { vehicle, consultation } = state;
     const knownFacts = consultation?.knownFacts || {};
-    const knownMotor = knownFacts.motor || vehicle?.model;
-    const knownRepaintTarget = knownFacts.repaintTarget || knownFacts.scope;
+    const knownMotor = knownFacts.motor?.value || vehicle?.model?.value;
+    const knownRepaintTarget = knownFacts.partToRepaint?.value || knownFacts.scope?.value;
 
     // Filter SOP based on context (knownFacts and remainingFacts)
     const contextKeys = [
@@ -58,6 +59,7 @@ function evaluateRepaintRules(state) {
     else if (isVelg) selectedFlow = REPAINT_FLOWS.VELG;
 
     if (selectedFlow) {
+        if (selectedFlow.blockingFacts) rules.blockingFacts.push(...selectedFlow.blockingFacts);
         if (selectedFlow.requiredFacts) rules.requiredFacts.push(...selectedFlow.requiredFacts);
         
         if (selectedFlow.blockedFacts && selectedFlow.blockedFacts.length > 0) {
@@ -69,7 +71,7 @@ function evaluateRepaintRules(state) {
         }
     } else {
         // Generic repaint, needs clarification
-        rules.requiredFacts.push("motorModel", "partToRepaint");
+        rules.blockingFacts.push("motorModel", "partToRepaint");
     }
 
     // 3. Upsells

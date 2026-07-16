@@ -8,9 +8,11 @@
 
 const REPAINT_FLOWS = {
     FULL_BODY: {
-        requiredFacts: [
+        blockingFacts: [
             "motorModel",
-            "partToRepaint",
+            "partToRepaint"
+        ],
+        requiredFacts: [
             "paintColor"
         ],
         optionalFacts: [
@@ -20,9 +22,11 @@ const REPAINT_FLOWS = {
         blockedFacts: []
     },
     BODY_HALUS: {
-        requiredFacts: [
+        blockingFacts: [
             "motorModel",
-            "partToRepaint",
+            "partToRepaint"
+        ],
+        requiredFacts: [
             "paintColor"
         ],
         optionalFacts: [
@@ -32,10 +36,11 @@ const REPAINT_FLOWS = {
         blockedFacts: []
     },
     BODY_KASAR: {
-        requiredFacts: [
+        blockingFacts: [
             "motorModel",
             "partToRepaint"
         ],
+        requiredFacts: [],
         optionalFacts: [
             "upsell_cuci_komplit"
         ],
@@ -46,9 +51,11 @@ const REPAINT_FLOWS = {
         ]
     },
     VELG: {
-        requiredFacts: [
+        blockingFacts: [
             "motorModel",
-            "partToRepaint",
+            "partToRepaint"
+        ],
+        requiredFacts: [
             "paintColor",
             "velgCondition"
         ],

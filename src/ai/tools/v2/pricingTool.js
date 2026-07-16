@@ -14,7 +14,7 @@ class PricingTool extends BaseTool {
 
         // Validation block: Prevent premature tool calls for Repaint
         const isRepaint = serviceNameArray.some(s => typeof s === 'string' && s.toLowerCase().includes('repaint'));
-        const partToRepaint = state.consultation?.knownFacts?.partToRepaint;
+        const partToRepaint = parameters.partToRepaint;
 
         if (isRepaint && !partToRepaint) {
             return { error: "Missing parameter: partToRepaint. Tolong pastikan bagian motor yang ingin dicat (bodi halus, bodi kasar, velg, dll) sudah diketahui sebelum mengecek harga." };
