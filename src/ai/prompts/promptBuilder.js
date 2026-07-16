@@ -126,12 +126,38 @@ function buildComposerPrompt(state, plannerDecision) {
         prompt += JSON.stringify(knowledge, null, 2) + `\n\n`;
     }
 
-    if (state.business?.restrictions?.length > 0) {
-        prompt += `=== BUSINESS CONSTRAINTS ===\n`;
-        state.business.restrictions.forEach(r => {
-            prompt += `Jelaskan penolakan/restriksi ini dengan sopan: ${r.reason}\n`;
-        });
-        prompt += `\n`;
+    if (state.business) {
+        if (state.business.restrictions?.length > 0) {
+            prompt += `=== BUSINESS CONSTRAINTS ===\n`;
+            state.business.restrictions.forEach(r => {
+                prompt += `Jelaskan penolakan/restriksi ini dengan sopan: ${r.reason}\n`;
+            });
+            prompt += `\n`;
+        }
+
+        if (state.business.guidelines?.length > 0) {
+            prompt += `=== CONVERSATION GUIDELINES ===\n`;
+            state.business.guidelines.forEach(g => {
+                prompt += `- ${g.directive}\n`;
+            });
+            prompt += `\n`;
+        }
+
+        if (state.business.promotions?.length > 0) {
+            prompt += `=== ACTIVE PROMOTIONS ===\n`;
+            state.business.promotions.forEach(p => {
+                prompt += `- PROMO: ${p.text} (Syarat: ${p.condition})\n`;
+            });
+            prompt += `\n`;
+        }
+
+        if (state.business.upsells?.length > 0) {
+            prompt += `=== UPSELL OPPORTUNITIES ===\n`;
+            state.business.upsells.forEach(u => {
+                prompt += `- Tawarkan layanan "${u.service}": ${u.reason}\n`;
+            });
+            prompt += `\n`;
+        }
     }
 
     prompt += `=== CONVERSATION HISTORY ===\n`;
