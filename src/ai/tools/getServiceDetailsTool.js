@@ -461,12 +461,12 @@ async function processSingleService(parsedServiceName, input, promoText) {
         const results = [];
         const { finalSize } = await resolveSizeForService({ service: { category: 'repaint' }, sizeArg: sizeFromArgs, motorModel });
 
-        const subs = ['bodi_halus', 'bodi_kasar', 'velg'];
+        const subs = ['bodi_kasar', 'velg']; // removed bodi_halus from here
         for (const sub of subs) {
             const lookup = await lookupRepaintPrice(motorModel, sub, finalSize);
             const info = formatRepaintPriceResult(lookup);
             if (info && info.price) {
-                const sName = sub === 'bodi_halus' ? 'Repaint Bodi Halus' : (sub === 'bodi_kasar' ? 'Repaint Bodi Kasar' : 'Repaint Velg');
+                const sName = sub === 'bodi_kasar' ? 'Repaint Bodi Kasar' : 'Repaint Velg';
                 const { finalPrice, breakdownText } = await applyAllSurcharges(info.price, sName, finalSize, motorModel, extraContext);
 
                 results.push({
@@ -474,6 +474,39 @@ async function processSingleService(parsedServiceName, input, promoText) {
                     price: finalPrice,
                     price_formatted: `Rp${finalPrice.toLocaleString('id-ID')}${breakdownText}`,
                     note: info.note
+                });
+            }
+        }
+
+        // Add Bodi Halus Packages
+        const bodiHalusPkgs = await prisma.service.findMany({
+            where: { name: { contains: 'Repaint Bodi Halus - Paket' } },
+            include: { prices: true }
+        });
+        
+        for (const s of bodiHalusPkgs) {
+            let basePrice = 0;
+            if (s.usesModelPricing && motorModel) {
+                const motorData = await lookupMotorSizeFromData(motorModel);
+                if (motorData) {
+                    const pEntry = await prisma.servicePrice.findFirst({
+                        where: { serviceId: s.id, vehicleModelId: motorData.id }
+                    });
+                    if (pEntry) basePrice = pEntry.price;
+                }
+            } else {
+                const pEntry = s.prices.find(p => p.size === finalSize) || s.prices.find(p => !p.size && !p.vehicleModelId);
+                if (pEntry) basePrice = pEntry.price;
+            }
+            
+            if (basePrice > 0) {
+                const { finalPrice, breakdownText } = await applyAllSurcharges(basePrice, s.name, finalSize, motorModel, extraContext);
+                results.push({
+                    name: s.name,
+                    summary: s.summary,
+                    price: finalPrice,
+                    price_formatted: `Rp${finalPrice.toLocaleString('id-ID')}${breakdownText}`,
+                    estimated_duration: formatDuration(s.estimatedDuration)
                 });
             }
         }
