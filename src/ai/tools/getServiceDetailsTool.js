@@ -679,6 +679,19 @@ async function implementation(input) {
       serviceNames = serviceNames.includes(',') ? serviceNames.split(',').map(s => s.trim()).filter(Boolean) : [serviceNames];
     }
 
+    // Expand "Full Bodi" aliases before processing
+    let expandedServices = [];
+    for (const name of serviceNames) {
+      const lowerName = name.toLowerCase();
+      // If it contains "full bodi" but NOT "halus", expand to both
+      if ((lowerName.includes('full bodi') || lowerName.includes('full body')) && !lowerName.includes('halus')) {
+        expandedServices.push('Repaint Bodi Halus', 'Repaint Bodi Kasar');
+      } else {
+        expandedServices.push(name);
+      }
+    }
+    serviceNames = expandedServices;
+
     if (Array.isArray(serviceNames)) {
       const results = await Promise.all(
         serviceNames.map(name => {
