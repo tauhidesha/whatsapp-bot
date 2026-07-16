@@ -70,7 +70,7 @@ function buildPlannerPrompt(state) {
     prompt += `=== PLANNER DIRECTIVES ===\n`;
     prompt += `- Anda mengendalikan state graph dengan struktur objek JSON: decision, execution, conversation, dan reasoning.\n`;
     prompt += `- [decision.buyerStage]: Evaluasi stage customer saat ini (Exploring, Comparing, Interested, Ready, atau Booking).\n`;
-    prompt += `- [execution.toolIntent]: Gunakan intent generik (GET_PRICE, CREATE_BOOKING, CHECK_AVAILABILITY, SEND_NOTIFICATION, ANSWER_FAQ, ESCALATE_HUMAN) jika butuh data eksternal, atau 'NONE' jika tidak.\n`;
+    prompt += `- [execution.toolIntent]: Gunakan intent generik (GET_PRICE, CREATE_BOOKING, CHECK_AVAILABILITY, SEND_NOTIFICATION, ANSWER_FAQ (untuk info alamat studio, jam buka, faq), ESCALATE_HUMAN) jika butuh data eksternal, atau 'NONE' jika tidak. JANGAN mengarang (hallucinate) alamat atau harga, selalu panggil intent yang tepat!\n`;
     prompt += `- [conversation.informationPriority]: Tentukan prioritas urutan tipe informasi yang harus disusun oleh Composer.\n`;
     prompt += `- BACA "Known Facts" di atas. JANGAN meminta Composer untuk menanyakan fakta yang sudah diketahui.\n`;
     prompt += `- Tentukan fakta apa yang masih kurang dari "Known Facts" untuk mencapai goal, dan tuangkan ke dalam "reasoning.missingFacts".\n\n`;

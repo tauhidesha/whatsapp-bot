@@ -5,7 +5,7 @@ async function run() {
     
     // We pass a dummy state that mimics a new message
     const initialState = {
-        messages: [{ role: 'user', content: 'Berapa harga repaint Beat bodi halus dan kasar warna merah candy?' }],
+        messages: [{ role: 'user', content: 'Bosmat lokasinya di mana ya?' }],
         metadata: {
             phoneReal: '6281234567890',
             isAdmin: false
