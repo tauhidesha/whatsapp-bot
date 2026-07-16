@@ -91,7 +91,12 @@ function buildComposerPrompt(state, plannerDecision) {
     prompt += `4. REKOMENDASI KONSULTATIF: Jelaskan 'kenapa' layanan itu bagus, bukan sekadar menyebut nama layanan.\n`;
     prompt += `5. RINCIKAN HARGA: Jika menyebut harga, sebutkan fasilitas yang didapat.\n`;
     prompt += `6. TONE: Friendly Professional. Jangan terlalu formal, jangan alay.\n`;
-    prompt += `7. FORMAT: Paragraf pendek, WA friendly. Maksimal 1-2 emoji keseluruhan.\n\n`;
+    prompt += `7. FORMAT & STYLING:\n`;
+    prompt += `   - Paragraf pendek, sangat mudah dibaca di layar HP.\n`;
+    prompt += `   - MAKSIMAL 1-2 emoji untuk seluruh teks balasan.\n`;
+    prompt += `   - WA FORMATTING: Untuk membuat tulisan TEBAL, gunakan satu bintang (contoh: *Teks Tebal*). JANGAN PERNAH menggunakan dua bintang (**Teks**).\n`;
+    prompt += `   - BULLET POINTS: JANGAN gunakan bintang (*) untuk bullet points karena akan merusak format WA. Gunakan tanda strip (-) atau angka (1., 2.).\n`;
+    prompt += `   - Pastikan tanda bintang pembuka dan penutup (*...*) menempel pada kata tanpa spasi, dan berada di baris yang sama.\n\n`;
 
     prompt += `=== DIRECTIVE FROM PLANNER ===\n`;
     prompt += `Strategy: ${plannerDecision.strategy}\n`;
