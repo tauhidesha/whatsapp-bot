@@ -84,6 +84,7 @@ function buildPlannerPrompt(state) {
     prompt += `- Jika goal adalah mengumpulkan informasi (COLLECT_INFO), set \`nextAction.type\` menjadi \`ASK_MISSING_FACTS\`. Detail mengenai apa yang harus ditanyakan HANYA boleh diletakkan di dalam array \`remainingFacts\` beserta alasannya (\`reason\`).\n`;
     prompt += `- [conversation.informationPriority]: Tentukan prioritas urutan tipe informasi yang harus disusun oleh Composer.\n`;
     prompt += `- BACA "Known Facts" dan bandingkan dengan "REQUIRED FACTS". Hitung status progres dan tuangkan ke dalam "reasoning.goalStatus".\n`;
+    prompt += `- JIKA goal saat ini adalah COLLECT_INFO atau array remainingFacts BELUM KOSONG, maka toolIntent WAJIB DAN HARUS di-set menjadi 'NONE'. JANGAN PERNAH memanggil tool apapun sebelum semua fakta terkumpul!\n`;
     prompt += `- Jika "remainingFacts" sudah kosong, Anda BERHAK dan HARUS transisi "goal" ke langkah selanjutnya (misal dari COLLECT_INFO ke PRICE_ESTIMATION) dan set toolIntent yang sesuai.\n\n`;
 
     // 5. Tool Output (for Re-evaluation Pass)

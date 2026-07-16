@@ -9,12 +9,20 @@ class PricingTool extends BaseTool {
     }
 
     async _run(parameters, state) {
+        // Ensure service_name is an array as expected by V1
+        const serviceNameArray = Array.isArray(parameters.service_name) ? parameters.service_name : [parameters.service_name];
+
+        // Validation block: Prevent premature tool calls for Repaint
+        const isRepaint = serviceNameArray.some(s => typeof s === 'string' && s.toLowerCase().includes('repaint'));
+        const partToRepaint = state.consultation?.knownFacts?.partToRepaint;
+
+        if (isRepaint && !partToRepaint) {
+            return { error: "Missing parameter: partToRepaint. Tolong pastikan bagian motor yang ingin dicat (bodi halus, bodi kasar, velg, dll) sudah diketahui sebelum mengecek harga." };
+        }
+
         // V1 implementation mapping
         // We pass arguments as required by V1 implementation: implementation({ service_name, motor_model, size, color_name })
-        const { service_name, motor_model, size, color_name } = parameters;
-        
-        // Ensure service_name is an array as expected by V1
-        const serviceNameArray = Array.isArray(service_name) ? service_name : [service_name];
+        const { motor_model, size, color_name } = parameters;
 
         const resultString = await getServiceDetailsTool.implementation({
             service_name: serviceNameArray,
