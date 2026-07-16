@@ -32,7 +32,7 @@ async function run() {
         console.log('Tool Result:', result.tool?.lastResult);
         
         console.log('\nComposer Last Message:');
-        console.log(result.conversation?.lastMessages?.[0] || 'No message generated');
+        console.log(result.messages?.[result.messages.length - 1]?.content || 'No message generated');
         
         console.log('\nExecution successful!');
     } catch (err) {

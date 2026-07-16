@@ -33,13 +33,8 @@ async function composerNode(state) {
 
         console.log('[Composer Node] Generated text:', responseText);
 
-        const conversationUpdate = {
-            lastMessages: [...(state.conversation?.lastMessages || []), responseText]
-        };
-
         const result = {
             messages: [new AIMessage(responseText)],
-            conversation: conversationUpdate,
             analytics: {
                 responseCount: (state.analytics?.responseCount || 0) + 1
             }
@@ -51,8 +46,8 @@ async function composerNode(state) {
         const fallbackText = 'Aduh maaf mas, sistem saya lagi gangguan sedikit 🙏. Boleh ditunggu sebentar ya.';
         return {
             messages: [new AIMessage(fallbackText)],
-            conversation: {
-                lastMessages: [...(state.conversation?.lastMessages || []), fallbackText]
+            analytics: {
+                responseCount: (state.analytics?.responseCount || 0) + 1
             }
         };
     }

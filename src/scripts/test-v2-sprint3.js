@@ -32,7 +32,7 @@ async function run() {
         
         console.log('\n--- EXECUTION RESULT ---');
         console.log('Composer Response:');
-        console.log(result.conversation?.lastMessages?.[0]);
+        console.log(result.messages?.[result.messages.length - 1]?.content);
 
         console.log('\n--- MEMORY TRACKER ---');
         console.log('Sales Memory:', result.memory?.salesMemory);
