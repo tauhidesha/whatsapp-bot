@@ -140,7 +140,7 @@ const ZoyaState = Annotation.Root({
     business: Annotation({
         reducer: (old, updated) => ({ ...old, ...updated }),
         default: () => ({
-            sop: [],
+            sop: {},
             constraints: [],
             requiredFacts: [],
             upsells: [],
@@ -167,7 +167,7 @@ const ZoyaState = Annotation.Root({
     knowledge: Annotation({
         reducer: (old, updated) => ({ ...old, ...updated }),
         default: () => ({
-            raw: ''
+            raw: {}
         })
     }),
 

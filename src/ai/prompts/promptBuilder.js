@@ -31,11 +31,10 @@ function buildPlannerPrompt(state) {
             prompt += `- RESTRIKSI (${r.service}): ${r.reason}. Solusi: ${r.suggestedAction}\n`;
         });
     }
-    if (business?.sop?.length > 0) {
-        prompt += `\n=== STANDARD OPERATING PROCEDURES (SOP) ===\n`;
-        business.sop.forEach(g => {
-            prompt += `- ${g}\n`;
-        });
+    if (business?.sop && Object.keys(business.sop).length > 0) {
+        prompt += `\n=== BUSINESS RULES & SOP (JSON) ===\n`;
+        prompt += `Berikut adalah aturan bisnis yang HARUS dipatuhi, dikategorikan dalam JSON:\n`;
+        prompt += JSON.stringify(business.sop, null, 2) + `\n`;
     }
     if (business?.constraints?.length > 0) {
         prompt += `\n=== CONSTRAINTS ===\n`;
@@ -55,10 +54,10 @@ function buildPlannerPrompt(state) {
     }
     prompt += `\n`;
 
-    // 3. Relevant Knowledge (Service Models)
-    if (state.knowledge?.raw) {
+    if (state.knowledge?.raw && Object.keys(state.knowledge.raw).length > 0) {
         const knowledgeStr = typeof state.knowledge.raw === 'object' ? JSON.stringify(state.knowledge.raw, null, 2) : state.knowledge.raw;
-        prompt += `=== SERVICE KNOWLEDGE ===\n`;
+        prompt += `=== SERVICE KNOWLEDGE (JSON) ===\n`;
+        prompt += `Gunakan data berikut jika perlu mengedukasi customer:\n`;
         prompt += `${knowledgeStr}\n\n`;
     }
 
@@ -168,9 +167,9 @@ function buildComposerPrompt(state, plannerDecision, prioritizedData = null) {
         prompt += JSON.stringify(remainingFacts, null, 2) + `\n\n`;
     }
 
-    if (state.knowledge?.raw) {
+    if (state.knowledge?.raw && Object.keys(state.knowledge.raw).length > 0) {
         const knowledgeStr = typeof state.knowledge.raw === 'object' ? JSON.stringify(state.knowledge.raw, null, 2) : state.knowledge.raw;
-        prompt += `=== SERVICE KNOWLEDGE (CATATAN HARGA & FASILITAS) ===\n`;
+        prompt += `=== SERVICE KNOWLEDGE (JSON) ===\n`;
         prompt += `Gunakan data ini jika Anda perlu menyebutkan harga atau menjelaskan fasilitas layanan.\n`;
         prompt += `${knowledgeStr}\n\n`;
     }
@@ -184,12 +183,10 @@ function buildComposerPrompt(state, plannerDecision, prioritizedData = null) {
             prompt += `\n`;
         }
 
-        if (state.business.sop?.length > 0) {
-            prompt += `=== STANDARD OPERATING PROCEDURES (SOP) ===\n`;
-            state.business.sop.forEach(g => {
-                prompt += `- ${g}\n`;
-            });
-            prompt += `\n`;
+        if (state.business.sop && Object.keys(state.business.sop).length > 0) {
+            prompt += `=== BUSINESS RULES & SOP (JSON) ===\n`;
+            prompt += `Berikut adalah aturan bisnis yang HARUS dipatuhi, dikategorikan dalam JSON:\n`;
+            prompt += JSON.stringify(state.business.sop, null, 2) + `\n\n`;
         }
 
         if (state.business.promotions?.length > 0) {

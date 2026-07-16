@@ -5,9 +5,11 @@ const { REPAINT_FLOWS } = require('../knowledge/repaintFlow');
  * Guides the conversation steps for repaint requests.
  */
 
+const { businessRules } = require('./businessRulesData');
+
 function evaluateRepaintRules(state) {
     const rules = {
-        sop: [],
+        sop: {},
         constraints: [],
         requiredFacts: [],
         upsells: [],
@@ -26,9 +28,19 @@ function evaluateRepaintRules(state) {
     const knownMotor = knownFacts.motor || vehicle?.model;
     const knownRepaintTarget = knownFacts.repaintTarget || knownFacts.scope;
 
-    // 1. SOP: Bodi Kasar Color Constraint & Communication Guideline
-    rules.sop.push("SOP BENGKEL: Warna Bodi Kasar selalu standar Hitam/Original. Pilihan warna khusus (seperti Candy/Mutiara) HANYA berlaku untuk Bodi Halus atau Velg. JANGAN tanyakan alokasi warna untuk Bodi Kasar.");
-    rules.sop.push("KOMUNIKASI: Saat menanyakan warna, tanyakan 'Warna apa yang diinginkan?'. JANGAN gunakan istilah teknis 'Jenis Cat' karena membingungkan customer.");
+    // Filter SOP based on context (knownFacts and remainingFacts)
+    const contextKeys = [
+        ...Object.keys(knownFacts), 
+        ...(state.planner?.reasoning?.goalStatus?.remainingFacts?.map(f => f.field) || [])
+    ];
+    
+    // Always include communication rules for repaint
+    rules.sop.communication = businessRules.communication;
+
+    // Include paint rules if color or part is discussed
+    if (contextKeys.includes('paintColor') || contextKeys.includes('partToRepaint') || isRepaintRequested) {
+        rules.sop.paint = businessRules.paint;
+    }
 
     // 2. Identify Flow and Inject Required Facts
     const isFullBody = requested.some(s => s.toLowerCase().includes('full bodi') && !s.toLowerCase().includes('halus'));

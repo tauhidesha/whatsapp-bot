@@ -13,7 +13,7 @@ function executeRules(state) {
     console.log('[Rule Engine] Evaluating business rules...');
     
     const flags = {
-        sop: [],
+        sop: {},
         constraints: [],
         requiredFacts: [],
         upsells: [],
@@ -55,7 +55,7 @@ function executeRules(state) {
     // 5. Evaluate Repaint Rules
     const repaintRules = evaluateRepaintRules(state);
     if (repaintRules) {
-        if (repaintRules.sop) flags.sop.push(...repaintRules.sop);
+        if (repaintRules.sop) Object.assign(flags.sop, repaintRules.sop);
         if (repaintRules.constraints) flags.constraints.push(...repaintRules.constraints);
         if (repaintRules.requiredFacts) flags.requiredFacts.push(...repaintRules.requiredFacts);
         if (repaintRules.upsells) flags.upsells.push(...repaintRules.upsells);
