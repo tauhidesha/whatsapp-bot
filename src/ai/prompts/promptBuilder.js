@@ -31,11 +31,21 @@ function buildPlannerPrompt(state) {
             prompt += `- RESTRIKSI (${r.service}): ${r.reason}. Solusi: ${r.suggestedAction}\n`;
         });
     }
-    if (business?.guidelines?.length > 0) {
-        prompt += `\n=== CONVERSATION GUIDELINES ===\n`;
-        business.guidelines.forEach(g => {
-            prompt += `- ${g.directive}\n`;
+    if (business?.sop?.length > 0) {
+        prompt += `\n=== STANDARD OPERATING PROCEDURES (SOP) ===\n`;
+        business.sop.forEach(g => {
+            prompt += `- ${g}\n`;
         });
+    }
+    if (business?.constraints?.length > 0) {
+        prompt += `\n=== CONSTRAINTS ===\n`;
+        business.constraints.forEach(c => {
+            prompt += `- ${c}\n`;
+        });
+    }
+    if (business?.requiredFacts?.length > 0) {
+        prompt += `\n=== REQUIRED FACTS ===\n`;
+        prompt += `Fakta yang WAJIB diketahui untuk goal saat ini:\n- ${business.requiredFacts.join('\n- ')}\n`;
     }
     if (business?.upsells?.length > 0) {
         prompt += `\n=== UPSELL OPPORTUNITIES ===\n`;
@@ -72,8 +82,8 @@ function buildPlannerPrompt(state) {
     prompt += `- [decision.buyerStage]: Evaluasi stage customer saat ini (Exploring, Comparing, Interested, Ready, atau Booking).\n`;
     prompt += `- [execution.toolIntent]: Gunakan intent generik (GET_PRICE, CREATE_BOOKING, CHECK_AVAILABILITY, SEND_NOTIFICATION, ANSWER_FAQ (untuk info alamat studio, jam buka, faq), ESCALATE_HUMAN) jika butuh data eksternal, atau 'NONE' jika tidak. JANGAN mengarang (hallucinate) alamat atau harga, selalu panggil intent yang tepat!\n`;
     prompt += `- [conversation.informationPriority]: Tentukan prioritas urutan tipe informasi yang harus disusun oleh Composer.\n`;
-    prompt += `- BACA "Known Facts" di atas. JANGAN meminta Composer untuk menanyakan fakta yang sudah diketahui.\n`;
-    prompt += `- Tentukan fakta apa yang masih kurang dari "Known Facts" untuk mencapai goal, dan tuangkan ke dalam "reasoning.missingFacts".\n\n`;
+    prompt += `- BACA "Known Facts" dan bandingkan dengan "REQUIRED FACTS". Hitung status progres dan tuangkan ke dalam "reasoning.goalStatus".\n`;
+    prompt += `- Jika "remainingFacts" sudah kosong, Anda BERHAK dan HARUS transisi "goal" ke langkah selanjutnya (misal dari COLLECT_INFO ke PRICE_ESTIMATION) dan set toolIntent yang sesuai.\n\n`;
 
     // 5. Tool Output (for Re-evaluation Pass)
     if (state.tool?.lastResult) {
@@ -134,9 +144,9 @@ function buildComposerPrompt(state, plannerDecision, prioritizedData = null) {
     if (plannerDecision.conversation?.informationPriority && plannerDecision.conversation.informationPriority.length > 0) {
         prompt += `\n=== INFORMATION PRIORITY ===\n`;
         prompt += `Gunakan prioritas (urutan) tipe informasi berikut saat merangkai pesan:\n`;
-        const sortedPriority = [...plannerDecision.conversation.informationPriority].sort((a, b) => a.order - b.order);
+        const sortedPriority = [...plannerDecision.conversation.informationPriority].sort((a, b) => a.priority - b.priority);
         sortedPriority.forEach((p) => {
-            prompt += `${p.order}. ${p.type}\n`;
+            prompt += `${p.priority}. ${p.type}\n`;
         });
     }
 
@@ -152,12 +162,12 @@ function buildComposerPrompt(state, plannerDecision, prioritizedData = null) {
     }
     prompt += `\n`;
 
-    const missingFacts = plannerDecision.reasoning?.missingFacts;
-    if (missingFacts && missingFacts.length > 0) {
+    const remainingFacts = plannerDecision.reasoning?.goalStatus?.remainingFacts;
+    if (remainingFacts && remainingFacts.length > 0) {
         prompt += `=== MISSING FACTS (PRIORITIZED) ===\n`;
         prompt += `Berikut adalah fakta yang perlu Anda tanyakan ke customer. Gabungkan gaya bertanya Anda dengan arahan Strategy di atas.\n`;
         prompt += `Pilih SATU fakta prioritas utama untuk ditanyakan secara natural:\n`;
-        prompt += JSON.stringify(missingFacts, null, 2) + `\n\n`;
+        prompt += JSON.stringify(remainingFacts, null, 2) + `\n\n`;
     }
 
     if (state.knowledge?.raw) {
@@ -176,10 +186,10 @@ function buildComposerPrompt(state, plannerDecision, prioritizedData = null) {
             prompt += `\n`;
         }
 
-        if (state.business.guidelines?.length > 0) {
-            prompt += `=== CONVERSATION GUIDELINES ===\n`;
-            state.business.guidelines.forEach(g => {
-                prompt += `- ${g.directive}\n`;
+        if (state.business.sop?.length > 0) {
+            prompt += `=== STANDARD OPERATING PROCEDURES (SOP) ===\n`;
+            state.business.sop.forEach(g => {
+                prompt += `- ${g}\n`;
             });
             prompt += `\n`;
         }

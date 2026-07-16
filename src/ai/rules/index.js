@@ -13,12 +13,15 @@ function executeRules(state) {
     console.log('[Rule Engine] Evaluating business rules...');
     
     const flags = {
-        disabledServices: [],
-        promotions: [],
+        sop: [],
+        constraints: [],
+        requiredFacts: [],
         upsells: [],
-        restrictions: [], // Full restriction objects for Context
+        promotions: [],
+        restrictions: [],
         escalations: [],
-        guidelines: []
+        guidelines: [],
+        disabledServices: []
     };
 
     // 1. Evaluate Coating Restrictions
@@ -52,10 +55,11 @@ function executeRules(state) {
     // 5. Evaluate Repaint Rules
     const repaintRules = evaluateRepaintRules(state);
     if (repaintRules) {
-        repaintRules.forEach(rule => {
-            if (rule.type === 'CONVERSATION_GUIDELINE') flags.guidelines.push(rule);
-            if (rule.type === 'UPSELL') flags.upsells.push(rule);
-        });
+        if (repaintRules.sop) flags.sop.push(...repaintRules.sop);
+        if (repaintRules.constraints) flags.constraints.push(...repaintRules.constraints);
+        if (repaintRules.requiredFacts) flags.requiredFacts.push(...repaintRules.requiredFacts);
+        if (repaintRules.upsells) flags.upsells.push(...repaintRules.upsells);
+        if (repaintRules.guidelines) flags.guidelines.push(...repaintRules.guidelines);
     }
 
     return flags;

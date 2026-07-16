@@ -101,11 +101,14 @@ const ZoyaState = Annotation.Root({
         reducer: (old, updated) => ({ ...old, ...updated }),
         default: () => ({
             goal: null,
-            reason: null,
-            nextAction: null, // ASK, RECOMMEND, PRICE, BOOK, HANDOVER, WAIT
-            capability: null,
-            confidence: 0,
-            strategy: null
+            plannerContext: {},
+            nextAction: null, // ASK, INFORM, CALL_TOOL, WAIT, END, CONFIRM, ESCALATE, HANDOFF
+            toolIntent: null, // NONE, GET_PRICE, BOOK, CHECK_BOOKING, ESCALATE, NOTIFY, ANSWER
+            informationPriority: [],
+            reasoning: {},
+            decision: {},
+            execution: {},
+            conversation: {}
         })
     }),
 
@@ -137,9 +140,13 @@ const ZoyaState = Annotation.Root({
     business: Annotation({
         reducer: (old, updated) => ({ ...old, ...updated }),
         default: () => ({
-            activeRules: [],
+            sop: [],
+            constraints: [],
+            requiredFacts: [],
+            upsells: [],
+            promotions: [],
+            restrictions: [],
             escalation: false,
-            promotion: null,
             disabledServices: []
         })
     }),

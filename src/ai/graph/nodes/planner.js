@@ -15,17 +15,17 @@ const PlannerSchema = z.object({
     }),
     execution: z.object({
         nextAction: z.object({
-            type: z.enum(['ASK', 'RECOMMEND', 'GET_INFORMATION', 'SHOW_PRICE', 'CREATE_BOOKING', 'UPDATE_BOOKING', 'ESCALATE', 'WAIT', 'FINISH']),
+            type: z.enum(['ASK', 'INFORM', 'CALL_TOOL', 'WAIT', 'END', 'CONFIRM', 'ESCALATE', 'HANDOFF']),
             target: z.string().optional().describe("Fakta/Topik target (misal: 'wheelCondition')"),
             priority: z.number().optional()
         }).describe("Aksi berikutnya yang harus diambil."),
-        toolIntent: z.enum(['GET_PRICE', 'CREATE_BOOKING', 'CHECK_AVAILABILITY', 'SEND_NOTIFICATION', 'ANSWER_FAQ', 'ESCALATE_HUMAN', 'NONE']).describe("Intent untuk memanggil external tools. Isi dengan 'NONE' jika tidak butuh.")
+        toolIntent: z.enum(['NONE', 'GET_PRICE', 'BOOK', 'CHECK_BOOKING', 'ESCALATE', 'NOTIFY', 'ANSWER']).describe("Intent untuk memanggil external tools. Isi dengan 'NONE' jika tidak butuh.")
     }),
     conversation: z.object({
         responseLength: z.enum(['SHORT', 'MEDIUM', 'LONG']).describe("Panjang balasan yang diinstruksikan ke Composer."),
         informationPriority: z.array(z.object({
             type: z.enum(['summary', 'price', 'education', 'question', 'empathy']),
-            order: z.number()
+            priority: z.number()
         })).describe("Urutan informasi yang harus disampaikan Composer.")
     }),
     reasoning: z.object({
@@ -35,18 +35,22 @@ const PlannerSchema = z.object({
             goal: z.number().min(0).max(1),
             nextAction: z.number().min(0).max(1)
         }).describe("Tingkat keyakinan Planner terhadap keputusannya."),
-        missingFacts: z.array(z.object({
-            field: z.string().describe("Nama field/fakta yang hilang (misal: 'wheelCondition', 'paintType', 'bookingDate')."),
-            reason: z.string().describe("Alasan logis kenapa fakta ini dibutuhkan sekarang."),
-            priority: z.number().describe("Prioritas (1 = paling utama, makin besar makin tidak prioritas).")
-        })).describe("Daftar fakta yang belum diketahui (belum ada di knownFacts) yang HARUS ditanyakan ke user."),
+        goalStatus: z.object({
+            completedFacts: z.array(z.string()).describe("Fakta/syarat yang sudah berhasil dikumpulkan."),
+            remainingFacts: z.array(z.object({
+                field: z.string().describe("Nama field/fakta yang hilang (misal: 'wheelCondition', 'paintType', 'bookingDate')."),
+                priority: z.number().describe("Prioritas (1 = paling utama, makin besar makin tidak prioritas)."),
+                reason: z.string().describe("Alasan logis kenapa fakta ini dibutuhkan sekarang.")
+            })).describe("Daftar fakta yang belum diketahui (belum ada di knownFacts) yang HARUS ditanyakan ke user.")
+        }).describe("Status progres dari goal saat ini, dihitung dengan membandingkan knownFacts vs requiredFacts."),
         decisionTrace: z.object({
             goal: z.string(),
-            usedFacts: z.array(z.string()),
-            missingFacts: z.array(z.string())
+            usedFacts: z.array(z.string())
         }).describe("Trace keputusan untuk keperluan debugging engineer.")
     })
 });
+
+const { derivePlannerContext } = require('../../utils/plannerContext');
 
 async function plannerNode(state) {
     console.log('[Planner Node] Analyzing State with LLM...');
@@ -67,6 +71,9 @@ async function plannerNode(state) {
             ['human', promptText]
         ]);
         
+        // Deterministik context kalkulasi
+        decision.plannerContext = derivePlannerContext({ ...state, planner: decision });
+
         const result = {
             planner: decision,
             analytics: {
@@ -78,39 +85,45 @@ async function plannerNode(state) {
     } catch (error) {
         console.error('[Planner Node] LLM Error:', error);
         // Fallback behavior if LLM fails
-        return {
-            planner: {
-                decision: {
-                    goal: 'GENERAL_SUPPORT',
-                    strategy: 'CLARIFY',
-                    buyerStage: 'Exploring'
+        const fallbackDecision = {
+            decision: {
+                goal: 'GENERAL_SUPPORT',
+                strategy: 'CLARIFY',
+                buyerStage: 'Exploring'
+            },
+            execution: {
+                nextAction: {
+                    type: 'ASK',
+                    target: 'general',
+                    priority: 1
                 },
-                execution: {
-                    nextAction: {
-                        type: 'ASK',
-                        target: 'general',
-                        priority: 1
-                    },
-                    toolIntent: 'NONE'
+                toolIntent: 'NONE'
+            },
+            conversation: {
+                responseLength: 'MEDIUM',
+                informationPriority: [
+                    { type: 'summary', priority: 1 },
+                    { type: 'question', priority: 2 }
+                ]
+            },
+            reasoning: {
+                reason: error.message,
+                confidence: { buyerStage: 0, goal: 0, nextAction: 0 },
+                goalStatus: {
+                    completedFacts: [],
+                    remainingFacts: []
                 },
-                conversation: {
-                    responseLength: 'MEDIUM',
-                    informationPriority: [
-                        { type: 'summary', order: 1 },
-                        { type: 'question', order: 2 }
-                    ]
-                },
-                reasoning: {
-                    reason: error.message,
-                    confidence: { buyerStage: 0, goal: 0, nextAction: 0 },
-                    missingFacts: [],
-                    decisionTrace: {
-                        goal: 'Fallback',
-                        usedFacts: [],
-                        missingFacts: []
-                    }
+                decisionTrace: {
+                    goal: 'Fallback',
+                    usedFacts: []
                 }
             }
+        };
+        
+        fallbackDecision.plannerContext = derivePlannerContext({ ...state, planner: fallbackDecision });
+
+        return {
+            planner: fallbackDecision
         };
     }
 }
