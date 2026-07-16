@@ -99,6 +99,16 @@ function buildComposerPrompt(state, plannerDecision) {
     prompt += `   - Pastikan tanda bintang pembuka dan penutup (*...*) menempel pada kata tanpa spasi, dan berada di baris yang sama.\n`;
     prompt += `8. LINK & LOKASI: Jika memberikan informasi alamat atau link (seperti Google Maps) yang didapat dari data, BERIKAN LINK ASLINYA secara utuh (contoh: https://maps.app.goo.gl/...). JANGAN menyuruh pengguna untuk mencari sendiri di Maps.\n\n`;
 
+    // Add current context (Time, Date, Sender Name)
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('id-ID', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta'
+    });
+    prompt += `=== CURRENT CONTEXT ===\n`;
+    prompt += `Waktu Sekarang: ${formatter.format(now)} WIB\n`;
+    prompt += `Nama Customer: ${state.customer?.name || 'Customer'}\n\n`;
+
     prompt += `=== DIRECTIVE FROM PLANNER ===\n`;
     prompt += `Strategy: ${plannerDecision.strategy}\n`;
     prompt += `Action: ${plannerDecision.nextAction}\n`;
