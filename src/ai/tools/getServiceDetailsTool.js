@@ -581,7 +581,16 @@ async function processSingleService(parsedServiceName, input, promoText) {
         basePrice = priceEntry?.price || 0;
     }
 
-    // Apply Surcharges
+    // If basePrice is 0 and it requires a size or model, it means the motor model was not recognized
+    if (basePrice === 0 && (service.usesModelPricing || isSizeBased)) {
+        return {
+            success: true,
+            needs_clarification: true,
+            message: `Maaf kak, aku belum mengenali detail ukuran untuk motor "${motorModel}". Boleh sebutkan motor yang lebih spesifik (misal: NMax, Beat, Vario) agar aku bisa berikan harga yang pas?`,
+            action: "ASK_USER"
+        };
+    }
+
     if (!basePrice && !service.prices.some(p => p.price > 0)) {
         return { success: false, error: 'price_not_found', message: `Harga "${service.name}" belum tersedia.` };
     }
