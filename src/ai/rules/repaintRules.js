@@ -75,11 +75,13 @@ function evaluateRepaintRules(state) {
     }
 
     // Bypass logic for UNDECIDED paintColor to prevent Infinite Loop
-    const isColorUndecided = knownFacts.paintColor?.state === 'UNDECIDED' || knownFacts.paintColor === 'Belum Menentukan';
+    const colorState = knownFacts.paintColor?.state;
+    const isColorUndecided = colorState === 'UNDECIDED' || knownFacts.paintColor === 'Belum Menentukan';
+    
     if (isColorUndecided) {
         rules.blockingFacts = rules.blockingFacts.filter(fact => fact !== 'paintColor');
         rules.requiredFacts = rules.requiredFacts.filter(fact => fact !== 'paintColor');
-        rules.constraints.push("Customer belum menentukan warna. BYPASS syarat warna. DILARANG menanyakan warna kembali. Langsung ubah Goal ke PRICE_ESTIMATION dan berikan RANGE harga dasar/estimasi.");
+        rules.constraints.push("INFO MUTLAK: Customer belum menentukan warna (UNDECIDED). DILARANG KERAS menanyakan warna lagi di pesan ini. Langsung transisi Goal ke PRICE_ESTIMATION dan berikan RANGE harga dasar.");
     }
 
     // 3. Upsells
