@@ -75,9 +75,22 @@ function formatDuration(minutesStr) {
 
 const VALID_SIZES = new Set(['S', 'M', 'L', 'XL']);
 
+const SIZE_MAPPING = {
+  'SMALL': 'S',
+  'MEDIUM': 'M',
+  'LARGE': 'L',
+  'EXTRA LARGE': 'XL',
+  'EXTRALARGE': 'XL'
+};
+
 function normalizeSizeInput(value) {
   if (typeof value !== 'string') return null;
-  const normalized = value.trim().toUpperCase();
+  let normalized = value.trim().toUpperCase();
+  
+  if (SIZE_MAPPING[normalized]) {
+      normalized = SIZE_MAPPING[normalized];
+  }
+  
   return VALID_SIZES.has(normalized) ? normalized : null;
 }
 
@@ -112,7 +125,8 @@ async function resolveSizeForService({ service, sizeArg, motorModel }) {
   if (!finalSize && motorModel) {
     const motorData = await lookupMotorSizeFromData(motorModel);
     if (motorData) {
-      finalSize = category === 'repaint' ? motorData.repaintSize : motorData.serviceSize;
+      let rawSize = category === 'repaint' ? motorData.repaintSize : motorData.serviceSize;
+      finalSize = normalizeSizeInput(rawSize) || rawSize;
       console.log(`[resolveSizeForService] Inferred ${finalSize} from model ${motorModel}`);
     }
   }
@@ -184,7 +198,8 @@ async function lookupRepaintPrice(motorModel, subcategory, motorSize) {
   // 2. Bodi Kasar (usesModelPricing = false, based on size)
   if (subcategory === 'bodi_kasar') {
     const service = await prisma.service.findFirst({ where: { subcategory: 'bodi_kasar' } });
-    const size = motorSize || motorData.repaintSize;
+    const rawSize = motorSize || motorData.repaintSize;
+    const size = normalizeSizeInput(rawSize) || rawSize;
     if (service && size) {
       const priceEntry = await prisma.servicePrice.findFirst({
         where: { serviceId: service.id, size: size }
@@ -211,7 +226,8 @@ async function lookupRepaintPrice(motorModel, subcategory, motorSize) {
       });
       // Fallback to size-based
       if (!priceEntry) {
-        const size = motorSize || motorData.repaintSize;
+        const rawSize = motorSize || motorData.repaintSize;
+        const size = normalizeSizeInput(rawSize) || rawSize;
         priceEntry = await prisma.servicePrice.findFirst({
           where: { serviceId: service.id, size: size }
         });
