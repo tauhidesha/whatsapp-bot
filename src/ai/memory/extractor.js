@@ -8,11 +8,11 @@ const { extractTextFromContent, getMessageType } = require('../graph/utils/sanit
 
 const MemorySchema = z.object({
     motor: z.string().optional().describe("Merek atau model motor yang disebut kustomer (misal: NMax, Beat, PCX). Jika tidak ada, kosongi."),
-    color: z.string().optional().describe("Warna atau jenis cat yang disebut kustomer (misal: merah candy, polos, mutiara). JIKA kustomer bilang 'asli', 'aslinya', 'standar', WAJIB isi dengan 'Standar Pabrik/Original'. Jika tidak ada warna, kosongi."),
+    color: z.string().optional().describe("Warna atau jenis cat yang disebut kustomer (misal: merah candy, polos, mutiara). JIKA kustomer bilang 'asli', 'aslinya', 'standar', WAJIB isi dengan 'Standar Pabrik/Original'. JIKA kustomer menyatakan belum tahu, bingung, atau belum memutuskan warna (contoh: 'belum tau', 'bingung', 'bebas'), WAJIB isi dengan 'Belum Menentukan'. Jika tidak ada warna, kosongi."),
     part: z.string().optional().describe("Bagian motor yang ingin dikerjakan (misal: full bodi, bodi halus, bodi kasar, velg). Jika tidak ada, kosongi."),
     objection: z.string().optional().describe("Keberatan atau komplain yang disebut kustomer (misal: 'belum gajian', 'mahal', 'jauh'). Jika tidak ada, kosongi."),
     services: z.array(z.string()).optional().describe("Daftar layanan yang di-request kustomer (misal: 'Repaint Bodi Halus', 'Repaint Velg', 'Detailing'). Jika tidak ada, kosongi."),
-    velgCondition: z.string().optional().describe("Kondisi velg motor saat ini (misal: 'masih ori', 'udah direpaint', 'banyak baret', 'grepes'). Jika tidak ada, kosongi.")
+    velgCondition: z.string().optional().describe("Kondisi velg motor saat ini (misal: 'masih ori', 'udah direpaint', 'banyak baret', 'grepes'). JIKA kustomer menyatakan belum tahu kondisinya, WAJIB isi dengan 'Belum Menentukan'. Jika tidak ada, kosongi.")
 });
 
 async function extractMemory(state) {

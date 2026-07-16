@@ -156,6 +156,16 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
     prompt += `Buyer Stage: ${plannerDecision.decision?.buyerStage}\n`;
     prompt += `Action Type: ${plannerDecision.execution?.nextAction?.type}\n`;
     
+    if (plannerDecision.decision?.goal === 'PRICE_ESTIMATION' && (state.vehicle?.paintType === 'Belum Menentukan' || state.consultation?.knownFacts?.paintColor === 'Belum Menentukan')) {
+        prompt += `\n=== CRITICAL FALLBACK RULE: WARNA BELUM MENENTUKAN ===\n`;
+        prompt += `DILARANG KERAS menanyakan warna lagi. Mulailah kalimat respons dengan empati yang mengarahkan konsultasi ke ahlinya (contoh: "Gapapa mas/kak kalo belom tau, nanti bisa konsul langsung sama bosmat soal warnanya."). Setelah itu, langsung berikan estimasi/range harga sesuai SOP yang berlaku.\n`;
+    }
+    
+    if (plannerDecision.decision?.goal === 'PRICE_ESTIMATION' && state.consultation?.knownFacts?.velgCondition === 'Belum Menentukan') {
+        prompt += `\n=== CRITICAL FALLBACK RULE: KONDISI VELG BELUM MENENTUKAN ===\n`;
+        prompt += `DILARANG KERAS menanyakan kondisi velg lagi. Mulailah kalimat respons dengan ramah bahwa tim Bosmat akan mengecek kondisinya langsung di tempat (contoh: "Santai kak, nanti kita cekin aja langsung kondisi velg aslinya di bengkel"). Setelah itu, berikan range harga velg secara umum sesuai SOP.\n`;
+    }
+    
     if (plannerDecision.conversation?.informationPriority && plannerDecision.conversation.informationPriority.length > 0) {
         prompt += `\n=== INFORMATION PRIORITY ===\n`;
         prompt += `Gunakan prioritas (urutan) tipe informasi berikut saat merangkai pesan:\n`;

@@ -40,3 +40,5 @@ tests/
 scratch/
 test-objection.js
 test_graph.js
+
+testsprite_tests/tmp/config.json

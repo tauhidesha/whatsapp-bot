@@ -1,0 +1,96 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Zoya V2 Test API",
+    "version": "1.0.0"
+  },
+  "components": {
+    "securitySchemes": {
+      "InternalSecret": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-internal-secret",
+        "description": "Internal secret key for API authentication"
+      }
+    }
+  },
+  "security": [
+    {
+      "InternalSecret": []
+    }
+  ],
+  "paths": {
+    "/test-ai": {
+      "post": {
+        "summary": "Chat with AI",
+        "description": "Endpoint for testing the AI chatbot logic",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "thread_id": {
+                    "type": "string",
+                    "example": "test_sprite_a"
+                  },
+                  "message": {
+                    "type": "string",
+                    "example": "mas mau repaint nmax"
+                  }
+                },
+                "required": ["thread_id", "message"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "AI response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ai_response": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/test-ai/clear": {
+      "delete": {
+        "summary": "Clear AI Session",
+        "description": "Must be called before starting a new test scenario to clear the chat history for a thread_id.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "thread_id": {
+                    "type": "string",
+                    "example": "test_sprite_a"
+                  }
+                },
+                "required": ["thread_id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Session cleared"
+          }
+        }
+      }
+    }
+  }
+}
