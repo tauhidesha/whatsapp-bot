@@ -6,8 +6,8 @@
 function trackAnalytics(state) {
     console.log('[Analytics Tracker] Tracking metrics and buyer stage...');
 
-    const { conversation, memory } = state;
-    let newBuyerStage = conversation?.buyerStage || 'Exploring';
+    const { conversation, memory, sales } = state;
+    let newBuyerStage = sales?.buyerStage || 'Exploring';
 
     // Heuristics for Buyer Stage
     if (memory?.salesMemory?.common_objection) {

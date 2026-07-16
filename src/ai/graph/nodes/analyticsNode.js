@@ -8,11 +8,9 @@ async function analyticsNode(state) {
 
     const newAnalytics = trackAnalytics(state);
     
-    // We update conversation status if needed, but mainly update analytics
     const result = {
         analytics: newAnalytics,
-        conversation: {
-            ...state.conversation,
+        sales: {
             buyerStage: newAnalytics.buyerStage
         }
     };
