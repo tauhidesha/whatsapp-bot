@@ -10,6 +10,8 @@ function prioritizeInformation(state) {
         return null;
     }
 
+    console.log('[Information Prioritizer] Processing tool result for capability:', state.tool.lastCapability);
+
     // 1. Pricing Tool Handling
     if (state.tool.lastCapability === 'pricing') {
         // If there are multiple services requested (e.g., Repaint + Repaint Velg)
