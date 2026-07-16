@@ -60,8 +60,12 @@ function buildPlannerPrompt(state) {
     prompt += `Conversation Status: ${conversation?.status}\n\n`;
     
     prompt += `=== PLANNER DIRECTIVES ===\n`;
+    prompt += `- Anda mengendalikan state graph dengan struktur objek JSON: decision, execution, conversation, dan reasoning.\n`;
+    prompt += `- [decision.buyerStage]: Evaluasi stage customer saat ini (Exploring, Comparing, Interested, Ready, atau Booking).\n`;
+    prompt += `- [execution.toolIntent]: Gunakan intent generik (GET_PRICE, CREATE_BOOKING, CHECK_AVAILABILITY, SEND_NOTIFICATION, ANSWER_FAQ, ESCALATE_HUMAN) jika butuh data eksternal, atau 'NONE' jika tidak.\n`;
+    prompt += `- [conversation.informationPriority]: Tentukan prioritas urutan tipe informasi yang harus disusun oleh Composer.\n`;
     prompt += `- BACA "Known Facts" di atas. JANGAN meminta Composer untuk menanyakan fakta yang sudah diketahui.\n`;
-    prompt += `- Tentukan fakta apa yang masih kurang dari "Known Facts" untuk mencapai goal, dan tuangkan ke dalam "missingFacts".\n\n`;
+    prompt += `- Tentukan fakta apa yang masih kurang dari "Known Facts" untuk mencapai goal, dan tuangkan ke dalam "reasoning.missingFacts".\n\n`;
 
     // 5. Tool Output (for Re-evaluation Pass)
     if (state.tool?.lastResult) {
@@ -111,22 +115,37 @@ function buildComposerPrompt(state, plannerDecision, prioritizedData = null) {
     prompt += `Nama Customer: ${state.customer?.name || 'Customer'}\n\n`;
 
     prompt += `=== DIRECTIVE FROM PLANNER ===\n`;
-    prompt += `Strategy: ${plannerDecision.strategy}\n`;
-    prompt += `Action: ${plannerDecision.nextAction}\n`;
+    prompt += `Goal: ${plannerDecision.decision?.goal}\n`;
+    prompt += `Strategy: ${plannerDecision.decision?.strategy}\n`;
+    prompt += `Buyer Stage: ${plannerDecision.decision?.buyerStage}\n`;
+    prompt += `Action Type: ${plannerDecision.execution?.nextAction?.type}\n`;
+    if (plannerDecision.execution?.nextAction?.target) {
+        prompt += `Action Target: ${plannerDecision.execution.nextAction.target}\n`;
+    }
     
+    if (plannerDecision.conversation?.informationPriority && plannerDecision.conversation.informationPriority.length > 0) {
+        prompt += `\n=== INFORMATION PRIORITY ===\n`;
+        prompt += `Gunakan prioritas (urutan) tipe informasi berikut saat merangkai pesan:\n`;
+        const sortedPriority = [...plannerDecision.conversation.informationPriority].sort((a, b) => a.order - b.order);
+        sortedPriority.forEach((p) => {
+            prompt += `${p.order}. ${p.type}\n`;
+        });
+    }
+
     // Inject Prioritized Data (or raw tool output if prioritizer returns the raw object)
     if (prioritizedData) {
-        prompt += `Data: ${JSON.stringify(prioritizedData, null, 2)}\n`;
+        prompt += `\nData: ${JSON.stringify(prioritizedData, null, 2)}\n`;
     } else if (state.tool?.lastResult) {
-        prompt += `Data: ${JSON.stringify(state.tool.lastResult)}\n`;
+        prompt += `\nData: ${JSON.stringify(state.tool.lastResult)}\n`;
     }
     prompt += `\n`;
 
-    if (plannerDecision.missingFacts && plannerDecision.missingFacts.length > 0) {
+    const missingFacts = plannerDecision.reasoning?.missingFacts;
+    if (missingFacts && missingFacts.length > 0) {
         prompt += `=== MISSING FACTS (PRIORITIZED) ===\n`;
         prompt += `Berikut adalah fakta yang perlu Anda tanyakan ke customer. Gabungkan gaya bertanya Anda dengan arahan Strategy di atas.\n`;
         prompt += `Pilih SATU fakta prioritas utama untuk ditanyakan secara natural:\n`;
-        prompt += JSON.stringify(plannerDecision.missingFacts, null, 2) + `\n\n`;
+        prompt += JSON.stringify(missingFacts, null, 2) + `\n\n`;
     }
 
     if (state.knowledge?.raw) {

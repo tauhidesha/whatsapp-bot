@@ -8,23 +8,44 @@ const { buildPlannerPrompt } = require('../../prompts/promptBuilder');
  */
 
 const PlannerSchema = z.object({
-    goal: z.string().describe("Tujuan utama percakapan saat ini dari sisi customer."),
-    reason: z.string().describe("Alasan kenapa planner mengambil keputusan ini."),
-    nextAction: z.string().describe("Aksi berikutnya yang harus diambil. Harus salah satu dari: 'ASK', 'RECOMMEND', 'GET_INFORMATION', 'SHOW_PRICE', 'CREATE_BOOKING', 'UPDATE_BOOKING', 'ESCALATE', 'WAIT', 'FINISH'."),
-    capability: z.string().describe("Nama capability tool. HARUS DIPILIH DARI: 'pricing', 'booking_availability', 'create_booking', 'update_booking', 'studio_info', 'promo', 'notification', 'calculate_home_service_fee'. Isi dengan 'NONE' jika tidak butuh."),
-    strategy: z.string().describe("Strategi komunikasi untuk composer. Harus salah satu dari: 'EDUCATE', 'BUILD_TRUST', 'EMPATHIZE', 'CLARIFY', 'URGENCY', 'CROSS_SELL'."),
-    responseLength: z.enum(['SHORT', 'MEDIUM', 'LONG']).describe("Panjang balasan yang diinstruksikan ke Composer."),
-    confidence: z.number().min(0).max(1).describe("Tingkat keyakinan Planner terhadap keputusannya (0.0 - 1.0)."),
-    missingFacts: z.array(z.object({
-        field: z.string().describe("Nama field/fakta yang hilang (misal: 'wheelCondition', 'paintShade', 'bookingDate')."),
-        reason: z.string().describe("Alasan logis kenapa fakta ini dibutuhkan sekarang."),
-        priority: z.number().describe("Prioritas (1 = paling utama, makin besar makin tidak prioritas).")
-    })).describe("Daftar fakta yang belum diketahui (belum ada di knownFacts) yang HARUS ditanyakan ke user."),
-    decisionTrace: z.object({
-        goal: z.string(),
-        usedFacts: z.array(z.string()),
-        missingFacts: z.array(z.string())
-    }).describe("Trace keputudan untuk keperluan debugging engineer (bukan untuk user).")
+    decision: z.object({
+        goal: z.enum(['COLLECT_INFO', 'PRICE_ESTIMATION', 'BOOKING', 'UPSELL', 'ESCALATION', 'GENERAL_SUPPORT', 'HANDLE_OBJECTION']).describe("Tujuan utama percakapan saat ini dari sisi customer."),
+        strategy: z.enum(['EDUCATE', 'BUILD_TRUST', 'EMPATHIZE', 'CLARIFY', 'URGENCY', 'CROSS_SELL']).describe("Strategi komunikasi untuk composer."),
+        buyerStage: z.enum(['Exploring', 'Comparing', 'Interested', 'Ready', 'Booking']).describe("Stage pembeli saat ini.")
+    }),
+    execution: z.object({
+        nextAction: z.object({
+            type: z.enum(['ASK', 'RECOMMEND', 'GET_INFORMATION', 'SHOW_PRICE', 'CREATE_BOOKING', 'UPDATE_BOOKING', 'ESCALATE', 'WAIT', 'FINISH']),
+            target: z.string().optional().describe("Fakta/Topik target (misal: 'wheelCondition')"),
+            priority: z.number().optional()
+        }).describe("Aksi berikutnya yang harus diambil."),
+        toolIntent: z.enum(['GET_PRICE', 'CREATE_BOOKING', 'CHECK_AVAILABILITY', 'SEND_NOTIFICATION', 'ANSWER_FAQ', 'ESCALATE_HUMAN', 'NONE']).describe("Intent untuk memanggil external tools. Isi dengan 'NONE' jika tidak butuh.")
+    }),
+    conversation: z.object({
+        responseLength: z.enum(['SHORT', 'MEDIUM', 'LONG']).describe("Panjang balasan yang diinstruksikan ke Composer."),
+        informationPriority: z.array(z.object({
+            type: z.enum(['summary', 'price', 'education', 'question', 'empathy']),
+            order: z.number()
+        })).describe("Urutan informasi yang harus disampaikan Composer.")
+    }),
+    reasoning: z.object({
+        reason: z.string().describe("Alasan kenapa planner mengambil keputusan ini."),
+        confidence: z.object({
+            buyerStage: z.number().min(0).max(1),
+            goal: z.number().min(0).max(1),
+            nextAction: z.number().min(0).max(1)
+        }).describe("Tingkat keyakinan Planner terhadap keputusannya."),
+        missingFacts: z.array(z.object({
+            field: z.string().describe("Nama field/fakta yang hilang (misal: 'wheelCondition', 'paintShade', 'bookingDate')."),
+            reason: z.string().describe("Alasan logis kenapa fakta ini dibutuhkan sekarang."),
+            priority: z.number().describe("Prioritas (1 = paling utama, makin besar makin tidak prioritas).")
+        })).describe("Daftar fakta yang belum diketahui (belum ada di knownFacts) yang HARUS ditanyakan ke user."),
+        decisionTrace: z.object({
+            goal: z.string(),
+            usedFacts: z.array(z.string()),
+            missingFacts: z.array(z.string())
+        }).describe("Trace keputusan untuk keperluan debugging engineer.")
+    })
 });
 
 async function plannerNode(state) {
@@ -59,18 +80,35 @@ async function plannerNode(state) {
         // Fallback behavior if LLM fails
         return {
             planner: {
-                goal: 'Fallback due to LLM error',
-                reason: error.message,
-                nextAction: 'ASK',
-                capability: 'NONE',
-                strategy: 'CLARIFY',
-                responseLength: 'MEDIUM',
-                confidence: 0,
-                missingFacts: [],
-                decisionTrace: {
-                    goal: 'Fallback',
-                    usedFacts: [],
-                    missingFacts: []
+                decision: {
+                    goal: 'GENERAL_SUPPORT',
+                    strategy: 'CLARIFY',
+                    buyerStage: 'Exploring'
+                },
+                execution: {
+                    nextAction: {
+                        type: 'ASK',
+                        target: 'general',
+                        priority: 1
+                    },
+                    toolIntent: 'NONE'
+                },
+                conversation: {
+                    responseLength: 'MEDIUM',
+                    informationPriority: [
+                        { type: 'summary', order: 1 },
+                        { type: 'question', order: 2 }
+                    ]
+                },
+                reasoning: {
+                    reason: error.message,
+                    confidence: { buyerStage: 0, goal: 0, nextAction: 0 },
+                    missingFacts: [],
+                    decisionTrace: {
+                        goal: 'Fallback',
+                        usedFacts: [],
+                        missingFacts: []
+                    }
                 }
             }
         };

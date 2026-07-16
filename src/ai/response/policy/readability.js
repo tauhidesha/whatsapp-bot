@@ -18,7 +18,7 @@ function getReadabilityDirectives(state, plannerDecision) {
     directives.push(`LINK & LOKASI: Jika memberikan alamat atau link, BERIKAN SECARA UTUH (contoh: https://maps.app.goo.gl/...). Jangan suruh pengguna mencari sendiri.`);
     
     // Length policy
-    const length = plannerDecision?.responseLength || 'MEDIUM';
+    const length = plannerDecision?.conversation?.responseLength || 'MEDIUM';
     if (length === 'SHORT') {
         directives.push(`RESPONSE LENGTH: SHORT. Jawab sesingkat mungkin dalam 1-2 kalimat.`);
     } else if (length === 'MEDIUM') {

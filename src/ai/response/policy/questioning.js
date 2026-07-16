@@ -19,7 +19,7 @@ function getQuestioningDirectives(state, plannerDecision) {
 
     // Sales stage alignment
     const stage = state.consultation?.stage;
-    const strategy = plannerDecision?.strategy;
+    const strategy = plannerDecision?.decision?.strategy;
     if (strategy === 'BUILD_TRUST' || stage === 'DISCOVERING') {
         directives.push(`SALES ALIGNMENT: Jangan melakukan *hard closing*, *upsell*, atau memaksa *booking* di tahap ini. Fokus pada edukasi dan membangun kepercayaan.`);
     }

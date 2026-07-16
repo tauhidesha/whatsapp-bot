@@ -8,21 +8,32 @@ const toolRegistry = require('../../tools/v2/registry');
 async function capabilityRouterNode(state) {
     console.log('[Capability Router Node] Routing Capability...');
     
-    const capability = state.planner?.capability;
+    const toolIntent = state.planner?.execution?.toolIntent;
     
-    if (!capability || capability === 'NONE') {
-        console.log(`[Capability Router Node] No tool requested (capability: ${capability}). Skipping tool execution.`);
+    if (!toolIntent || toolIntent === 'NONE') {
+        console.log(`[Capability Router Node] No tool requested (intent: ${toolIntent}). Skipping tool execution.`);
         // If no capability is needed, we don't update the tool state
         return {};
     }
 
+    // Map generic intent to specific tool implementation
+    const intentToToolMap = {
+        'GET_PRICE': 'getRepaintPricing',
+        'CREATE_BOOKING': 'createBooking',
+        'CHECK_AVAILABILITY': 'booking_availability',
+        'SEND_NOTIFICATION': 'notification',
+        'ANSWER_FAQ': 'studio_info',
+        'ESCALATE_HUMAN': 'escalate_human'
+    };
+
+    const capability = intentToToolMap[toolIntent];
     const tool = toolRegistry.getTool(capability);
     
     let resultData = null;
     let toolUpdate = {};
 
     if (tool) {
-        console.log(`[Capability Router Node] Executing Tool: ${tool.name} for capability: ${capability}`);
+        console.log(`[Capability Router Node] Executing Tool: ${tool.name} for intent: ${toolIntent} (mapped to ${capability})`);
         
         // Prepare input from state
         const toolInput = {

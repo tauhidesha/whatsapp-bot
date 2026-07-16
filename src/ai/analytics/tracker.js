@@ -7,18 +7,9 @@ function trackAnalytics(state) {
     console.log('[Analytics Tracker] Tracking metrics and buyer stage...');
 
     const { conversation, memory, sales } = state;
-    let newBuyerStage = sales?.buyerStage || 'Exploring';
-
-    // Heuristics for Buyer Stage
-    if (memory?.salesMemory?.common_objection) {
-        newBuyerStage = 'Hesitating';
-    } else if (state.tool?.lastCapability === 'pricing') {
-        newBuyerStage = 'Comparing';
-    } else if (state.planner?.nextAction === 'BOOK') {
-        newBuyerStage = 'Ready to Buy';
-    } else if (state.planner?.strategy === 'WAIT' && newBuyerStage === 'Hesitating') {
-        newBuyerStage = 'Cooling Down';
-    }
+    // Read Buyer Stage from Planner Decision (Single Source of Truth)
+    // with fallback to previous state or Exploring
+    let newBuyerStage = state.planner?.decision?.buyerStage || sales?.buyerStage || 'Exploring';
 
     return {
         buyerStage: newBuyerStage,

@@ -23,12 +23,13 @@ async function run() {
         const result = await zoyaAgent.invoke(initialState, config);
         
         console.log('\n--- EXECUTION RESULT ---');
-        console.log('Planner Goal:', result.planner?.goal);
-        console.log('Planner Action:', result.planner?.nextAction);
-        console.log('Planner Capability:', result.planner?.capability);
-        console.log('Planner Strategy:', result.planner?.strategy);
+        console.log('Planner Goal:', result.planner?.decision?.goal);
+        console.log('Planner Action:', JSON.stringify(result.planner?.execution?.nextAction));
+        console.log('Planner Tool Intent:', result.planner?.execution?.toolIntent);
+        console.log('Planner Strategy:', result.planner?.decision?.strategy);
+        console.log('Buyer Stage:', result.planner?.decision?.buyerStage);
         
-        console.log('\nTool Last Capability:', result.tool?.lastCapability);
+        console.log('\nTool Last Intent:', result.tool?.lastCapability);
         console.log('Tool Result:', result.tool?.lastResult);
         
         console.log('\nComposer Last Message:');
