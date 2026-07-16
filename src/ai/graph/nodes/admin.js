@@ -46,7 +46,7 @@ async function adminNode(state) {
         .map(t => t.toolDefinition);
 
     const modelConfig = {
-        model: process.env.ADMIN_AI_MODEL || process.env.AI_MODEL || 'gemini-2.5-flash-lite',
+        model: process.env.ADMIN_AI_MODEL || process.env.AI_MODEL || 'gemini-flash-latest',
         maxOutputTokens: 2048,
         temperature: 0
     };

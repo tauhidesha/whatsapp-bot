@@ -19,7 +19,7 @@ const MemorySchema = z.object({
     part: FactSchema("Bagian motor yang dikerjakan (misal: full bodi, bodi halus, velg)."),
     objection: FactSchema("Keberatan/komplain kustomer (misal: 'mahal', 'jauh')."),
     services: z.array(z.string()).optional().describe("Daftar layanan (misal: 'Repaint Bodi Halus')."),
-    velgCondition: FactSchema("Kondisi velg (misal: 'masih ori', 'grepes').")
+    velgCondition: FactSchema("Kondisi cat velg sebelumnya (misal: 'masih ori pabrik', 'udah pernah dicat/repaint', 'belum pernah'). JANGAN isi ini dengan baret/lecet, fokus HANYA pada status cat asli/repaint.")
 });
 
 async function extractMemory(state) {
@@ -38,7 +38,7 @@ async function extractMemory(state) {
     }
 
     const llm = new ChatGoogleGenerativeAI({
-        model: process.env.AI_MODEL || 'gemini-2.5-flash-lite',
+        model: process.env.AI_MODEL || 'gemini-flash-latest',
         temperature: 0,
         maxOutputTokens: 256,
         apiKey: process.env.GOOGLE_API_KEY

@@ -18,7 +18,7 @@ async function composerNode(state) {
     
     // Inisialisasi model
     const llm = new ChatGoogleGenerativeAI({
-        model: process.env.AI_MODEL || 'gemini-2.5-flash-lite',
+        model: process.env.AI_MODEL || 'gemini-flash-latest',
         temperature: 0.7,
         maxOutputTokens: 512,
         apiKey: process.env.GOOGLE_API_KEY

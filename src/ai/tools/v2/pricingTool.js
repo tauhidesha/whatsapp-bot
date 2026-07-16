@@ -9,12 +9,32 @@ class PricingTool extends BaseTool {
     }
 
     async _run(parameters, state) {
-        // Ensure service_name is an array as expected by V1
-        const serviceNameArray = Array.isArray(parameters.service_name) ? parameters.service_name : [parameters.service_name];
+        // Fallback to knownFacts if parameters are empty
+        const knownFacts = state.consultation?.knownFacts || {};
+        const vehicle = state.vehicle || {};
+        
+        let rawServiceName = parameters.service_name || parameters.service || parameters.partToRepaint || knownFacts.partToRepaint?.value || 'Repaint Bodi Halus';
+        let serviceNameArray = Array.isArray(rawServiceName) ? rawServiceName : [rawServiceName];
+
+        // Ensure "Repaint" prefix for known parts if missing
+        serviceNameArray = serviceNameArray.map(s => {
+            if (typeof s === 'string' && !s.toLowerCase().includes('repaint')) {
+                if (['velg', 'bodi halus', 'bodi kasar', 'full bodi', 'cvt', 'arm'].some(part => s.toLowerCase().includes(part))) {
+                    return `Repaint ${s}`;
+                }
+            }
+            return s;
+        });
 
         // Validation block: Prevent premature tool calls for Repaint
         const isRepaint = serviceNameArray.some(s => typeof s === 'string' && s.toLowerCase().includes('repaint'));
-        const partToRepaint = parameters.partToRepaint;
+        const partToRepaintStr = serviceNameArray.find(s => typeof s === 'string' && s.toLowerCase().includes('repaint')) || '';
+        let partToRepaint = parameters.partToRepaint;
+        if (!partToRepaint && isRepaint) {
+            if (partToRepaintStr.toLowerCase().includes('halus')) partToRepaint = 'bodi halus';
+            else if (partToRepaintStr.toLowerCase().includes('kasar')) partToRepaint = 'bodi kasar';
+            else if (partToRepaintStr.toLowerCase().includes('velg')) partToRepaint = 'velg';
+        }
 
         if (isRepaint && !partToRepaint) {
             return { error: "Missing parameter: partToRepaint. Tolong pastikan bagian motor yang ingin dicat (bodi halus, bodi kasar, velg, dll) sudah diketahui sebelum mengecek harga." };
@@ -22,7 +42,9 @@ class PricingTool extends BaseTool {
 
         // V1 implementation mapping
         // We pass arguments as required by V1 implementation: implementation({ service_name, motor_model, size, color_name })
-        const { motor_model, size, color_name } = parameters;
+        const motor_model = parameters.motor_model || parameters.motorModel || parameters.motor || knownFacts.motor?.value || vehicle.model?.value || vehicle.model || 'NMax';
+        const size = parameters.size || parameters.motorSize;
+        const color_name = parameters.color_name || parameters.paintColor || parameters.color || knownFacts.paintColor?.value || vehicle.paintType?.value;
 
         const resultString = await getServiceDetailsTool.implementation({
             service_name: serviceNameArray,

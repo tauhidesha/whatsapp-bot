@@ -3333,11 +3333,16 @@ async function connectToWhatsApp() {
         }
 
         if (connection === 'close') {
-            const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
+            const errorMsg = lastDisconnect.error?.message || lastDisconnect.error?.toString() || '';
+            const isQrRefsEnded = errorMsg.includes('QR refs attempts ended');
+            const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut && !isQrRefsEnded;
+            
             console.log('connection closed due to ', lastDisconnect.error, ', reconnecting ', shouldReconnect);
             // reconnect if not logged out
             if (shouldReconnect) {
                 setTimeout(connectToWhatsApp, 5000);
+            } else if (isQrRefsEnded) {
+                console.log('⚠️ [Baileys] QR refs attempts ended. Tolong restart server dan scan QR code baru jika ingin login.');
             }
         } else if (connection === 'open') {
             console.log('opened connection');
@@ -3350,7 +3355,11 @@ async function connectToWhatsApp() {
     });
 }
 
-connectToWhatsApp().catch(err => console.log("unexpected error: " + err));
+if (process.env.DISABLE_WA !== 'true') {
+    connectToWhatsApp().catch(err => console.log("unexpected error: " + err));
+} else {
+    console.log('⚠️ [STARTUP] WhatsApp connection disabled by DISABLE_WA=true');
+}
 
 module.exports = { 
     saveMessageToPrisma, 

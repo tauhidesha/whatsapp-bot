@@ -682,6 +682,7 @@ async function implementation(input) {
     // Expand "Full Bodi" aliases before processing
     let expandedServices = [];
     for (const name of serviceNames) {
+      if (!name) continue;
       const lowerName = name.toLowerCase();
       // If it contains "full bodi" but NOT "halus", expand to both
       if ((lowerName.includes('full bodi') || lowerName.includes('full body')) && !lowerName.includes('halus')) {

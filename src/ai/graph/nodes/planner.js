@@ -59,7 +59,7 @@ async function plannerNode(state) {
     
     // Inisialisasi model
     const llm = new ChatGoogleGenerativeAI({
-        model: process.env.AI_MODEL || 'gemini-2.5-flash-lite',
+        model: process.env.AI_MODEL || 'gemini-flash-latest',
         temperature: 0,
         maxOutputTokens: 1024,
         apiKey: process.env.GOOGLE_API_KEY

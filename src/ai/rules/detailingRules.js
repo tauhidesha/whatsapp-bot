@@ -7,13 +7,29 @@ function evaluateDetailingRules(state) {
     const rules = [];
     const requested = state.consultation?.requestedServices || [];
     
-    if (!requested.includes('detailing') && !requested.includes('coating')) {
+    const isDetailing = requested.some(s => {
+        const lower = s.toLowerCase();
+        return lower.includes('detailing') || lower.includes('coating') || lower.includes('poles') || lower.includes('cuci');
+    });
+    
+    if (!isDetailing) {
         return null;
     }
 
     const { vehicle, consultation } = state;
-    const isBongkar = consultation?.isBongkarTotal;
-    const paintType = vehicle?.paintType?.toLowerCase();
+    let isBongkar = consultation?.isBongkarTotal;
+    
+    // Auto-infer bongkar status for specific services
+    if (requested.some(s => s.toLowerCase().includes('poles') || s.toLowerCase().includes('bodi'))) {
+        if (isBongkar === undefined) isBongkar = false;
+    }
+    
+    let paintType = null;
+    if (typeof vehicle?.paintType === 'string') {
+        paintType = vehicle.paintType.toLowerCase();
+    } else if (vehicle?.paintType?.value) {
+        paintType = vehicle.paintType.value.toLowerCase();
+    }
     
     // Langkah 1: Tanya jenis motor
     if (!vehicle?.model) {

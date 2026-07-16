@@ -61,6 +61,12 @@ function buildPlannerPrompt(state) {
         });
         prompt += `PENTING: Jika Anda memutuskan untuk melakukan upsell, pastikan Anda menambahkan objek { type: 'upsell', priority: [n] } ke dalam conversation.informationPriority.\n`;
     }
+    if (business?.guidelines?.length > 0) {
+        prompt += `\n=== CONVERSATION GUIDELINES ===\n`;
+        business.guidelines.forEach(g => {
+            prompt += `- ${g.directive}\n`;
+        });
+    }
     prompt += `\n`;
 
     if (state.knowledge?.raw && Object.keys(state.knowledge.raw).length > 0) {
@@ -185,7 +191,7 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
             prompt += `\nData: ${JSON.stringify(state.tool.lastResult)}\n`;
         }
     }
-    prompt += `\n`;
+    prompt += `PENTING: JANGAN meringkas atau menyembunyikan biaya tambahan (surcharge). Jika di dalam Data terdapat "Rincian:" (misal harga dasar + biaya warna/remover), WAJIB sebutkan biaya tambahan tersebut secara jelas ke customer!\n\n`;
 
     const remainingFacts = plannerDecision.reasoning?.goalStatus?.remainingFacts;
     if (remainingFacts && remainingFacts.length > 0) {
@@ -229,6 +235,14 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
             prompt += `=== UPSELL OPPORTUNITIES ===\n`;
             state.business.upsells.forEach(u => {
                 prompt += `- Tawarkan layanan "${u.service}": ${u.reason}\n`;
+            });
+            prompt += `\n`;
+        }
+
+        if (state.business.guidelines?.length > 0) {
+            prompt += `=== CONVERSATION GUIDELINES ===\n`;
+            state.business.guidelines.forEach(g => {
+                prompt += `- ${g.directive}\n`;
             });
             prompt += `\n`;
         }

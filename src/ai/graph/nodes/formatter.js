@@ -12,7 +12,7 @@ const rulesPath = path.join(__dirname, 'conversation-rules.md');
 const conversationRules = fs.existsSync(rulesPath) ? fs.readFileSync(rulesPath, 'utf8') : '';
 
 const model = new ChatGoogleGenerativeAI({
-    model: process.env.AI_MODEL || 'gemini-2.5-flash-lite',
+    model: process.env.AI_MODEL || 'gemini-flash-latest',
     maxOutputTokens: 500,
     temperature: 0.7,
 });
