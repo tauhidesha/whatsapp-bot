@@ -144,7 +144,11 @@ function buildComposerPrompt(state, plannerDecision, prioritizedData = null) {
     if (prioritizedData) {
         prompt += `\nData: ${JSON.stringify(prioritizedData, null, 2)}\n`;
     } else if (state.tool?.lastResult) {
-        prompt += `\nData: ${JSON.stringify(state.tool.lastResult)}\n`;
+        if (state.tool.lastResult.formattedText) {
+            prompt += `\nData:\n${state.tool.lastResult.formattedText}\n`;
+        } else {
+            prompt += `\nData: ${JSON.stringify(state.tool.lastResult)}\n`;
+        }
     }
     prompt += `\n`;
 

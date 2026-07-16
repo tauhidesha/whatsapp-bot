@@ -40,6 +40,7 @@ const repaintKnowledge = {
         "Repaint Velg: Ada biaya tambahan jika mau warna Chrome atau Two-Tone dengan Polish.",
         "Repaint Velg: Ada biaya tambahan (paint remover) jika velg sudah pernah dicat ulang.",
         "Repaint Full Bodi: Mencakup Bodi Halus + Bodi Kasar.",
+        "Repaint Full Bodi Halus: Hanya Bodi Halus saja (bukan Full Bodi).",
         "Pengerjaan standar memakan waktu 4-5 hari kerja",
         "Wajib DP minimal 50%",
         "Cat bergaransi 3 bulan untuk cacat pengerjaan"

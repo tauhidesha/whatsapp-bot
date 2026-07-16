@@ -23,10 +23,41 @@ class PricingTool extends BaseTool {
             color_name
         });
 
-        // The old tool returns a formatted string. We can return it directly or try to parse it.
-        // For compatibility with Composer, we return it as an object with raw text.
+        // Format the raw JSON into a clean string so the Composer doesn't hallucinate
+        let formattedText = "";
+        
+        try {
+            const processResult = (res) => {
+                let text = "";
+                if (res.message) text += `${res.message}\n`;
+                if (res.candidates && Array.isArray(res.candidates)) {
+                    res.candidates.forEach(c => {
+                        text += `- ${c.name}: ${c.price_formatted}\n`;
+                        if (c.summary) text += `  Keterangan: ${c.summary}\n`;
+                        if (c.note) text += `  Catatan: ${c.note}\n`;
+                        if (c.estimated_duration) text += `  Estimasi waktu: ${c.estimated_duration}\n`;
+                    });
+                } else if (res.price_formatted) {
+                    text += `- ${res.name || res.service_name}: ${res.price_formatted}\n`;
+                    if (res.summary) text += `  Keterangan: ${res.summary}\n`;
+                    if (res.estimated_duration) text += `  Estimasi waktu: ${res.estimated_duration}\n`;
+                }
+                return text;
+            };
+
+            if (resultString.multiple_services_requested && Array.isArray(resultString.results)) {
+                formattedText = resultString.results.map(processResult).join('\n');
+            } else {
+                formattedText = processResult(resultString);
+            }
+        } catch (e) {
+            console.error('[PricingTool] Failed to format result:', e);
+            formattedText = "Gagal memformat harga, silakan cek manual.";
+        }
+
         return {
             rawText: resultString,
+            formattedText: formattedText,
             service: serviceNameArray.join(', ')
         };
     }

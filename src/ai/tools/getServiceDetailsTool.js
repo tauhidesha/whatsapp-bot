@@ -713,7 +713,7 @@ const getServiceDetailsTool = {
           service_name: {
             type: "array",
             items: { type: "string" },
-            description: "Array nama layanan spesifik (contoh: ['Repaint Bodi Halus']). WAJIB pilih dari: 'Repaint Bodi Halus', 'Repaint Bodi Kasar', 'Repaint Velg', 'Repaint Cover CVT', 'Spot Repair', 'Detailing Mesin', 'Cuci Komplit', 'Poles Bodi Glossy', 'Full Detailing Glossy', 'Coating Doff', 'Coating Glossy', 'Complete Service Doff', 'Complete Service Glossy'. JANGAN isi dengan kategori umum seperti 'repaint'."
+            description: "Array nama layanan spesifik (contoh: ['Repaint Bodi Halus']). WAJIB pilih dari: 'Repaint Bodi Halus', 'Repaint Bodi Kasar', 'Repaint Velg', 'Repaint Cover CVT', 'Spot Repair', 'Detailing Mesin', 'Cuci Komplit', 'Poles Bodi Glossy', 'Full Detailing Glossy', 'Coating Doff', 'Coating Glossy', 'Complete Service Doff', 'Complete Service Glossy'. JIKA customer minta 'Full Bodi', WAJIB pilih ['Repaint Bodi Halus', 'Repaint Bodi Kasar']. JIKA 'Full Bodi Halus', WAJIB pilih ['Repaint Bodi Halus']. JANGAN isi dengan kategori umum seperti 'repaint'."
           },
           motor_model: {
             type: "string",
