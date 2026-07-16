@@ -96,7 +96,8 @@ function buildComposerPrompt(state, plannerDecision) {
     prompt += `   - MAKSIMAL 1-2 emoji untuk seluruh teks balasan.\n`;
     prompt += `   - WA FORMATTING: Untuk membuat tulisan TEBAL, gunakan satu bintang (contoh: *Teks Tebal*). JANGAN PERNAH menggunakan dua bintang (**Teks**).\n`;
     prompt += `   - BULLET POINTS: JANGAN gunakan bintang (*) untuk bullet points karena akan merusak format WA. Gunakan tanda strip (-) atau angka (1., 2.).\n`;
-    prompt += `   - Pastikan tanda bintang pembuka dan penutup (*...*) menempel pada kata tanpa spasi, dan berada di baris yang sama.\n\n`;
+    prompt += `   - Pastikan tanda bintang pembuka dan penutup (*...*) menempel pada kata tanpa spasi, dan berada di baris yang sama.\n`;
+    prompt += `8. LINK & LOKASI: Jika memberikan informasi alamat atau link (seperti Google Maps) yang didapat dari data, BERIKAN LINK ASLINYA secara utuh (contoh: https://maps.app.goo.gl/...). JANGAN menyuruh pengguna untuk mencari sendiri di Maps.\n\n`;
 
     prompt += `=== DIRECTIVE FROM PLANNER ===\n`;
     prompt += `Strategy: ${plannerDecision.strategy}\n`;
