@@ -168,7 +168,7 @@ async function triggerPromoNurture() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${process.env.API_SECRET_TOKEN || 'your_secret_token_here'}`
+                    'x-internal-secret': process.env.INTERNAL_API_SECRET || 'your_secret_here'
                 },
                 body: JSON.stringify({
                     number: item.senderNumber,
