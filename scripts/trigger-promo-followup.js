@@ -23,14 +23,14 @@ async function triggerPromoNurture() {
 
     for (const item of nurturingQueue) {
         try {
-            // Paksa angle menjadi promo diskon 10%
-            item.strategy.angle = 'tawarkan promo diskon 10% untuk transaksi hari ini';
+            // Paksa angle menjadi promo diskon 10% (jangan paksa harus hari ini, promo eksklusif)
+            item.strategy.angle = 'tawarkan promo eksklusif diskon 10% khusus untuk pelanggan yang menerima WA ini. Promo berlaku untuk jasa repaint (booking slot dulu aja bebas kapan).';
 
             // Override promoData null karena kita sudah set spesifik di angle
             const message = await generateFollowUpMessage(
                 item.queueItem,
                 item.strategy,
-                { description: 'Promo Spesial Diskon 10% hari ini!' } // promoData
+                { description: 'Promo Eksklusif Diskon Repaint 10% (khusus penerima pesan WA ini)' } // promoData
             );
 
             if (message) {
