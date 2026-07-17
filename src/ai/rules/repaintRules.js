@@ -39,6 +39,9 @@ function evaluateRepaintRules(state) {
     // Always include communication rules for repaint
     rules.sop.communication = businessRules.communication;
 
+    // Always include repair rules for repaint
+    rules.sop.repair = businessRules.repair;
+
     // Include paint rules if color or part is discussed
     if (contextKeys.includes('paintColor') || contextKeys.includes('partToRepaint') || isRepaintRequested) {
         rules.sop.paint = businessRules.paint;

@@ -12,6 +12,10 @@ const businessRules = {
   "pricing": [
     "JIKA tool pricing sudah memberikan harga beserta Rincian/Surcharge, WAJIB sebutkan biaya tambahan (surcharge) tersebut secara spesifik di pesan (contoh: biaya tambahan untuk warna Candy, Paint Remover, dll).",
     "Jika customer menginformasikan velg sudah pernah direpaint/dicat ulang, WAJIB berikan info bahwa ada biaya tambahan (surcharge) untuk cairan 'Paint Remover' / rontok cat di luar harga dasar."
+  ],
+  "repair": [
+    "Jika ada bagian yang retak, patah, atau rusak, sampaikan bahwa itu BISA di-repair dan sudah TERMASUK dalam paket repaint bodi halus.",
+    "Beri tahu juga bahwa jika kerusakannya tergolong parah, akan ada biaya tambahan yang baru bisa dipastikan setelah melihat kondisi aslinya (real) di studio."
   ]
 };
 
