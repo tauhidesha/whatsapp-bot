@@ -144,7 +144,7 @@ async function generateFollowUpMessage(customerData, strategy, promoData = null)
             : '';
 
         let chatHistorySection = '';
-        const rawPhone = customerData.docId || context.phone;
+        const rawPhone = customerData.senderNumber || context.phone || customerData.docId;
         // Strip WA suffix so we match DB format (stored without @c.us/@lid)
         const phone = rawPhone ? rawPhone.replace(/@c\.us$|@lid$/, '') : null;
         if (phone) {
