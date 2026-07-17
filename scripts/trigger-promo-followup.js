@@ -1,87 +1,210 @@
 require('dotenv').config();
-const { _buildDryRunQueue } = require('../src/ai/agents/followUpEngine/scheduler.js');
+const prisma = require('../src/lib/prisma');
 const { generateFollowUpMessage } = require('../src/ai/agents/followUpEngine/messageGenerator.js');
+const { STRATEGY_CONFIG } = require('../src/ai/agents/followUpEngine/config.js');
+
+function resolveWhatsappId(customer) {
+    if (customer.whatsappLid) return customer.whatsappLid;
+    if (customer.phone && customer.phone.includes('@')) return customer.phone;
+    return customer.phone ? customer.phone + '@c.us' : null;
+}
+
+function isEligible(context, metadata) {
+    const label = context.customerLabel;
+    const strategy = STRATEGY_CONFIG[label];
+    if (!strategy || strategy.action === 'stop') return false;
+
+    const lastFollowUp = context.lastFollowUpAt ? new Date(context.lastFollowUpAt) : null;
+    const lastMessage = metadata?.lastMessageAt
+        ? new Date(metadata.lastMessageAt)
+        : (context.updatedAt ? new Date(context.updatedAt) : null);
+
+    if (!lastMessage) return false;
+
+    const now = new Date();
+
+    if (lastFollowUp) {
+        const followUpCount = context.followUpCount || 0;
+        const interval = followUpCount >= 2
+            ? (strategy.secondIntervalDays || strategy.intervalDays)
+            : (strategy.intervalDays || strategy.waitDays);
+        const daysSinceLastFollowUp = Math.floor((now - lastFollowUp) / (1000 * 60 * 60 * 24));
+        if (daysSinceLastFollowUp < interval) return false;
+    } else {
+        const referenceDate = (label === 'existing_customer' || label === 'loyal_customer')
+            ? (context.lastServiceAt ? new Date(context.lastServiceAt) : lastMessage)
+            : lastMessage;
+        const daysSinceReference = Math.floor((now - referenceDate) / (1000 * 60 * 60 * 24));
+        if (daysSinceReference < strategy.waitDays) return false;
+    }
+
+    const followUpCount = context.followUpCount || 0;
+    if (followUpCount >= strategy.maxFollowUps) return false;
+
+    return true;
+}
+
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Random delay between 7 and 10 minutes (in ms)
+function getRandomDelay() {
+    const min = 7 * 60 * 1000;
+    const max = 10 * 60 * 1000;
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
 
 async function triggerPromoNurture() {
-    console.log('🚀 Memulai proses pengambilan antrean Nurturing...');
+    console.log('🚀 Memulai proses pengiriman Nurturing Promo secara sekuensial...');
     
-    // 1. Ambil antrean eligible saat ini
-    const queue = await _buildDryRunQueue(new Date());
-    console.log(`📊 Ditemukan total ${queue.length} pelanggan eligible untuk hari ini.`);
+    // 1. Ambil semua konteks
+    const contexts = await prisma.customerContext.findMany({
+        where: { customerLabel: { not: null } },
+        include: {
+            customer: true
+        }
+    });
 
-    // 2. Filter hanya yang bertipe nurturing (bukan review/rebooking)
-    const nurturingQueue = queue.filter(item => item.type === 'nurturing');
-    console.log(`🎯 Dari total tersebut, ada ${nurturingQueue.length} pelanggan eligible untuk Nurturing.`);
+    const now = new Date();
+    const eligibleQueue = [];
 
-    if (nurturingQueue.length === 0) {
+    // 2. Evaluasi yang eligible
+    for (const context of contexts) {
+        const customer = context.customer;
+        if (!customer) continue;
+
+        const senderNumber = resolveWhatsappId(customer);
+        const metadata = {
+            lastMessageAt: customer.lastMessageAt,
+            name: customer.name,
+            fullSenderId: senderNumber
+        };
+
+        // Hindari bentrok dengan logic review/rebooking, filter murni yg eligible utk Nurture reguler
+        const isNurtureEligible = isEligible(context, metadata);
+        if (!isNurtureEligible) continue;
+
+        // Skip jika harusnya ini review (3-7 hari pasca servis)
+        let isReviewEligible = false;
+        const lastService = customer.lastService ? new Date(customer.lastService) : null;
+        if (lastService && !context.reviewFollowUpSent) {
+            const daysSinceService = Math.floor((now - lastService) / (1000 * 60 * 60 * 24));
+            if (daysSinceService >= 3 && daysSinceService <= 7) isReviewEligible = true;
+        }
+        if (isReviewEligible) continue;
+
+        // Skip jika harusnya rebooking (sesuai interval tipe servis)
+        let isRebookingEligible = false;
+        if (lastService && context.lastServiceType) {
+            const daysSinceService = Math.floor((now - lastService) / (1000 * 60 * 60 * 24));
+            const REBOOKING_INTERVALS = { coating: 180, detailing: 30, repaint: 90 };
+            const interval = REBOOKING_INTERVALS[context.lastServiceType];
+            if (interval && daysSinceService >= interval && daysSinceService <= interval + 3) {
+                const lastFup = context.lastFollowUpAt ? new Date(context.lastFollowUpAt) : null;
+                const daysSinceLastFup = lastFup ? Math.floor((now - lastFup) / (1000 * 60 * 60 * 24)) : 999;
+                if (daysSinceLastFup > 7) {
+                    isRebookingEligible = true;
+                }
+            }
+        }
+        if (isRebookingEligible) continue;
+
+        const strategy = { ...STRATEGY_CONFIG[context.customerLabel] };
+        
+        // Kita timpa anglenya dengan eksklusif promo
+        strategy.angle = 'tawarkan promo eksklusif diskon 10% khusus untuk pelanggan yang menerima WA ini. Promo berlaku untuk jasa repaint (booking slot dulu aja bebas kapan).';
+
+        eligibleQueue.push({
+            docId: context.id,
+            senderNumber,
+            name: customer.name || 'Mas',
+            context,
+            metadata,
+            strategy
+        });
+    }
+
+    console.log(`📊 Ditemukan total ${eligibleQueue.length} pelanggan eligible untuk Promo Nurturing hari ini.`);
+
+    if (eligibleQueue.length === 0) {
         console.log('✅ Tidak ada pelanggan yang eligible untuk nurturing hari ini.');
         process.exit(0);
     }
 
-    const approvedItems = [];
-    console.log('🤖 Mulai men-generate pesan promo diskon 10% dengan AI...');
+    // Sort by last message so newest active users are prioritized
+    eligibleQueue.sort((a, b) => {
+        const dateA = a.metadata?.lastMessageAt ? new Date(a.metadata.lastMessageAt) : new Date(0);
+        const dateB = b.metadata?.lastMessageAt ? new Date(b.metadata.lastMessageAt) : new Date(0);
+        return dateB - dateA;
+    });
 
-    for (const item of nurturingQueue) {
+    const fetch = (await import('node-fetch')).default;
+
+    // 3. Proses 1 per 1 dengan delay
+    for (let i = 0; i < eligibleQueue.length; i++) {
+        const item = eligibleQueue[i];
+        console.log(`\n[${i+1}/${eligibleQueue.length}] 🤖 Men-generate pesan untuk ${item.name} (${item.senderNumber})...`);
+
         try {
-            // Paksa angle menjadi promo diskon 10% (jangan paksa harus hari ini, promo eksklusif)
-            item.strategy.angle = 'tawarkan promo eksklusif diskon 10% khusus untuk pelanggan yang menerima WA ini. Promo berlaku untuk jasa repaint (booking slot dulu aja bebas kapan).';
-
-            // Override promoData null karena kita sudah set spesifik di angle
+            // Generate pesan
             const message = await generateFollowUpMessage(
-                item.queueItem,
+                { name: item.name, context: item.context, metadata: item.metadata, senderNumber: item.senderNumber, docId: item.docId },
                 item.strategy,
-                { description: 'Promo Eksklusif Diskon Repaint 10% (khusus penerima pesan WA ini)' } // promoData
+                { description: 'Promo Eksklusif Diskon Repaint 10% (khusus penerima pesan WA ini)' }
             );
 
-            if (message) {
-                approvedItems.push({
-                    docId: item.docId,
-                    senderNumber: item.senderNumber,
-                    type: item.type,
-                    message: message,
-                    approved: true
-                });
-                console.log(`✅ [Berhasil] ${item.senderNumber}: ${message.substring(0, 50)}...`);
+            if (!message) {
+                console.log(`  ❌ Gagal generate pesan untuk ${item.senderNumber}. Skip.`);
+                continue;
             }
+
+            console.log(`  ✅ Pesan berhasil digenerate: "${message.substring(0, 50)}..."`);
+            console.log(`  📤 Mengirim pesan via API /send-message...`);
+
+            // Send via local API
+            const response = await fetch('http://localhost:3000/send-message', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${process.env.API_SECRET_TOKEN || 'your_secret_token_here'}`
+                },
+                body: JSON.stringify({
+                    number: item.senderNumber,
+                    message: message
+                })
+            });
+
+            if (response.ok) {
+                console.log(`  ✅ Pesan terkirim! Mengupdate status di database...`);
+                
+                // Update context
+                await prisma.customerContext.update({
+                    where: { id: item.docId },
+                    data: {
+                        followUpCount: { increment: 1 },
+                        lastFollowUpAt: new Date(),
+                        lastFollowUpStrategy: 'promo diskon 10% eksklusif'
+                    }
+                });
+
+            } else {
+                const errData = await response.text();
+                console.error(`  ❌ API Gagal: ${response.status} - ${errData}`);
+            }
+
         } catch (err) {
-            console.error(`❌ [Gagal] ${item.senderNumber}: ${err.message}`);
+            console.error(`  ❌ Error memproses ${item.senderNumber}: ${err.message}`);
+        }
+
+        if (i < eligibleQueue.length - 1) {
+            const waitTime = getRandomDelay();
+            console.log(`⏱️  Jeda sebelum kirim ke pelanggan berikutnya: ${(waitTime/60000).toFixed(1)} menit...`);
+            await delay(waitTime);
         }
     }
 
-    if (approvedItems.length === 0) {
-        console.log('❌ Gagal men-generate pesan untuk semua pelanggan.');
-        process.exit(1);
-    }
-
-    console.log(`\n📤 Mengirim ${approvedItems.length} pesan ke antrean eksekutor (delay acak dari backend)...`);
-
-    // 3. Kirim ke API eksekutor
-    const delayMs = 300000; // 5 menit rata-rata per pesan
-    
-    try {
-        const fetch = (await import('node-fetch')).default;
-        const response = await fetch('http://localhost:3000/follow-up-queue/execute', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.API_SECRET_TOKEN || 'your_secret_token_here'}`
-            },
-            body: JSON.stringify({
-                items: approvedItems,
-                delayMs: delayMs
-            })
-        });
-
-        const data = await response.json();
-        if (response.ok && data.success) {
-            console.log(`✅ Antrean berhasil dikirim! API response:`, data);
-        } else {
-            console.error(`❌ Gagal mengirim antrean ke API:`, data);
-        }
-    } catch (apiErr) {
-        console.error(`❌ Tidak dapat terhubung ke API lokal. Pastikan server (app.js) sedang berjalan. Error:`, apiErr.message);
-    }
-
+    console.log('\n🎉 Semua antrean selesai diproses!');
     process.exit(0);
 }
 
