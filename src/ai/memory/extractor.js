@@ -39,9 +39,9 @@ async function extractMemory(state) {
     }
 
     // LangChain JS has a bug where it checks if the modelName includes "1.5" or "vision" to allow images.
-    // We explicitly use gemini-1.5-flash-latest to bypass this block.
+    // User requested to use .env
     const llm = new ChatGoogleGenerativeAI({
-        model: 'gemini-1.5-flash-latest',
+        model: process.env.VISION_MODEL || process.env.AI_MODEL || 'gemini-1.5-flash-latest',
         temperature: 0,
         maxOutputTokens: 512,
         apiKey: process.env.GOOGLE_API_KEY,
