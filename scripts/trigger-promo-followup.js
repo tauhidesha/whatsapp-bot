@@ -163,7 +163,8 @@ async function triggerPromoNurture() {
             console.log(`  📤 Mengirim pesan via API /send-message...`);
 
             // Send via local API
-            const response = await fetch('http://localhost:3000/send-message', {
+            const PORT = process.env.PORT || 4000;
+            const response = await fetch(`http://localhost:${PORT}/send-message`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
