@@ -112,8 +112,8 @@ async function triggerPromoNurture() {
 
         const strategy = { ...STRATEGY_CONFIG[context.customerLabel] };
         
-        // Kita timpa anglenya dengan eksklusif promo
-        strategy.angle = 'tawarkan promo eksklusif diskon 10% khusus untuk pelanggan yang menerima WA ini. Promo berlaku untuk jasa repaint (booking slot dulu aja bebas kapan).';
+        // Gunakan angle 'promo' agar template instruksi terbaca oleh AI
+        strategy.angle = 'promo';
 
         eligibleQueue.push({
             docId: context.id,
@@ -151,7 +151,7 @@ async function triggerPromoNurture() {
             const message = await generateFollowUpMessage(
                 { name: item.name, context: item.context, metadata: item.metadata, senderNumber: item.senderNumber, docId: item.docId },
                 item.strategy,
-                { description: 'Promo Eksklusif Diskon Repaint 10% (khusus penerima pesan WA ini)' }
+                { promoText: 'Promo Eksklusif Diskon Repaint 10% (khusus penerima pesan WA ini, bisa booking slot kapan saja)' }
             );
 
             if (!message) {
