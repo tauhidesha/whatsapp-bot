@@ -1013,6 +1013,8 @@ async function processBufferedMessages(senderNumber, client) {
     if (await isSnoozeActive(normalizedAddress)) {
         console.log(`[DEBOUNCED] AI skipped for ${senderNumber} (handover active). Saving message only.`);
         if (prisma) await saveMessageToPrisma(senderNumber, combinedMessage, 'user');
+        classifyAndSaveCustomer(senderNumber).catch(err => console.warn('[Classifier] Failed:', err.message));
+        updateSignalsOnIncomingMessage(senderNumber, combinedMessage).catch(err => console.warn('[SignalTracker] Failed:', err.message));
         return;
     }
 
@@ -1552,6 +1554,8 @@ function start(client) {
 
                 await saveMessageToPrisma(senderNumber, storedContent, 'user');
                 console.log(`[SNOOZE] Pesan dari ${senderName} disimpan tanpa respons AI (handover aktif).`);
+                classifyAndSaveCustomer(senderNumber).catch(err => console.warn('[Classifier] Failed:', err.message));
+                updateSignalsOnIncomingMessage(senderNumber, storedContent).catch(err => console.warn('[SignalTracker] Failed:', err.message));
                 return;
             }
 

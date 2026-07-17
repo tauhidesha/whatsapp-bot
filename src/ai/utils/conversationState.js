@@ -1,4 +1,5 @@
 const prisma = require('../../lib/prisma.js');
+const { parseSenderIdentity } = require('../../lib/utils.js');
 
 /**
  * Mengelola state percakapan yang persisten di PostgreSQL via Prisma.
@@ -6,7 +7,7 @@ const prisma = require('../../lib/prisma.js');
 async function updateState(senderNumber, data) {
     if (!senderNumber || !data || typeof data !== 'object') return;
 
-    const phone = senderNumber.replace(/[^0-9]/g, '');
+    const { docId: phone } = parseSenderIdentity(senderNumber);
     
     try {
         await prisma.customerContext.upsert({
@@ -30,7 +31,7 @@ async function updateState(senderNumber, data) {
 async function getState(senderNumber) {
     if (!senderNumber) return null;
 
-    const phone = senderNumber.replace(/[^0-9]/g, '');
+    const { docId: phone } = parseSenderIdentity(senderNumber);
     
     try {
         const state = await prisma.customerContext.findUnique({
@@ -46,7 +47,7 @@ async function getState(senderNumber) {
 async function clearState(senderNumber) {
     if (!senderNumber) return;
 
-    const phone = senderNumber.replace(/[^0-9]/g, '');
+    const { docId: phone } = parseSenderIdentity(senderNumber);
     
     try {
         await prisma.customerContext.delete({
