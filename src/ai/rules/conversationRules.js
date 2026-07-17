@@ -18,7 +18,10 @@ function evaluateConversationRules(state) {
 
     // Menangani Penolakan
     // If the planner indicates a hesitation or cooling down stage, or if objections were extracted
-    if (state.conversation?.buyerStage === 'Hesitating' || consultation?.knownFacts?.hasObjection?.state === 'KNOWN' || consultation?.knownFacts?.commonObjection?.state === 'KNOWN' || consultation?.knownFacts?.commonObjection?.value) {
+    const objVal = consultation?.knownFacts?.commonObjection?.value?.toLowerCase() || '';
+    const hasRealObjection = objVal && !['tidak', 'tidak ada', 'none', 'null', 'false', 'aman', '-'].includes(objVal);
+    
+    if (state.sales?.buyerStage === 'Hesitating' || hasRealObjection) {
         rules.push({
             type: 'CONVERSATION_GUIDELINE',
             directive: 'Customer mungkin pernah ragu/menolak. Jangan memaksa, tapi kamu tetap BOLEH menawarkan booking secara elegan dan santai (bukan hard sales).'
