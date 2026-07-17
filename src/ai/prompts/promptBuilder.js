@@ -31,11 +31,7 @@ function buildPlannerPrompt(state) {
             prompt += `- RESTRIKSI (${r.service}): ${r.reason}. Solusi: ${r.suggestedAction}\n`;
         });
     }
-    if (business?.sop && Object.keys(business.sop).length > 0) {
-        prompt += `\n=== BUSINESS RULES & SOP (JSON) ===\n`;
-        prompt += `Berikut adalah aturan bisnis yang HARUS dipatuhi, dikategorikan dalam JSON:\n`;
-        prompt += JSON.stringify(business.sop, null, 2) + `\n`;
-    }
+
     if (business?.constraints?.length > 0) {
         prompt += `\n=== CONSTRAINTS ===\n`;
         business.constraints.forEach(c => {
@@ -61,12 +57,7 @@ function buildPlannerPrompt(state) {
         });
         prompt += `PENTING: Jika Anda memutuskan untuk melakukan upsell, pastikan Anda menambahkan objek { type: 'upsell', priority: [n] } ke dalam conversation.informationPriority.\n`;
     }
-    if (business?.guidelines?.length > 0) {
-        prompt += `\n=== CONVERSATION GUIDELINES ===\n`;
-        business.guidelines.forEach(g => {
-            prompt += `- ${g.directive}\n`;
-        });
-    }
+
     prompt += `\n`;
 
     if (state.knowledge?.raw && Object.keys(state.knowledge.raw).length > 0) {
