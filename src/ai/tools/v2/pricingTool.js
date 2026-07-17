@@ -16,11 +16,28 @@ class PricingTool extends BaseTool {
         let rawServiceName = parameters.service_name || parameters.service || parameters.partToRepaint || knownFacts.partToRepaint?.value || 'Repaint Bodi Halus';
         let serviceNameArray = Array.isArray(rawServiceName) ? rawServiceName : [rawServiceName];
 
-        // Ensure "Repaint" prefix for known parts if missing
+        // Normalize services and ensure "Repaint" prefix for known parts
         serviceNameArray = serviceNameArray.map(s => {
-            if (typeof s === 'string' && !s.toLowerCase().includes('repaint')) {
-                if (['velg', 'bodi halus', 'bodi kasar', 'full bodi', 'cvt', 'arm'].some(part => s.toLowerCase().includes(part))) {
-                    return `Repaint ${s}`;
+            if (typeof s === 'string') {
+                let sLower = s.toLowerCase();
+                
+                // Do not touch other primary categories
+                if (sLower.includes('detailing') || sLower.includes('coating') || sLower.includes('poles') || sLower.includes('cuci')) {
+                    return s;
+                }
+
+                // If it's a repaint or an unknown part
+                if (sLower.includes('repaint')) {
+                    if (['bodi halus', 'bodi kasar', 'velg', 'full bodi', 'cvt', 'arm'].some(p => sLower.includes(p))) {
+                        return s; // it's a known repaint package
+                    }
+                    return 'Repaint Bodi Halus'; // Unknown repaint part -> default to Bodi Halus
+                } else {
+                    if (['velg', 'bodi halus', 'bodi kasar', 'full bodi', 'cvt', 'arm'].some(part => sLower.includes(part))) {
+                        return `Repaint ${s}`;
+                    }
+                    // If it doesn't have 'repaint' and isn't detailing/coating, assume it's a raw part name like "bodi belakang"
+                    return 'Repaint Bodi Halus';
                 }
             }
             return s;

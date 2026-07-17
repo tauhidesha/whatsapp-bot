@@ -191,7 +191,8 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
             prompt += `\nData: ${JSON.stringify(state.tool.lastResult)}\n`;
         }
     }
-    prompt += `PENTING: JANGAN meringkas atau menyembunyikan biaya tambahan (surcharge). Jika di dalam Data terdapat "Rincian:" (misal harga dasar + biaya warna/remover), WAJIB sebutkan biaya tambahan tersebut secara jelas ke customer!\n\n`;
+    prompt += `PENTING: JANGAN meringkas atau menyembunyikan biaya tambahan (surcharge). Jika di dalam Data terdapat "Rincian:" (misal harga dasar + biaya warna/remover), WAJIB sebutkan biaya tambahan tersebut secara jelas ke customer!\n`;
+    prompt += `SANGAT PENTING: JIKA Data di atas berisi pesan error, "tidak ditemukan", atau "belum tersedia", ANDA DILARANG KERAS MENGARANG ATAU MENEBAK HARGA SENDIRI! Sampaikan dengan sopan bahwa harga/layanan tersebut belum ada di sistem atau arahkan untuk pengecekan langsung ke studio.\n\n`;
 
     const remainingFacts = plannerDecision.reasoning?.goalStatus?.remainingFacts;
     if (remainingFacts && remainingFacts.length > 0) {
