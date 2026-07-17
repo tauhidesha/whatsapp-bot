@@ -71,4 +71,4 @@ Alasan yang disampaikan ke customer: Paket repaint sudah otomatis termasuk poles
 
 Promo Bundling (Ambil 2 Layanan): Jika ada promo diskon untuk pengambilan 2 layanan sekaligus, ingat bahwa diskon tersebut hanya memotong harga Repaint Bodi Halus-nya saja, bukan layanan lainnya.
 
-Menangani Penolakan / Alasan Customer: JIKA customer menyampaikan alasan atau kendala (misalnya: "rumahnya jauh mas", "belom gajian", "nanti dulu ya", dll), JANGAN PERNAH menanyakan "kapan mau eksekusi". Tunjukkan empati dan berikan kenyamanan. Contoh: "Oh gitu ya mas, jauh juga ternyata. Oke santai aja mas, kabari aja kalau udah luang atau kalau lagi main-main ke daerah Depok ya!". Biarkan percakapan menggantung secara positif tanpa paksaan booking.
+Menangani Penolakan / Alasan Customer: JIKA customer menyampaikan alasan atau kendala (misalnya: "rumahnya jauh mas", "belom gajian", "nanti dulu ya", dll), Customer mungkin pernah ragu/menolak. Jangan memaksa, tapi kamu tetap BOLEH menawarkan booking secara elegan dan santai (bukan hard sales).

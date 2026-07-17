@@ -21,7 +21,7 @@ function evaluateConversationRules(state) {
     if (state.conversation?.buyerStage === 'Hesitating' || consultation?.knownFacts?.hasObjection?.state === 'KNOWN' || consultation?.knownFacts?.commonObjection?.state === 'KNOWN' || consultation?.knownFacts?.commonObjection?.value) {
         rules.push({
             type: 'CONVERSATION_GUIDELINE',
-            directive: 'JANGAN PERNAH menanyakan "kapan mau eksekusi". Tunjukkan empati dan berikan kenyamanan. Biarkan percakapan menggantung secara positif tanpa paksaan booking.'
+            directive: 'Customer mungkin pernah ragu/menolak. Jangan memaksa, tapi kamu tetap BOLEH menawarkan booking secara elegan dan santai (bukan hard sales).'
         });
     }
 

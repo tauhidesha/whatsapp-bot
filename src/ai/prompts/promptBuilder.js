@@ -77,6 +77,12 @@ function buildPlannerPrompt(state) {
     }
 
     // 4. Current State Snapshot
+    if (state.metadata?.visualSummary) {
+        prompt += `=== VISUAL CONTEXT ===\n`;
+        prompt += `Customer telah mengirimkan gambar/foto. Berikut adalah ringkasan visual dari InfoCollector:\n`;
+        prompt += `${state.metadata.visualSummary}\n\n`;
+    }
+
     prompt += `=== CURRENT STATE ===\n`;
     prompt += `Customer: ${customer?.name} (Status: ${customer?.status})\n`;
     
@@ -163,7 +169,11 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
     });
     prompt += `=== CURRENT CONTEXT ===\n`;
     prompt += `Waktu Sekarang: ${formatter.format(now)} WIB\n`;
-    prompt += `Nama Customer: ${state.customer?.name || 'Customer'}\n\n`;
+    prompt += `Nama Customer: ${state.customer?.name || 'Customer'}\n`;
+    if (state.metadata?.visualSummary) {
+        prompt += `Visual Summary (Dari Foto User): ${state.metadata.visualSummary}\n`;
+    }
+    prompt += `\n`;
 
     prompt += `=== DIRECTIVE FROM PLANNER ===\n`;
     prompt += `Goal: ${plannerDecision.decision?.goal}\n`;

@@ -155,8 +155,11 @@ function extractTextFromContent(content, joiner = '\n') {
     
     if (Array.isArray(content)) {
         return content
-            .filter(item => item && item.type === 'text')
-            .map(item => item.text || '')
+            .filter(item => item && (item.type === 'text' || item.type === 'image_url'))
+            .map(item => {
+                if (item.type === 'image_url') return '[Foto/Media terlampir]';
+                return item.text || '';
+            })
             .filter(text => text !== '')
             .join(joiner);
     }

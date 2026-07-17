@@ -19,7 +19,8 @@ const MemorySchema = z.object({
     part: FactSchema("Bagian motor yang dikerjakan (misal: full bodi, bodi halus, velg)."),
     objection: FactSchema("Keberatan/komplain kustomer (misal: 'mahal', 'jauh')."),
     services: z.array(z.string()).optional().describe("Daftar layanan (misal: 'Repaint Bodi Halus')."),
-    velgCondition: FactSchema("Kondisi cat velg sebelumnya (misal: 'masih ori pabrik', 'udah pernah dicat/repaint', 'belum pernah'). JANGAN isi ini dengan baret/lecet, fokus HANYA pada status cat asli/repaint.")
+    velgCondition: FactSchema("Kondisi cat velg sebelumnya (misal: 'masih ori pabrik', 'udah pernah dicat/repaint', 'belum pernah'). JANGAN isi ini dengan baret/lecet, fokus HANYA pada status cat asli/repaint."),
+    visualSummary: z.string().optional().describe("Ringkasan visual 1-2 kalimat mengenai apa yang terlihat di gambar/foto yang dikirim user. HANYA isi jika user mengirim foto.")
 });
 
 async function extractMemory(state) {
@@ -31,24 +32,48 @@ async function extractMemory(state) {
         return type === 'human' || type === 'user';
     });
     const lastUserContent = lastUserMessageObj ? (lastUserMessageObj.kwargs?.content || lastUserMessageObj.content) : null;
-    const lastUserMessage = lastUserContent ? extractTextFromContent(lastUserContent) : '';
+    const lastUserMessageText = lastUserContent ? extractTextFromContent(lastUserContent) : '';
 
-    if (!lastUserMessage) {
+    if (!lastUserContent) {
         return {};
     }
 
+    // LangChain JS has a bug where it checks if the modelName includes "1.5" or "vision" to allow images.
+    // We explicitly use gemini-1.5-flash-latest to bypass this block.
     const llm = new ChatGoogleGenerativeAI({
-        model: process.env.AI_MODEL || 'gemini-flash-latest',
+        model: 'gemini-1.5-flash-latest',
         temperature: 0,
-        maxOutputTokens: 256,
-        apiKey: process.env.GOOGLE_API_KEY
-    }).withStructuredOutput(MemorySchema);
+        maxOutputTokens: 512,
+        apiKey: process.env.GOOGLE_API_KEY,
+        responseMimeType: "application/json"
+    });
 
     try {
-        const extraction = await llm.invoke([
-            ['system', 'Anda adalah sistem ekstraksi memori. Ekstrak data relevan dari pesan kustomer terakhir. ATURAN UPDATE STATE: HANYA ekstrak dan output field yang SECARA EKSPLISIT dibahas di pesan terakhir kustomer. Jika suatu informasi (misal: motor atau part) TIDAK DIBAHAS di pesan saat ini, JANGAN masukkan field tersebut ke dalam output JSON sama sekali. Biarkan LLM mengabaikannya agar reducer tidak meniban data lama. Jika kustomer spesifik bilang belum tau/bingung, output state UNDECIDED.'],
-            ['human', lastUserMessage]
+        const { SystemMessage, HumanMessage } = require('@langchain/core/messages');
+        const systemPrompt = `Anda adalah sistem ekstraksi memori. Ekstrak data relevan dari pesan (dan gambar/foto jika ada) kustomer terakhir.
+ATURAN UPDATE STATE: HANYA ekstrak dan output field yang SECARA EKSPLISIT dibahas di pesan atau terlihat jelas di gambar terakhir kustomer. JIKA ada foto, WAJIB isi visualSummary.
+Jika suatu informasi TIDAK DIBAHAS, JANGAN masukkan field tersebut ke dalam output JSON.
+Format JSON output yang diharapkan:
+{
+  "motor": "Merek/model motor",
+  "color": "Warna cat",
+  "part": "Bagian motor",
+  "objection": "Keberatan kustomer",
+  "services": ["layanan 1"],
+  "velgCondition": "Kondisi velg",
+  "visualSummary": "Ringkasan visual 1-2 kalimat (jika ada gambar)"
+}
+Field yang bernilai string (kecuali visualSummary dan services) bisa berupa objek: { "value": "...", "state": "KNOWN|UNDECIDED|NOT_APPLICABLE" }`;
+
+        const response = await llm.invoke([
+            new SystemMessage(systemPrompt),
+            new HumanMessage({ content: lastUserContent })
         ]);
+        
+        const rawResponseText = response.content;
+        const cleanedJson = rawResponseText.replace(/```json\n?|```/g, '').trim();
+        const extraction = JSON.parse(cleanedJson);
+        console.log('[Memory Extractor] Extracted Data:', JSON.stringify(extraction));
         
         const updates = {};
 
@@ -92,6 +117,11 @@ async function extractMemory(state) {
                 const newServices = [...new Set([...existingServices, ...extraction.services])];
                 updates.consultation.requestedServices = newServices;
             }
+        }
+
+        if (extraction.visualSummary) {
+            updates.metadata = { ...(state.metadata || {}) };
+            updates.metadata.visualSummary = extraction.visualSummary;
         }
 
         return updates;
