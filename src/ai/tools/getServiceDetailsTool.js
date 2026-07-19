@@ -503,6 +503,7 @@ async function processSingleService(parsedServiceName, input, promoText) {
                 results.push({
                     name: s.name,
                     summary: s.summary,
+                    description: s.description,
                     price: finalPrice,
                     price_formatted: `Rp${finalPrice.toLocaleString('id-ID')}${breakdownText}`,
                     estimated_duration: formatDuration(s.estimatedDuration)
@@ -569,6 +570,7 @@ async function processSingleService(parsedServiceName, input, promoText) {
                     results.push({
                         name: s.name,
                         summary: s.summary,
+                        description: s.description,
                         price: finalPrice,
                         price_formatted: `Rp${finalPrice.toLocaleString('id-ID')}${breakdownText}`,
                         estimated_duration: formatDuration(s.estimatedDuration)
@@ -650,6 +652,7 @@ async function processSingleService(parsedServiceName, input, promoText) {
         service_id: service.id,
         service_name: service.name,
         summary: service.summary,
+        description: service.description,
         price: finalPrice,
         price_formatted: `Rp${finalPrice.toLocaleString('id-ID')}${breakdownText}`,
         estimated_duration: durationFormatted,

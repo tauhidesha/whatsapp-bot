@@ -81,12 +81,14 @@ class PricingTool extends BaseTool {
                     res.candidates.forEach(c => {
                         text += `- ${c.name}: ${c.price_formatted}\n`;
                         if (c.summary) text += `  Keterangan: ${c.summary}\n`;
+                        if (c.description) text += `  Detail: ${c.description.replace(/\n/g, ' ')}\n`;
                         if (c.note) text += `  Catatan: ${c.note}\n`;
                         if (c.estimated_duration) text += `  Estimasi waktu: ${c.estimated_duration}\n`;
                     });
                 } else if (res.price_formatted) {
                     text += `- ${res.name || res.service_name}: ${res.price_formatted}\n`;
                     if (res.summary) text += `  Keterangan: ${res.summary}\n`;
+                    if (res.description) text += `  Detail: ${res.description.replace(/\n/g, ' ')}\n`;
                     if (res.estimated_duration) text += `  Estimasi waktu: ${res.estimated_duration}\n`;
                 }
                 return text;

@@ -68,6 +68,7 @@ function prioritizeInformation(state) {
         if (toolResult.price) {
             return {
                 service: toolResult.service_name,
+                description: toolResult.description,
                 price: toolResult.price_formatted,
                 duration: toolResult.estimated_duration,
                 promo_active: toolResult.promo_active
