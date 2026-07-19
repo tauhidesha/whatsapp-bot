@@ -47,7 +47,7 @@ Fokuslah pada merangkai data yang disuapkan ke Anda menjadi satu pesan WhatsApp 
         const toolIntent = state.planner?.execution?.toolIntent || 'NONE';
         const hasPrioritizedData = !!prioritizedData;
         const hasToolResult = !!state.tool?.lastResult;
-        const isPriceForbidden = toolIntent === 'NONE' || (!hasPrioritizedData && !hasToolResult);
+        const isPriceForbidden = !hasPrioritizedData && !hasToolResult;
 
         while (retryCount <= maxRetries) {
             let currentPrompt = promptText;

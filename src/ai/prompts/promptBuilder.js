@@ -208,7 +208,7 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
     }
 
     prompt += `\n=== TOOL RESULT ===\n`;
-    if (plannerDecision.execution?.toolIntent === 'NONE' || (!prioritizedData && !state.tool?.lastResult)) {
+    if (!prioritizedData && !state.tool?.lastResult) {
         prompt += `(Belum ada — belum melakukan pricing call turn ini)\n\n`;
     } else {
         if (prioritizedData) {

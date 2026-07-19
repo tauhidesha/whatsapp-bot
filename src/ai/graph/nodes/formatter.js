@@ -30,6 +30,8 @@ async function formatterNode(state) {
     const toolResult = metadata?.toolResult;
     const comboPromo = metadata?.comboPromo; // Structured: { promoText, comboDiscount, comboMinServices }
     const activePromo = metadata?.activePromo;
+    const comboDiscountPercent = comboPromo ? Math.round(comboPromo.comboDiscount * 100) : 15;
+    const comboDiscountMultiplier = comboPromo ? (1 - comboPromo.comboDiscount) : 0.85;
 
     // Ambil mode balasan dari metadata
     const replyMode = metadata?.replyMode || 'inform';
@@ -57,7 +59,7 @@ async function formatterNode(state) {
 
             if (isAlreadyCoating) {
                 // DO NOT UPSELL for Coating/Complete Service. 
-                // They already get the 10% discount automatically, and we should just book them.
+                // They already get the ${comboDiscountPercent}% discount automatically, and we should just book them.
                 upsellSuggestion = null;
                 benefitText = null;
                 packageExplanation = null;
@@ -94,11 +96,11 @@ async function formatterNode(state) {
             if (primarySvc.includes('halus')) {
                 upsellSuggestion = 'Cuci Komplit, Repaint Velg, atau Repaint Bodi Kasar';
                 benefitText = 'biar tampilan motor makin maksimal secara keseluruhan';
-                packageExplanation = '(Tawarkan 3 opsi pilihan: cuci komplit, repaint velg, atau repaint bodi kasar. Jelaskan singkat: Ambil salah satu dari opsi itu aja, Repaint Bodi Halus-nya udah otomatis dapet diskon 10%. Info juga kalau cat baru belum bisa dicoating, harus nunggu 1 bulan biar cat matang.)';
+                packageExplanation = `(Tawarkan 3 opsi pilihan: cuci komplit, repaint velg, atau repaint bodi kasar. Jelaskan singkat: Ambil salah satu dari opsi itu aja, Repaint Bodi Halus-nya udah otomatis dapet diskon ${comboDiscountPercent}%. Info juga kalau cat baru belum bisa dicoating, harus nunggu 1 bulan biar cat matang.)`;
             } else if (primarySvc.includes('kasar') || primarySvc.includes('velg')) {
                 upsellSuggestion = 'Repaint Bodi Halus';
-                benefitText = 'karena kalau ambil paket Repaint Bodi Halus sekalian, paket bodi halusnya otomatis dapet diskon 10%';
-                packageExplanation = '(Infoin santai: Kalau mau sekalian Repaint Bodi Halus juga mumpung lagi ada promo diskon 10% untuk paket bodi halusnya, jadi motornya bisa fresh kayak baru lagi.)';
+                benefitText = `karena kalau ambil paket Repaint Bodi Halus sekalian, paket bodi halusnya otomatis dapet diskon ${comboDiscountPercent}%`;
+                packageExplanation = `(Infoin santai: Kalau mau sekalian Repaint Bodi Halus juga mumpung lagi ada promo diskon ${comboDiscountPercent}% untuk paket bodi halusnya, jadi motornya bisa fresh kayak baru lagi.)`;
             }
         }
 
@@ -108,7 +110,7 @@ async function formatterNode(state) {
     // Build combo offer text for formatter
     let comboOfferInstruction = '';
     if ((replyMode === 'inform' || replyMode === 'ask') && comboPromo && context.serviceTypes?.length === 1 && !context.comboOffered && upsellSuggestion) {
-        const pct = Math.round(comboPromo.comboDiscount * 100);
+        const pct = comboDiscountPercent;
         let upsellPriceStr = "";
         let primarySvcTitle = toolResult?.results?.[0]?.name || toolResult?.results?.[0]?.service_name || context.serviceTypes[0];
 
@@ -173,13 +175,13 @@ ATURAN BAHASA PENAWARAN PROMO:
             statusPromoCombo = `
 # STATUS PROMO COMBO (Info untuk User)
 Kakak sudah mengambil kombinasi layanan: Bodi Halus + ${comboPartners.join(', ')}. 
-Maka kakak otomatis berhak mendapatkan diskon 10% untuk Repaint Bodi Halus!
+Maka kakak otomatis berhak mendapatkan diskon ${comboDiscountPercent}% untuk Repaint Bodi Halus!
 -> Sampaikan kabar baik ini secara eksplisit dan antusias SEBELUM membeberkan rincian harga paket di bawah ini.
 `;
         } else {
             statusPromoCombo = `
-# SYARAT PROMO DISKON 10% (Info untuk User)
-Sampaikan dengan jelas bahwa Promo Diskon 10% Repaint Bodi Halus ini HANYA BERLAKU jika kakak sekalian mengambil layanan kombinasi (${upsellSuggestion || 'Cuci Komplit, Repaint Velg, atau Repaint Bodi Kasar'}).
+# SYARAT PROMO DISKON ${comboDiscountPercent}% (Info untuk User)
+Sampaikan dengan jelas bahwa Promo Diskon ${comboDiscountPercent}% Repaint Bodi Halus ini HANYA BERLAKU jika kakak sekalian mengambil layanan kombinasi (${upsellSuggestion || 'Cuci Komplit, Repaint Velg, atau Repaint Bodi Kasar'}).
 `;
         }
 
@@ -190,7 +192,7 @@ Aturan penyajian:
 1. Urutkan dari yang Termahal (Premium) sampai yang Termurah (Ekonomis).
 1a. FORMATTING (SANGAT PENTING): Gunakan karakter bulat (•) sebagai bullet point (jangan gunakan * atau - untuk list). Jika ingin menebalkan tulisan, apit HANYA teks tersebut dengan satu bintang WhatsApp (contoh: • *Paket Standar*: ~Rp1.000.000~ jadi Rp900.000). Jangan pernah menggunakan dobel bintang (**). Pastikan baris baru antar paket agar rapi.
 1b. DESKRIPSI PAKET: Sertakan deskripsi/penjelasan singkat untuk setiap paket persis seperti yang tertera pada hasil tool JSON.
-2. TAMPILKAN PROMO CORET: Untuk paket Premium, Standar, dan Basic, kalikan harga dasar dengan 0.9 (diskon 10%), lalu coret harga asli dan tampilkan harga diskonnya. (Contoh: ~Rp1.000.000~ jadi Rp900.000).
+2. TAMPILKAN PROMO CORET: Untuk paket Premium, Standar, dan Basic, kalikan harga dasar dengan ${comboDiscountMultiplier} (diskon ${comboDiscountPercent}%), lalu coret harga asli dan tampilkan harga diskonnya. (Contoh: ~Rp1.000.000~ jadi Rp${Math.round(1000000 * comboDiscountMultiplier).toLocaleString('id-ID')}).
 3. Paket Ekonomis TIDAK MENDAPAT DISKON (jangan dicoret).
 4. REKOMENDASIKAN PAKET STANDAR: Setelah menampilkan harga, disarankan untuk menuliskan kalimat rekomendasi untuk memilih "Paket Standar". Contoh: "Dari 4 paket di atas, Zoya paling saranin kakak ambil Paket Standar ya! Hasilnya udah mantap mirror finish dan dapet garansi 1 tahun lho."
 5. TAMPILKAN LAYANAN LAIN: JIKA ada layanan lain selain Bodi Halus di dalam TOOL RESULT JSON (misalnya Repaint Bodi Kasar, Cuci Komplit, dll), berikan juga harga layanan tersebut.
