@@ -26,8 +26,8 @@ const PlannerSchema = z.object({
         informationPriority: z.array(z.object({
             type: z.enum(['summary', 'price', 'education', 'question', 'empathy', 'upsell', 'restriction']),
             priority: z.number(),
-            content: z.string().describe("Isi spesifik dari informasi yang mau disampaikan, misalnya 'Retak/patah bisa direpair'")
-        })).describe("Urutan informasi yang harus disampaikan Composer.")
+            content: z.string().describe("Poin singkat/ide utama (contoh: 'Beritahu bahwa retak bisa direpair'), BUKAN kalimat utuh/kaku.")
+        })).describe("Urutan ide informasi yang harus disampaikan Composer."),
     }),
     reasoning: z.object({
         reason: z.string().describe("Alasan kenapa planner mengambil keputusan ini."),
@@ -41,7 +41,7 @@ const PlannerSchema = z.object({
             remainingFacts: z.array(z.object({
                 field: z.string().describe("Nama field/fakta yang hilang (misal: 'wheelCondition', 'paintType', 'bookingDate')."),
                 priority: z.number().describe("Prioritas (1 = paling utama, makin besar makin tidak prioritas)."),
-                reason: z.string().describe("Alasan logis kenapa fakta ini dibutuhkan sekarang.")
+                reason: z.string().describe("Poin singkat alasan logis perlunya fakta ini (misal: 'Butuh tau bagian untuk estimasi'). JANGAN kalimat korporat kaku.")
             })).describe("Daftar fakta yang belum diketahui (belum ada di knownFacts) yang HARUS ditanyakan ke user.")
         }).describe("Status progres dari goal saat ini, dihitung dengan membandingkan knownFacts vs requiredFacts."),
         decisionTrace: z.object({
