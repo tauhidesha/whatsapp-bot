@@ -223,6 +223,22 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
         prompt += `PENTING: JANGAN meringkas atau menyembunyikan biaya tambahan (surcharge). Jika di dalam Data terdapat "Rincian:" (misal harga dasar + biaya warna/remover), WAJIB sebutkan biaya tambahan tersebut secara jelas ke customer!\n\n`;
     }
 
+    if (prioritizedData && prioritizedData.injected_knowledge) {
+        prompt += `=== INJECTED KNOWLEDGE ===\n`;
+        prompt += `${prioritizedData.injected_knowledge}\n\n`;
+        prompt += `=== ANTI-HALLUCINATION RULES ===\n`;
+        prompt += `- Saat menjelaskan layanan, Anda WAJIB HANYA menggunakan fakta yang ada di dalam blok INJECTED KNOWLEDGE di atas.\n`;
+        prompt += `- DILARANG mengarang, berasumsi, atau membuat-buat prosedur, tahapan, atau detail layanan yang tidak ada di sana.\n\n`;
+    } else if (plannerDecision.decision?.strategy === 'CLARIFY_SERVICE') {
+        prompt += `=== ANTI-HALLUCINATION RULES ===\n`;
+        prompt += `- Strategi saat ini adalah CLARIFY_SERVICE.\n`;
+        prompt += `- Tanya user secara sopan dan santai layanan mana yang mereka maksud karena sebutannya ambigu (contoh: "Maaf Kak, untuk detailnya, Kakak nanya soal layanan Cuci Komplit atau Repaint Velg nih?").\n\n`;
+    } else if (state.intent === 'ASK_SERVICE_DETAILS') {
+        prompt += `=== ANTI-HALLUCINATION RULES ===\n`;
+        prompt += `- INJECTED_KNOWLEDGE kosong.\n`;
+        prompt += `- Karena user bertanya detail layanan tapi data tidak ditemukan, WAJIB gunakan fallback: "Wah, untuk detail prosedur pastinya aku hold dulu ya Kak, biar nggak salah info, aku tanyakan ke Bosmat langsung."\n\n`;
+    }
+
     const remainingFacts = plannerDecision.reasoning?.goalStatus?.remainingFacts;
     if (remainingFacts && remainingFacts.length > 0) {
         prompt += `=== MISSING FACTS (PRIORITIZED) ===\n`;

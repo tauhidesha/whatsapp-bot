@@ -4,13 +4,30 @@
  * prioritized information for the Composer, preventing information overload.
  */
 
+const masterLayanan = require('../../data/masterLayanan');
+
 function prioritizeInformation(state) {
     const toolResult = state.tool?.lastResult;
-    if (!toolResult || !toolResult.success) {
+    let injectedKnowledge = null;
+
+    if (state.intent === 'ASK_SERVICE_DETAILS' && state.planner?.decision?.strategy !== 'CLARIFY_SERVICE' && state.context?.targetService) {
+        const svc = masterLayanan.find(s => s.name.toLowerCase() === state.context.targetService.toLowerCase());
+        if (svc) {
+            injectedKnowledge = svc.description || svc.summary;
+            console.log(`[Information Prioritizer] Injecting knowledge for ${state.context.targetService}`);
+        }
+    }
+
+    if ((!toolResult || !toolResult.success) && !injectedKnowledge) {
         return null;
     }
 
-    console.log('[Information Prioritizer] Processing tool result for capability:', state.tool.lastCapability);
+    let resultData = toolResult?.success ? { ...toolResult } : {};
+    if (injectedKnowledge) {
+        resultData.injected_knowledge = injectedKnowledge;
+    }
+
+    console.log('[Information Prioritizer] Processing tool result/knowledge');
 
     // 1. Pricing Tool Handling
     if (state.tool.lastCapability === 'pricing') {
@@ -37,7 +54,7 @@ function prioritizeInformation(state) {
             });
 
             if (minTotal > 0) {
-                return {
+                const returnObj = {
                     summary: 'Customer meminta beberapa layanan sekaligus (Full Repaint). Berikan estimasi RANGE TOTAL saja.',
                     itemsIncluded: items.join(', '),
                     estimatedTotalRange: minTotal === maxTotal 
@@ -45,6 +62,8 @@ function prioritizeInformation(state) {
                         : `Rp${minTotal.toLocaleString('id-ID')} - Rp${maxTotal.toLocaleString('id-ID')}`,
                     rawResults: toolResult.results // keep raw just in case
                 };
+                if (injectedKnowledge) returnObj.injected_knowledge = injectedKnowledge;
+                return returnObj;
             }
         }
 
@@ -54,30 +73,34 @@ function prioritizeInformation(state) {
             if (prices.length > 0) {
                 const minPrice = Math.min(...prices);
                 const maxPrice = Math.max(...prices);
-                return {
+                const returnObj = {
                     summary: `Ada ${toolResult.candidates.length} pilihan paket untuk ${toolResult.category}. Jangan sebutkan semua detailnya kecuali ditanya.`,
                     estimatedRange: minPrice === maxPrice 
                         ? `Rp${minPrice.toLocaleString('id-ID')}` 
                         : `Rp${minPrice.toLocaleString('id-ID')} - Rp${maxPrice.toLocaleString('id-ID')}`,
                     note: toolResult.promo_active ? 'Ada promo aktif, bisa di-mention jika relevan.' : ''
                 };
+                if (injectedKnowledge) returnObj.injected_knowledge = injectedKnowledge;
+                return returnObj;
             }
         }
 
         // Just a single exact price
         if (toolResult.price) {
-            return {
+            const returnObj = {
                 service: toolResult.service_name,
                 description: toolResult.description,
                 price: toolResult.price_formatted,
                 duration: toolResult.estimated_duration,
                 promo_active: toolResult.promo_active
             };
+            if (injectedKnowledge) returnObj.injected_knowledge = injectedKnowledge;
+            return returnObj;
         }
     }
 
     // Default passthrough if we don't have a specific prioritizer logic
-    return toolResult;
+    return resultData;
 }
 
 module.exports = {

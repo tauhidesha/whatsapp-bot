@@ -78,6 +78,7 @@ Dukung penuh analisis gambar! Jika user mengirim foto motor/mobil:
 - **GREETING**: Sapaan awal (Halo, P, Assalamualaikum).
 - **CONSULTATION**: Tanya promo atau tanya saran umum tanpa detail motor.
 - **BOOKING_SERVICE**: Niat servis, tanya harga layanan tertentu, atau menjawab pertanyaan teknis AI.
+- **ASK_SERVICE_DETAILS**: Tanya detail layanan, prosedur, atau penjelasan suatu paket (termasuk pronoun ambigu seperti "apaan tuh?", "maksudnya?").
 - **GENERAL_INQUIRY**: Tanya lokasi, jam buka, kontak studio, atau kebingungan mencari lokasi. (PENTING: Jika pesan berisi "Shareloc" atau template iklan seperti "Bosmat Studio berlokasi di area Depok", MASUKKAN KE SINI, JANGAN HUMAN_HANDOVER).
 - **HUMAN_HANDOVER**: Minta bicara dengan admin manusia, konsultasi konsep motor/warna custom, atau meminta warna spesial (Bunglon, Chrome, Hologram). (Kecuali pesan dari template iklan).
 - **OTHER**: Di luar kategori di atas.
@@ -97,6 +98,8 @@ Ekstrak data ke dalam format JSON dengan field berikut:
 11. **package_choice**: Pilihan paket layanan yang user pilih (contoh: "Premium", "Standar", "Basic", "Ekonomis", "Complete Service"). Wajib diisi jika user secara eksplisit memilih salah satu dari opsi paket yang ditawarkan. Jika belum pilih, biarkan null.
 12. **is_confirming_visit**: (Boolean/null) Jika user secara eksplisit setuju untuk datang, booking, atau mengonfirmasi kedatangan (misal: "iya", "boleh dibooking", "nanti sore saya ke sana", "otw").
 13. **visual_summary**: Deskripsi singkat apa yang terlihat di gambar.
+14. **target_service**: (String/null) Jika intent adalah ASK_SERVICE_DETAILS, isi dengan nama layanan yang ditanyakan.
+15. **needs_clarification**: (Boolean) True JIKA user bertanya dengan kata ganti/pronoun (misal "itu", "apaan tuh") DAN ada lebih dari 1 layanan di \`Layanan Terakhir Ditawarkan\` sehingga membingungkan.
 
 # INTENT RULES
 - JIKA user hanya menyapa (Halo, P, Assalamualaikum), WAJIB intent = "GREETING".
@@ -107,6 +110,7 @@ Ekstrak data ke dalam format JSON dengan field berikut:
 - **Bodi Halus vs Kasar**: Jika user sebut "bodi kasar", masukkan ke \`detailing_focus\`.
 - **Warna**: Bedakan dengan teliti antara warna bodi dan warna velg.
 - **Visual Summary**: Wajib isi field "visual_summary" dengan deskripsi singkat (1-2 kalimat) tentang apa yang kamu lihat dalam foto.
+- **Coreference Resolution**: Jika input user ambigu atau mengandung pronoun (misal "apaan tuh?", "itu gimana?"), KAMU WAJIB melihat \`Layanan Terakhir Ditawarkan\` di Konteks Percakapan. Jika hanya ada 1 (misal: "Cuci Komplit"), ekstrak itu sebagai \`target_service\` dan set intent ke "ASK_SERVICE_DETAILS". Jika ada lebih dari 1, set \`needs_clarification\` menjadi true.
 - **Negative Constraint**: JANGAN menebak data yang tidak ada. Jika ragu, berikan \`null\`.
 - **Context Awareness**: Gunakan riwayat untuk melengkapi data yang sebelumnya sudah disebutkan.
 
@@ -130,7 +134,7 @@ Output: {
         const visionContent = [
             {
                 type: 'text',
-                text: `BERIKUT ADALAH KONTEKS PERCAKAPAN:\n\n${chatTranscript}\n\nPESAN TERAKHIR USER (Mungkin disertai gambar/foto):\n`
+                text: `BERIKUT ADALAH KONTEKS PERCAKAPAN:\nLayanan Terakhir Ditawarkan: ${(state.consultation?.last_offered_services || []).join(', ') || 'Tidak ada'}\n\n${chatTranscript}\n\nPESAN TERAKHIR USER (Mungkin disertai gambar/foto):\n`
             }
         ];
 
@@ -188,7 +192,7 @@ Output: {
         console.log(`[INFO_COLLECTOR_NODE] Intent: ${classifiedIntent} (Prev: ${prevIntent})`);
 
         // --- SKIP EXTRACTION for non-relevant intents ---
-        if (classifiedIntent !== 'BOOKING_SERVICE' && classifiedIntent !== 'GENERAL_INQUIRY' && classifiedIntent !== 'CONSULTATION') {
+        if (classifiedIntent !== 'BOOKING_SERVICE' && classifiedIntent !== 'GENERAL_INQUIRY' && classifiedIntent !== 'CONSULTATION' && classifiedIntent !== 'ASK_SERVICE_DETAILS') {
             const elapsed = Date.now() - startTime;
             console.log(`[INFO_COLLECTOR_NODE] Skipping extraction for ${classifiedIntent}. Done in ${elapsed}ms`);
             return {
@@ -241,6 +245,8 @@ Output: {
         }
 
         // Update other fields (only if not null)
+        if (extracted.target_service) ctx.targetService = extracted.target_service;
+        if (extracted.needs_clarification !== undefined && extracted.needs_clarification !== null) ctx.needsClarification = extracted.needs_clarification;
         if (extracted.paint_type) ctx.paintType = extracted.paint_type;
         if (extracted.is_bongkar_total !== null && extracted.is_bongkar_total !== undefined) ctx.isBongkarTotal = extracted.is_bongkar_total;
         if (extracted.detailing_focus) {

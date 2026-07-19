@@ -54,6 +54,7 @@ const ZoyaState = Annotation.Root({
             stage: 'DISCOVERING', // DISCOVERING, CLARIFYING, CONSULTING, RECOMMENDING, PRICING, OBJECTION, BOOKING, DONE
             requestedServices: [],
             recommendedServices: [],
+            last_offered_services: [],
             knownFacts: {},
             missingFacts: []
         })

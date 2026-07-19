@@ -10,7 +10,7 @@ const { buildPlannerPrompt } = require('../../prompts/promptBuilder');
 const PlannerSchema = z.object({
     decision: z.object({
         goal: z.enum(['COLLECT_INFO', 'PRICE_ESTIMATION', 'BOOKING', 'UPSELL', 'ESCALATION', 'GENERAL_SUPPORT', 'HANDLE_OBJECTION']).describe("Tujuan utama percakapan saat ini dari sisi customer."),
-        strategy: z.enum(['EDUCATE', 'BUILD_TRUST', 'EMPATHIZE', 'CLARIFY', 'URGENCY', 'CROSS_SELL']).describe("Strategi komunikasi untuk composer."),
+        strategy: z.enum(['EDUCATE', 'BUILD_TRUST', 'EMPATHIZE', 'CLARIFY', 'CLARIFY_SERVICE', 'URGENCY', 'CROSS_SELL']).describe("Strategi komunikasi untuk composer."),
         buyerStage: z.enum(['Exploring', 'Comparing', 'Interested', 'Ready', 'Booking']).describe("Stage pembeli saat ini.")
     }),
     execution: z.object({
@@ -71,7 +71,15 @@ async function plannerNode(state) {
             ['system', 'Anda adalah Zoya V2 Planner, otak dari sistem AI assistant Bosmat. Anda HARUS mengembalikan format JSON.'],
             ['human', promptText]
         ]);
-        
+        // Coreference Override
+        if (state.intent === 'ASK_SERVICE_DETAILS') {
+            if (state.context?.needsClarification) {
+                decision.decision.strategy = 'CLARIFY_SERVICE';
+            } else {
+                decision.decision.strategy = 'EDUCATE';
+            }
+        }
+
         // Deterministik context kalkulasi
         decision.plannerContext = derivePlannerContext({ ...state, planner: decision });
 

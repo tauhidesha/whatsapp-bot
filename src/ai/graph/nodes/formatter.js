@@ -255,7 +255,33 @@ ${dateInfo}
 `.trim();
 
     let serviceKnowledgeInstruction = '';
-    if (context.serviceTypes && context.serviceTypes.length > 0) {
+    const injectedKnowledge = toolResult?.injected_knowledge;
+    const strategy = state.planner?.decision?.strategy;
+
+    if (injectedKnowledge) {
+        serviceKnowledgeInstruction = `
+[INJECTED_KNOWLEDGE]
+${injectedKnowledge}
+[/INJECTED_KNOWLEDGE]
+
+# ANTI-HALLUCINATION RULES
+- Saat menjelaskan layanan, kamu WAJIB HANYA menggunakan fakta yang ada di dalam blok [INJECTED_KNOWLEDGE].
+- DILARANG mengarang, berasumsi, atau membuat-buat prosedur, tahapan, atau detail layanan yang tidak ada di sana.
+`;
+    } else if (strategy === 'CLARIFY_SERVICE') {
+        serviceKnowledgeInstruction = `
+# ANTI-HALLUCINATION RULES
+- Strategi saat ini adalah CLARIFY_SERVICE.
+- Tanya user secara sopan dan santai layanan mana yang mereka maksud karena sebutannya ambigu (contoh: "Maaf Kak, untuk detailnya, Kakak nanya soal layanan A atau B nih?").
+`;
+    } else if (intent === 'ASK_SERVICE_DETAILS') {
+        serviceKnowledgeInstruction = `
+# ANTI-HALLUCINATION RULES
+- [INJECTED_KNOWLEDGE] kosong.
+- Karena user bertanya detail layanan tapi data tidak ditemukan, WAJIB gunakan fallback: "Wah, untuk detail prosedur pastinya aku hold dulu ya Kak, biar nggak salah info, aku tanyakan ke Bosmat langsung."
+`;
+    } else if (context.serviceTypes && context.serviceTypes.length > 0) {
+        // General background knowledge for non-specific queries
         let knowledge = '';
         masterLayanan.forEach(svc => {
             const isMentioned = context.serviceTypes.some(st => 
@@ -265,7 +291,7 @@ ${dateInfo}
                 (svc.name.toLowerCase() === 'repaint bodi kasar' && st.toLowerCase().includes('repaint bodi kasar'))
             );
             if (isMentioned) {
-                knowledge += `- ${svc.name}: ${svc.description.replace(/\n/g, ' ')}\n`;
+                knowledge += `- ${svc.name}: ${svc.description.replace(/\\n/g, ' ')}\n`;
             }
         });
         if (knowledge) {
