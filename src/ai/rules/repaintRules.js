@@ -38,11 +38,21 @@ async function evaluateRepaintRules(state) {
     ];
     
     // Always include communication rules for repaint
-    rules.applicableSOP.push('communication.askColor', 'communication.noTechnicalJargon', 'communication.explainPartOptions');
+    rules.applicableSOP.push(
+        'communication.askColor', 
+        'communication.noTechnicalJargon', 
+        'communication.explainPartOptions',
+        'communication.noPaintTypeQuestion'
+    );
+    rules.constraints.push(businessRules.communication.noPaintTypeQuestion);
 
     // Repair rules are context-driven (only if damage is reported)
     if (knownFacts.hasDamage === true) {
         rules.applicableSOP.push('repair.repairIncluded', 'repair.severeDamageSurcharge');
+    } else {
+        // If damage not reported, forbid asking about damage
+        rules.applicableSOP.push('communication.noDamageQuestion');
+        rules.constraints.push(businessRules.communication.noDamageQuestion);
     }
 
     // Include generic paint rules
