@@ -21,10 +21,6 @@ const MemorySchema = z.object({
     services: z.array(z.string()).optional().describe("Daftar layanan (misal: 'Repaint Bodi Halus')."),
     velgCondition: FactSchema("Kondisi cat velg sebelumnya (misal: 'masih ori pabrik', 'udah pernah dicat/repaint', 'belum pernah'). JANGAN isi ini dengan baret/lecet, fokus HANYA pada status cat asli/repaint."),
     hasDamage: z.boolean().nullable().optional().describe("Apakah customer menyebutkan ada kerusakan (retak, patah, baret dalam)? Pengecualian disengaja: tidak menggunakan format {value, status} karena fact yes/no tidak memiliki state UNDECIDED."),
-    damageSeverity: z.object({
-        value: z.enum(["ringan", "sedang", "parah"]).nullable(),
-        state: FactState
-    }).nullable().optional().describe("Tingkat keparahan kerusakan JIKA hasDamage === true."),
     visualSummary: z.string().optional().describe("Ringkasan visual 1-2 kalimat mengenai apa yang terlihat di gambar/foto yang dikirim user. HANYA isi jika user mengirim foto.")
 });
 
@@ -67,11 +63,9 @@ Format JSON output yang diharapkan:
   "services": ["layanan 1"],
   "velgCondition": "Kondisi velg",
   "hasDamage": true/false,
-  "damageSeverity": { "value": "ringan/sedang/parah", "state": "KNOWN/UNDECIDED" },
   "visualSummary": "Ringkasan visual 1-2 kalimat (jika ada gambar)"
 }
-Field yang bernilai string (kecuali visualSummary, services, hasDamage) bisa berupa objek: { "value": "...", "state": "KNOWN|UNDECIDED|NOT_APPLICABLE" }.
-Untuk damageSeverity, turunkan dari kalimat customer mengenai tingkat kerusakannya HANYA JIKA hasDamage adalah true. Contoh: "nggak parah" -> ringan, "lumayan" -> sedang, "parah banget / patah" -> parah. Jika customer bilang rusak tapi tidak bilang separah apa, set state UNDECIDED dan value null. JANGAN isi jika hasDamage false.`;
+Field yang bernilai string (kecuali visualSummary, services, hasDamage) bisa berupa objek: { "value": "...", "state": "KNOWN|UNDECIDED|NOT_APPLICABLE" }.`;
 
         const response = await llm.invoke([
             new SystemMessage(systemPrompt),
@@ -103,9 +97,6 @@ Untuk damageSeverity, turunkan dari kalimat customer mengenai tingkat kerusakann
             }
             if (extraction.hasDamage !== undefined && extraction.hasDamage !== null) {
                 updates.consultation.knownFacts.hasDamage = extraction.hasDamage;
-            }
-            if (extraction.damageSeverity) {
-                updates.consultation.knownFacts.damageSeverity = extraction.damageSeverity;
             }
             if (extraction.part) {
                 updates.consultation.knownFacts.partToRepaint = extraction.part;
