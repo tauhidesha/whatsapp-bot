@@ -15,6 +15,7 @@ async function executeRules(state) {
     const flags = {
         applicableSOP: [],
         constraints: [],
+        blockingFacts: [],
         requiredFacts: [],
         optionalFacts: [],
         upsells: [],
@@ -58,6 +59,7 @@ async function executeRules(state) {
     if (repaintRules) {
         if (repaintRules.applicableSOP) flags.applicableSOP.push(...repaintRules.applicableSOP);
         if (repaintRules.constraints) flags.constraints.push(...repaintRules.constraints);
+        if (repaintRules.blockingFacts) flags.blockingFacts.push(...repaintRules.blockingFacts);
         if (repaintRules.requiredFacts) flags.requiredFacts.push(...repaintRules.requiredFacts);
         if (repaintRules.optionalFacts) flags.optionalFacts.push(...repaintRules.optionalFacts);
         if (repaintRules.upsells) flags.upsells.push(...repaintRules.upsells);
