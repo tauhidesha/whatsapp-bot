@@ -87,25 +87,7 @@ async function evaluateRepaintRules(state) {
         rules.constraints.push("Customer belum tahu warna. WAJIB ubah Goal menjadi PRICE_ESTIMATION dan panggil tool GET_PRICE untuk memberikan estimasi/range harga dasar.");
     }
 
-    // 3. Upsells
-    if (isBodiHalus || isFullBody) {
-        rules.upsells.push({
-            type: 'UPSELL',
-            service: 'Cuci Komplit',
-            reason: 'Sekalian tambah layanan Cuci Komplit agar pas motornya selesai dicat, bagian lainnya juga bersih semua.'
-        });
-    }
-
-    // 4. Conversation Guidelines (Legacy support for specific prompting tweaks)
-    const isShowingPrice = (state.planner?.nextAction === 'SHOW_PRICE' || state.planner?.strategy === 'EDUCATE' || state.planner?.toolIntent === 'GET_PRICE');
-    if (isShowingPrice) {
-        rules.guidelines.push({
-            type: 'CONVERSATION_GUIDELINE',
-            directive: 'Pastikan untuk merangkum total harga sebagai range (misal: "estimasi total sekitar 2.2 - 2.5 juta") jika ada banyak layanan. JANGAN tanya "masuk budget nggak?". Tanyakan saja "Bagaimana mas, mau lanjut booking atau ada yang mau ditanyakan soal paketnya?".'
-        });
-    }
-
-    // 5. Promo/Combo Logic
+    // 3. Promo/Combo Logic
     const promoInfo = await getActivePromo();
     if (promoInfo && promoInfo.promoText) {
         rules.promotions = rules.promotions || [];
@@ -115,6 +97,32 @@ async function evaluateRepaintRules(state) {
             discountPct: promoInfo.comboDiscount,
             minServices: promoInfo.comboMinServices,
             eligibleCombos: promoInfo.eligibleCombos
+        });
+    }
+
+    // 4. Upsells
+    if (isBodiHalus || isFullBody) {
+        let reason = 'Sekalian tambah layanan Cuci Komplit agar pas motornya selesai dicat, bagian lainnya juga bersih semua.';
+        
+        // Cek apakah ada promo aktif yang bisa di-piggyback
+        if (promoInfo && promoInfo.comboDiscount) {
+            const discPct = promoInfo.comboDiscount * 100;
+            reason += ` Apalagi kebetulan lagi ada promo diskon combo ${discPct}% kalau ambil barengan!`;
+        }
+        
+        rules.upsells.push({
+            type: 'UPSELL',
+            service: 'Cuci Komplit',
+            reason: reason
+        });
+    }
+
+    // 5. Conversation Guidelines (Legacy support for specific prompting tweaks)
+    const isShowingPrice = (state.planner?.nextAction === 'SHOW_PRICE' || state.planner?.strategy === 'EDUCATE' || state.planner?.toolIntent === 'GET_PRICE');
+    if (isShowingPrice) {
+        rules.guidelines.push({
+            type: 'CONVERSATION_GUIDELINE',
+            directive: 'Pastikan untuk merangkum total harga sebagai range (misal: "estimasi total sekitar 2.2 - 2.5 juta") jika ada banyak layanan. JANGAN tanya "masuk budget nggak?". Tanyakan saja "Bagaimana mas, mau lanjut booking atau ada yang mau ditanyakan soal paketnya?".'
         });
     }
 
