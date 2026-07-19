@@ -16,7 +16,6 @@ const REPAINT_FLOWS = {
             "paintColor"
         ],
         optionalFacts: [
-            "paintType",
             "upsell_cuci_komplit"
         ],
         blockedFacts: []
@@ -30,7 +29,6 @@ const REPAINT_FLOWS = {
             "paintColor"
         ],
         optionalFacts: [
-            "paintType",
             "upsell_cuci_komplit"
         ],
         blockedFacts: []
@@ -60,7 +58,6 @@ const REPAINT_FLOWS = {
             "velgCondition"
         ],
         optionalFacts: [
-            "paintType",
             "upsell_cuci_komplit"
         ],
         blockedFacts: []
