@@ -69,12 +69,12 @@ workflow.addEdge('plannerNode', 'capabilityRouterNode');
 workflow.addConditionalEdges(
     'capabilityRouterNode',
     (state) => {
-        const capability = state.planner?.capability;
+        const toolIntent = state.planner?.execution?.toolIntent;
         const plannerRuns = state.analytics?.plannerRuns || 0;
         
         // Di full V2 implementation, kita me-reroute balik ke planner (re-evaluate)
-        // jika tool berjalan (capability !null) dan planner baru berjalan 1 kali
-        if (capability && plannerRuns < 2) {
+        // jika tool berjalan (toolIntent != 'NONE') dan planner baru berjalan 1 kali
+        if (toolIntent && toolIntent !== 'NONE' && plannerRuns < 2) {
             return 'plannerNode';
         }
         
