@@ -24,7 +24,7 @@ const PlannerSchema = z.object({
     conversation: z.object({
         responseLength: z.enum(['SHORT', 'MEDIUM', 'LONG']).describe("Panjang balasan yang diinstruksikan ke Composer."),
         informationPriority: z.array(z.object({
-            type: z.enum(['summary', 'price', 'education', 'question', 'empathy', 'upsell']),
+            type: z.enum(['summary', 'price', 'education', 'question', 'empathy', 'upsell', 'restriction']),
             priority: z.number(),
             content: z.string().describe("Isi spesifik dari informasi yang mau disampaikan, misalnya 'Retak/patah bisa direpair'")
         })).describe("Urutan informasi yang harus disampaikan Composer.")

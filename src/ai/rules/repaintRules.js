@@ -6,8 +6,9 @@ const { REPAINT_FLOWS } = require('../knowledge/repaintFlow');
  */
 
 const { businessRules } = require('./businessRulesData');
+const { getActivePromo } = require('../utils/promoConfig');
 
-function evaluateRepaintRules(state) {
+async function evaluateRepaintRules(state) {
     const rules = {
         applicableSOP: [],
         constraints: [],
@@ -42,8 +43,6 @@ function evaluateRepaintRules(state) {
     // Repair rules are context-driven (only if damage is reported)
     if (knownFacts.hasDamage === true) {
         rules.applicableSOP.push('repair.repairIncluded', 'repair.severeDamageSurcharge');
-        // Also add severity to required facts if we know there is damage
-        rules.requiredFacts.push('damageSeverity');
     }
 
     // Include generic paint rules
@@ -103,6 +102,19 @@ function evaluateRepaintRules(state) {
         rules.guidelines.push({
             type: 'CONVERSATION_GUIDELINE',
             directive: 'Pastikan untuk merangkum total harga sebagai range (misal: "estimasi total sekitar 2.2 - 2.5 juta") jika ada banyak layanan. JANGAN tanya "masuk budget nggak?". Tanyakan saja "Bagaimana mas, mau lanjut booking atau ada yang mau ditanyakan soal paketnya?".'
+        });
+    }
+
+    // 5. Promo/Combo Logic
+    const promoInfo = await getActivePromo();
+    if (promoInfo && promoInfo.promoText) {
+        rules.promotions = rules.promotions || [];
+        rules.promotions.push({
+            type: 'PROMO',
+            active: true,
+            discountPct: promoInfo.comboDiscount,
+            minServices: promoInfo.comboMinServices,
+            eligibleCombos: promoInfo.eligibleCombos
         });
     }
 

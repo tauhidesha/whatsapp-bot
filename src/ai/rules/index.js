@@ -9,7 +9,7 @@ const { evaluateRepaintRules } = require('./repaintRules');
  * Evaluates the current state against all business rules and outputs Business Flags.
  */
 
-function executeRules(state) {
+async function executeRules(state) {
     console.log('[Rule Engine] Evaluating business rules...');
     
     const flags = {
@@ -54,13 +54,14 @@ function executeRules(state) {
     }
 
     // 5. Evaluate Repaint Rules
-    const repaintRules = evaluateRepaintRules(state);
+    const repaintRules = await evaluateRepaintRules(state);
     if (repaintRules) {
         if (repaintRules.applicableSOP) flags.applicableSOP.push(...repaintRules.applicableSOP);
         if (repaintRules.constraints) flags.constraints.push(...repaintRules.constraints);
         if (repaintRules.requiredFacts) flags.requiredFacts.push(...repaintRules.requiredFacts);
         if (repaintRules.optionalFacts) flags.optionalFacts.push(...repaintRules.optionalFacts);
         if (repaintRules.upsells) flags.upsells.push(...repaintRules.upsells);
+        if (repaintRules.promotions) flags.promotions.push(...repaintRules.promotions);
         if (repaintRules.guidelines) flags.guidelines.push(...repaintRules.guidelines);
     }
 

@@ -9,7 +9,7 @@ async function ruleEngineNode(state) {
     console.log('[Rule Engine Node] Evaluating constraints...');
 
     // Call the core rule engine
-    const businessFlags = executeRules(state);
+    const businessFlags = await executeRules(state);
 
     // Return the updated state under the `business` channel
     const result = {

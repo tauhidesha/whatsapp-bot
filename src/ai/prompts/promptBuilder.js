@@ -31,7 +31,9 @@ function buildPlannerPrompt(state) {
             prompt += `- RESTRIKSI (${r.service}): ${r.reason}. Solusi: ${r.suggestedAction}\n`;
         });
     }
-
+    if (business?.disabledServices?.length > 0 || business?.restrictions?.length > 0) {
+        prompt += `PENTING: Jika customer secara eksplisit menyebut/menanyakan/meminta layanan yang masuk BUSINESS CONSTRAINTS di atas, tambahkan SATU item di conversation.informationPriority dengan type 'restriction' yang isinya penjelasan restriksi tersebut secara sopan. Jika customer TIDAK menyebut/menanyakan layanan tersebut sama sekali di turn ini, JANGAN sertakan item ini.\n`;
+    }
     if (business?.constraints?.length > 0) {
         prompt += `\n=== CONSTRAINTS ===\n`;
         business.constraints.forEach(c => {
@@ -56,6 +58,14 @@ function buildPlannerPrompt(state) {
             prompt += `- Tawarkan ${u.service}: ${u.reason}\n`;
         });
         prompt += `PENTING: Jika Anda memutuskan untuk melakukan upsell, pastikan Anda menambahkan objek { type: 'upsell', priority: [n] } ke dalam conversation.informationPriority.\n`;
+    }
+    if (business?.promotions?.length > 0) {
+        prompt += `\n=== ACTIVE PROMOTIONS ===\n`;
+        business.promotions.forEach(p => {
+            prompt += `- PROMO/COMBO AKTIF: Diskon ${p.discountPct * 100}%. Syarat minimum ${p.minServices} layanan.\n`;
+            prompt += `  Kombinasi yang berlaku (opsi Upsell): ${JSON.stringify(p.eligibleCombos)}\n`;
+        });
+        prompt += `PENTING: Jika goal adalah PRICE_ESTIMATION atau BOOKING dan tidak ada keberatan budget, Anda dapat mempertimbangkan informasi promo ini untuk menentukan strategi upsell ke customer (tambahkan di conversation.informationPriority dengan type 'upsell' di urutan terakhir).\n`;
     }
 
     prompt += `\n`;
@@ -221,11 +231,14 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
 
     if (state.business) {
         if (state.business.restrictions?.length > 0) {
-            prompt += `=== BUSINESS CONSTRAINTS ===\n`;
-            state.business.restrictions.forEach(r => {
-                prompt += `Jelaskan penolakan/restriksi ini dengan sopan: ${r.reason}\n`;
-            });
-            prompt += `\n`;
+            const hasRestriction = plannerDecision.conversation?.informationPriority?.some(p => p.type === 'restriction');
+            if (hasRestriction) {
+                prompt += `=== BUSINESS CONSTRAINTS ===\n`;
+                state.business.restrictions.forEach(r => {
+                    prompt += `Jelaskan penolakan/restriksi ini dengan sopan: ${r.reason}\n`;
+                });
+                prompt += `\n`;
+            }
         }
 
         const activeSOPs = [];

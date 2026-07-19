@@ -34,7 +34,11 @@ async function getActivePromo() {
                 promoText: kv.value.promoText || null,
                 comboDiscount: kv.value.comboDiscount || 0, // 0.15 = 15%
                 comboMinServices: kv.value.comboMinServices || 2,
-                discountEligiblePattern: kv.value.discountEligiblePattern || 'bodi halus'
+                discountEligiblePattern: kv.value.discountEligiblePattern || 'bodi halus',
+                eligibleCombos: kv.value.eligibleCombos || [
+                    { anchor: "Repaint Bodi Halus", pairWith: ["Cuci Komplit", "Repaint Velg", "Repaint Bodi Kasar"] },
+                    { anchor: "Coating", pairWith: ["Complete Service"] }
+                ]
             };
         } else {
             promoCache = null;
