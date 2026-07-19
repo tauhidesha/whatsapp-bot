@@ -10,6 +10,7 @@ const path = require('path');
 
 const rulesPath = path.join(__dirname, 'conversation-rules.md');
 const conversationRules = fs.existsSync(rulesPath) ? fs.readFileSync(rulesPath, 'utf8') : '';
+const masterLayanan = require('../../data/masterLayanan');
 
 const model = new ChatGoogleGenerativeAI({
     model: process.env.AI_MODEL || 'gemini-flash-latest',
@@ -138,12 +139,23 @@ async function formatterNode(state) {
         const isUpsellHalus = upsellSuggestion.includes('Repaint Bodi Halus');
         const discountedService = isUpsellHalus ? upsellSuggestion : primarySvcTitle;
 
+        let upsellDescriptions = '';
+        masterLayanan.forEach(svc => {
+            if (upsellSuggestion.toLowerCase().includes(svc.name.toLowerCase()) || 
+               (svc.name.toLowerCase() === 'cuci komplit' && upsellSuggestion.toLowerCase().includes('cuci komplit')) ||
+               (svc.name.toLowerCase() === 'repaint velg' && upsellSuggestion.toLowerCase().includes('repaint velg')) ||
+               (svc.name.toLowerCase() === 'repaint bodi kasar' && upsellSuggestion.toLowerCase().includes('repaint bodi kasar')) ) {
+                upsellDescriptions += `- ${svc.name}: ${svc.description.replace(/\n/g, ' ')}\n`;
+            }
+        });
+
         const promoMsg = comboPromo.promoText ? comboPromo.promoText : `Lagi ada promo diskon ${pct}% nih kalau ambil ${comboPromo.comboMinServices} layanan sekaligus`;
         comboOfferInstruction = `
 PROMOSI COMBO (Tawarkan secara natural di akhir pesan):
 Setelah kasih estimasi harga, tawarkan layanan tambahan: "${upsellSuggestion}".
 Catatan Paket: ${packageExplanation || 'Jelaskan benefit intinya secara ringkas.'}
 Detail Promo Asli: "${promoMsg}"
+${upsellDescriptions ? `Info Layanan Tambahan (Gunakan ini HANYA jika user bertanya detail tentang layanan tambahan yang ditawarkan, JANGAN sebutkan jika tidak ditanya!):\n${upsellDescriptions}` : ''}
 ATURAN BAHASA PENAWARAN PROMO:
 - Hindari copy-paste syarat promo mentah-mentah (hindari kata kaku seperti "paket ekonomis tidak diskon", "khusus 10 motor", dll).
 - Pastikan menyebut nama paket spesifiknya: "${upsellSuggestion}".
