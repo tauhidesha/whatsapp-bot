@@ -20,6 +20,7 @@ const MemorySchema = z.object({
     objection: FactSchema("Keberatan/komplain kustomer (misal: 'mahal', 'jauh')."),
     services: z.array(z.string()).optional().describe("Daftar layanan (misal: 'Repaint Bodi Halus')."),
     velgCondition: FactSchema("Kondisi cat velg sebelumnya (misal: 'masih ori pabrik', 'udah pernah dicat/repaint', 'belum pernah'). JANGAN isi ini dengan baret/lecet, fokus HANYA pada status cat asli/repaint."),
+    hasDamage: z.boolean().nullable().optional().describe("Apakah customer menyebutkan ada kerusakan (retak, patah, baret dalam)? Pengecualian disengaja: tidak menggunakan format {value, status} karena fact yes/no tidak memiliki state UNDECIDED."),
     visualSummary: z.string().optional().describe("Ringkasan visual 1-2 kalimat mengenai apa yang terlihat di gambar/foto yang dikirim user. HANYA isi jika user mengirim foto.")
 });
 
@@ -61,9 +62,10 @@ Format JSON output yang diharapkan:
   "objection": "Keberatan kustomer",
   "services": ["layanan 1"],
   "velgCondition": "Kondisi velg",
+  "hasDamage": true/false,
   "visualSummary": "Ringkasan visual 1-2 kalimat (jika ada gambar)"
 }
-Field yang bernilai string (kecuali visualSummary dan services) bisa berupa objek: { "value": "...", "state": "KNOWN|UNDECIDED|NOT_APPLICABLE" }`;
+Field yang bernilai string (kecuali visualSummary, services, hasDamage) bisa berupa objek: { "value": "...", "state": "KNOWN|UNDECIDED|NOT_APPLICABLE" }`;
 
         const response = await llm.invoke([
             new SystemMessage(systemPrompt),
@@ -83,7 +85,7 @@ Field yang bernilai string (kecuali visualSummary dan services) bisa berupa obje
             if (extraction.color) updates.vehicle.paintType = extraction.color;
         }
 
-        if (extraction.objection || extraction.part || (extraction.services && extraction.services.length > 0) || extraction.velgCondition) {
+        if (extraction.objection || extraction.part || (extraction.services && extraction.services.length > 0) || extraction.velgCondition || extraction.hasDamage !== undefined) {
             updates.consultation = { ...state.consultation };
             updates.consultation.knownFacts = { ...(updates.consultation.knownFacts || {}) };
             
@@ -92,6 +94,9 @@ Field yang bernilai string (kecuali visualSummary dan services) bisa berupa obje
             }
             if (extraction.velgCondition) {
                 updates.consultation.knownFacts.velgCondition = extraction.velgCondition;
+            }
+            if (extraction.hasDamage !== undefined && extraction.hasDamage !== null) {
+                updates.consultation.knownFacts.hasDamage = extraction.hasDamage;
             }
             if (extraction.part) {
                 updates.consultation.knownFacts.partToRepaint = extraction.part;

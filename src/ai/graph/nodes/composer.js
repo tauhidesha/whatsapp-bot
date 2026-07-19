@@ -39,15 +39,44 @@ Anda DILARANG KERAS:
 
 Fokuslah pada merangkai data yang disuapkan ke Anda menjadi satu pesan WhatsApp yang singkat, nyaman dibaca, dan tidak tumpang tindih.`;
 
-        const response = await llm.invoke([
-            ['system', systemInstruction],
-            ['human', promptText]
-        ]);
+        let responseText = '';
+        let retryCount = 0;
+        const maxRetries = 1;
+        const priceRegex = /(Rp\s*[\d.,]+)|(\d+\s*(juta|ribu|jt|rb)an?)/i;
         
-        let responseText = response.content;
-        
-        // Trim standard quotes if generated
-        responseText = responseText.replace(/^["']|["']$/g, '');
+        const toolIntent = state.planner?.execution?.toolIntent || 'NONE';
+        const hasPrioritizedData = !!prioritizedData;
+        const hasToolResult = !!state.tool?.lastResult;
+        const isPriceForbidden = toolIntent === 'NONE' || (!hasPrioritizedData && !hasToolResult);
+
+        while (retryCount <= maxRetries) {
+            let currentPrompt = promptText;
+            if (retryCount > 0) {
+                currentPrompt += `\n\nSISTEM WARNING: Pesan Anda sebelumnya menyebutkan angka/estimasi harga padahal Tool Result KOSONG! Anda DILARANG menyebutkan harga. Harap buat ulang pesan tanpa menyebutkan harga.`;
+                console.log(`[Composer Node] Retrying due to price hallucination (Attempt ${retryCount})...`);
+            }
+
+            const response = await llm.invoke([
+                ['system', systemInstruction],
+                ['human', currentPrompt]
+            ]);
+            
+            responseText = response.content.replace(/^["']|["']$/g, '');
+
+            if (isPriceForbidden && priceRegex.test(responseText)) {
+                retryCount++;
+                if (retryCount <= maxRetries) {
+                    continue;
+                } else {
+                    console.log('[Composer Node] Max retries reached for price hallucination. Applying fallback.');
+                    responseText = "Untuk harga pastinya, aku cek dulu ya kak 🙏";
+                    break;
+                }
+            }
+            
+            // Valid response or price is allowed
+            break;
+        }
 
         console.log('[Composer Node] Generated text:', responseText);
 

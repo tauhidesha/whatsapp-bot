@@ -126,8 +126,14 @@ function buildPlannerPrompt(state) {
 }
 
 const { getResponsePolicies } = require('../response/policy');
+const { businessRules } = require('../rules/businessRulesData');
 
 function buildComposerPrompt(state, plannerDecision, prioritizedData = null) {
+    // Dynamic Response Length
+    let sentenceLimit = "Max 3 kalimat";
+    if (plannerDecision.conversation?.responseLength === 'MEDIUM') sentenceLimit = "Max 4-5 kalimat";
+    else if (plannerDecision.conversation?.responseLength === 'LONG') sentenceLimit = "Max 6-7 kalimat";
+
     // Similar to Planner, but with the goal of writing natural text based on planner's strategy
     let prompt = `# ROLE
 Kamu adalah Zoya, Automotive Consultant & Studio Assistant (Vision-Enabled) di Bosmat Repaint Studio.
@@ -143,7 +149,7 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
 - **Multi-Motor**: Jika user menyebutkan 2 motor berbeda di satu pesan, bahas SATU per SATU. "Wah dua motor nih, kita bahas yang pertama dulu ya kak biar gak pusing 😆".
 
 # ANTI-YAPPING (WAJIB)
-- **Max 3 kalimat** untuk pesan pertama. JANGAN tulis essay panjang.
+- **${sentenceLimit}** untuk pesan ini. Sesuaikan panjangnya dengan instruksi Planner.
 - **JANGAN beri info yang tidak diminta** (jam buka, alamat, promo) KECUALI planner memerintahkannya di Information Priority.
 - **JANGAN minta foto** di pesan pertama. Terlalu agresif. Cukup tanya bagian motornya dulu.
 - **Contoh BURUK**: "Kenalin aku Zoya ✨ Biar aku bisa kasih info yang pas... boleh kasih tahu motornya apa? Kalau ada foto boleh kirim juga ya! Oh ya kita buka jam 08.00-17.00..."
@@ -178,22 +184,25 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
         prompt += `Gunakan prioritas (urutan) tipe informasi berikut saat merangkai pesan:\n`;
         const sortedPriority = [...plannerDecision.conversation.informationPriority].sort((a, b) => a.priority - b.priority);
         sortedPriority.forEach((p) => {
-            prompt += `${p.priority}. ${p.type}\n`;
+            prompt += `${p.priority}. ${p.type}${p.content ? `: ${p.content}` : ''}\n`;
         });
     }
 
-    // Inject Prioritized Data (or raw tool output if prioritizer returns the raw object)
-    if (prioritizedData) {
-        prompt += `\nData: ${JSON.stringify(prioritizedData, null, 2)}\n`;
-    } else if (state.tool?.lastResult) {
-        if (state.tool.lastResult.formattedText) {
-            prompt += `\nData:\n${state.tool.lastResult.formattedText}\n`;
-        } else {
-            prompt += `\nData: ${JSON.stringify(state.tool.lastResult)}\n`;
+    prompt += `\n=== TOOL RESULT ===\n`;
+    if (plannerDecision.execution?.toolIntent === 'NONE' || (!prioritizedData && !state.tool?.lastResult)) {
+        prompt += `(Belum ada — belum melakukan pricing call turn ini)\n\n`;
+    } else {
+        if (prioritizedData) {
+            prompt += `Data: ${JSON.stringify(prioritizedData, null, 2)}\n`;
+        } else if (state.tool?.lastResult) {
+            if (state.tool.lastResult.formattedText) {
+                prompt += `Data:\n${state.tool.lastResult.formattedText}\n`;
+            } else {
+                prompt += `Data: ${JSON.stringify(state.tool.lastResult)}\n`;
+            }
         }
+        prompt += `PENTING: JANGAN meringkas atau menyembunyikan biaya tambahan (surcharge). Jika di dalam Data terdapat "Rincian:" (misal harga dasar + biaya warna/remover), WAJIB sebutkan biaya tambahan tersebut secara jelas ke customer!\n\n`;
     }
-    prompt += `PENTING: JANGAN meringkas atau menyembunyikan biaya tambahan (surcharge). Jika di dalam Data terdapat "Rincian:" (misal harga dasar + biaya warna/remover), WAJIB sebutkan biaya tambahan tersebut secara jelas ke customer!\n`;
-    prompt += `SANGAT PENTING: JIKA Data di atas berisi pesan error, "tidak ditemukan", atau "belum tersedia", ANDA DILARANG KERAS MENGARANG ATAU MENEBAK HARGA SENDIRI! Sampaikan dengan sopan bahwa harga/layanan tersebut belum ada di sistem atau arahkan untuk pengecekan langsung ke studio.\n\n`;
 
     const remainingFacts = plannerDecision.reasoning?.goalStatus?.remainingFacts;
     if (remainingFacts && remainingFacts.length > 0) {
@@ -219,10 +228,27 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
             prompt += `\n`;
         }
 
-        if (state.business.sop && Object.keys(state.business.sop).length > 0) {
-            prompt += `=== BUSINESS RULES & SOP (JSON) ===\n`;
-            prompt += `Berikut adalah aturan bisnis yang HARUS dipatuhi, dikategorikan dalam JSON:\n`;
-            prompt += JSON.stringify(state.business.sop, null, 2) + `\n\n`;
+        const activeSOPs = [];
+        if (state.business.applicableSOP && state.business.applicableSOP.length > 0) {
+            state.business.applicableSOP.forEach(id => {
+                const [category, key] = id.split('.');
+                if (businessRules[category] && businessRules[category][key]) {
+                    activeSOPs.push(businessRules[category][key]);
+                }
+            });
+        }
+        // Dynamically inject pricing SOP if Planner chose GET_PRICE
+        if (plannerDecision.execution?.toolIntent === 'GET_PRICE') {
+            Object.values(businessRules.pricing).forEach(rule => activeSOPs.push(rule));
+        }
+
+        if (activeSOPs.length > 0) {
+            prompt += `=== BUSINESS RULES & SOP ===\n`;
+            prompt += `Berikut adalah aturan bisnis yang HARUS dipatuhi untuk konteks saat ini:\n`;
+            activeSOPs.forEach(rule => {
+                prompt += `- ${rule}\n`;
+            });
+            prompt += `\n`;
         }
 
         if (state.business.promotions?.length > 0) {
@@ -249,6 +275,9 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
             prompt += `\n`;
         }
     }
+
+    prompt += `\nSANGAT PENTING: JIKA section TOOL RESULT kosong atau (Belum ada), ANDA DILARANG MUTLAK menyebut angka rupiah apapun! Fokus hanya ke edukasi dan pertanyaan.\n`;
+    prompt += `Jika terdapat pesan error pada Tool Result, sampaikan dengan sopan bahwa harga/layanan tersebut belum ada di sistem atau arahkan untuk pengecekan langsung ke studio.\n\n`;
 
     prompt += `=== CONVERSATION HISTORY ===\n`;
     if (state.messages && state.messages.length > 0) {

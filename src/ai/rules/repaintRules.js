@@ -9,7 +9,7 @@ const { businessRules } = require('./businessRulesData');
 
 function evaluateRepaintRules(state) {
     const rules = {
-        sop: {},
+        applicableSOP: [],
         constraints: [],
         blockingFacts: [],
         requiredFacts: [],
@@ -37,16 +37,17 @@ function evaluateRepaintRules(state) {
     ];
     
     // Always include communication rules for repaint
-    rules.sop.communication = businessRules.communication;
+    rules.applicableSOP.push('communication.askColor', 'communication.noTechnicalJargon', 'communication.explainPartOptions');
 
-    // Always include repair rules for repaint
-    rules.sop.repair = businessRules.repair;
-
-    // Include paint rules if color or part is discussed
-    if (contextKeys.includes('paintColor') || contextKeys.includes('partToRepaint') || isRepaintRequested) {
-        rules.sop.paint = businessRules.paint;
-        rules.sop.pricing = businessRules.pricing;
+    // Repair rules are context-driven (only if damage is reported)
+    if (knownFacts.hasDamage === true) {
+        rules.applicableSOP.push('repair.repairIncluded', 'repair.severeDamageSurcharge');
+        // Also add severity to required facts if we know there is damage
+        rules.requiredFacts.push('damageSeverity');
     }
+
+    // Include generic paint rules
+    rules.applicableSOP.push('paint.bodiKasarColor', 'paint.specialColor', 'paint.noBodiKasarColor');
 
     // 2. Identify Flow and Inject Required Facts
     const isFullBody = requested.some(s => s.toLowerCase().includes('full bodi') && !s.toLowerCase().includes('halus'));
