@@ -10,7 +10,7 @@ const path = require('path');
 
 const rulesPath = path.join(__dirname, 'conversation-rules.md');
 const conversationRules = fs.existsSync(rulesPath) ? fs.readFileSync(rulesPath, 'utf8') : '';
-const masterLayanan = require('../../data/masterLayanan');
+const masterLayanan = require('../../../data/masterLayanan');
 
 const model = new ChatGoogleGenerativeAI({
     model: process.env.AI_MODEL || 'gemini-flash-latest',
@@ -254,6 +254,25 @@ ${dateInfo}
 - Warna Velg: ${context.velgColorChoice || 'Belum ditentukan'}
 `.trim();
 
+    let serviceKnowledgeInstruction = '';
+    if (context.serviceTypes && context.serviceTypes.length > 0) {
+        let knowledge = '';
+        masterLayanan.forEach(svc => {
+            const isMentioned = context.serviceTypes.some(st => 
+                st.toLowerCase().includes(svc.name.toLowerCase()) || 
+                (svc.name.toLowerCase() === 'cuci komplit' && st.toLowerCase().includes('cuci komplit')) ||
+                (svc.name.toLowerCase() === 'repaint velg' && st.toLowerCase().includes('repaint velg')) ||
+                (svc.name.toLowerCase() === 'repaint bodi kasar' && st.toLowerCase().includes('repaint bodi kasar'))
+            );
+            if (isMentioned) {
+                knowledge += `- ${svc.name}: ${svc.description.replace(/\n/g, ' ')}\n`;
+            }
+        });
+        if (knowledge) {
+            serviceKnowledgeInstruction = `\n# KNOWLEDGE BASE LAYANAN (Gunakan info ini JIKA user bertanya detail tentang layanan terkait):\n${knowledge}`;
+        }
+    }
+
     let informCTAInstruction = '';
     if (!missingQ && replyMode === 'inform' && !comboOfferInstruction) {
 
@@ -313,6 +332,7 @@ ${contextInfo}
 ${activePromo && activePromo.promoText ? `- Promo Aktif Saat Ini: ${activePromo.promoText}` : ''}
 - Hasil Teknis/Tool:
 ${JSON.stringify(toolResult || 'Tidak ada data tambahan')}
+${serviceKnowledgeInstruction}
 
 # VISION AWARENESS (PENTING)
 Gunakan foto yang dikirim user untuk membuat percakapan jadi lebih personal dan nyata:
