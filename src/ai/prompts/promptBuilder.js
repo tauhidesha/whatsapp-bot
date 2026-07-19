@@ -106,7 +106,7 @@ function buildPlannerPrompt(state) {
     prompt += `  2. Jika semua \`blockingFacts\` sudah \`KNOWN\`, namun ada \`requiredFacts\` yang state-nya \`UNDECIDED\`, Anda bebas berpindah goal (misal ke \`PRICE_ESTIMATION\`) dan ubah strategi (misal ke \`EDUCATE\`), karena kustomer sudah ditanya tapi belum bisa memutuskan.\n`;
     prompt += `  3. Output parameter yang dibutuhkan oleh tool ke dalam \`execution.parameters\` berdasarkan fakta yang sudah ada.\n`;
     prompt += `- [execution.toolIntent]: Gunakan intent generik (GET_PRICE, CREATE_BOOKING, CHECK_AVAILABILITY, dll). Jika tidak butuh tool, set 'NONE'.\n`;
-    prompt += `- [conversation.informationPriority]: Tentukan prioritas urutan tipe informasi yang harus disusun oleh Composer.\n`;
+    prompt += `- [conversation.informationPriority]: Tentukan prioritas urutan tipe informasi yang harus disusun oleh Composer. Isi 'content' dengan POIN SINGKAT inti idenya saja, BUKAN kalimat lengkap atau bahasa korporat kaku. Biarkan Composer yang merangkainya menjadi kalimat natural.\n`;
     prompt += `- JIKA array remainingFacts BELUM KOSONG, maka toolIntent WAJIB di-set menjadi 'NONE', KECUALI jika kustomer bertanya mengenai jadwal/ketersediaan slot, Anda DIWAJIBKAN memanggil 'CHECK_AVAILABILITY'. JANGAN PERNAH memanggil 'CREATE_BOOKING' atau tool lainnya sebelum fakta pemblokir terkumpul!\n`;
     prompt += `- ATURAN MUTLAK UPSELL/PROMO: Jika goal adalah ESCALATION atau HANDLE_OBJECTION (atau customer menunjukkan tanda keberatan/frustrasi), Anda DILARANG KERAS menyertakan item 'upsell' di informationPriority turn ini, apapun ketersediaannya.\n\n`;
 
@@ -170,6 +170,7 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
 
 # TONE & STYLE (MUTLAK)
 - JANGAN PERNAH menggunakan bahasa kaku/robotik/korporat. Hindari frasa seperti "Senang sekali Anda tertarik", "Untuk memberikan estimasi yang akurat", atau "Kami perlu mengetahui".
+- JANGAN copy-paste kalimat mentah dari Planner (Information Priority / Missing Facts). Ubah poin-poin tersebut menjadi gaya bahasa Anda sendiri yang asik dan luwes.
 - Gunakan bahasa obrolan sehari-hari yang natural ("Biar aku bisa bantu itungin", "Boleh tau...").
 - Anggap Anda sedang membalas WA teman tongkrongan yang nanya soal motor.\n\n`;
 
