@@ -107,7 +107,17 @@ function buildPlannerPrompt(state) {
     prompt += `- Aturan Transisi:\n`;
     prompt += `  1. Jika masih ada fakta di \`blockingFacts\` yang tidak ada di \`knownFacts\` (implicit UNKNOWN) atau state-nya BUKAN \`KNOWN\`, Anda WAJIB bertanya (\`COLLECT_INFO\`) dan set \`nextAction.type\` menjadi \`ASK_MISSING_FACTS\`. Detail fakta yang ditanyakan letakkan di \`remainingFacts\`.\n`;
     prompt += `  2. Jika semua \`blockingFacts\` sudah \`KNOWN\`, namun ada \`requiredFacts\` yang state-nya \`UNDECIDED\`, Anda bebas berpindah goal (misal ke \`PRICE_ESTIMATION\`) dan ubah strategi (misal ke \`EDUCATE\`), karena kustomer sudah ditanya tapi belum bisa memutuskan.\n`;
-    prompt += `  3. Output parameter yang dibutuhkan oleh tool ke dalam \`execution.parameters\` berdasarkan fakta yang sudah ada.\n`;
+    prompt += `  3. Output parameter yang dibutuhkan oleh tool ke dalam \`execution.parameters\` berdasarkan fakta yang sudah ada di \`knownFacts\`. WAJIB isi dengan nilai konkret, JANGAN biarkan parameters kosong ({}) jika ada fakta yang relevan.\n`;
+    
+    // Inject explicit parameter hints from current known facts so planner doesn't send empty params
+    const paramHints = [];
+    if (vehicle?.model) paramHints.push(`motor_model: "${vehicle.model}"`);
+    if (consultation?.knownFacts?.colorChoice) paramHints.push(`paintColor: "${consultation.knownFacts.colorChoice}"`);
+    if (consultation?.requestedServices?.length > 0) paramHints.push(`service: ${JSON.stringify(consultation.requestedServices)}`);
+    if (paramHints.length > 0) {
+        prompt += `     ✅ PARAMETER TERSEDIA (gunakan ini sebagai dasar execution.parameters): { ${paramHints.join(', ')} }\n`;
+    }
+
     prompt += `- [execution.toolIntent]: Gunakan intent generik (GET_PRICE, CREATE_BOOKING, CHECK_AVAILABILITY, dll). Jika tidak butuh tool, set 'NONE'.\n`;
     prompt += `- [conversation.informationPriority]: Tentukan prioritas urutan tipe informasi yang harus disusun oleh Composer. Isi 'content' dengan POIN SINGKAT inti idenya saja, BUKAN kalimat lengkap atau bahasa korporat kaku. Biarkan Composer yang merangkainya menjadi kalimat natural.\n`;
     prompt += `- JIKA array remainingFacts BELUM KOSONG, maka toolIntent WAJIB di-set menjadi 'NONE', KECUALI jika kustomer bertanya mengenai jadwal/ketersediaan slot, Anda DIWAJIBKAN memanggil 'CHECK_AVAILABILITY'. JANGAN PERNAH memanggil 'CREATE_BOOKING' atau tool lainnya sebelum fakta pemblokir terkumpul!\n`;

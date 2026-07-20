@@ -59,11 +59,25 @@ async function evaluateRepaintRules(state) {
     rules.applicableSOP.push('paint.bodiKasarColor', 'paint.specialColor', 'paint.noBodiKasarColor');
 
     // 2. Identify Flow and Inject Required Facts
-    const isFullBody = requested.some(s => s.toLowerCase().includes('full bodi') && !s.toLowerCase().includes('halus'));
-    const isBodiHalus = requested.some(s => s.toLowerCase().includes('bodi halus') || s.toLowerCase().includes('full bodi halus'));
-    const isBodiKasar = requested.some(s => s.toLowerCase().includes('bodi kasar'));
+    // Business Rule: "full bodi" = Repaint Bodi Halus + Repaint Bodi Kasar
+    //                "full bodi halus" = Repaint Bodi Halus only
+    const isFullBodiHalus = requested.some(s => s.toLowerCase().includes('full bodi halus'));
+    const isFullBody = !isFullBodiHalus && requested.some(s => s.toLowerCase().includes('full bodi') || s.toLowerCase().includes('full body'));
+    const isBodiHalus = isFullBodiHalus || requested.some(s => s.toLowerCase().includes('bodi halus'));
+    const isBodiKasar = isFullBody || requested.some(s => s.toLowerCase().includes('bodi kasar'));
     const isVelg = requested.some(s => s.toLowerCase().includes('velg')) || knownRepaintTarget?.toLowerCase().includes('velg');
     
+    // Inject resolved services for "full bodi" as a constraint so planner + pricing tool know the scope
+    if (isFullBody) {
+        rules.constraints.push(
+            'REQUEST SCOPE: Customer meminta "full bodi" yang berarti mencakup DUA layanan: "Repaint Bodi Halus" + "Repaint Bodi Kasar". Pricing tool harus dipanggil dengan kedua layanan ini.'
+        );
+    } else if (isFullBodiHalus) {
+        rules.constraints.push(
+            'REQUEST SCOPE: Customer meminta "full bodi halus" yang berarti HANYA "Repaint Bodi Halus". Bukan bodi kasar.'
+        );
+    }
+
     let selectedFlow = null;
 
     if (isFullBody) selectedFlow = REPAINT_FLOWS.FULL_BODY;

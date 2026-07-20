@@ -23,6 +23,27 @@ class PricingTool extends BaseTool {
         }
         let serviceNameArray = Array.isArray(rawServiceName) ? rawServiceName : [rawServiceName];
 
+        // Business Rule Expansion BEFORE normalization:
+        // "full bodi" = Repaint Bodi Halus + Repaint Bodi Kasar
+        // "full bodi halus" = Repaint Bodi Halus only
+        const expandedServices = [];
+        for (const s of serviceNameArray) {
+            if (typeof s === 'string') {
+                const sLower = s.toLowerCase();
+                if ((sLower.includes('full bodi') || sLower.includes('full body')) && !sLower.includes('halus')) {
+                    // full bodi = dua layanan
+                    expandedServices.push('Repaint Bodi Halus', 'Repaint Bodi Kasar');
+                } else if (sLower.includes('full bodi halus')) {
+                    expandedServices.push('Repaint Bodi Halus');
+                } else {
+                    expandedServices.push(s);
+                }
+            } else {
+                expandedServices.push(s);
+            }
+        }
+        serviceNameArray = [...new Set(expandedServices)];
+
         // Normalize services and ensure "Repaint" prefix for known parts
         serviceNameArray = serviceNameArray.map(s => {
             if (typeof s === 'string') {
@@ -35,15 +56,15 @@ class PricingTool extends BaseTool {
 
                 // If it's a repaint or an unknown part
                 if (sLower.includes('repaint')) {
-                    if (['bodi halus', 'bodi kasar', 'velg', 'full bodi', 'cvt', 'arm'].some(p => sLower.includes(p))) {
+                    if (['bodi halus', 'bodi kasar', 'velg', 'cvt', 'arm'].some(p => sLower.includes(p))) {
                         return s; // it's a known repaint package
                     }
                     return 'Repaint Bodi Halus'; // Unknown repaint part -> default to Bodi Halus
                 } else {
-                    if (['velg', 'bodi halus', 'bodi kasar', 'full bodi', 'cvt', 'arm'].some(part => sLower.includes(part))) {
+                    if (['velg', 'bodi halus', 'bodi kasar', 'cvt', 'arm'].some(part => sLower.includes(part))) {
                         return `Repaint ${s}`;
                     }
-                    // If it doesn't have 'repaint' and isn't detailing/coating, assume it's a raw part name like "bodi belakang"
+                    // If it doesn't have 'repaint' and isn't detailing/coating, assume it's a raw part name
                     return 'Repaint Bodi Halus';
                 }
             }
