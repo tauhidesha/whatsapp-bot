@@ -51,8 +51,7 @@ workflow.addConditionalEdges(
 // Admin Flow:
 workflow.addConditionalEdges(
     'admin',
-    // In V2, we might want to change isReadyForTools mapping, but we keep admin flow isolated for now
-    (state) => (state.consultation?.missingFacts?.length === 0 ? 'adminExecutor' : 'END'),
+    (state) => (state.context?.isReadyForTools ? 'adminExecutor' : END),
     {
         'adminExecutor': 'adminExecutor',
         'END': END
