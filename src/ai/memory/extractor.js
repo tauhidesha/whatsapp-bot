@@ -69,9 +69,11 @@ Format JSON output yang diharapkan:
   "services": ["layanan 1"],
   "velgCondition": "Kondisi velg",
   "hasDamage": true/false,
-  "visualSummary": "Ringkasan visual 1-2 kalimat (jika ada gambar)"
+  "visualSummary": "Ringkasan visual 1-2 kalimat (jika ada gambar)",
+  "targetService": "Nama layanan yang ditanyakan (isi HANYA jika kustomer bertanya tentang layanan spesifik atau menyebut pronoun seperti 'apaan tuh', 'gimana itu')",
+  "needsClarification": true/false (isi HANYA jika pronoun ambigu dan lastOffered berisi >1 layanan)
 }
-Field yang bernilai string (kecuali visualSummary, services, hasDamage) bisa berupa objek: { "value": "...", "state": "KNOWN|UNDECIDED|NOT_APPLICABLE" }.`;
+Field yang bernilai string (kecuali visualSummary, services, hasDamage, targetService, needsClarification) bisa berupa objek: { "value": "...", "state": "KNOWN|UNDECIDED|NOT_APPLICABLE" }.`;
 
         const response = await llm.invoke([
             new SystemMessage(systemPrompt),
@@ -127,6 +129,20 @@ Field yang bernilai string (kecuali visualSummary, services, hasDamage) bisa ber
                 const existingServices = state.consultation?.requestedServices || [];
                 const newServices = [...new Set([...existingServices, ...extraction.services])];
                 updates.consultation.requestedServices = newServices;
+            }
+        }
+
+        // Persist coreference fields to V2 knownFacts so plannerNode can read them
+        if (extraction.targetService || extraction.needsClarification !== undefined) {
+            if (!updates.consultation) {
+                updates.consultation = { ...state.consultation };
+                updates.consultation.knownFacts = { ...(updates.consultation.knownFacts || {}) };
+            }
+            if (extraction.targetService) {
+                updates.consultation.knownFacts.targetService = extraction.targetService;
+            }
+            if (extraction.needsClarification !== undefined) {
+                updates.consultation.knownFacts.needsClarification = extraction.needsClarification;
             }
         }
 

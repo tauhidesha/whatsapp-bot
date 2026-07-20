@@ -2,6 +2,7 @@ const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
 const { AIMessage } = require('@langchain/core/messages');
 const { buildComposerPrompt } = require('../../prompts/promptBuilder');
 const { prioritizeInformation } = require('../../response/prioritizer');
+const masterLayanan = require('../../../data/masterLayanan');
 
 /**
  * Response Composer Node for Zoya V2
@@ -81,7 +82,6 @@ Fokuslah pada merangkai data yang disuapkan ke Anda menjadi satu pesan WhatsApp 
         console.log('[Composer Node] Generated text:', responseText);
 
         // Track last offered services for coreference resolution
-        const masterLayanan = require('../../../data/masterLayanan');
         const lowerResponse = responseText.toLowerCase();
         const offeredServices = [];
         masterLayanan.forEach(svc => {
@@ -99,7 +99,9 @@ Fokuslah pada merangkai data yang disuapkan ke Anda menjadi satu pesan WhatsApp 
 
         const result = {
             messages: [new AIMessage(responseText)],
-            last_offered_services: offeredServices,
+            consultation: {
+                last_offered_services: offeredServices
+            },
             analytics: {
                 responseCount: (state.analytics?.responseCount || 0) + 1
             }

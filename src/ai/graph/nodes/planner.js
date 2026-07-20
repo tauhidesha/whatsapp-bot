@@ -18,7 +18,7 @@ const PlannerSchema = z.object({
             type: z.enum(['ASK_MISSING_FACTS', 'EXECUTE_TOOL', 'PROVIDE_INFO', 'CLOSING', 'UPSELL']),
             priority: z.number().optional()
         }).describe("Aksi berikutnya yang harus diambil."),
-        toolIntent: z.enum(['NONE', 'GET_PRICE', 'BOOK', 'CHECK_BOOKING', 'ESCALATE', 'NOTIFY', 'ANSWER']).describe("Intent untuk memanggil external tools. Isi dengan 'NONE' jika tidak butuh."),
+        toolIntent: z.enum(['NONE', 'GET_PRICE', 'CREATE_BOOKING', 'CHECK_AVAILABILITY', 'SEND_NOTIFICATION', 'ANSWER_FAQ', 'ESCALATE_HUMAN']).describe("Intent untuk memanggil external tools. Gunakan NONE jika tidak butuh tool. GET_PRICE untuk estimasi harga. CREATE_BOOKING untuk membuat booking. CHECK_AVAILABILITY untuk cek slot. ANSWER_FAQ untuk info studio. ESCALATE_HUMAN untuk alihkan ke admin."),
         parameters: z.record(z.any()).optional().describe("Parameter untuk tool (jika toolIntent != NONE). Misalnya motor, scope, paintColor, dll.")
     }),
     conversation: z.object({
@@ -71,9 +71,9 @@ async function plannerNode(state) {
             ['system', 'Anda adalah Zoya V2 Planner, otak dari sistem AI assistant Bosmat. Anda HARUS mengembalikan format JSON.'],
             ['human', promptText]
         ]);
-        // Coreference Override
-        if (state.intent === 'ASK_SERVICE_DETAILS') {
-            if (state.context?.needsClarification) {
+        // Coreference Override: use V2 state fields (consultation.knownFacts)
+        if (state.consultation?.knownFacts?.targetService) {
+            if (state.consultation?.knownFacts?.needsClarification) {
                 decision.decision.strategy = 'CLARIFY_SERVICE';
             } else {
                 decision.decision.strategy = 'EDUCATE';

@@ -143,11 +143,14 @@ const ZoyaState = Annotation.Root({
         default: () => ({
             sop: {},
             constraints: [],
+            blockingFacts: [],
             requiredFacts: [],
             optionalFacts: [],
             upsells: [],
             promotions: [],
             restrictions: [],
+            escalations: [],
+            guidelines: [],
             escalation: false,
             disabledServices: []
         })
@@ -189,6 +192,12 @@ const ZoyaState = Annotation.Root({
             }
             return combined;
         },
+        default: () => []
+    }),
+
+    // Track last offered services for coreference resolution (populated by composerNode)
+    last_offered_services: Annotation({
+        reducer: (old, next) => (Array.isArray(next) ? next : old),
         default: () => []
     }),
 

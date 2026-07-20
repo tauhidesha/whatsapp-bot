@@ -291,21 +291,31 @@ async function syncGraphStateToCRM(senderNumber, state) {
     if (!docId) return;
 
     try {
-        const { vehicle, services, consultation, memory, conversation } = state;
+        const { vehicle, consultation, metadata } = state;
         
-        // Map LangGraph context back to snake_case for the existing merger
+        // Map Zoya V2 LangGraph state → snake_case for the existing merger
         const extractorData = {
-            motor_model: vehicle?.model || memory?.identity?.motor,
-            motor_color: vehicle?.paintType,
+            motor_model: vehicle?.model || null,
+            motor_color: consultation?.knownFacts?.colorChoice || null,
             target_services: consultation?.requestedServices || [],
-            service_detail: consultation?.problemDescription,
-            paint_type: vehicle?.paintType,
-            is_bongkar_total: false,
-            visual_summary: memory?.identity?.visual_summary,
+            service_detail: consultation?.knownFacts?.serviceDetail || null,
+            paint_type: vehicle?.paintType || null,
+            is_bongkar_total: consultation?.knownFacts?.isBongkarTotal ?? null,
+            visual_summary: metadata?.visualSummary || null,
             detected_intents: [],
-            conversation_stage: conversation?.status,
-            shared_photo: false
+            conversation_stage: null,
+            shared_photo: !!metadata?.visualSummary
         };
+
+        // Only sync if there's actual data to write
+        const hasData = extractorData.motor_model || extractorData.motor_color ||
+            (extractorData.target_services && extractorData.target_services.length > 0) ||
+            extractorData.paint_type || extractorData.is_bongkar_total !== null;
+
+        if (!hasData) {
+            console.log(`[CRM-Sync] No meaningful data to sync for ${docId}, skipping.`);
+            return;
+        }
 
         // Merge and Save
         await mergeAndSaveContext(senderNumber, extractorData);
