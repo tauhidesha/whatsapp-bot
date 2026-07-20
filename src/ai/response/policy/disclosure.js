@@ -6,7 +6,7 @@
 
 const config = {
     maxTopics: 5,         // Maximum main information chunks per message
-    preferSummary: true,  // Should we prefer summarizing ranges instead of listing all variants?
+    preferSummary: false, // Updated to false: we want to list packages, not summarize as ranges
     maxBullet: 4          // Maximum bullet points in a list
 };
 
@@ -15,9 +15,8 @@ function getDisclosureDirectives(state, plannerDecision) {
     
     directives.push(`PROGRESSIVE DISCLOSURE: Jangan mengirim lebih dari ${config.maxTopics} informasi utama dalam satu pesan WA (Misal: Total, isi pekerjaan, range harga, penjelasan singkat, satu pertanyaan).`);
     
-    if (config.preferSummary) {
-        directives.push(`PAKET HARGA: JANGAN jelaskan perbedaan paket (Basic, Standar, Premium, Ekonomis) secara detail KECUALI customer secara spesifik bertanya "apa bedanya?". Cukup sebutkan ada beberapa pilihan kualitas/paket, atau ringkas menjadi range harga total saja.`);
-    }
+    // Always provide package breakdown with short summary
+    directives.push(`PAKET HARGA: JIKA terdapat pilihan paket (misal Ekonomis, Basic, Standar, Premium), Anda WAJIB menjabarkan nama paket beserta harganya dalam bentuk bullet points. Berikan penjelasan perbedaan tiap paket secara RINGKAS (maksimal 1 kalimat atau poin pentingnya saja per paket). JANGAN diringkas menjadi rentang harga total.`);
 
     return directives;
 }
