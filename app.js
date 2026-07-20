@@ -65,6 +65,7 @@ const browserUtils = require('./src/ai/utils/browser.js');
 
 // --- LangGraph Integration ---
 const { zoyaAgent, checkpointer } = require('./src/ai/graph/index.js');
+const { autoLabelCustomers } = require('./src/ai/agents/customerAudit.js');
 
 // --- Global Constants ---
 const ACTIVE_AI_MODEL = process.env.AI_MODEL || 'gemini-flash-lite-latest';
@@ -1149,13 +1150,62 @@ async function processBufferedMessages(senderNumber, client) {
             if (hydratedVehicle) input.vehicle = hydratedVehicle;
             if (hydratedConsultation) input.consultation = hydratedConsultation;
 
-            // Jalankan Graph dengan thread_id (senderNumber) untuk manajemen state persisten
-            const result = await zoyaAgent.invoke(input, {
-                configurable: { thread_id: senderNumber }
+            // Jalankan Graph dengan thread_id (senderNumber) secara streaming (Asynchronous WhatsApp Send)
+            let aiResponse = null;
+            let result = null;
+            let hasSentWA = false;
+            let finalReply = null;
+
+            const stream = await zoyaAgent.stream(input, {
+                configurable: { thread_id: senderNumber },
+                streamMode: "updates"
             });
 
-            const lastMessage = result.messages[result.messages.length - 1];
-            const aiResponse = lastMessage ? extractTextFromContent(lastMessage.content) : null;
+            for await (const chunk of stream) {
+                const nodeName = Object.keys(chunk)[0];
+                const nodeState = chunk[nodeName];
+
+                if (nodeName === 'composerNode' && nodeState.messages && nodeState.messages.length > 0) {
+                    const lastMessage = nodeState.messages[nodeState.messages.length - 1];
+                    aiResponse = lastMessage ? extractTextFromContent(lastMessage.content) : null;
+
+                    if (aiResponse && nodeState.intent !== 'HUMAN_HANDOVER' && !hasSentWA) {
+                        hasSentWA = true;
+                        
+                        let responseText = '';
+                        if (typeof aiResponse === 'string') {
+                            responseText = aiResponse;
+                        } else if (Array.isArray(aiResponse)) {
+                            responseText = aiResponse
+                                .map(c => typeof c === 'string' ? c : (c.text || ''))
+                                .filter(Boolean)
+                                .join('\n');
+                        } else {
+                            responseText = String(aiResponse || '');
+                        }
+                        
+                        finalReply = responseText.trim();
+                        const targetNumber = toSenderNumberWithSuffix(senderNumber);
+                        
+                        // Kirim balasan AI SECARA ASINKRON secepat mungkin! (AnalyticsNode akan jalan di background)
+                        markBotMessage(targetNumber, finalReply);
+                        client.sendText(targetNumber, finalReply).then(() => {
+                            console.log(`⚡ [PERF] WA Message sent at ${Date.now() - pipelineStart}ms for ${senderNumber} (Before Analytics)`);
+                            client.stopTyping(senderNumber).catch(() => {});
+                        }).catch(err => console.error('[LangGraph WA Send] Error:', err));
+                    }
+                }
+            }
+
+            // Dapatkan state final yang terakumulasi
+            const finalStateWrapper = await zoyaAgent.getState({ configurable: { thread_id: senderNumber } });
+            result = finalStateWrapper.values;
+
+            // Pastikan aiResponse tertangkap walau stream terlewat (misal cache)
+            if (!aiResponse && result.messages && result.messages.length > 0) {
+                const lastMessage = result.messages[result.messages.length - 1];
+                aiResponse = lastMessage ? extractTextFromContent(lastMessage.content) : null;
+            }
 
 
 
@@ -1188,12 +1238,11 @@ async function processBufferedMessages(senderNumber, client) {
             if (aiResponse) {
                 const targetNumber = toSenderNumberWithSuffix(senderNumber);
                 
-                // Ensure aiResponse is a string (handle LangGraph arrays/objects)
+                // Pastikan format teks (fallback kalau stream tidak menangkap)
                 let responseText = '';
                 if (typeof aiResponse === 'string') {
                     responseText = aiResponse;
                 } else if (Array.isArray(aiResponse)) {
-                    // Extract ONLY text blocks, ignore thinking/tool blocks for WhatsApp message
                     responseText = aiResponse
                         .map(c => typeof c === 'string' ? c : (c.text || ''))
                         .filter(Boolean)
@@ -1202,18 +1251,21 @@ async function processBufferedMessages(senderNumber, client) {
                     responseText = String(aiResponse || '');
                 }
                 
-                const finalReply = responseText.trim();
+                finalReply = finalReply || responseText.trim();
                 
-                // Send to WhatsApp IMMEDIATELY (no artificial delay)
-                markBotMessage(targetNumber, finalReply);
-                await client.sendText(targetNumber, finalReply);
-                console.log(`⚡ [PERF] Pipeline took ${Date.now() - pipelineStart}ms for ${senderNumber}`);
+                // Jika belum terkirim via stream, kirim sekarang
+                if (!hasSentWA && result.intent !== 'HUMAN_HANDOVER') {
+                    markBotMessage(targetNumber, finalReply);
+                    await client.sendText(targetNumber, finalReply);
+                    console.log(`⚡ [PERF] Pipeline took ${Date.now() - pipelineStart}ms for ${senderNumber}`);
+                    hasSentWA = true;
+                }
 
                 // Fire & Forget: Save history + metadata AFTER sending
                 if (prisma) {
                     Promise.all([
                         saveMessageToPrisma(senderNumber, combinedMessage, isAdmin ? 'admin' : 'user'),
-                        saveMessageToPrisma(senderNumber, aiResponse, 'ai')
+                        saveMessageToPrisma(senderNumber, finalReply, 'ai')
                     ]).catch(err => console.warn('[SaveMessage] Failed:', err.message));
                 }
 
@@ -1225,7 +1277,9 @@ async function processBufferedMessages(senderNumber, client) {
                 }
             }
 
-            await client.stopTyping(senderNumber);
+            if (!hasSentWA) {
+                await client.stopTyping(senderNumber);
+            }
             return; // Finished processing via LangGraph
 
         } catch (err) {
@@ -3189,6 +3243,12 @@ app.post('/follow-up-queue/execute', requireAuth, async (req, res) => {
 server.listen(PORT, '0.0.0.0', async () => {
     console.log(`🚀 WhatsApp AI Chatbot listening on http://0.0.0.0:${PORT}`);
     
+    // Background Job: Run auto-label script every hour to fill missing customer labels
+    setInterval(() => {
+        console.log('[AutoLabel Job] Running autoLabelCustomers...');
+        autoLabelCustomers().catch(err => console.error('[AutoLabel Job] Failed:', err.message));
+    }, 60 * 60 * 1000); // 1 hour
+
     // SQL triggers handled in-app via customerSync utility.
 
     console.log(`🤖 AI Provider: Google Gemini`);
