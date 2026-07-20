@@ -291,7 +291,7 @@ async function syncGraphStateToCRM(senderNumber, state) {
     if (!docId) return;
 
     try {
-        const { vehicle, consultation, metadata } = state;
+        const { vehicle, consultation, metadata, extractedContext } = state;
         
         // Map Zoya V2 LangGraph state → snake_case for the existing merger
         const extractorData = {
@@ -302,19 +302,14 @@ async function syncGraphStateToCRM(senderNumber, state) {
             paint_type: vehicle?.paintType || null,
             is_bongkar_total: consultation?.knownFacts?.isBongkarTotal ?? null,
             visual_summary: metadata?.visualSummary || null,
-            detected_intents: [],
-            conversation_stage: null,
+            detected_intents: consultation?.goal ? [consultation.goal] : [],
+            conversation_stage: consultation?.stage || null,
             shared_photo: !!metadata?.visualSummary
         };
 
-        // Only sync if there's actual data to write
-        const hasData = extractorData.motor_model || extractorData.motor_color ||
-            (extractorData.target_services && extractorData.target_services.length > 0) ||
-            extractorData.paint_type || extractorData.is_bongkar_total !== null;
-
-        if (!hasData) {
-            console.log(`[CRM-Sync] No meaningful data to sync for ${docId}, skipping.`);
-            return;
+        // If memory node generated summary, sync it
+        if (extractedContext?.summary) {
+            extractorData.conversation_summary = extractedContext.summary;
         }
 
         // Merge and Save

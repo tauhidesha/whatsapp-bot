@@ -42,7 +42,8 @@ async function evaluateRepaintRules(state) {
         'communication.askColor', 
         'communication.noTechnicalJargon', 
         'communication.explainPartOptions',
-        'communication.noPaintTypeQuestion'
+        'communication.noPaintTypeQuestion',
+        'communication.fullBodiDefinition'
     );
     rules.constraints.push(businessRules.communication.noPaintTypeQuestion);
 

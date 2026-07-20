@@ -77,6 +77,15 @@ Fokuslah pada merangkai data yang disuapkan ke Anda menjadi satu pesan WhatsApp 
                     continue;
                 } else {
                     console.log('[Composer Node] Max retries reached for price hallucination. Applying fallback.');
+                    
+                    // Alert Admin
+                    try {
+                        const { sendWhatsappNotification } = require('../../utils/humanHandover.js');
+                        sendWhatsappNotification(`🚨 *AI HALLUCINATION ALERT* 🚨\n\nAI mencoba menyebutkan harga tanpa Tool Result valid.\nFallback pesan diterapkan.\n\nNomor: ${state.metadata?.phoneReal || 'Unknown'}\nPesan Asli AI: ${responseText}`);
+                    } catch (err) {
+                        console.error('[Composer Node] Gagal mengirim alert ke admin:', err.message);
+                    }
+
                     responseText = "Untuk harga pastinya, aku cek dulu ya kak 🙏";
                     break;
                 }
@@ -117,6 +126,15 @@ Fokuslah pada merangkai data yang disuapkan ke Anda menjadi satu pesan WhatsApp 
         return result;
     } catch (error) {
         console.error('[Composer Node] LLM Error:', error);
+        
+        // Alert Admin
+        try {
+            const { sendWhatsappNotification } = require('../../utils/humanHandover.js');
+            sendWhatsappNotification(`🚨 *AI SYSTEM ERROR* 🚨\n\nComposer Node mengalami kegagalan/LLM Error.\n\nError: ${error.message}\nNomor: ${state.metadata?.phoneReal || 'Unknown'}`);
+        } catch (err) {
+            console.error('[Composer Node] Gagal mengirim alert error ke admin:', err.message);
+        }
+
         const fallbackText = 'Aduh maaf mas, sistem saya lagi gangguan sedikit 🙏. Boleh ditunggu sebentar ya.';
         return {
             messages: [new AIMessage(fallbackText)],
