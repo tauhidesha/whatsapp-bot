@@ -13,7 +13,14 @@ class PricingTool extends BaseTool {
         const knownFacts = state.consultation?.knownFacts || {};
         const vehicle = state.vehicle || {};
         
-        let rawServiceName = parameters.service_name || parameters.service || parameters.partToRepaint || knownFacts.partToRepaint?.value || 'Repaint Bodi Halus';
+        const requestedServices = state.consultation?.requestedServices || [];
+        let rawServiceName = parameters.service_name || parameters.service || parameters.partToRepaint || knownFacts.partToRepaint?.value;
+        if (!rawServiceName && requestedServices.length > 0) {
+            rawServiceName = requestedServices;
+        }
+        if (!rawServiceName) {
+            rawServiceName = 'Repaint Bodi Halus';
+        }
         let serviceNameArray = Array.isArray(rawServiceName) ? rawServiceName : [rawServiceName];
 
         // Normalize services and ensure "Repaint" prefix for known parts

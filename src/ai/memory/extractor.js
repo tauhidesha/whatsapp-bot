@@ -51,9 +51,15 @@ async function extractMemory(state) {
 
     try {
         const { SystemMessage, HumanMessage } = require('@langchain/core/messages');
+        let contextStr = '';
+        const lastOffered = state.last_offered_services || [];
+        if (lastOffered.length > 0) {
+            contextStr = `\nKONTEKS: Layanan terakhir yang ditawarkan ke kustomer adalah: [${lastOffered.join(', ')}]. Jika kustomer merespon dengan kata ganti (misal: "itu aja", "boleh deh", "mau"), anggap mereka meminta layanan tersebut dan outputkan di field "services".`;
+        }
+
         const systemPrompt = `Anda adalah sistem ekstraksi memori. Ekstrak data relevan dari pesan (dan gambar/foto jika ada) kustomer terakhir.
 ATURAN UPDATE STATE: HANYA ekstrak dan output field yang SECARA EKSPLISIT dibahas di pesan atau terlihat jelas di gambar terakhir kustomer. JIKA ada foto, WAJIB isi visualSummary.
-Jika suatu informasi TIDAK DIBAHAS, JANGAN masukkan field tersebut ke dalam output JSON.
+Jika suatu informasi TIDAK DIBAHAS, JANGAN masukkan field tersebut ke dalam output JSON.${contextStr}
 Format JSON output yang diharapkan:
 {
   "motor": "Merek/model motor",

@@ -20,8 +20,12 @@ function evaluateDetailingRules(state) {
     let isBongkar = consultation?.isBongkarTotal;
     
     // Auto-infer bongkar status for specific services
-    if (requested.some(s => s.toLowerCase().includes('poles') || s.toLowerCase().includes('bodi'))) {
-        if (isBongkar === undefined) isBongkar = false;
+    if (isBongkar === undefined || isBongkar === null) {
+        if (requested.some(s => s.toLowerCase().includes('poles') || s.toLowerCase().includes('bodi') || s.toLowerCase().includes('coating'))) {
+            isBongkar = false;
+        } else if (requested.some(s => s.toLowerCase() === 'cuci komplit' || s.toLowerCase().includes('full detailing'))) {
+            isBongkar = true;
+        }
     }
     
     let paintType = null;

@@ -96,6 +96,9 @@ function buildPlannerPrompt(state) {
     };
     
     prompt += `Known Facts: ${JSON.stringify(allKnownFacts)}\n`;
+    if (consultation?.requestedServices?.length > 0) {
+        prompt += `Requested Services: ${JSON.stringify(consultation.requestedServices)}\n`;
+    }
     prompt += `Conversation Status: ${conversation?.status}\n\n`;
     
     prompt += `=== PLANNER DIRECTIVES ===\n`;
@@ -247,11 +250,33 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
         prompt += JSON.stringify(remainingFacts, null, 2) + `\n\n`;
     }
 
+    const masterLayanan = require('../../data/masterLayanan');
+    
     if (state.knowledge?.raw && Object.keys(state.knowledge.raw).length > 0) {
         const knowledgeStr = typeof state.knowledge.raw === 'object' ? JSON.stringify(state.knowledge.raw, null, 2) : state.knowledge.raw;
         prompt += `=== SERVICE KNOWLEDGE (JSON) ===\n`;
         prompt += `Gunakan data ini jika Anda perlu menyebutkan harga atau menjelaskan fasilitas layanan.\n`;
-        prompt += `${knowledgeStr}\n\n`;
+        prompt += `${knowledgeStr}\n`;
+        
+        // Anti-hallucination for upsells: If planner wants to upsell, inject its knowledge if it's missing
+        if (plannerDecision.conversation?.informationPriority) {
+            const upsells = plannerDecision.conversation.informationPriority.filter(p => p.type === 'upsell');
+            upsells.forEach(upsell => {
+                const matchedService = masterLayanan.find(s => 
+                    upsell.content.toLowerCase().includes(s.name.toLowerCase()) || 
+                    (s.keywords && s.keywords.some(k => upsell.content.toLowerCase().includes(k.toLowerCase())))
+                );
+                
+                if (matchedService) {
+                    // Check if it's already in knowledgeStr to avoid duplication
+                    if (!knowledgeStr.toLowerCase().includes(matchedService.name.toLowerCase())) {
+                        prompt += `\n[Info Tambahan Layanan]: ${matchedService.name}\n`;
+                        prompt += `Deskripsi: ${matchedService.description}\n`;
+                    }
+                }
+            });
+        }
+        prompt += `\n`;
     }
 
     if (state.business) {

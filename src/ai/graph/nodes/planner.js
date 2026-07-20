@@ -42,7 +42,7 @@ const PlannerSchema = z.object({
                 field: z.string().describe("Nama field/fakta yang hilang (misal: 'wheelCondition', 'paintType', 'bookingDate')."),
                 priority: z.number().describe("Prioritas (1 = paling utama, makin besar makin tidak prioritas)."),
                 reason: z.string().describe("Poin singkat alasan logis perlunya fakta ini (misal: 'Butuh tau bagian untuk estimasi'). JANGAN kalimat korporat kaku.")
-            })).describe("Daftar fakta yang belum diketahui (belum ada di knownFacts) yang HARUS ditanyakan ke user.")
+            })).describe("Daftar fakta dari BLOCKING FACTS atau REQUIRED FACTS yang belum diketahui. JIKA tidak ada di BLOCKING FACTS / REQUIRED FACTS, biarkan KOSONG. JANGAN MENGARANG fakta baru!")
         }).describe("Status progres dari goal saat ini, dihitung dengan membandingkan knownFacts vs requiredFacts."),
         decisionTrace: z.object({
             goal: z.string(),

@@ -80,8 +80,26 @@ Fokuslah pada merangkai data yang disuapkan ke Anda menjadi satu pesan WhatsApp 
 
         console.log('[Composer Node] Generated text:', responseText);
 
+        // Track last offered services for coreference resolution
+        const masterLayanan = require('../../../data/masterLayanan');
+        const lowerResponse = responseText.toLowerCase();
+        const offeredServices = [];
+        masterLayanan.forEach(svc => {
+            if (lowerResponse.includes(svc.name.toLowerCase())) {
+                offeredServices.push(svc.name);
+            } else if (svc.keywords) {
+                for (const keyword of svc.keywords) {
+                    if (lowerResponse.includes(keyword.toLowerCase())) {
+                        offeredServices.push(svc.name);
+                        break;
+                    }
+                }
+            }
+        });
+
         const result = {
             messages: [new AIMessage(responseText)],
+            last_offered_services: offeredServices,
             analytics: {
                 responseCount: (state.analytics?.responseCount || 0) + 1
             }
