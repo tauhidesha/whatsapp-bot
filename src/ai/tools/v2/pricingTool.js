@@ -54,14 +54,21 @@ class PricingTool extends BaseTool {
         const isRepaint = serviceNameArray.some(s => typeof s === 'string' && s.toLowerCase().includes('repaint'));
         const partToRepaintStr = serviceNameArray.find(s => typeof s === 'string' && s.toLowerCase().includes('repaint')) || '';
         let partToRepaint = parameters.partToRepaint;
-        if (!partToRepaint && isRepaint) {
+        if (isRepaint && !partToRepaint) {
             if (partToRepaintStr.toLowerCase().includes('halus')) partToRepaint = 'bodi halus';
             else if (partToRepaintStr.toLowerCase().includes('kasar')) partToRepaint = 'bodi kasar';
             else if (partToRepaintStr.toLowerCase().includes('velg')) partToRepaint = 'velg';
+            else if (partToRepaintStr.toLowerCase().includes('full')) partToRepaint = 'full bodi';
+        }
+
+        // Juga cek dari requestedServices jika partToRepaint masih null
+        if (isRepaint && !partToRepaint) {
+            const fullBodiService = requestedServices.find(s => typeof s === 'string' && s.toLowerCase().includes('full'));
+            if (fullBodiService) partToRepaint = 'full bodi';
         }
 
         if (isRepaint && !partToRepaint) {
-            return { error: "Missing parameter: partToRepaint. Tolong pastikan bagian motor yang ingin dicat (bodi halus, bodi kasar, velg, dll) sudah diketahui sebelum mengecek harga." };
+            return { error: "Missing parameter: partToRepaint. Tolong pastikan bagian motor yang ingin dicat (bodi halus, bodi kasar, velg, full bodi) sudah diketahui sebelum mengecek harga." };
         }
 
         // V1 implementation mapping

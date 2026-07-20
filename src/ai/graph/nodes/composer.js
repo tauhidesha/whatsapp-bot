@@ -46,14 +46,21 @@ Fokuslah pada merangkai data yang disuapkan ke Anda menjadi satu pesan WhatsApp 
         const priceRegex = /(Rp\s*[\d.,]+)|(\d+\s*(juta|ribu|jt|rb)an?)/i;
         
         const toolIntent = state.planner?.execution?.toolIntent || 'NONE';
+        const lastResult = state.tool?.lastResult;
+        // Tool result hanya dianggap valid jika ada DAN tidak mengandung error
+        const hasValidToolResult = !!lastResult && !lastResult.error && !lastResult.formattedText?.includes('Gagal');
         const hasPrioritizedData = !!prioritizedData;
-        const hasToolResult = !!state.tool?.lastResult;
-        const isPriceForbidden = !hasPrioritizedData && !hasToolResult;
+        const isPriceForbidden = !hasPrioritizedData && !hasValidToolResult;
+
+        // Jika tool dipanggil untuk pricing tapi hasilnya error, inject warning ke prompt
+        const toolErrorWarning = (toolIntent === 'GET_PRICE' && lastResult?.error)
+            ? `\n\n⚠️ SISTEM: Tool pricing dipanggil tapi GAGAL dengan error: "${lastResult.error}". Kamu TIDAK BOLEH menyebutkan harga apapun. Sampaikan dengan ramah bahwa kamu perlu info lebih lanjut sebelum bisa berikan estimasi.`
+            : '';
 
         while (retryCount <= maxRetries) {
-            let currentPrompt = promptText;
+            let currentPrompt = promptText + toolErrorWarning;
             if (retryCount > 0) {
-                currentPrompt += `\n\nSISTEM WARNING: Pesan Anda sebelumnya menyebutkan angka/estimasi harga padahal Tool Result KOSONG! Anda DILARANG menyebutkan harga. Harap buat ulang pesan tanpa menyebutkan harga.`;
+                currentPrompt += `\n\nSISTEM WARNING: Pesan Anda sebelumnya menyebutkan angka/estimasi harga padahal Tool Result KOSONG atau ERROR! Anda DILARANG menyebutkan harga. Harap buat ulang pesan tanpa menyebutkan harga.`;
                 console.log(`[Composer Node] Retrying due to price hallucination (Attempt ${retryCount})...`);
             }
 
