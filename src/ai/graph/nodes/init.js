@@ -64,7 +64,7 @@ async function initNode(state) {
             return {
                 isAdmin: isAdmin,
                 customer: {
-                    name: isAdmin ? 'Admin' : 'Guest',
+                    name: metadata?.senderName || (isAdmin ? 'Admin' : 'Guest'),
                     status: 'new'
                 },
                 metadata: { ...metadata, currentDateTime }
@@ -78,7 +78,7 @@ async function initNode(state) {
             isAdmin: isAdmin,
             customer: {
                 id: customer.id,
-                name: customer.name || (isAdmin ? 'Admin' : `Sobat ${studioMetadata.shortName}`),
+                name: customer.name || metadata?.senderName || (isAdmin ? 'Admin' : `Sobat ${studioMetadata.shortName}`),
                 phone: customer.phone,
                 status: customer.status,
                 vehicles: customer.vehicles.map(v => ({

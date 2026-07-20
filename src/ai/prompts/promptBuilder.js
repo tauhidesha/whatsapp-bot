@@ -200,6 +200,20 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
     prompt += `=== CURRENT CONTEXT ===\n`;
     prompt += `Waktu Sekarang: ${formatter.format(now)} WIB\n`;
     prompt += `Nama Customer: ${state.customer?.name || 'Customer'}\n`;
+    
+    if (state.customer?.status) {
+        prompt += `Status CRM Customer: ${state.customer.status} `;
+        if (state.customer.status === 'existing' || state.customer.status === 'loyal') {
+            prompt += `(Pelanggan lama/langganan. Sapa dengan akrab dan berikan apresiasi karena kembali ke studio)\n`;
+        } else if (state.customer.status === 'new') {
+            prompt += `(Pelanggan baru. Sapa dengan ramah dan perkenalkan studio jika perlu)\n`;
+        } else if (state.customer.status.includes('lead')) {
+            prompt += `(Prospek potensial. Fokus pada follow-up ringan yang tidak memaksa)\n`;
+        } else {
+            prompt += `\n`;
+        }
+    }
+
     if (state.metadata?.visualSummary) {
         prompt += `Visual Summary (Dari Foto User): ${state.metadata.visualSummary}\n`;
     }
