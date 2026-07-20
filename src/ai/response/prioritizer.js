@@ -18,11 +18,15 @@ function prioritizeInformation(state) {
         }
     }
 
-    if ((!toolResult || !toolResult.success) && !injectedKnowledge) {
+    // toolResult is the unwrapped data payload on success, or the full error object on failure.
+    // So if it failed, it has .error. If it succeeded, it might not have .success explicitly.
+    const isSuccess = toolResult && !toolResult.error;
+
+    if (!isSuccess && !injectedKnowledge) {
         return null;
     }
 
-    let resultData = toolResult?.success ? { ...toolResult } : {};
+    let resultData = isSuccess ? { ...toolResult } : {};
     if (injectedKnowledge) {
         resultData.injected_knowledge = injectedKnowledge;
     }
@@ -31,13 +35,15 @@ function prioritizeInformation(state) {
 
     // 1. Pricing Tool Handling
     if (state.tool.lastCapability === 'pricing') {
+        const rawData = toolResult.rawText || toolResult;
+        
         // If there are multiple services requested (e.g., Repaint + Repaint Velg)
-        if (toolResult.multiple_services_requested && toolResult.results) {
+        if (rawData.multiple_services_requested && rawData.results) {
             let minTotal = 0;
             let maxTotal = 0;
             let items = [];
 
-            toolResult.results.forEach(res => {
+            rawData.results.forEach(res => {
                 if (res.success && res.candidates) {
                     const prices = res.candidates.map(c => c.price).filter(p => p > 0);
                     if (prices.length > 0) {
@@ -60,7 +66,7 @@ function prioritizeInformation(state) {
                     estimatedTotalRange: minTotal === maxTotal 
                         ? `Rp${minTotal.toLocaleString('id-ID')}` 
                         : `Rp${minTotal.toLocaleString('id-ID')} - Rp${maxTotal.toLocaleString('id-ID')}`,
-                    rawResults: toolResult.results // keep raw just in case
+                    rawResults: rawData.results // keep raw just in case
                 };
                 if (injectedKnowledge) returnObj.injected_knowledge = injectedKnowledge;
                 return returnObj;
@@ -68,17 +74,17 @@ function prioritizeInformation(state) {
         }
 
         // Single service with multiple packages (e.g., Repaint Bodi Halus)
-        if (toolResult.multiple_candidates && toolResult.candidates) {
-            const prices = toolResult.candidates.map(c => c.price).filter(p => p > 0);
+        if (rawData.multiple_candidates && rawData.candidates) {
+            const prices = rawData.candidates.map(c => c.price).filter(p => p > 0);
             if (prices.length > 0) {
                 const minPrice = Math.min(...prices);
                 const maxPrice = Math.max(...prices);
                 const returnObj = {
-                    summary: `Ada ${toolResult.candidates.length} pilihan paket untuk ${toolResult.category}. Jangan sebutkan semua detailnya kecuali ditanya.`,
+                    summary: `Ada ${rawData.candidates.length} pilihan paket untuk ${rawData.category || rawData.service_name}. Jangan sebutkan semua detailnya kecuali ditanya.`,
                     estimatedRange: minPrice === maxPrice 
                         ? `Rp${minPrice.toLocaleString('id-ID')}` 
                         : `Rp${minPrice.toLocaleString('id-ID')} - Rp${maxPrice.toLocaleString('id-ID')}`,
-                    note: toolResult.promo_active ? 'Ada promo aktif, bisa di-mention jika relevan.' : ''
+                    note: rawData.promo_active ? 'Ada promo aktif, bisa di-mention jika relevan.' : ''
                 };
                 if (injectedKnowledge) returnObj.injected_knowledge = injectedKnowledge;
                 return returnObj;
@@ -86,7 +92,7 @@ function prioritizeInformation(state) {
         }
 
         // Just a single exact price
-        if (toolResult.price) {
+        if (rawData.price) {
             const returnObj = {
                 service: toolResult.service_name,
                 description: toolResult.description,

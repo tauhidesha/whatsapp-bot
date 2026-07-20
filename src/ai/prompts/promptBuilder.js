@@ -235,8 +235,12 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
             }
         }
         prompt += `PENTING: JANGAN meringkas atau menyembunyikan biaya tambahan (surcharge). Jika di dalam Data terdapat "Rincian:" (misal harga dasar + biaya warna/remover), WAJIB sebutkan biaya tambahan tersebut secara jelas ke customer!\n`;
-        if (prioritizedData?.multiple_candidates || state.tool?.lastResult?.multiple_candidates) {
-            prompt += `ATURAN PENYAJIAN PAKET: Karena ada beberapa paket/pilihan, sebutkan perbedaannya SECARA RINGKAS dengan menyorot spesifikasi utama (misal: jenis clear, garansi). Gunakan format bullet points atau daftar pendek agar mudah dibaca.\n`;
+        const hasCandidates = (prioritizedData?.candidates?.length > 0) || 
+                              (state.tool?.lastResult?.candidates?.length > 0) ||
+                              (state.tool?.lastResult?.results?.some(r => r.candidates?.length > 0));
+        
+        if (hasCandidates) {
+            prompt += `ATURAN PENYAJIAN PAKET: Karena ada beberapa pilihan paket layanan, JANGAN copas semua deksripsi panjangnya! Sebutkan perbedaannya SECARA RINGKAS dengan menyorot point penting saja (misal: jenis clear, estimasi hasil/garansi). Gunakan format bullet points pendek agar nyaman dibaca di chat WA.\n`;
         }
         prompt += `\n`;
     }

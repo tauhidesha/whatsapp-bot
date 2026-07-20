@@ -19,7 +19,7 @@ async function capabilityRouterNode(state) {
     // Map generic intent to specific tool implementation
     const intentToToolMap = {
         'GET_PRICE': 'pricing',
-        'CREATE_BOOKING': 'createBooking',
+        'CREATE_BOOKING': 'create_booking',
         'CHECK_AVAILABILITY': 'booking_availability',
         'SEND_NOTIFICATION': 'notification',
         'ANSWER_FAQ': 'studio_info',
@@ -95,7 +95,8 @@ async function capabilityRouterNode(state) {
         toolUpdate = {
             lastCapability: capability,
             lastTool: 'unknown',
-            lastResult: resultData,
+            // Preserve previous successful result if the current tool is not found
+            lastResult: state.tool?.lastResult?.error ? resultData : (state.tool?.lastResult || resultData),
             executionHistory: [...(state.tool?.executionHistory || []), { capability, result: resultData, time: new Date().toISOString() }]
         };
     }
