@@ -109,19 +109,21 @@ Field yang bernilai string (kecuali visualSummary, services, hasDamage, targetSe
             if (extraction.part) {
                 updates.consultation.knownFacts.partToRepaint = extraction.part;
                 
-                // Regex fallback to ensure requestedServices captures the specific repaint flow
+                // Regex fallback to ensure requestedServices captures all specific repaint flows
                 const partLower = extraction.part.value ? extraction.part.value.toLowerCase() : '';
-                let specificService = null;
-                if (partLower.includes('halus')) specificService = 'Repaint Bodi Halus';
-                else if (partLower.includes('kasar')) specificService = 'Repaint Bodi Kasar';
-                else if (partLower.includes('velg') || partLower.includes('pelg')) specificService = 'Repaint Velg';
-                else if (partLower.includes('full')) specificService = 'Repaint Full Bodi';
+                const specificServices = [];
+                if (partLower.includes('halus')) specificServices.push('Repaint Bodi Halus');
+                if (partLower.includes('kasar')) specificServices.push('Repaint Bodi Kasar');
+                if (partLower.includes('velg') || partLower.includes('pelg')) specificServices.push('Repaint Velg');
+                if (partLower.includes('full')) specificServices.push('Repaint Full Bodi');
 
-                if (specificService) {
+                if (specificServices.length > 0) {
                     extraction.services = extraction.services || [];
-                    if (!extraction.services.includes(specificService)) {
-                        extraction.services.push(specificService);
-                    }
+                    specificServices.forEach(srv => {
+                        if (!extraction.services.includes(srv)) {
+                            extraction.services.push(srv);
+                        }
+                    });
                 }
             }
             
