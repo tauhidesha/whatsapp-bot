@@ -90,12 +90,19 @@ Field yang bernilai string (kecuali visualSummary, services, hasDamage, targetSe
         if (extraction.motor || extraction.color) {
             updates.vehicle = { ...state.vehicle };
             if (extraction.motor) updates.vehicle.model = extraction.motor;
-            if (extraction.color) updates.vehicle.paintType = extraction.color;
+            if (extraction.color) {
+                updates.vehicle.paintType = extraction.color;
+                // Also save to knownFacts so rules and planner can detect special colors
+                updates.consultation = updates.consultation || { ...state.consultation };
+                updates.consultation.knownFacts = updates.consultation.knownFacts || { ...(state.consultation?.knownFacts || {}) };
+                updates.consultation.knownFacts.paintColor = extraction.color;
+            }
         }
 
         if (extraction.objection || extraction.part || (extraction.services && extraction.services.length > 0) || extraction.velgCondition || extraction.hasDamage !== undefined) {
-            updates.consultation = { ...state.consultation };
-            updates.consultation.knownFacts = { ...(updates.consultation.knownFacts || {}) };
+            updates.consultation = updates.consultation || { ...state.consultation };
+            updates.consultation.knownFacts = updates.consultation.knownFacts || { ...(state.consultation?.knownFacts || {}) };
+
             
             if (extraction.objection) {
                 updates.consultation.knownFacts.commonObjection = extraction.objection;
