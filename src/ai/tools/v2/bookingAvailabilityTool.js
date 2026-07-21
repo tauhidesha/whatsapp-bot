@@ -9,8 +9,11 @@ class BookingAvailabilityTool extends BaseTool {
     }
 
     async _run(parameters, state) {
-        // V1 implementation mapping
-        const { bookingDate, bookingTime, serviceName, estimatedDurationMinutes } = parameters;
+        // V1 implementation mapping with fallback to state knownFacts
+        const bookingDate = parameters?.bookingDate || state?.consultation?.knownFacts?.bookingDate?.value;
+        const bookingTime = parameters?.bookingTime || state?.consultation?.knownFacts?.bookingTime?.value;
+        const serviceName = parameters?.serviceName || state?.consultation?.requestedServices?.[0] || 'Layanan Umum';
+        const estimatedDurationMinutes = parameters?.estimatedDurationMinutes || 120;
         
         const result = await checkBookingAvailabilityTool.implementation({
             bookingDate,

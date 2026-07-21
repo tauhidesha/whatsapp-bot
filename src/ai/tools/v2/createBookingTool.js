@@ -15,10 +15,10 @@ class CreateBookingTool extends BaseTool {
         const args = {
             customerName: state.customer?.name || 'Customer',
             customerPhone: state.metadata?.phoneReal || '6280000000000',
-            serviceName: Array.isArray(service_name) ? service_name.join(', ') : (service_name || 'Repaint'),
-            bookingDate: bookingDate || new Date().toISOString().split('T')[0],
-            bookingTime: bookingTime || '10:00',
-            motorModel: motor_model || state.memory?.identity?.motor || 'Motor'
+            serviceName: Array.isArray(service_name) ? service_name.join(', ') : (service_name || state.consultation?.requestedServices?.join(', ') || 'Repaint'),
+            bookingDate: bookingDate || state.consultation?.knownFacts?.bookingDate?.value || new Date().toISOString().split('T')[0],
+            bookingTime: bookingTime || state.consultation?.knownFacts?.bookingTime?.value || '10:00',
+            motorModel: motor_model || state.consultation?.knownFacts?.motorModel?.value || state.memory?.identity?.motor || 'Motor'
         };
 
         const result = await legacyTool.implementation(args);
