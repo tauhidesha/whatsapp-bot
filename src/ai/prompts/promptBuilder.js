@@ -21,6 +21,14 @@ function buildPlannerPrompt(state) {
     prompt += `Sebagai Planner, tugas Anda adalah menganalisis percakapan dan memutuskan strategi serta aksi selanjutnya.\n`;
     prompt += `Anda HANYA boleh output dalam format JSON sesuai skema yang diminta, TANPA teks tambahan apapun.\n\n`;
 
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('id-ID', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta'
+    });
+    prompt += `=== CURRENT CONTEXT ===\n`;
+    prompt += `Waktu Sekarang: ${formatter.format(now)} WIB\n\n`;
+
     // 2. Business Flags (from Rule Engine)
     prompt += `=== BUSINESS CONSTRAINTS ===\n`;
     if (business?.disabledServices?.length > 0) {

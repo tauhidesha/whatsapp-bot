@@ -59,7 +59,15 @@ async function extractMemory(state) {
             contextStr = `\nKONTEKS: Layanan terakhir yang ditawarkan ke kustomer adalah: [${lastOffered.join(', ')}]. Jika kustomer merespon dengan kata ganti (misal: "itu aja", "boleh deh", "mau"), anggap mereka meminta layanan tersebut dan outputkan di field "services".`;
         }
 
+        const now = new Date();
+        const formatter = new Intl.DateTimeFormat('id-ID', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+            hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta'
+        });
+        const currentDateTime = formatter.format(now);
+
         const systemPrompt = `Anda adalah sistem ekstraksi memori. Ekstrak data relevan dari pesan (dan gambar/foto jika ada) kustomer terakhir.
+WAKTU SEKARANG: ${currentDateTime} WIB. Gunakan ini sebagai referensi jika kustomer menyebut waktu seperti "besok" atau "hari ini".
 ATURAN UPDATE STATE: HANYA ekstrak dan output field yang SECARA EKSPLISIT dibahas di pesan atau terlihat jelas di gambar terakhir kustomer. JIKA ada foto, WAJIB isi visualSummary.
 Jika suatu informasi TIDAK DIBAHAS, JANGAN masukkan field tersebut ke dalam output JSON.${contextStr}
 Format JSON output yang diharapkan:
@@ -71,6 +79,8 @@ Format JSON output yang diharapkan:
   "services": ["layanan 1"],
   "velgCondition": "Kondisi velg",
   "hasDamage": true/false,
+  "bookingDate": "Tanggal booking (misal: besok, 25 Juli)",
+  "bookingTime": "Jam booking (misal: jam 10 pagi)",
   "visualSummary": "Ringkasan visual 1-2 kalimat (jika ada gambar)",
   "targetService": "Nama layanan yang ditanyakan (isi HANYA jika kustomer bertanya tentang layanan spesifik atau menyebut pronoun seperti 'apaan tuh', 'gimana itu')",
   "needsClarification": true/false (isi HANYA jika pronoun ambigu dan lastOffered berisi >1 layanan)
