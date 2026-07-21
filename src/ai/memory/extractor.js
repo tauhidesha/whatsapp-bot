@@ -153,6 +153,12 @@ Field yang bernilai string (kecuali visualSummary, services, hasDamage, targetSe
             }
         }
 
+        if (extraction.bookingDate || extraction.bookingTime) {
+            updates.consultation = updates.consultation || { ...state.consultation };
+            if (extraction.bookingDate) updates.consultation.bookingDate = extraction.bookingDate;
+            if (extraction.bookingTime) updates.consultation.bookingTime = extraction.bookingTime;
+        }
+
         // Persist coreference fields to V2 knownFacts so plannerNode can read them
         if (extraction.targetService || extraction.needsClarification !== undefined) {
             if (!updates.consultation) {
