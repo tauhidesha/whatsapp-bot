@@ -306,6 +306,23 @@ async function implementation(rawInput) {
         }
       }
 
+      // If it's a service with daily capacity, check the whole day once first
+      let dailyAvailable = true;
+      const dayTestInput = { ...normalizedInput, bookingDate: checkedDate };
+      
+      if (isRepaint) {
+        const check = await checkRepaintCapacity(dayTestInput);
+        if (!check.available) dailyAvailable = false;
+      } else if (isDetailingOrCoating) {
+        const check = await checkDetailingOrCoatingCapacity(dayTestInput);
+        if (!check.available) dailyAvailable = false;
+      }
+
+      // If the day is fully booked for these services, skip the time slots
+      if (!dailyAvailable) {
+        continue;
+      }
+
       // Iterate through slots every 30 mins until 16:30
       let slotFoundForDay = false;
       for (let h = startHour; h <= 16; h++) {
@@ -314,9 +331,10 @@ async function implementation(rawInput) {
           const testInput = { ...normalizedInput, bookingDate: checkedDate, bookingTime: testTime };
           
           let availCheck;
-          if (isRepaint) availCheck = await checkRepaintCapacity(testInput);
-          else if (isDetailingOrCoating) availCheck = await checkDetailingOrCoatingCapacity(testInput);
-          else {
+          if (isRepaint || isDetailingOrCoating) {
+            // We already confirmed the day is available above
+            availCheck = { available: true };
+          } else {
             const res = await checkSimpleSlotAvailability(testInput);
             availCheck = { available: res.isAvailable };
           }
