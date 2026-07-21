@@ -105,13 +105,21 @@ Field yang bernilai string (kecuali visualSummary, services, hasDamage, targetSe
 
         if (extraction.motor || extraction.color) {
             updates.vehicle = { ...state.vehicle };
-            if (extraction.motor) updates.vehicle.model = extraction.motor;
+            if (extraction.motor) {
+                const currentMotor = state.vehicle?.model;
+                if (extraction.motor.state === 'KNOWN' || currentMotor?.state !== 'KNOWN') {
+                    updates.vehicle.model = extraction.motor;
+                }
+            }
             if (extraction.color) {
-                updates.vehicle.paintType = extraction.color;
-                // Also save to knownFacts so rules and planner can detect special colors
-                updates.consultation = updates.consultation || { ...state.consultation };
-                updates.consultation.knownFacts = updates.consultation.knownFacts || { ...(state.consultation?.knownFacts || {}) };
-                updates.consultation.knownFacts.paintColor = extraction.color;
+                const currentColor = state.vehicle?.paintType;
+                if (extraction.color.state === 'KNOWN' || currentColor?.state !== 'KNOWN') {
+                    updates.vehicle.paintType = extraction.color;
+                    // Also save to knownFacts so rules and planner can detect special colors
+                    updates.consultation = updates.consultation || { ...state.consultation };
+                    updates.consultation.knownFacts = updates.consultation.knownFacts || { ...(state.consultation?.knownFacts || {}) };
+                    updates.consultation.knownFacts.paintColor = extraction.color;
+                }
             }
         }
 
@@ -121,16 +129,25 @@ Field yang bernilai string (kecuali visualSummary, services, hasDamage, targetSe
 
             
             if (extraction.objection) {
-                updates.consultation.knownFacts.commonObjection = extraction.objection;
+                const currentObj = state.consultation?.knownFacts?.commonObjection;
+                if (extraction.objection.state === 'KNOWN' || currentObj?.state !== 'KNOWN') {
+                    updates.consultation.knownFacts.commonObjection = extraction.objection;
+                }
             }
             if (extraction.velgCondition) {
-                updates.consultation.knownFacts.velgCondition = extraction.velgCondition;
+                const currentVelg = state.consultation?.knownFacts?.velgCondition;
+                if (extraction.velgCondition.state === 'KNOWN' || currentVelg?.state !== 'KNOWN') {
+                    updates.consultation.knownFacts.velgCondition = extraction.velgCondition;
+                }
             }
             if (extraction.hasDamage !== undefined && extraction.hasDamage !== null) {
                 updates.consultation.knownFacts.hasDamage = extraction.hasDamage;
             }
             if (extraction.part) {
-                updates.consultation.knownFacts.partToRepaint = extraction.part;
+                const currentPart = state.consultation?.knownFacts?.partToRepaint;
+                if (extraction.part.state === 'KNOWN' || currentPart?.state !== 'KNOWN') {
+                    updates.consultation.knownFacts.partToRepaint = extraction.part;
+                }
                 
                 // Regex fallback to ensure requestedServices captures all specific repaint flows
                 const partLower = extraction.part.value ? extraction.part.value.toLowerCase() : '';
@@ -182,10 +199,16 @@ Field yang bernilai string (kecuali visualSummary, services, hasDamage, targetSe
             updates.consultation.knownFacts = updates.consultation.knownFacts || { ...(state.consultation?.knownFacts || {}) };
             
             if (extraction.bookingDate) {
-                updates.consultation.knownFacts.bookingDate = { state: 'KNOWN', value: extraction.bookingDate };
+                const currentBD = state.consultation?.knownFacts?.bookingDate;
+                if (extraction.bookingDate.state === 'KNOWN' || currentBD?.state !== 'KNOWN') {
+                    updates.consultation.knownFacts.bookingDate = { state: 'KNOWN', value: extraction.bookingDate };
+                }
             }
             if (extraction.bookingTime) {
-                updates.consultation.knownFacts.bookingTime = { state: 'KNOWN', value: extraction.bookingTime };
+                const currentBT = state.consultation?.knownFacts?.bookingTime;
+                if (extraction.bookingTime.state === 'KNOWN' || currentBT?.state !== 'KNOWN') {
+                    updates.consultation.knownFacts.bookingTime = { state: 'KNOWN', value: extraction.bookingTime };
+                }
             }
         }
 

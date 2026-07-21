@@ -121,7 +121,10 @@ function buildPlannerPrompt(state) {
     
     // Inject explicit parameter hints from current known facts so planner doesn't send empty params
     const paramHints = [];
-    if (vehicle?.model) paramHints.push(`motor_model: "${vehicle.model}"`);
+    if (vehicle?.model) {
+        const modelStr = typeof vehicle.model === 'object' ? vehicle.model.value : vehicle.model;
+        if (modelStr) paramHints.push(`motor_model: "${modelStr}"`);
+    }
     // colorChoice OR paintColor — both keys used by different memory extractors
     let rawColorParam = consultation?.knownFacts?.colorChoice || consultation?.knownFacts?.paintColor;
     let knownColorParam = typeof rawColorParam === 'object' && rawColorParam !== null ? rawColorParam.value : rawColorParam;
