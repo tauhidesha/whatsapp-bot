@@ -140,7 +140,12 @@ function buildPlannerPrompt(state) {
     let knownColorForPrompt = typeof rawColor === 'object' && rawColor !== null ? rawColor.value : rawColor;
     if (typeof knownColorForPrompt === 'string') {
         const isSpecialColor = /candy|stabilo|bunglon|hologram|chrome|two.?tone|pearl|metalik|mazda/i.test(knownColorForPrompt);
-        if (hasBodiHalus && isSpecialColor) {
+        
+        const cartItems = state.cart?.items || {};
+        const bodiHalusCartItem = Object.entries(cartItems).find(([name, item]) => name.toLowerCase().includes('bodi halus'))?.[1];
+        const isColorAlreadyCalculated = bodiHalusCartItem && (bodiHalusCartItem.colorName || '').toLowerCase() === knownColorForPrompt.toLowerCase();
+
+        if (hasBodiHalus && isSpecialColor && !isColorAlreadyCalculated) {
             prompt += `- 🚨 [CRITICAL RULE] ATURAN WARNA KHUSUS: Customer baru saja mengonfirmasi warna "${knownColorForPrompt}". Ini adalah warna SPESIAL/EFFECT yang PASTI menambah surcharge (biaya tambahan) pada Repaint Bodi Halus. Harga yang pernah Anda berikan sebelumnya menjadi TIDAK VALID! Anda WAJIB MENGHITUNG ULANG HARGA sekarang juga. SET execution.toolIntent = "GET_PRICE" dan masukkan parameter color_name = "${knownColorForPrompt}". DILARANG KERAS SET 'NONE'!\n`;
         }
     }

@@ -79,8 +79,8 @@ Format JSON output yang diharapkan:
   "services": ["layanan 1"],
   "velgCondition": "Kondisi velg",
   "hasDamage": true/false,
-  "bookingDate": "Tanggal booking (misal: besok, 25 Juli)",
-  "bookingTime": "Jam booking (misal: jam 10 pagi)",
+  "bookingDate": "Tanggal booking absolut dalam format YYYY-MM-DD (Evaluasi berdasar WAKTU SEKARANG, misal jika besok, hitung tanggalnya jadi '2026-07-25')",
+  "bookingTime": "Jam booking dalam format HH:mm (misal: '10:00')",
   "visualSummary": "Ringkasan visual 1-2 kalimat (jika ada gambar)",
   "targetService": "Nama layanan yang ditanyakan (isi HANYA jika kustomer bertanya tentang layanan spesifik atau menyebut pronoun seperti 'apaan tuh', 'gimana itu')",
   "needsClarification": true/false (isi HANYA jika pronoun ambigu dan lastOffered berisi >1 layanan)

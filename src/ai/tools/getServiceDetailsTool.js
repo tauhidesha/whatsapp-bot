@@ -587,6 +587,7 @@ async function processSingleService(parsedServiceName, input, promoText) {
                 category: 'repaint_bodi_halus',
                 motor_model: motorModel,
                 motor_size: finalSize,
+                color_name: paintType,
                 candidates: results,
                 promo_active: !!promoText,
                 message: `Berikut 4 pilihan paket Repaint Bodi Halus untuk motor ${motorModel}.`

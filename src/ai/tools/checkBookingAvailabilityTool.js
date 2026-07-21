@@ -278,54 +278,80 @@ async function implementation(rawInput) {
   // --- LOGIKA REKOMENDASI SLOT JIKA JAM KOSONG ---
   if (!normalizedInput.bookingTime) {
     const nowJkt = DateTime.now().setZone('Asia/Jakarta');
-    const isToday = normalizedInput.bookingDate === formatDate(nowJkt.toJSDate());
-    
-    // Start searching from 09:00 or Now + 30 mins
-    let startHour = 9;
-    let startMin = 0;
+    let foundSlot = null;
+    let checkedDate = normalizedInput.bookingDate;
 
-    if (isToday) {
-      const earliestStart = nowJkt.plus({ minutes: 30 });
-      startHour = earliestStart.hour;
-      startMin = earliestStart.minute > 30 ? 60 : 30; // Round to next 30 min block
-      if (startMin === 60) {
-        startHour += 1;
-        startMin = 0;
-      }
-      if (startHour < 9) {
-        startHour = 9;
-        startMin = 0;
-      }
-    }
+    for (let dayOffset = 0; dayOffset <= 7; dayOffset++) {
+      const searchDateObj = new Date(`${normalizedInput.bookingDate}T00:00:00`);
+      searchDateObj.setDate(searchDateObj.getDate() + dayOffset);
+      checkedDate = formatDate(searchDateObj);
 
-    // Iterate through slots every 30 mins until 16:30
-    for (let h = startHour; h <= 16; h++) {
-      for (let m = (h === startHour ? startMin : 0); m < 60; m += 30) {
-        const testTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-        const testInput = { ...normalizedInput, bookingTime: testTime };
-        
-        let availCheck;
-        if (isRepaint) availCheck = await checkRepaintCapacity(testInput);
-        else if (isDetailingOrCoating) availCheck = await checkDetailingOrCoatingCapacity(testInput);
-        else {
-          const res = await checkSimpleSlotAvailability(testInput);
-          availCheck = { available: res.isAvailable };
+      const isToday = checkedDate === formatDate(nowJkt.toJSDate());
+      
+      // Start searching from 09:00 or Now + 30 mins
+      let startHour = 9;
+      let startMin = 0;
+
+      if (isToday) {
+        const earliestStart = nowJkt.plus({ minutes: 30 });
+        startHour = earliestStart.hour;
+        startMin = earliestStart.minute > 30 ? 60 : 30; // Round to next 30 min block
+        if (startMin === 60) {
+          startHour += 1;
+          startMin = 0;
         }
-
-        if (availCheck.available) {
-          return {
-            available: true,
-            recommendedTime: testTime,
-            summary: `Slot tersedia untuk ${normalizedInput.serviceName} pada ${normalizedInput.bookingDate}. Jam paling dekat yang tersedia adalah: ${testTime}.`,
-          };
+        if (startHour < 9) {
+          startHour = 9;
+          startMin = 0;
         }
       }
+
+      // Iterate through slots every 30 mins until 16:30
+      let slotFoundForDay = false;
+      for (let h = startHour; h <= 16; h++) {
+        for (let m = (h === startHour ? startMin : 0); m < 60; m += 30) {
+          const testTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+          const testInput = { ...normalizedInput, bookingDate: checkedDate, bookingTime: testTime };
+          
+          let availCheck;
+          if (isRepaint) availCheck = await checkRepaintCapacity(testInput);
+          else if (isDetailingOrCoating) availCheck = await checkDetailingOrCoatingCapacity(testInput);
+          else {
+            const res = await checkSimpleSlotAvailability(testInput);
+            availCheck = { available: res.isAvailable };
+          }
+
+          if (availCheck.available) {
+            foundSlot = { date: checkedDate, time: testTime };
+            slotFoundForDay = true;
+            break;
+          }
+        }
+        if (slotFoundForDay) break;
+      }
+
+      if (foundSlot) break;
     }
 
-    return {
-      available: false,
-      summary: `Maaf, untuk tanggal ${normalizedInput.bookingDate} sepertinya semua slot sudah penuh atau sudah melewati jam operasional. Silakan pilih hari lain?`,
-    };
+    if (foundSlot) {
+      if (foundSlot.date === normalizedInput.bookingDate) {
+        return {
+          available: true,
+          recommendedTime: foundSlot.time,
+          summary: `Slot tersedia untuk ${normalizedInput.serviceName} pada ${normalizedInput.bookingDate}. Jam paling dekat yang tersedia adalah: ${foundSlot.time}.`,
+        };
+      } else {
+        return {
+          available: false,
+          summary: `Maaf, untuk tanggal ${normalizedInput.bookingDate} sepertinya semua slot sudah penuh atau sudah melewati jam operasional. Slot kosong berikutnya ada di tanggal ${foundSlot.date} jam ${foundSlot.time}.`,
+        };
+      }
+    } else {
+      return {
+        available: false,
+        summary: `Maaf, untuk tanggal ${normalizedInput.bookingDate} hingga seminggu ke depan sepertinya semua slot sudah penuh. Silakan pilih hari lain atau hubungi admin?`,
+      };
+    }
   }
 
   // --- LOGIKA CEK SLOT SPESIFIK (Default Path) ---

@@ -40,14 +40,16 @@ function extractCartItems(toolResult, plannerParameters) {
                     type: 'multi-package',
                     candidates,
                     selectedPackage: matchedPkg ? matchedPkg.name : null,
-                    isDiscountEligible: isDiscountEligible(serviceName)
+                    isDiscountEligible: isDiscountEligible(serviceName),
+                    colorName: block.color_name || null
                 };
             }
         } else if (block.price && block.price > 0) {
             cartItems[serviceName] = {
                 type: 'fixed',
                 price: block.price,
-                isDiscountEligible: isDiscountEligible(serviceName)
+                isDiscountEligible: isDiscountEligible(serviceName),
+                colorName: block.color_name || null
             };
         }
     };
