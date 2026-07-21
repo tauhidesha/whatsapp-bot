@@ -181,14 +181,14 @@ function isEligible(context, metadata) {
         const interval = followUpCount >= 2
             ? (strategy.secondIntervalDays || strategy.intervalDays)
             : (strategy.intervalDays || strategy.waitDays);
-        const daysSinceLastFollowUp = Math.floor((now - lastFollowUp) / (1000 * 60 * 60 * 24));
+        const daysSinceLastFollowUp = getDaysSince(lastFollowUp);
         if (daysSinceLastFollowUp < interval) return false;
     } else {
         // First follow-up — check waitDays since last message or last service
         const referenceDate = (label === 'existing_customer' || label === 'loyal_customer')
             ? (context.lastServiceAt ? new Date(context.lastServiceAt) : lastMessage)
             : lastMessage;
-        const daysSinceReference = Math.floor((now - referenceDate) / (1000 * 60 * 60 * 24));
+        const daysSinceReference = getDaysSince(referenceDate);
         if (daysSinceReference < strategy.waitDays) return false;
     }
 
@@ -230,7 +230,7 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
                 include: {
                     bookings: {
                         where: {
-                            status: { notIn: ['DONE', 'CANCELLED'] }
+                            status: { notIn: ['COMPLETED', 'PAID', 'DONE', 'CANCELLED'] }
                         }
                     }
                 }
@@ -293,7 +293,7 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
         const hasActiveBooking = activeBookings.length > 0;
 
         if (lastService && !context.reviewFollowUpSent && !hasActiveBooking) {
-            const daysSinceService = Math.floor((now - lastService) / (1000 * 60 * 60 * 24));
+            const daysSinceService = getDaysSince(lastService);
             if (daysSinceService >= 3 && daysSinceService <= 7) {
                 isReviewEligible = true;
             }
@@ -303,14 +303,13 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
         let isRebookingEligible = false;
         let rebookingAngle = null;
         if (lastService && context.lastServiceType) {
-            const daysSinceService = Math.floor((now - lastService) / (1000 * 60 * 60 * 24));
+            const daysSinceService = getDaysSince(lastService);
             const interval = REBOOKING_INTERVALS[context.lastServiceType];
 
             // Trigger exactly on interval or within 3-day window after interval
             if (interval && daysSinceService >= interval && daysSinceService <= interval + 3) {
                 // Also check if we haven't sent a rebooking follow-up recently
-                const lastFup = context.lastFollowUpAt ? new Date(context.lastFollowUpAt) : null;
-                const daysSinceLastFup = lastFup ? Math.floor((now - lastFup) / (1000 * 60 * 60 * 24)) : 999;
+                const daysSinceLastFup = context.lastFollowUpAt ? getDaysSince(context.lastFollowUpAt) : 999;
 
                 if (daysSinceLastFup > 7) { // Don't spam if they just got a different message
                     isRebookingEligible = true;

@@ -13,8 +13,13 @@ function getDaysSince(date) {
     if (!date) return null;
     const now = new Date();
     const past = new Date(date);
-    const diffTime = Math.abs(now - past);
-    return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    // Normalize to midnight local time to ensure accurate calendar day calculation
+    const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const pastMidnight = new Date(past.getFullYear(), past.getMonth(), past.getDate());
+    
+    const diffTime = Math.abs(nowMidnight - pastMidnight);
+    return Math.round(diffTime / (1000 * 60 * 60 * 24));
 }
 
 // Strategy definitions (Angle instructions)
