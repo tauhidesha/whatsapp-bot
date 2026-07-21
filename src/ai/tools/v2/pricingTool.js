@@ -112,12 +112,16 @@ class PricingTool extends BaseTool {
         const size = parameters.size || parameters.motorSize;
         const color_name = parameters.color_name || parameters.paintColor || parameters.color || knownFacts.paintColor?.value || vehicle.paintType?.value;
 
-        const resultString = await getServiceDetailsTool.implementation({
+        const toolResponse = await getServiceDetailsTool.implementation({
             service_name: serviceNameArray,
             motor_model,
             size,
             color_name
         });
+
+        // getServiceDetailsTool wraps result in { success, data: actual_pricing, metadata, error, executionTimeMs }
+        // Unwrap at source so processResult and extractCartItems both see actual pricing keys directly
+        const resultString = toolResponse.data || toolResponse;
 
         // Format the raw JSON into a clean string so the Composer doesn't hallucinate
         let formattedText = "";
