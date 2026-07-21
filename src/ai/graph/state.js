@@ -224,6 +224,12 @@ const ZoyaState = Annotation.Root({
     isAdmin: Annotation({
         reducer: (old, next) => next,
         default: () => false
+    }),
+
+    // Metadata for incoming request
+    metadata: Annotation({
+        reducer: (old, next) => ({ ...old, ...next }),
+        default: () => ({})
     })
 });
 
