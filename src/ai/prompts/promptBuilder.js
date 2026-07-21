@@ -333,29 +333,37 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
 
     prompt += `\n=== TOOL RESULT ===\n`;
     if (!prioritizedData && !state.tool?.lastResult) {
-        prompt += `(Belum ada — belum melakukan pricing call turn ini)\n\n`;
-    } else if (cartCalc) {
-        // Cart summary already injected above — no need to re-dump raw tool result
-        prompt += `(Sudah dirangkum di CART SUMMARY di atas. JANGAN sebutkan angka lain selain yang ada di sana.)\n\n`;
+        prompt += `(Belum ada — belum melakukan eksekusi tool turn ini)\n\n`;
     } else {
-        if (prioritizedData) {
-            prompt += `Data: ${JSON.stringify(prioritizedData, null, 2)}\n`;
-        } else if (state.tool?.lastResult) {
-            if (state.tool.lastResult.formattedText) {
-                prompt += `Data:\n${state.tool.lastResult.formattedText}\n`;
-            } else {
-                prompt += `Data: ${JSON.stringify(state.tool.lastResult)}\n`;
+        if (cartCalc && state.tool?.lastCapability === 'pricing') {
+            // Cart summary already injected above — no need to re-dump raw tool result for pricing
+            prompt += `(Sudah dirangkum di CART SUMMARY di atas. JANGAN sebutkan angka lain selain yang ada di sana.)\n\n`;
+        } else {
+            let dataToPrint = prioritizedData ? { ...prioritizedData } : null;
+            if (dataToPrint && dataToPrint.cartCalculation) {
+                delete dataToPrint.cartCalculation;
             }
+            
+            if (dataToPrint && Object.keys(dataToPrint).length > 0) {
+                prompt += `Data: ${JSON.stringify(dataToPrint, null, 2)}\n`;
+            } else if (state.tool?.lastResult) {
+                if (state.tool.lastResult.formattedText) {
+                    prompt += `Data:\n${state.tool.lastResult.formattedText}\n`;
+                } else {
+                    prompt += `Data: ${JSON.stringify(state.tool.lastResult)}\n`;
+                }
+            }
+            
+            prompt += `PENTING: JANGAN meringkas atau menyembunyikan biaya tambahan (surcharge). Jika di dalam Data terdapat "Rincian:" (misal harga dasar + biaya warna/remover), WAJIB sebutkan biaya tambahan tersebut secara jelas ke customer!\n`;
+            const hasCandidates = (prioritizedData?.candidates?.length > 0) || 
+                                  (state.tool?.lastResult?.candidates?.length > 0) ||
+                                  (state.tool?.lastResult?.results?.some(r => r.candidates?.length > 0));
+            
+            if (hasCandidates) {
+                prompt += `ATURAN PENYAJIAN PAKET: Karena ada beberapa pilihan paket layanan, JANGAN copas semua deksripsi panjangnya! Sebutkan perbedaannya SECARA RINGKAS dengan menyorot point penting saja (misal: jenis clear, estimasi hasil/garansi). Gunakan format bullet points pendek agar nyaman dibaca di chat WA.\n`;
+            }
+            prompt += `\n`;
         }
-        prompt += `PENTING: JANGAN meringkas atau menyembunyikan biaya tambahan (surcharge). Jika di dalam Data terdapat "Rincian:" (misal harga dasar + biaya warna/remover), WAJIB sebutkan biaya tambahan tersebut secara jelas ke customer!\n`;
-        const hasCandidates = (prioritizedData?.candidates?.length > 0) || 
-                              (state.tool?.lastResult?.candidates?.length > 0) ||
-                              (state.tool?.lastResult?.results?.some(r => r.candidates?.length > 0));
-        
-        if (hasCandidates) {
-            prompt += `ATURAN PENYAJIAN PAKET: Karena ada beberapa pilihan paket layanan, JANGAN copas semua deksripsi panjangnya! Sebutkan perbedaannya SECARA RINGKAS dengan menyorot point penting saja (misal: jenis clear, estimasi hasil/garansi). Gunakan format bullet points pendek agar nyaman dibaca di chat WA.\n`;
-        }
-        prompt += `\n`;
     }
 
     if (prioritizedData && prioritizedData.injected_knowledge) {
