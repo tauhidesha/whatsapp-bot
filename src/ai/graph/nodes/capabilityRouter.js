@@ -52,14 +52,26 @@ function extractCartItems(toolResult, plannerParameters) {
         }
     };
 
-    if (toolResult.multiple_services_requested && Array.isArray(toolResult.results)) {
-        toolResult.results.forEach(res => parseServiceBlock(res));
+    // PricingTool wraps actual pricing data inside rawText field.
+    // Always unwrap it before dispatching to parse blocks.
+    const actualData = toolResult.rawText || toolResult;
+
+    if (actualData.multiple_services_requested && Array.isArray(actualData.results)) {
+        // Multiple services were fetched in one call
+        actualData.results.forEach(res => parseServiceBlock(res));
     } else {
-        const rawData = toolResult.rawText || toolResult;
-        parseServiceBlock(rawData);
+        // Single service response
+        parseServiceBlock(actualData);
     }
 
-    return Object.keys(cartItems).length > 0 ? cartItems : null;
+    const parsed = Object.keys(cartItems);
+    if (parsed.length > 0) {
+        console.log('[extractCartItems] Parsed services into cart:', parsed);
+    } else {
+        console.warn('[extractCartItems] No cart items extracted. actualData keys:', Object.keys(actualData || {}));
+    }
+
+    return parsed.length > 0 ? cartItems : null;
 }
 
 async function capabilityRouterNode(state) {
@@ -108,11 +120,11 @@ async function capabilityRouterNode(state) {
         resultData = response;
 
         if (capability === 'pricing') {
-            const rawResult = response.data || response;
+            // PricingTool returns { rawText: actualData, formattedText, service }
+            // Pass response directly — extractCartItems handles rawText unwrapping internally
             const plannerParams = state.planner?.execution?.parameters || {};
-            const newCartItems = extractCartItems(rawResult, plannerParams);
+            const newCartItems = extractCartItems(response, plannerParams);
             if (newCartItems) {
-                console.log('[Capability Router Node] Updating cart:', Object.keys(newCartItems));
                 cartUpdate = { items: newCartItems, calculatedAt: new Date().toISOString() };
             }
         }

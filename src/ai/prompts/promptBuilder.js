@@ -264,24 +264,24 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
         if (cartCalc.type === 'multi-package-simulation') {
             // Skenario A: user belum pilih paket, tampilkan simulasi per paket
             prompt += `MODE: SIMULASI PER PAKET (user belum pilih paket ${cartCalc.serviceName})\n`;
-            prompt += `Ada ${cartCalc.simulations.length} paket. Tampilkan SEMUA opsi dengan format:\n`;
-            prompt += `"[Nama Paket]: [harga asli] (sebelum diskon) → [harga diskon] + [layanan lain] = **[total]**"\n\n`;
+            prompt += `Tampilkan SEMUA paket format: "- Paket [Nama]: ~[harga asli]~ -> *[harga diskon]*"\n`;
+            prompt += `Setelah list, tiap baris tambahkan total: "*[harga diskon]* + [fixed] = *[total]*"\n\n`;
             if (cartCalc.hasComboDiscount) {
-                prompt += `Diskon ${cartCalc.comboDiscountPct}% sudah diterapkan ke ${cartCalc.serviceName} di setiap simulasi.\n`;
+                prompt += `Diskon ${cartCalc.comboDiscountPct}% sudah diterapkan ke ${cartCalc.serviceName} di setiap baris.\n\n`;
             }
             cartCalc.simulations.forEach(sim => {
                 const discInfo = sim.hasDiscount
-                    ? `${sim.basePriceFormatted} (sebelum diskon) → ${sim.discountedPriceFormatted}`
-                    : sim.basePriceFormatted;
+                    ? `~${sim.basePriceFormatted}~ -> *${sim.discountedPriceFormatted}*`
+                    : `*${sim.basePriceFormatted}*`;
                 prompt += `- Paket ${sim.packageName}: ${discInfo}`;
                 if (cartCalc.fixedLineItems?.length > 0) {
-                    const fixedNames = cartCalc.fixedLineItems.map(f => `${f.name} ${f.priceFormatted}`).join(' + ');
-                    prompt += ` + ${fixedNames}`;
+                    const fixedSummary = cartCalc.fixedLineItems.map(f => `${f.name} ${f.priceFormatted}`).join(' + ');
+                    prompt += ` -> sama ${fixedSummary} = *${sim.totalFormatted}*`;
                 }
-                prompt += ` = **${sim.totalFormatted}**\n`;
+                prompt += `\n`;
             });
             if (cartCalc.fixedLineItems?.length > 0) {
-                prompt += `\nLayanan fixed yang sudah di cart:\n`;
+                prompt += `\nLayanan fixed di cart:\n`;
                 cartCalc.fixedLineItems.forEach(f => prompt += `- ${f.name}: ${f.priceFormatted}\n`);
             }
         } else if (cartCalc.type === 'fixed-cart') {
