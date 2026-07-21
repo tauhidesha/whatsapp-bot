@@ -2541,7 +2541,7 @@ app.post('/send-media', requireAuth, async (req, res) => {
 
 app.post('/test-ai', requireAuth, async (req, res) => {
     try {
-        const { message, senderNumber, mode, model_override, history, media } = req.body;
+        const { message, senderNumber, senderName, mode, model_override, history, media } = req.body;
         const testMessage = message || "Hello, test message";
 
         // Convert base64 media to Buffer format
@@ -2556,14 +2556,14 @@ app.post('/test-ai', requireAuth, async (req, res) => {
 
         // If mode is 'admin', force the admin sender number
         let effectiveSenderNumber = senderNumber || null;
-        let senderName = "Test User";
+        let effectiveSenderName = senderName || "Test User";
         let isAdmin = false;
         if (mode === 'admin') {
             // Only force the sender number if it's already set somehow, otherwise we still want it to be null to use local memory if applicable
             if (effectiveSenderNumber) {
                 effectiveSenderNumber = process.env.BOSMAT_ADMIN_NUMBER || process.env.ADMIN_WHATSAPP_NUMBER || effectiveSenderNumber;
             }
-            senderName = "Admin (Playground)";
+            effectiveSenderName = "Admin (Playground)";
             isAdmin = true;
         }
 
@@ -2593,7 +2593,7 @@ app.post('/test-ai', requireAuth, async (req, res) => {
             messages: [new HumanMessage({ content: messageContent })],
             metadata: {
                 phoneReal: finalThreadId,
-                senderName: senderName,
+                senderName: effectiveSenderName,
                 mediaItems: mediaItems,
                 isAdmin: isAdmin 
             }

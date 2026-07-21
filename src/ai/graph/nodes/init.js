@@ -34,7 +34,7 @@ async function initNode(state) {
         console.log('[INIT_NODE] No phoneReal, using default Stranger.');
         return { 
             isAdmin: false,
-            customer: { name: 'Stranger' },
+            customer: { name: metadata?.senderName || 'Stranger' },
             metadata: { ...metadata, currentDateTime }
         };
     }
