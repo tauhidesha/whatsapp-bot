@@ -112,7 +112,9 @@ function buildPlannerPrompt(state) {
     // Inject explicit parameter hints from current known facts so planner doesn't send empty params
     const paramHints = [];
     if (vehicle?.model) paramHints.push(`motor_model: "${vehicle.model}"`);
-    if (consultation?.knownFacts?.colorChoice) paramHints.push(`paintColor: "${consultation.knownFacts.colorChoice}"`);
+    // colorChoice OR paintColor — both keys used by different memory extractors
+    const knownColor = consultation?.knownFacts?.colorChoice || consultation?.knownFacts?.paintColor;
+    if (knownColor) paramHints.push(`color_name: "${knownColor}"`);
     if (consultation?.requestedServices?.length > 0) paramHints.push(`service: ${JSON.stringify(consultation.requestedServices)}`);
     if (paramHints.length > 0) {
         prompt += `     ✅ PARAMETER TERSEDIA (gunakan ini sebagai dasar execution.parameters): { ${paramHints.join(', ')} }\n`;
@@ -121,6 +123,13 @@ function buildPlannerPrompt(state) {
     prompt += `- [execution.toolIntent]: Gunakan intent generik (GET_PRICE, CREATE_BOOKING, CHECK_AVAILABILITY, dll). Jika tidak butuh tool, set 'NONE'.\n`;
     prompt += `- [conversation.informationPriority]: Tentukan prioritas urutan tipe informasi yang harus disusun oleh Composer. Isi 'content' dengan POIN SINGKAT inti idenya saja, BUKAN kalimat lengkap atau bahasa korporat kaku. Biarkan Composer yang merangkainya menjadi kalimat natural.\n`;
     prompt += `- JIKA array remainingFacts BELUM KOSONG, maka toolIntent WAJIB di-set menjadi 'NONE', KECUALI jika kustomer bertanya mengenai jadwal/ketersediaan slot, Anda DIWAJIBKAN memanggil 'CHECK_AVAILABILITY'. JANGAN PERNAH memanggil 'CREATE_BOOKING' atau tool lainnya sebelum fakta pemblokir terkumpul!\n`;
+    // Color surcharge re-fetch rule
+    const hasBodiHalus = (consultation?.requestedServices || []).some(s => s.toLowerCase().includes('bodi halus'));
+    const knownColorForPrompt = consultation?.knownFacts?.colorChoice || consultation?.knownFacts?.paintColor;
+    const isSpecialColor = knownColorForPrompt && /candy|stabilo|bunglon|hologram|chrome|two.?tone|pearl|metalik/i.test(knownColorForPrompt);
+    if (hasBodiHalus && isSpecialColor) {
+        prompt += `- ⚠️ ATURAN WARNA KHUSUS: Customer menyebutkan warna "${knownColorForPrompt}" yang merupakan warna SPESIAL/EFFECT dan berpotensi menambah surcharge pada Repaint Bodi Halus. WAJIB set toolIntent = GET_PRICE dengan parameter color_name = "${knownColorForPrompt}" agar sistem menghitung surcharge yang tepat. JANGAN set toolIntent = NONE pada turn ini!\n`;
+    }
     prompt += `- ATURAN MUTLAK UPSELL/PROMO: Jika goal adalah ESCALATION atau HANDLE_OBJECTION (atau customer menunjukkan tanda keberatan/frustrasi), Anda DILARANG KERAS menyertakan item 'upsell' di informationPriority turn ini, apapun ketersediaannya.\n\n`;
 
     // 5. Tool Output (for Re-evaluation Pass)
