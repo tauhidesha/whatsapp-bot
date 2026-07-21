@@ -31,5 +31,6 @@ registry.register(require('./studioInfoTool'));
 registry.register(require('./promoTool'));
 registry.register(require('./notificationTool'));
 registry.register(require('./calculateHomeServiceFeeTool'));
+registry.register(require('./escalateHumanTool'));
 
 module.exports = registry;
