@@ -128,7 +128,7 @@ function buildPlannerPrompt(state) {
     let rawColor = consultation?.knownFacts?.colorChoice || consultation?.knownFacts?.paintColor;
     let knownColorForPrompt = typeof rawColor === 'object' && rawColor !== null ? rawColor.value : rawColor;
     if (typeof knownColorForPrompt === 'string') {
-        const isSpecialColor = /candy|stabilo|bunglon|hologram|chrome|two.?tone|pearl|metalik/i.test(knownColorForPrompt);
+        const isSpecialColor = /candy|stabilo|bunglon|hologram|chrome|two.?tone|pearl|metalik|mazda/i.test(knownColorForPrompt);
         if (hasBodiHalus && isSpecialColor) {
             prompt += `- ⚠️ ATURAN WARNA KHUSUS: Customer menyebutkan warna "${knownColorForPrompt}" yang merupakan warna SPESIAL/EFFECT dan berpotensi menambah surcharge pada Repaint Bodi Halus. WAJIB set toolIntent = GET_PRICE dengan parameter color_name = "${knownColorForPrompt}" agar sistem menghitung surcharge yang tepat. JANGAN set toolIntent = NONE pada turn ini!\n`;
         }
