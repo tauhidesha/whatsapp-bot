@@ -14,18 +14,17 @@ class PricingTool extends BaseTool {
         const vehicle = state.vehicle || {};
         
         const requestedServices = state.consultation?.requestedServices || [];
-        // Priority: explicit params → requestedServices (captures latest user intent) → knownFacts fallback
-        let rawServiceName = parameters.service_name || parameters.service || parameters.partToRepaint;
-        if (!rawServiceName && requestedServices.length > 0) {
-            // Use requestedServices — contains all services user has mentioned including the latest one
-            rawServiceName = requestedServices;
-        } else if (!rawServiceName) {
-            // Last resort: use the first known service from state
-            rawServiceName = knownFacts.partToRepaint?.value;
-        }
-        if (!rawServiceName) {
-            rawServiceName = 'Repaint Bodi Halus';
-        }
+        // Build service list: ALWAYS merge planner parameters with requestedServices
+        // This ensures that when user asks "bodi halus dan kasar", both are fetched
+        // even if planner parameters only captured one of them.
+        const paramService = parameters.service_name || parameters.service || parameters.partToRepaint;
+        const paramArr = paramService
+            ? (Array.isArray(paramService) ? paramService : [paramService])
+            : [];
+        // requestedServices is the authoritative source — merge and deduplicate
+        const mergedServices = [...new Set([...paramArr, ...requestedServices])];
+        let rawServiceName = mergedServices.length > 0 ? mergedServices : knownFacts.partToRepaint?.value;
+        if (!rawServiceName) rawServiceName = 'Repaint Bodi Halus';
         let serviceNameArray = Array.isArray(rawServiceName) ? rawServiceName : [rawServiceName];
 
         // Business Rule Expansion BEFORE normalization:
@@ -84,8 +83,9 @@ class PricingTool extends BaseTool {
             }
             return s;
         });
+        // Deduplicate after normalization (e.g. "repaint" and "Repaint Bodi Halus" both → same string)
+        serviceNameArray = [...new Set(serviceNameArray)];
 
-        // Validation block: Prevent premature tool calls for Repaint
         const isRepaint = serviceNameArray.some(s => typeof s === 'string' && s.toLowerCase().includes('repaint'));
         const partToRepaintStr = serviceNameArray.find(s => typeof s === 'string' && s.toLowerCase().includes('repaint')) || '';
         let partToRepaint = parameters.partToRepaint;
