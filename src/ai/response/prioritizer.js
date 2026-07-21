@@ -55,7 +55,14 @@ async function prioritizeInformation(state) {
 
     // ── Pricing Tool Handling (for non-cart legacy display) ─────────
     if (state.tool?.lastCapability === 'pricing') {
-        const rawData = toolResult?.rawText || toolResult;
+        let rawData = toolResult?.rawText || toolResult;
+
+        // getServiceDetailsTool wraps pricing data in { success, data: {actual}, metadata, ... }
+        // Unwrap if pricing keys are not at the top level
+        const hasPricingKeys = rawData?.candidates || rawData?.price || rawData?.multiple_candidates || rawData?.multiple_services_requested;
+        if (!hasPricingKeys && rawData?.data) {
+            rawData = rawData.data;
+        }
 
         // If cart calculation is available, it takes priority — skip legacy format
         if (resultData.cartCalculation) {

@@ -14,9 +14,14 @@ class PricingTool extends BaseTool {
         const vehicle = state.vehicle || {};
         
         const requestedServices = state.consultation?.requestedServices || [];
-        let rawServiceName = parameters.service_name || parameters.service || parameters.partToRepaint || knownFacts.partToRepaint?.value;
+        // Priority: explicit params → requestedServices (captures latest user intent) → knownFacts fallback
+        let rawServiceName = parameters.service_name || parameters.service || parameters.partToRepaint;
         if (!rawServiceName && requestedServices.length > 0) {
+            // Use requestedServices — contains all services user has mentioned including the latest one
             rawServiceName = requestedServices;
+        } else if (!rawServiceName) {
+            // Last resort: use the first known service from state
+            rawServiceName = knownFacts.partToRepaint?.value;
         }
         if (!rawServiceName) {
             rawServiceName = 'Repaint Bodi Halus';

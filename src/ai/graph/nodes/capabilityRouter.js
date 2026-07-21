@@ -54,7 +54,15 @@ function extractCartItems(toolResult, plannerParameters) {
 
     // PricingTool wraps actual pricing data inside rawText field.
     // Always unwrap it before dispatching to parse blocks.
-    const actualData = toolResult.rawText || toolResult;
+    let actualData = toolResult.rawText || toolResult;
+
+    // getServiceDetailsTool wraps result in { success, data: {pricing_data}, metadata, ... }
+    // Unwrap one more level if actual pricing keys are not at top level
+    const hasPricingKeys = actualData.candidates || actualData.price || actualData.multiple_candidates || actualData.multiple_services_requested;
+    if (!hasPricingKeys && actualData.data) {
+        console.log('[extractCartItems] Unwrapping actualData.data layer');
+        actualData = actualData.data;
+    }
 
     if (actualData.multiple_services_requested && Array.isArray(actualData.results)) {
         // Multiple services were fetched in one call

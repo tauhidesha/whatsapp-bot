@@ -137,7 +137,9 @@ async function evaluateRepaintRules(state) {
         
         rules.upsells.push({
             type: 'UPSELL',
-            service: eligiblePairs.join(' / '),
+            // service: null — PricingTool now uses requestedServices to fetch new services.
+            // Don't auto-push a joined multi-service string here as it breaks normalization.
+            service: null,
             reason: `Kebetulan ada promo diskon ${discPct}% khusus buat harga Bodi Halusnya, kalau sekalian ambil 2 layanan. Bisa sekalian ${pairListText}. Lumayan, nanti Bodi Halusnya langsung kena diskon ${discPct}%!`
         });
     }
