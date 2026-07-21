@@ -21,6 +21,8 @@ const MemorySchema = z.object({
     services: z.array(z.string()).optional().describe("Daftar layanan (misal: 'Repaint Bodi Halus')."),
     velgCondition: FactSchema("Kondisi cat velg sebelumnya (misal: 'masih ori pabrik', 'udah pernah dicat/repaint', 'belum pernah'). JANGAN isi ini dengan baret/lecet, fokus HANYA pada status cat asli/repaint."),
     hasDamage: z.boolean().nullable().optional().describe("Apakah customer menyebutkan ada kerusakan (retak, patah, baret dalam)? Pengecualian disengaja: tidak menggunakan format {value, status} karena fact yes/no tidak memiliki state UNDECIDED."),
+    bookingDate: FactSchema("Tanggal atau hari yang diinginkan customer untuk booking (misal: 'besok', 'hari senin', 'tanggal 25')."),
+    bookingTime: FactSchema("Jam yang diinginkan customer untuk booking (misal: 'jam 10 pagi', 'sore')."),
     visualSummary: z.string().optional().describe("Ringkasan visual 1-2 kalimat mengenai apa yang terlihat di gambar/foto yang dikirim user. HANYA isi jika user mengirim foto.")
 });
 

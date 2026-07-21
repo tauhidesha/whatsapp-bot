@@ -67,10 +67,12 @@ Fokuslah pada merangkai data yang disuapkan ke kamu menjadi satu pesan WhatsApp 
         const hasPrioritizedData = !!prioritizedData;
         const isPriceForbidden = !hasPrioritizedData && !hasValidToolResult;
 
-        // Jika tool dipanggil untuk pricing tapi hasilnya error, inject warning ke prompt
-        const toolErrorWarning = (toolIntent === 'GET_PRICE' && lastResult?.error)
-            ? `\n\n⚠️ SISTEM: Tool pricing dipanggil tapi GAGAL dengan error: "${lastResult.error}". Kamu TIDAK BOLEH menyebutkan harga apapun. Sampaikan dengan ramah bahwa kamu perlu info lebih lanjut sebelum bisa berikan estimasi.`
-            : '';
+        let toolErrorWarning = '';
+        if (toolIntent === 'GET_PRICE' && lastResult?.error) {
+            toolErrorWarning = `\n\n⚠️ SISTEM: Tool pricing dipanggil tapi GAGAL dengan error: "${lastResult.error.message || lastResult.error}". Kamu TIDAK BOLEH menyebutkan harga apapun. Sampaikan dengan ramah bahwa kamu perlu info lebih lanjut sebelum bisa berikan estimasi.`;
+        } else if (toolIntent === 'CHECK_AVAILABILITY' && lastResult?.error) {
+            toolErrorWarning = `\n\n⚠️ SISTEM: Tool cek slot dipanggil tapi GAGAL dengan error: "${lastResult.error.message || lastResult.error}". Kamu TIDAK BOLEH mengarang jadwal (misal: "besok full", "lusa kosong"). Sampaikan dengan ramah bahwa sistem sedang mengecek atau kamu butuh info tanggal yang spesifik.`;
+        }
 
         while (retryCount <= maxRetries) {
             let currentPrompt = promptText + toolErrorWarning;

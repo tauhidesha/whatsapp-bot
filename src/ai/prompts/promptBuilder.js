@@ -117,6 +117,8 @@ function buildPlannerPrompt(state) {
     let knownColorParam = typeof rawColorParam === 'object' && rawColorParam !== null ? rawColorParam.value : rawColorParam;
     if (knownColorParam) paramHints.push(`color_name: "${knownColorParam}"`);
     if (consultation?.requestedServices?.length > 0) paramHints.push(`service: ${JSON.stringify(consultation.requestedServices)}`);
+    if (consultation?.knownFacts?.bookingDate?.value) paramHints.push(`bookingDate: "${consultation.knownFacts.bookingDate.value}"`);
+    if (consultation?.knownFacts?.bookingTime?.value) paramHints.push(`bookingTime: "${consultation.knownFacts.bookingTime.value}"`);
     if (paramHints.length > 0) {
         prompt += `     ✅ PARAMETER TERSEDIA (gunakan ini sebagai dasar execution.parameters): { ${paramHints.join(', ')} }\n`;
     }
