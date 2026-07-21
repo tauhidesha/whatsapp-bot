@@ -526,7 +526,7 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
             customer: {
                 include: {
                     bookings: {
-                        where: { status: { notIn: ['DONE', 'CANCELLED'] } }
+                        where: { status: { notIn: ['COMPLETED', 'PAID', 'DONE', 'CANCELLED'] } }
                     }
                 }
             }
@@ -554,7 +554,7 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
         const strategy = STRATEGY_CONFIG[label];
         const lastFollowUp = context.lastFollowUpAt ? new Date(context.lastFollowUpAt) : null;
         const lastMsg = metadata.lastMessageAt ? new Date(metadata.lastMessageAt) : null;
-        const daysSince = lastMsg ? Math.floor((now - lastMsg) / (1000 * 60 * 60 * 24)) : 'N/A';
+        const daysSince = lastMsg ? getDaysSince(lastMsg) : 'N/A';
         const followUpCount = context.followUpCount || 0;
         if (!strategy) {
             // console.log(`[DryRun][Skip] ${customer.name} (${label}) → no strategy config`);
@@ -568,18 +568,17 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
         const lastService = customer.lastService ? new Date(customer.lastService) : null;
         const hasActiveBooking = (customer.bookings || []).length > 0;
         if (lastService && !context.reviewFollowUpSent && !hasActiveBooking) {
-            const daysSinceService = Math.floor((now - lastService) / (1000 * 60 * 60 * 24));
+            const daysSinceService = getDaysSince(lastService);
             if (daysSinceService >= 3 && daysSinceService <= 7) isReviewEligible = true;
         }
 
         let isRebookingEligible = false;
         let rebookingAngle = null;
         if (lastService && context.lastServiceType) {
-            const daysSinceService = Math.floor((now - lastService) / (1000 * 60 * 60 * 24));
+            const daysSinceService = getDaysSince(lastService);
             const interval = REBOOKING_INTERVALS[context.lastServiceType];
             if (interval && daysSinceService >= interval && daysSinceService <= interval + 3) {
-                const lastFup = context.lastFollowUpAt ? new Date(context.lastFollowUpAt) : null;
-                const daysSinceLastFup = lastFup ? Math.floor((now - lastFup) / (1000 * 60 * 60 * 24)) : 999;
+                const daysSinceLastFup = context.lastFollowUpAt ? getDaysSince(context.lastFollowUpAt) : 999;
                 if (daysSinceLastFup > 7) {
                     isRebookingEligible = true;
                     rebookingAngle = `rebooking_${context.lastServiceType}`;
