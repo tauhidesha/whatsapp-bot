@@ -15,8 +15,13 @@ function getDisclosureDirectives(state, plannerDecision) {
     
     directives.push(`PROGRESSIVE DISCLOSURE: Jangan mengirim lebih dari ${config.maxTopics} informasi utama dalam satu pesan WA (Misal: Total, isi pekerjaan, range harga, penjelasan singkat, satu pertanyaan).`);
     
-    // Always provide package breakdown with short summary
-    directives.push(`PAKET HARGA: JIKA terdapat pilihan paket (misal Ekonomis, Basic, Standar, Premium), Anda WAJIB menjabarkan nama paket beserta harganya dalam bentuk bullet points. Berikan penjelasan perbedaan tiap paket secara RINGKAS (maksimal 1 kalimat atau poin pentingnya saja per paket). JANGAN diringkas menjadi rentang harga total.`);
+    // Package display: name + price + 1-liner from summary field
+    directives.push(`PAKET HARGA: JIKA terdapat pilihan paket (misal Ekonomis, Basic, Standar, Premium):
+- WAJIB format tiap bullet: "- Paket [Nama]: Rp[Harga] — [1 kalimat ringkas perbedaan utama]"
+- Ambil 1-liner dari field "summary" tiap paket di TOOL RESULT data (jangan copy panjang, cukup inti bedanya).
+- Contoh: "- Paket Standar: Rp1.430.000 — Mirror finish, tahan baret, garansi 1 tahun."
+- JANGAN tampilkan harga saja tanpa deskripsi.
+- JANGAN diringkas menjadi rentang harga total.`);
 
     return directives;
 }

@@ -127,18 +127,18 @@ async function evaluateRepaintRules(state) {
 
     // 4. Upsells
     if (isBodiHalus || isFullBody) {
-        let reason = 'Sekalian tambah layanan Cuci Komplit agar pas motornya selesai dicat, bagian lainnya juga bersih semua.';
-        
-        // Cek apakah ada promo aktif yang bisa di-piggyback
-        if (promoInfo && promoInfo.comboDiscount) {
-            const discPct = promoInfo.comboDiscount * 100;
-            reason += ` Apalagi kebetulan lagi ada promo diskon combo ${discPct}% kalau ambil barengan!`;
-        }
+        // Collect eligible pair services for Bodi Halus from promo config
+        const bodiHalusCombo = promoInfo?.eligibleCombos?.find(
+            c => c.anchor === 'Repaint Bodi Halus'
+        );
+        const eligiblePairs = bodiHalusCombo?.pairWith || ['Cuci Komplit'];
+        const pairListText = eligiblePairs.join(', atau ');
+        const discPct = promoInfo?.comboDiscount ? Math.round(promoInfo.comboDiscount * 100) : 15;
         
         rules.upsells.push({
             type: 'UPSELL',
-            service: 'Cuci Komplit',
-            reason: reason
+            service: eligiblePairs.join(' / '),
+            reason: `Kebetulan ada promo diskon ${discPct}% khusus buat harga Bodi Halusnya, kalau sekalian ambil 2 layanan. Bisa sekalian ${pairListText}. Lumayan, nanti Bodi Halusnya langsung kena diskon ${discPct}%!`
         });
     }
 

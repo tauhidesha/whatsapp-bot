@@ -19,7 +19,11 @@ function extractCartItems(toolResult, plannerParameters) {
     const cartItems = {};
 
     const parseServiceBlock = (block) => {
-        const serviceName = block.service_name || block.name || block.category || 'Unknown';
+        // Normalize service name: prefer explicit name, fallback to category with underscore-to-space conversion
+        const rawName = block.service_name || block.name || block.category || 'Unknown';
+        const serviceName = rawName.includes('_')
+            ? rawName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+            : rawName;
 
         if (block.multiple_candidates && Array.isArray(block.candidates) && block.candidates.length > 0) {
             const candidates = block.candidates

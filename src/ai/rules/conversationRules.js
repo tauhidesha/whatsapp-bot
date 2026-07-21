@@ -41,7 +41,7 @@ function evaluateConversationRules(state) {
     if (consultation?.requestedServices?.includes('repaint') && consultation?.requestedServices?.length > 1) {
          rules.push({
             type: 'PRICING_GUIDELINE',
-            directive: 'Jika ada promo diskon bundling, diskon tersebut hanya memotong harga Repaint Bodi Halus, bukan layanan lainnya.'
+            directive: 'FRAMING PROMO WAJIB: Diskon 15% KHUSUS memotong harga "Repaint Bodi Halus", bukan layanan tambahan lainnya. Katakan "Bodi Halusnya diskon 15%" bukan "diskon combo 15% buat layanan repaint". Sebutkan SEMUA alternatif pasangan yang bisa dipilih customer (Cuci Komplit, Repaint Bodi Kasar, ATAU Repaint Velg).'
         });
     }
 
