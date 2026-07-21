@@ -125,11 +125,15 @@ function buildPlannerPrompt(state) {
     prompt += `- JIKA array remainingFacts BELUM KOSONG, maka toolIntent WAJIB di-set menjadi 'NONE', KECUALI jika kustomer bertanya mengenai jadwal/ketersediaan slot, Anda DIWAJIBKAN memanggil 'CHECK_AVAILABILITY'. JANGAN PERNAH memanggil 'CREATE_BOOKING' atau tool lainnya sebelum fakta pemblokir terkumpul!\n`;
     // Color surcharge re-fetch rule
     const hasBodiHalus = (consultation?.requestedServices || []).some(s => s.toLowerCase().includes('bodi halus'));
-    const knownColorForPrompt = consultation?.knownFacts?.colorChoice || consultation?.knownFacts?.paintColor;
-    const isSpecialColor = knownColorForPrompt && /candy|stabilo|bunglon|hologram|chrome|two.?tone|pearl|metalik/i.test(knownColorForPrompt);
-    if (hasBodiHalus && isSpecialColor) {
-        prompt += `- ⚠️ ATURAN WARNA KHUSUS: Customer menyebutkan warna "${knownColorForPrompt}" yang merupakan warna SPESIAL/EFFECT dan berpotensi menambah surcharge pada Repaint Bodi Halus. WAJIB set toolIntent = GET_PRICE dengan parameter color_name = "${knownColorForPrompt}" agar sistem menghitung surcharge yang tepat. JANGAN set toolIntent = NONE pada turn ini!\n`;
+    let rawColor = consultation?.knownFacts?.colorChoice || consultation?.knownFacts?.paintColor;
+    let knownColorForPrompt = typeof rawColor === 'object' && rawColor !== null ? rawColor.value : rawColor;
+    if (typeof knownColorForPrompt === 'string') {
+        const isSpecialColor = /candy|stabilo|bunglon|hologram|chrome|two.?tone|pearl|metalik/i.test(knownColorForPrompt);
+        if (hasBodiHalus && isSpecialColor) {
+            prompt += `- ⚠️ ATURAN WARNA KHUSUS: Customer menyebutkan warna "${knownColorForPrompt}" yang merupakan warna SPESIAL/EFFECT dan berpotensi menambah surcharge pada Repaint Bodi Halus. WAJIB set toolIntent = GET_PRICE dengan parameter color_name = "${knownColorForPrompt}" agar sistem menghitung surcharge yang tepat. JANGAN set toolIntent = NONE pada turn ini!\n`;
+        }
     }
+
     prompt += `- ATURAN MUTLAK UPSELL/PROMO: Jika goal adalah ESCALATION atau HANDLE_OBJECTION (atau customer menunjukkan tanda keberatan/frustrasi), Anda DILARANG KERAS menyertakan item 'upsell' di informationPriority turn ini, apapun ketersediaannya.\n\n`;
 
     // 5. Tool Output (for Re-evaluation Pass)
