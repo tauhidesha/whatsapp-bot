@@ -70,6 +70,7 @@ function calculateCartTotal(cartItems = {}, comboDiscountPct = 0.15) {
             const total = discountedPrice + fixedTotal + selectedMultiTotal;
             return {
                 packageName: c.name,
+                description: c.description,
                 basePrice,
                 discountedPrice,
                 total,

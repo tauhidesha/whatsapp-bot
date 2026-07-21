@@ -292,6 +292,9 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
                     const fixedSummary = cartCalc.fixedLineItems.map(f => `${f.name} ${f.priceFormatted}`).join(' + ');
                     prompt += ` -> sama ${fixedSummary} = *${sim.totalFormatted}*`;
                 }
+                if (sim.description) {
+                    prompt += ` — ${sim.description}`;
+                }
                 prompt += `\n`;
             });
             if (cartCalc.fixedLineItems?.length > 0) {

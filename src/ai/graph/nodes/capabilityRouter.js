@@ -28,7 +28,7 @@ function extractCartItems(toolResult, plannerParameters) {
         if (block.multiple_candidates && Array.isArray(block.candidates) && block.candidates.length > 0) {
             const candidates = block.candidates
                 .filter(c => c.price > 0)
-                .map(c => ({ name: c.name, price: c.price }));
+                .map(c => ({ name: c.name, price: c.price, description: c.description }));
 
             if (candidates.length > 0) {
                 const selectedPkg = plannerParameters?.packageName || plannerParameters?.package_name || null;
