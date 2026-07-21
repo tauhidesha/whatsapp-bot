@@ -20,7 +20,7 @@ async function implementation(args) {
         const value = {
             promoText,
             isActive: isActive !== undefined ? isActive : true,
-            comboDiscount: comboDiscount !== undefined ? comboDiscount : 0.15,       // default 15%
+            comboDiscount: comboDiscount !== undefined ? comboDiscount : 0.10,       // default 10%
             comboMinServices: comboMinServices !== undefined ? comboMinServices : 2, // default 2 layanan
             updatedAt: new Date().toISOString(),
             updatedBy: senderNumber
@@ -77,7 +77,7 @@ const updatePromoOfTheMonthTool = {
                     },
                     comboDiscount: {
                         type: 'number',
-                        description: 'Persentase diskon combo dalam desimal (0.15 = 15%). Default 0.15.'
+                        description: 'Persentase diskon combo dalam desimal (0.10 = 10%). Default 0.10.'
                     },
                     comboMinServices: {
                         type: 'integer',

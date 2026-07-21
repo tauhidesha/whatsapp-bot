@@ -42,7 +42,7 @@ async function prioritizeInformation(state) {
     if (hasCartItems) {
         try {
             const promoInfo = await getActivePromo();
-            const comboDiscountPct = (promoInfo?.comboDiscount) || 0.15;
+            const comboDiscountPct = (promoInfo?.comboDiscount) || 0.10;
             const cartCalc = calculateCartTotal(cartItems, comboDiscountPct);
             if (cartCalc) {
                 resultData.cartCalculation = cartCalc;

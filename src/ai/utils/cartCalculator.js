@@ -19,10 +19,10 @@ const formatRp = (num) => 'Rp' + num.toLocaleString('id-ID');
  *      Shows final line items and grand total.
  *
  * @param {Object} cartItems - state.cart.items
- * @param {number} comboDiscountPct - e.g. 0.15 for 15%
- * @returns {Object|null} calculation result
+ * @param {number} comboDiscountPct - e.g. 0.10 for 10%
+ * @returns {object} Total Calculation { items, subTotal, discount, grandTotal }
  */
-function calculateCartTotal(cartItems = {}, comboDiscountPct = 0.15) {
+function calculateCartTotal(cartItems = {}, comboDiscountPct = 0.10) {
     const entries = Object.entries(cartItems);
     if (entries.length === 0) return null;
 

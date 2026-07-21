@@ -32,7 +32,7 @@ async function getActivePromo() {
         if (kv?.value?.isActive) {
             promoCache = {
                 promoText: kv.value.promoText || null,
-                comboDiscount: kv.value.comboDiscount || 0, // 0.15 = 15%
+                comboDiscount: kv.value.comboDiscount ?? 0.10, // 0.10 = 10%
                 comboMinServices: kv.value.comboMinServices || 2,
                 discountEligiblePattern: kv.value.discountEligiblePattern || 'bodi halus',
                 eligibleCombos: kv.value.eligibleCombos || [
