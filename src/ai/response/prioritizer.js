@@ -1,12 +1,15 @@
 /**
  * Information Prioritizer
- * Middle layer that filters and formats raw Tool JSON outputs into concise,
- * prioritized information for the Composer, preventing information overload.
+ * Middle layer that:
+ * 1. Filters and formats raw Tool JSON outputs for the Composer.
+ * 2. Calls calculateCartTotal() server-side — so the Composer NEVER calculates prices.
  */
 
 const masterLayanan = require('../../data/masterLayanan');
+const { calculateCartTotal } = require('../utils/cartCalculator');
+const { getActivePromo } = require('../utils/promoConfig');
 
-function prioritizeInformation(state) {
+async function prioritizeInformation(state) {
     const toolResult = state.tool?.lastResult;
     let injectedKnowledge = null;
 
@@ -18,8 +21,6 @@ function prioritizeInformation(state) {
         }
     }
 
-    // toolResult is the unwrapped data payload on success, or the full error object on failure.
-    // So if it failed, it has .error. If it succeeded, it might not have .success explicitly.
     const isSuccess = toolResult && !toolResult.error;
 
     if (!isSuccess && !injectedKnowledge) {
@@ -33,12 +34,37 @@ function prioritizeInformation(state) {
 
     console.log('[Information Prioritizer] Processing tool result/knowledge');
 
-    // 1. Pricing Tool Handling
-    if (state.tool.lastCapability === 'pricing') {
-        const rawData = toolResult.rawText || toolResult;
-        
-        // If there are multiple services requested (e.g., Repaint + Repaint Velg)
-        if (rawData.multiple_services_requested && rawData.results) {
+    // ── Cart Calculation (server-side, always) ──────────────────────
+    // Read from state.cart (updated by capabilityRouter after tool call)
+    const cartItems = state.cart?.items || {};
+    const hasCartItems = Object.keys(cartItems).length > 0;
+
+    if (hasCartItems) {
+        try {
+            const promoInfo = await getActivePromo();
+            const comboDiscountPct = (promoInfo?.comboDiscount) || 0.15;
+            const cartCalc = calculateCartTotal(cartItems, comboDiscountPct);
+            if (cartCalc) {
+                resultData.cartCalculation = cartCalc;
+                console.log(`[Information Prioritizer] Cart calculation type: ${cartCalc.type}, items: ${Object.keys(cartItems).length}`);
+            }
+        } catch (err) {
+            console.warn('[Information Prioritizer] Cart calculation failed:', err.message);
+        }
+    }
+
+    // ── Pricing Tool Handling (for non-cart legacy display) ─────────
+    if (state.tool?.lastCapability === 'pricing') {
+        const rawData = toolResult?.rawText || toolResult;
+
+        // If cart calculation is available, it takes priority — skip legacy format
+        if (resultData.cartCalculation) {
+            if (injectedKnowledge) resultData.injected_knowledge = injectedKnowledge;
+            return resultData;
+        }
+
+        // Legacy: multiple services requested (e.g., Repaint + Repaint Velg)
+        if (rawData?.multiple_services_requested && rawData.results) {
             let minTotal = 0;
             let maxTotal = 0;
             let items = [];
@@ -51,7 +77,7 @@ function prioritizeInformation(state) {
                         maxTotal += Math.max(...prices);
                     }
                     if (res.category === 'repaint_bodi_halus') items.push('Bodi Halus');
-                    else if (res.category === 'repaint') items.push('Repaint Area (termasuk Bodi Kasar/Velg)');
+                    else if (res.category === 'repaint') items.push('Repaint Area');
                 } else if (res.success && res.price) {
                     minTotal += res.price;
                     maxTotal += res.price;
@@ -61,29 +87,30 @@ function prioritizeInformation(state) {
 
             if (minTotal > 0) {
                 const returnObj = {
-                    summary: 'Customer meminta beberapa layanan sekaligus (Full Repaint). Berikan estimasi RANGE TOTAL saja.',
+                    summary: 'Customer meminta beberapa layanan sekaligus. Berikan estimasi RANGE TOTAL saja.',
                     itemsIncluded: items.join(', '),
-                    estimatedTotalRange: minTotal === maxTotal 
-                        ? `Rp${minTotal.toLocaleString('id-ID')}` 
+                    estimatedTotalRange: minTotal === maxTotal
+                        ? `Rp${minTotal.toLocaleString('id-ID')}`
                         : `Rp${minTotal.toLocaleString('id-ID')} - Rp${maxTotal.toLocaleString('id-ID')}`,
-                    rawResults: rawData.results // keep raw just in case
+                    rawResults: rawData.results
                 };
                 if (injectedKnowledge) returnObj.injected_knowledge = injectedKnowledge;
                 return returnObj;
             }
         }
 
-        // Single service with multiple packages (e.g., Repaint Bodi Halus)
-        if (rawData.multiple_candidates && rawData.candidates) {
+        // Legacy: single service with multiple packages (Repaint Bodi Halus)
+        if (rawData?.multiple_candidates && rawData.candidates) {
             const prices = rawData.candidates.map(c => c.price).filter(p => p > 0);
             if (prices.length > 0) {
                 const minPrice = Math.min(...prices);
                 const maxPrice = Math.max(...prices);
                 const returnObj = {
-                    summary: `Ada ${rawData.candidates.length} pilihan paket untuk ${rawData.category || rawData.service_name}. Jangan sebutkan semua detailnya kecuali ditanya.`,
-                    estimatedRange: minPrice === maxPrice 
-                        ? `Rp${minPrice.toLocaleString('id-ID')}` 
+                    summary: `Ada ${rawData.candidates.length} pilihan paket. Jangan sebutkan semua detailnya kecuali ditanya.`,
+                    estimatedRange: minPrice === maxPrice
+                        ? `Rp${minPrice.toLocaleString('id-ID')}`
                         : `Rp${minPrice.toLocaleString('id-ID')} - Rp${maxPrice.toLocaleString('id-ID')}`,
+                    candidates: rawData.candidates,
                     note: rawData.promo_active ? 'Ada promo aktif, bisa di-mention jika relevan.' : ''
                 };
                 if (injectedKnowledge) returnObj.injected_knowledge = injectedKnowledge;
@@ -91,8 +118,8 @@ function prioritizeInformation(state) {
             }
         }
 
-        // Just a single exact price
-        if (rawData.price) {
+        // Legacy: single exact price
+        if (rawData?.price) {
             const returnObj = {
                 service: toolResult.service_name,
                 description: toolResult.description,
@@ -105,10 +132,13 @@ function prioritizeInformation(state) {
         }
     }
 
-    // Default passthrough if we don't have a specific prioritizer logic
+    // Default passthrough
     return resultData;
 }
 
 module.exports = {
     prioritizeInformation
 };
+
+
+

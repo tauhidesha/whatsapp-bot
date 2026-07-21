@@ -168,7 +168,26 @@ const ZoyaState = Annotation.Root({
         })
     }),
 
-    // 13. Knowledge (Loaded once, read-only for Planner and Composer)
+    // 13. Cart — Persistent shopping cart accumulating services across turns
+    // Items schema:
+    //   multi-package: { type:"multi-package", candidates:[{name,price}], selectedPackage:null|"Standar", isDiscountEligible:true }
+    //   fixed-price:   { type:"fixed", price:275000, isDiscountEligible:false }
+    cart: Annotation({
+        reducer: (old, updated) => {
+            if (!updated) return old;
+            const mergedItems = { ...(old?.items || {}) };
+            if (updated.items) {
+                Object.assign(mergedItems, updated.items);
+            }
+            return {
+                items: mergedItems,
+                calculatedAt: updated.calculatedAt || old?.calculatedAt || null
+            };
+        },
+        default: () => ({ items: {}, calculatedAt: null })
+    }),
+
+    // 14. Knowledge (Loaded once, read-only for Planner and Composer)
     knowledge: Annotation({
         reducer: (old, updated) => ({ ...old, ...updated }),
         default: () => ({

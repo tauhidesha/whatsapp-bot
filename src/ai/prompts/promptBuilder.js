@@ -182,6 +182,25 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
 - **Contoh BAGUS**: "Halo kak! Aku Zoya dari Bosmat 🎨 Tertarik sama hasil repaint Vario yang di postingan ya? Motornya apa nih kak?"
 - **Contoh BAGUS (Tanya Info)**: "Boleh tau mau ngecat bagian apa aja kak? Biar aku bisa itungin kisaran harganya."
 
+# FRASA DILARANG (LANGSUNG TOLAK JIKA MUNCUL DI PIKIRAN)
+- ❌ "Promo diskon 15% ini memang khusus untuk..."
+- ❌ "Sebagai informasi, kami memiliki promo bundling..."
+- ❌ "Harga setelah diskon menjadi..."
+- ❌ Kalimat yang terasa seperti brosur/iklan korporat
+
+# FRASA DIANJURKAN (GAYA TEMEN BENGKEL)
+- ✅ "Nah, sekalian ambil Cuci Komplit juga, bodi halusnya langsung dapet diskon 15% kak!"
+- ✅ "Wih, silver cakep tuh! Kelihatan elegan dan ngga gampang kelihatan kotor."
+- ✅ "Mantap kalau masih ori, proses stripping-nya lebih cepet!"
+- ✅ "Motor dijamin keluar studio berasa turun baru dari dealer!"
+
+# ATURAN KALKULASI MUTLAK (NON-NEGOTIABLE)
+⛔ KAMU DILARANG KERAS MELAKUKAN ARITMATIKA APAPUN.
+- JANGAN pernah menjumlahkan, mengalikan, atau memperkirakan angka harga sendiri.
+- JANGAN mengubah angka dari CART SUMMARY (rounding, estimasi, dll).
+- Semua total sudah dihitung TEPAT oleh sistem. Tugasmu hanya mencetak angka tersebut.
+- Untuk format coret di WA, gunakan teks: "(sebelum diskon: Rp1.300.000)" karena ~~ tidak didukung.
+
 # TONE & STYLE (MUTLAK)
 - JANGAN PERNAH menggunakan bahasa kaku/robotik/korporat. Hindari frasa seperti "Senang sekali Anda tertarik", "Untuk memberikan estimasi yang akurat", atau "Kami perlu mengetahui".
 - JANGAN copy-paste kalimat mentah dari Planner (Information Priority / Missing Facts). Ubah poin-poin tersebut menjadi gaya bahasa Anda sendiri yang asik dan luwes.
@@ -235,9 +254,57 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
         });
     }
 
+    // ── CART SUMMARY (server-calculated, highest priority for pricing turns) ──
+    const cartCalc = prioritizedData?.cartCalculation;
+    if (cartCalc) {
+        prompt += `=== CART SUMMARY (SUDAH DIHITUNG SERVER — JANGAN UBAH ANGKA INI) ===\n`;
+        prompt += `⛔ INSTRUKSI KRITIS: Semua angka di bawah SUDAH BENAR. Kamu DILARANG menghitung ulang.\n`;
+        prompt += `Tugasmu: cetak angka-angka ini dalam pesan natural sesuai format di bawah.\n\n`;
+
+        if (cartCalc.type === 'multi-package-simulation') {
+            // Skenario A: user belum pilih paket, tampilkan simulasi per paket
+            prompt += `MODE: SIMULASI PER PAKET (user belum pilih paket ${cartCalc.serviceName})\n`;
+            prompt += `Ada ${cartCalc.simulations.length} paket. Tampilkan SEMUA opsi dengan format:\n`;
+            prompt += `"[Nama Paket]: [harga asli] (sebelum diskon) → [harga diskon] + [layanan lain] = **[total]**"\n\n`;
+            if (cartCalc.hasComboDiscount) {
+                prompt += `Diskon ${cartCalc.comboDiscountPct}% sudah diterapkan ke ${cartCalc.serviceName} di setiap simulasi.\n`;
+            }
+            cartCalc.simulations.forEach(sim => {
+                const discInfo = sim.hasDiscount
+                    ? `${sim.basePriceFormatted} (sebelum diskon) → ${sim.discountedPriceFormatted}`
+                    : sim.basePriceFormatted;
+                prompt += `- Paket ${sim.packageName}: ${discInfo}`;
+                if (cartCalc.fixedLineItems?.length > 0) {
+                    const fixedNames = cartCalc.fixedLineItems.map(f => `${f.name} ${f.priceFormatted}`).join(' + ');
+                    prompt += ` + ${fixedNames}`;
+                }
+                prompt += ` = **${sim.totalFormatted}**\n`;
+            });
+            if (cartCalc.fixedLineItems?.length > 0) {
+                prompt += `\nLayanan fixed yang sudah di cart:\n`;
+                cartCalc.fixedLineItems.forEach(f => prompt += `- ${f.name}: ${f.priceFormatted}\n`);
+            }
+        } else if (cartCalc.type === 'fixed-cart') {
+            // Skenario B/C: semua harga sudah fix, tampilkan rekap
+            prompt += `MODE: REKAP CART (semua harga sudah fix)\n`;
+            prompt += `Format output: bullet point per layanan + baris terakhir total bold.\n\n`;
+            cartCalc.lineItems.forEach(item => {
+                const priceInfo = item.basePrice !== item.finalPrice
+                    ? `${item.finalPriceFormatted} (sebelum diskon: ${item.basePriceFormatted})`
+                    : item.finalPriceFormatted;
+                prompt += `- ${item.name}: ${priceInfo} — ${item.note}\n`;
+            });
+            prompt += `\n**Total Keseluruhan: ${cartCalc.grandTotalFormatted}**\n`;
+        }
+        prompt += `\n`;
+    }
+
     prompt += `\n=== TOOL RESULT ===\n`;
     if (!prioritizedData && !state.tool?.lastResult) {
         prompt += `(Belum ada — belum melakukan pricing call turn ini)\n\n`;
+    } else if (cartCalc) {
+        // Cart summary already injected above — no need to re-dump raw tool result
+        prompt += `(Sudah dirangkum di CART SUMMARY di atas. JANGAN sebutkan angka lain selain yang ada di sana.)\n\n`;
     } else {
         if (prioritizedData) {
             prompt += `Data: ${JSON.stringify(prioritizedData, null, 2)}\n`;
