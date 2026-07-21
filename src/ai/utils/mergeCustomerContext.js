@@ -22,32 +22,41 @@ function normalizePhone(senderNumber) {
  * Map LLM snake_case output to Prisma camelCase field names.
  */
 function mapExtractedToPrismaFields(extracted) {
+    const safeStr = (val) => {
+        if (val === null || val === undefined) return null;
+        if (typeof val === 'object') {
+            if (Array.isArray(val)) return val.join(', ');
+            return val.value || val.name || val.model || JSON.stringify(val);
+        }
+        return String(val);
+    };
+
     return {
-        motorModel: extracted.motor_model || null,
-        motorPlate: extracted.motor_plate ? normalizePlate(extracted.motor_plate) : null,
-        motorYear: extracted.motor_year || null,
-        motorColor: extracted.motor_color || null,
-        motorCondition: extracted.motor_condition || null,
+        motorModel: safeStr(extracted.motor_model),
+        motorPlate: extracted.motor_plate ? normalizePlate(safeStr(extracted.motor_plate)) : null,
+        motorYear: safeStr(extracted.motor_year),
+        motorColor: safeStr(extracted.motor_color),
+        motorCondition: safeStr(extracted.motor_condition),
         targetServices: Array.isArray(extracted.target_services) ? extracted.target_services : [],
-        serviceDetail: extracted.service_detail || null,
-        paintType: extracted.paint_type || null,
+        serviceDetail: safeStr(extracted.service_detail),
+        paintType: safeStr(extracted.paint_type),
         isBongkarTotal: extracted.is_bongkar_total === true ? true : extracted.is_bongkar_total === false ? false : null,
-        budgetSignal: extracted.budget_signal || null,
+        budgetSignal: safeStr(extracted.budget_signal),
         detectedIntents: Array.isArray(extracted.detected_intents) ? extracted.detected_intents : [],
         isChangingTopic: extracted.is_changing_topic === true,
         saidExpensive: extracted.said_expensive === true ? true : extracted.said_expensive === false ? false : null,
         askedPrice: extracted.asked_price === true ? true : extracted.asked_price === false ? false : null,
         askedAvailability: extracted.asked_availability === true ? true : extracted.asked_availability === false ? false : null,
         sharedPhoto: extracted.shared_photo === true ? true : extracted.shared_photo === false ? false : null,
-        preferredDay: extracted.preferred_day || null,
-        preferredTime: extracted.preferred_time || null,
-        locationHint: extracted.location_hint || null,
+        preferredDay: safeStr(extracted.preferred_day),
+        preferredTime: safeStr(extracted.preferred_time),
+        locationHint: safeStr(extracted.location_hint),
         quotedServices: extracted.quoted_services || null,
         quotedTotalNormal: extracted.quoted_total_normal || null,
         quotedTotalBundling: extracted.quoted_total_bundling || null,
         quotedAt: extracted.quoted_at ? new Date(extracted.quoted_at) : null,
-        conversationStage: extracted.conversation_stage || null,
-        lastAiAction: extracted.last_ai_action || null,
+        conversationStage: safeStr(extracted.conversation_stage),
+        lastAiAction: safeStr(extracted.last_ai_action),
         upsellOffered: extracted.upsell_offered === true ? true : extracted.upsell_offered === false ? false : null,
         upsellAccepted: extracted.upsell_accepted === true ? true : extracted.upsell_accepted === false ? false : null,
         butuhBantuanAdmin: extracted.butuh_bantuan_admin === true,
