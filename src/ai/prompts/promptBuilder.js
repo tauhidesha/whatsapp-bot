@@ -113,8 +113,9 @@ function buildPlannerPrompt(state) {
     const paramHints = [];
     if (vehicle?.model) paramHints.push(`motor_model: "${vehicle.model}"`);
     // colorChoice OR paintColor — both keys used by different memory extractors
-    const knownColor = consultation?.knownFacts?.colorChoice || consultation?.knownFacts?.paintColor;
-    if (knownColor) paramHints.push(`color_name: "${knownColor}"`);
+    let rawColorParam = consultation?.knownFacts?.colorChoice || consultation?.knownFacts?.paintColor;
+    let knownColorParam = typeof rawColorParam === 'object' && rawColorParam !== null ? rawColorParam.value : rawColorParam;
+    if (knownColorParam) paramHints.push(`color_name: "${knownColorParam}"`);
     if (consultation?.requestedServices?.length > 0) paramHints.push(`service: ${JSON.stringify(consultation.requestedServices)}`);
     if (paramHints.length > 0) {
         prompt += `     ✅ PARAMETER TERSEDIA (gunakan ini sebagai dasar execution.parameters): { ${paramHints.join(', ')} }\n`;
@@ -130,7 +131,7 @@ function buildPlannerPrompt(state) {
     if (typeof knownColorForPrompt === 'string') {
         const isSpecialColor = /candy|stabilo|bunglon|hologram|chrome|two.?tone|pearl|metalik|mazda/i.test(knownColorForPrompt);
         if (hasBodiHalus && isSpecialColor) {
-            prompt += `- ⚠️ ATURAN WARNA KHUSUS: Customer menyebutkan warna "${knownColorForPrompt}" yang merupakan warna SPESIAL/EFFECT dan berpotensi menambah surcharge pada Repaint Bodi Halus. WAJIB set toolIntent = GET_PRICE dengan parameter color_name = "${knownColorForPrompt}" agar sistem menghitung surcharge yang tepat. JANGAN set toolIntent = NONE pada turn ini!\n`;
+            prompt += `- 🚨 [CRITICAL RULE] ATURAN WARNA KHUSUS: Customer baru saja mengonfirmasi warna "${knownColorForPrompt}". Ini adalah warna SPESIAL/EFFECT yang PASTI menambah surcharge (biaya tambahan) pada Repaint Bodi Halus. Harga yang pernah Anda berikan sebelumnya menjadi TIDAK VALID! Anda WAJIB MENGHITUNG ULANG HARGA sekarang juga. SET execution.toolIntent = "GET_PRICE" dan masukkan parameter color_name = "${knownColorForPrompt}". DILARANG KERAS SET 'NONE'!\n`;
         }
     }
 
