@@ -54,7 +54,7 @@ workflow.addConditionalEdges(
     (state) => (state.context?.isReadyForTools ? 'adminExecutor' : END),
     {
         'adminExecutor': 'adminExecutor',
-        'END': END
+        [END]: END
     }
 );
 workflow.addEdge('adminExecutor', 'admin');
