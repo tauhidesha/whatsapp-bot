@@ -61,6 +61,8 @@ Ekstrak ke format ini (isi null jika tidak disebutkan):
 Aturan ketat:
 - Hanya isi field fakta yang BENAR-BENAR ada di percakapan ini
 - Jangan inferensi atau mengarang fakta
+- BAHASA GAUL/SLANG: Kata "kura2" atau "kura-kura" dalam konteks tanya harga berarti "kira-kira" (estimasi), BUKAN hewan atau warna kura-kura!
+- ASUMSI DEFAULT (IKLAN META): Saat ini sedang berjalan Iklan Meta untuk Repaint. Jika user masuk dan bertanya harga secara ambigu/tidak spesifik (misal: "pcx berapa?", "kalo full berapa?"), asumsikan layanan yang dituju adalah "Repaint Full Bodi".
 
 PENTING (ANTI-HALUSINASI): 
 - Hanya ekstrak motor_model, motor_plate, motor_color, dan target_services jika itu adalah kendaraan MILIK USER yang akan dikerjakan.
