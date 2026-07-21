@@ -1,3 +1,5 @@
+const studioMetadata = require('../constants/studioMetadata');
+
 const serviceKnowledge = {
   "general": "Bosmat STUDIO adalah spesialis repaint dan detailing motor kelas premium.",
   "services": {
@@ -6,7 +8,7 @@ const serviceKnowledge = {
   },
   "faq": {
     "jam_buka": "Buka setiap hari jam 09.00 - 18.00 WIB.",
-    "lokasi": "Depok, Jawa Barat."
+    "lokasi": `Lokasi lengkap: ${studioMetadata.location.address}. Google Maps: ${studioMetadata.location.googleMaps}. ${studioMetadata.location.landmark}.`
   }
 };
 
