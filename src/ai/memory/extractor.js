@@ -70,6 +70,10 @@ async function extractMemory(state) {
 WAKTU SEKARANG: ${currentDateTime} WIB. Gunakan ini sebagai referensi jika kustomer menyebut waktu seperti "besok" atau "hari ini".
 ATURAN UPDATE STATE: HANYA ekstrak dan output field yang SECARA EKSPLISIT dibahas di pesan atau terlihat jelas di gambar terakhir kustomer. JIKA ada foto, WAJIB isi visualSummary.
 Jika suatu informasi TIDAK DIBAHAS, JANGAN masukkan field tersebut ke dalam output JSON.${contextStr}
+ATURAN KETAT:
+- BAHASA GAUL/SLANG: Kata "kura2" atau "kura-kura" dalam konteks tanya harga berarti "kira-kira" (estimasi), BUKAN hewan atau warna kura-kura!
+- ASUMSI DEFAULT (IKLAN META): Saat ini sedang berjalan Iklan Meta untuk Repaint. Jika user masuk dan bertanya harga secara ambigu/tidak spesifik (misal: "pcx berapa?", "kalo full berapa?", "full body brpan"), asumsikan layanan yang dituju adalah "Repaint Full Bodi" dan WAJIB MASUKKAN ke array \`services\`.
+
 Format JSON output yang diharapkan:
 {
   "motor": "Merek/model motor",
@@ -135,6 +139,26 @@ Field yang bernilai string (kecuali visualSummary, services, hasDamage, targetSe
                 if (partLower.includes('kasar')) specificServices.push('Repaint Bodi Kasar');
                 if (partLower.includes('velg') || partLower.includes('pelg')) specificServices.push('Repaint Velg');
                 if (partLower.includes('full')) specificServices.push('Repaint Full Bodi');
+
+                if (specificServices.length > 0) {
+                    extraction.services = extraction.services || [];
+                    specificServices.forEach(srv => {
+                        if (!extraction.services.includes(srv)) {
+                            extraction.services.push(srv);
+                        }
+                    });
+                }
+            }
+
+            if (extraction.targetService) {
+                const targetLower = typeof extraction.targetService === 'string' ? extraction.targetService.toLowerCase() : '';
+                const specificServices = [];
+                if (targetLower.includes('halus')) specificServices.push('Repaint Bodi Halus');
+                if (targetLower.includes('kasar')) specificServices.push('Repaint Bodi Kasar');
+                if (targetLower.includes('velg') || targetLower.includes('pelg')) specificServices.push('Repaint Velg');
+                if (targetLower.includes('full')) specificServices.push('Repaint Full Bodi');
+                if (targetLower.includes('detailing')) specificServices.push('Detailing');
+                if (targetLower.includes('cuci')) specificServices.push('Cuci Komplit');
 
                 if (specificServices.length > 0) {
                     extraction.services = extraction.services || [];
