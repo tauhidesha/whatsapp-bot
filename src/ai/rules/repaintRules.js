@@ -58,6 +58,9 @@ async function evaluateRepaintRules(state) {
 
     // Include generic paint rules
     rules.applicableSOP.push('paint.bodiKasarColor', 'paint.specialColor', 'paint.noBodiKasarColor');
+    
+    // Explicitly forbid asking about 'bongkar total' for Repaint
+    rules.constraints.push('DILARANG KERAS menanyakan apakah perlu bongkar total atau tidak, karena bongkar total HANYA ditanyakan untuk layanan Detailing.');
 
     // 2. Identify Flow and Inject Required Facts
     // Business Rule: "full bodi" = Repaint Bodi Halus + Repaint Bodi Kasar
