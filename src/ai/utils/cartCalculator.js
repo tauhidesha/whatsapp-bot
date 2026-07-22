@@ -51,7 +51,11 @@ function calculateCartTotal(cartItems = {}, comboDiscountPct = 0.10) {
         const candidate = item.candidates?.find(c => c.name === item.selectedPackage);
         const basePrice = candidate?.price || 0;
         const hasOtherServices = fixedEntries.length > 0 || selectedMultiEntries.length > 1;
-        const applyDiscount = item.isDiscountEligible && comboDiscountPct > 0 && hasOtherServices;
+        
+        // Paket Ekonomis does not receive combo discount
+        const isEkonomis = (item.selectedPackage || '').toLowerCase().includes('ekonomis');
+        const applyDiscount = item.isDiscountEligible && comboDiscountPct > 0 && hasOtherServices && !isEkonomis;
+        
         const finalPrice = applyDiscount ? Math.round(basePrice * (1 - comboDiscountPct)) : basePrice;
         selectedMultiTotal += finalPrice;
         return {
@@ -73,7 +77,10 @@ function calculateCartTotal(cartItems = {}, comboDiscountPct = 0.10) {
 
         const simulations = candidates.map(c => {
             const basePrice = c.price || 0;
-            const discountedPrice = applyDiscount ? Math.round(basePrice * (1 - comboDiscountPct)) : basePrice;
+            // Paket Ekonomis does not receive combo discount
+            const isEkonomis = c.name.toLowerCase().includes('ekonomis');
+            const shouldDiscountThisPackage = applyDiscount && !isEkonomis;
+            const discountedPrice = shouldDiscountThisPackage ? Math.round(basePrice * (1 - comboDiscountPct)) : basePrice;
             const total = discountedPrice + fixedTotal + selectedMultiTotal;
             return {
                 packageName: c.name,
@@ -84,7 +91,7 @@ function calculateCartTotal(cartItems = {}, comboDiscountPct = 0.10) {
                 basePriceFormatted: formatRp(basePrice),
                 discountedPriceFormatted: formatRp(discountedPrice),
                 totalFormatted: formatRp(total),
-                hasDiscount: applyDiscount
+                hasDiscount: shouldDiscountThisPackage
             };
         }).sort((a, b) => b.basePrice - a.basePrice); // Urutkan dari MAHAL ke MURAH (Premium -> Standar -> Basic -> Ekonomis)
 
