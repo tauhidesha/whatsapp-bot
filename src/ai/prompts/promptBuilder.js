@@ -139,6 +139,7 @@ function buildPlannerPrompt(state) {
     prompt += `- [execution.toolIntent]: Gunakan intent generik (GET_PRICE, CREATE_BOOKING, CHECK_AVAILABILITY, dll). Jika tidak butuh tool, set 'NONE'.\n`;
     prompt += `- [conversation.informationPriority]: Tentukan prioritas urutan tipe informasi yang harus disusun oleh Composer. Isi 'content' dengan POIN SINGKAT inti idenya saja, BUKAN kalimat lengkap atau bahasa korporat kaku. Biarkan Composer yang merangkainya menjadi kalimat natural.\n`;
     prompt += `- JIKA array remainingFacts BELUM KOSONG, maka toolIntent WAJIB di-set menjadi 'NONE', KECUALI jika kustomer bertanya mengenai jadwal/ketersediaan slot, Anda DIWAJIBKAN memanggil 'CHECK_AVAILABILITY'. JANGAN PERNAH memanggil 'CREATE_BOOKING' atau tool lainnya sebelum fakta pemblokir terkumpul!\n`;
+    prompt += `- 🚨 [CRITICAL RULE] LAYANAN BARU TERDETEKSI: JIKA kustomer menanyakan atau menambah layanan baru (contoh: awalnya nanya bodi halus, lalu nanya full bodi) dan semua fakta pemblokir sudah terkumpul, Anda WAJIB SET execution.toolIntent = "GET_PRICE" agar sistem menghitung ulang harga. DILARANG KERAS set 'NONE'!\n`;
     // Color surcharge re-fetch rule
     const hasBodiHalus = (consultation?.requestedServices || []).some(s => s.toLowerCase().includes('bodi halus'));
     let rawColor = consultation?.knownFacts?.colorChoice || consultation?.knownFacts?.paintColor;
