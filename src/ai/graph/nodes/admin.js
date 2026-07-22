@@ -95,10 +95,16 @@ Langsung jawab pertanyaan bisnis/teknis secara to the point.
     const safeHistory = sanitizeMessagesForGemini(rawHistory);
     console.log(`[ADMIN_NODE] History: ${messages.length} total → last 10 → ${safeHistory.length} after sanitize`);
 
-    const response = await model.invoke([
-        new SystemMessage(systemPrompt),
-        ...safeHistory
-    ]);
+    let response;
+    try {
+        response = await model.invoke([
+            new SystemMessage(systemPrompt),
+            ...safeHistory
+        ]);
+    } catch (err) {
+        console.error('[ADMIN_NODE] Error invoking model:', err);
+        return { messages: [new AIMessage('Maaf, terjadi kesalahan saat memproses perintah Admin.')] };
+    }
 
     // Check if tool calls exist
     const isReadyForTools = response.tool_calls && response.tool_calls.length > 0;

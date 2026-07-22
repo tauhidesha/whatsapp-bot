@@ -164,6 +164,8 @@ async function generateFollowUpMessage(customerData, strategy, promoData = null)
                             { phone: phoneStripped },
                             { phoneReal: rawPhone },
                             { phoneReal: phoneStripped },
+                            { whatsappLid: rawPhone },
+                            { whatsappLid: phoneStripped },
                         ]
                     },
                     include: {

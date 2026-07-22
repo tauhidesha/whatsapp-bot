@@ -3,6 +3,8 @@
  * Guides the conversation steps for detailing requests.
  */
 
+const { businessRules } = require('./businessRulesData');
+
 function evaluateDetailingRules(state) {
     const rules = [];
     const requested = state.consultation?.requestedServices || [];
@@ -42,6 +44,11 @@ function evaluateDetailingRules(state) {
             directive: 'Tanyakan jenis motor customer (Misal: Nmax, Aerox, dll).'
         });
         return rules; // Pause logic untill fulfilled
+    } else {
+        rules.push({
+            type: 'CONVERSATION_GUIDELINE',
+            directive: businessRules.communication.noMotorVariantQuestion
+        });
     }
 
     // Langkah 2: Tanya sejauh mana detailing (Bongkar Rangka?)

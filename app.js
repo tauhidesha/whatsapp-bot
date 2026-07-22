@@ -1167,7 +1167,7 @@ async function processBufferedMessages(senderNumber, client) {
 
                 if (nodeName === 'composerNode' && nodeState.messages && nodeState.messages.length > 0) {
                     const lastMessage = nodeState.messages[nodeState.messages.length - 1];
-                    aiResponse = lastMessage ? extractTextFromContent(lastMessage.content) : null;
+                    aiResponse = lastMessage ? extractTextFromContent(lastMessage.content ?? lastMessage.kwargs?.content) : null;
 
                     if (aiResponse && nodeState.intent !== 'HUMAN_HANDOVER' && !hasSentWA) {
                         hasSentWA = true;
@@ -1204,7 +1204,7 @@ async function processBufferedMessages(senderNumber, client) {
             // Pastikan aiResponse tertangkap walau stream terlewat (misal cache)
             if (!aiResponse && result.messages && result.messages.length > 0) {
                 const lastMessage = result.messages[result.messages.length - 1];
-                aiResponse = lastMessage ? extractTextFromContent(lastMessage.content) : null;
+                aiResponse = lastMessage ? extractTextFromContent(lastMessage.content ?? lastMessage.kwargs?.content) : null;
             }
 
 
@@ -1748,7 +1748,19 @@ async function saveMessageToPrisma(senderNumber, message, senderType) {
                 .join('\n');
         } else if (typeof message === 'object' && message !== null) {
             // New: Handle object-based messages (e.g. from structured AI output)
-            messageText = message.text || message.message || JSON.stringify(message);
+            if (message.text && typeof message.text === 'string') {
+                messageText = message.text;
+            } else if (message.message && typeof message.message === 'string') {
+                messageText = message.message;
+            } else {
+                // Safeguard against stringifying large media buffers or assigning nested objects
+                messageText = JSON.stringify(message, (key, value) => {
+                    if (value && value.type === 'Buffer') return '[Buffer]';
+                    // also handle raw baileys message structure if accidentally passed
+                    if (key === 'imageMessage' || key === 'videoMessage' || key === 'documentMessage') return '[Media]';
+                    return value;
+                });
+            }
         } else {
             messageText = String(message || '');
         }
@@ -2610,7 +2622,7 @@ app.post('/test-ai', requireAuth, async (req, res) => {
         });
 
         const lastMessage = aiResult.messages[aiResult.messages.length - 1];
-        const response = lastMessage ? extractTextFromContent(lastMessage.content) : "No response";
+        const response = lastMessage ? extractTextFromContent(lastMessage.content ?? lastMessage.kwargs?.content) : "No response";
         const runId = aiResult.runId || null;
 
         // Save messages to history AFTER processing to avoid doubling in history

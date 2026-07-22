@@ -37,15 +37,16 @@ async function evaluateRepaintRules(state) {
         ...(state.planner?.reasoning?.goalStatus?.remainingFacts?.map(f => f.field) || [])
     ];
     
-    // Always include communication rules for repaint
     rules.applicableSOP.push(
         'communication.askColor', 
         'communication.noTechnicalJargon', 
         'communication.explainPartOptions',
         'communication.noPaintTypeQuestion',
-        'communication.fullBodiDefinition'
+        'communication.fullBodiDefinition',
+        'communication.noMotorVariantQuestion'
     );
     rules.constraints.push(businessRules.communication.noPaintTypeQuestion);
+    rules.constraints.push(businessRules.communication.noMotorVariantQuestion);
 
     // Repair rules are context-driven (only if damage is reported)
     if (knownFacts.hasDamage === true) {

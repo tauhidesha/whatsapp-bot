@@ -123,7 +123,7 @@ Field yang bernilai string (kecuali visualSummary, services, hasDamage, targetSe
             }
         }
 
-        if (extraction.objection || extraction.part || (extraction.services && extraction.services.length > 0) || extraction.velgCondition || extraction.hasDamage !== undefined) {
+        if (extraction.targetService || extraction.objection || extraction.part || (extraction.services && extraction.services.length > 0) || extraction.velgCondition || extraction.hasDamage !== undefined) {
             updates.consultation = updates.consultation || { ...state.consultation };
             updates.consultation.knownFacts = updates.consultation.knownFacts || { ...(state.consultation?.knownFacts || {}) };
 

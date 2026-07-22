@@ -31,10 +31,10 @@ async function initNode(state) {
     };
 
     if (!phoneReal && !isAdmin) {
-        console.log('[INIT_NODE] No phoneReal, using default Stranger.');
+        console.log('[INIT_NODE] No phoneReal, using default fallback.');
         return { 
             isAdmin: false,
-            customer: { name: metadata?.senderName || 'Stranger' },
+            customer: { name: metadata?.senderName || `Sobat ${studioMetadata.shortName}` },
             metadata: { ...metadata, currentDateTime }
         };
     }
@@ -44,7 +44,7 @@ async function initNode(state) {
             return {
                 isAdmin: isAdmin,
                 customer: {
-                    name: isAdmin ? 'Admin' : 'Guest',
+                    name: isAdmin ? 'Admin' : (metadata?.senderName || `Sobat ${studioMetadata.shortName}`),
                     status: 'new'
                 },
                 metadata: { ...metadata, currentDateTime }
@@ -52,8 +52,13 @@ async function initNode(state) {
         }
 
         // Cari pelanggan di database - phoneReal pasti ada di sini
-        const customer = await prisma.customer.findUnique({
-            where: { phone: phoneReal },
+        const customer = await prisma.customer.findFirst({
+            where: {
+                OR: [
+                    { phone: phoneReal },
+                    { whatsappLid: phoneReal }
+                ]
+            },
             include: {
                 vehicles: true,
                 customerContext: true
@@ -64,7 +69,7 @@ async function initNode(state) {
             return {
                 isAdmin: isAdmin,
                 customer: {
-                    name: metadata?.senderName || (isAdmin ? 'Admin' : 'Guest'),
+                    name: metadata?.senderName || (isAdmin ? 'Admin' : `Sobat ${studioMetadata.shortName}`),
                     status: 'new'
                 },
                 metadata: { ...metadata, currentDateTime }
