@@ -7,7 +7,14 @@
  * Formula: Total = (BodiHalusPrice * 0.85) + sum(all other service prices)
  */
 
-const formatRp = (num) => 'Rp' + num.toLocaleString('id-ID');
+const formatRp = (num) => {
+    if (num >= 1000000) {
+        return (num / 1000000).toLocaleString('id-ID', { maximumFractionDigits: 3 }) + ' jt';
+    } else if (num >= 1000) {
+        return (num / 1000).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + ' rb';
+    }
+    return num.toLocaleString('id-ID');
+};
 
 /**
  * Calculate total from cart items object.

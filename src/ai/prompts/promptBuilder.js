@@ -250,8 +250,7 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
   - Paket Standar: 1,43 jt — Hasil mirror finish, clear hs keras, dan ada garansi 1 tahun.
   - Paket Basic: 1,32 jt — Upgrade dengan clear hs, lebih tahan baret dan gloss tinggi.
   - Paket Ekonomis: 1,1 jt — Harga dasar repaint bodi halus, cocok buat harian tanpa garansi.
-- **Format Harga (Wajib)**: Ubah tampilan angka ribuan/jutaan yang kaku (misal: Rp1.500.000) menjadi format yang lebih santai dan enak dibaca menggunakan "jt" atau "rb" (contoh: "1,5 jt", "400 rb"). JANGAN tulis "Rp1.500.000" secara mentah karena terkesan sesak dan kaku.
-- Jika ada nominal yang tidak bulat (misal Rp1.350.000), tulis "1,35 jt". Jika Rp1.170.000, tulis "1,17 jt".
+- **Format Harga (Wajib)**: Harga dari sistem sudah diformat dengan baik menggunakan "jt" atau "rb" tanpa "Rp". Cetak APA ADANYA angka tersebut (contoh: "1,5 jt", "400 rb"). JANGAN tambahkan "Rp" lagi.
 - Untuk format coret (diskon) di WA, gunakan teks: "(sebelum diskon: 1,3 jt)" karena fitur strikethrough (~~) tidak didukung dengan baik.
 
 # TONE & STYLE (MUTLAK)

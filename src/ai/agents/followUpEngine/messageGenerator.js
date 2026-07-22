@@ -153,15 +153,17 @@ async function generateFollowUpMessage(customerData, strategy, promoData = null)
 
         let chatHistorySection = '';
         const rawPhone = customerData.senderNumber || context.phone || customerData.docId;
-        // Strip WA suffix so we match DB format (stored without @c.us/@lid)
-        const phone = rawPhone ? rawPhone.replace(/@c\.us$|@lid$/, '') : null;
-        if (phone) {
+        const phoneStripped = rawPhone ? rawPhone.replace(/@c\.us$|@lid$/, '') : null;
+        
+        if (rawPhone) {
             try {
                 const customerRecord = await prisma.customer.findFirst({
                     where: {
                         OR: [
-                            { phone: phone },
-                            { phoneReal: phone },
+                            { phone: rawPhone },
+                            { phone: phoneStripped },
+                            { phoneReal: rawPhone },
+                            { phoneReal: phoneStripped },
                         ]
                     },
                     include: {
