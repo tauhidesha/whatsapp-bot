@@ -1421,7 +1421,17 @@ function start(client) {
 
             const contextInfo = rawMsg.message?.extendedTextMessage?.contextInfo || rawMsg.message?.imageMessage?.contextInfo || rawMsg.message?.videoMessage?.contextInfo || rawMsg.message?.contextInfo;
             const externalAdReply = contextInfo?.externalAdReply;
-            const ctwaClid = externalAdReply?.ctwaClid || contextInfo?.ctwaClid;
+            let ctwaClid = externalAdReply?.ctwaClid || contextInfo?.ctwaClid || externalAdReply?.sourceId;
+
+            if (!ctwaClid && contextInfo?.conversionData) {
+                try {
+                    ctwaClid = Buffer.isBuffer(contextInfo.conversionData) 
+                        ? contextInfo.conversionData.toString('utf-8') 
+                        : String(contextInfo.conversionData);
+                } catch (e) {
+                    console.error('[CTWA] Failed to parse conversionData', e);
+                }
+            }
 
             const msg = {
                 from: senderJid,
