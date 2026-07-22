@@ -27,9 +27,10 @@ async function composerNode(state) {
 
     try {
         const isFollowUpTurn = state.messages && state.messages.length > 1;
+        const userName = state.metadata?.senderName || 'kak';
         const greetingDirective = isFollowUpTurn
-            ? `\n⛔ ATURAN SAPAAN (STRICT & MUTLAK - TURN KE-${state.messages.length}): Percakapan ini SUDAH BERJALAN. DILARANG KERAS MENGUCAPKAN "halo", "halo kak", "halo mas", "selamat pagi/siang/malam", ATAU "salam kenal"! Mengulang "halo kak" di setiap balasan adalah KESALAHAN FATAL. LANGSUNG jawab poin obrolan atau pertanyaan user secara natural.`
-            : `\n=== ATURAN SAPAAN (PESAN PERTAMA) ===\nSapa dengan ramah dan natural (misal: "halo kak [nama]!").`;
+            ? `\n⛔ ATURAN SAPAAN (STRICT & MUTLAK - TURN KE-${state.messages.length}): Percakapan ini SUDAH BERJALAN. DILARANG KERAS MENGUCAPKAN "halo", "halo kak", "halo mas", "selamat pagi/siang/malam", ATAU "salam kenal"! Mengulang sapaan di setiap balasan adalah KESALAHAN FATAL. LANGSUNG jawab poin obrolan atau pertanyaan user secara natural.`
+            : `\n=== ATURAN SAPAAN (PESAN PERTAMA) ===\nSapa dengan ramah dan natural (misal: "halo ${userName}!"). Jika nama kustomer tersedia, gunakan nama tersebut.`;
 
         const systemInstruction = `Kamu adalah Zoya, Customer Service Bosmat Repaint & Detailing Studio. Bukan chatbot korporat — kamu adalah "temen bengkel" yang ngerti banget soal repaint dan detailing motor.
 

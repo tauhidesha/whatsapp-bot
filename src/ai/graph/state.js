@@ -177,7 +177,14 @@ const ZoyaState = Annotation.Root({
             if (!updated) return old;
             const mergedItems = { ...(old?.items || {}) };
             if (updated.items) {
-                Object.assign(mergedItems, updated.items);
+                // If a key's value is explicitly null, delete it from the cart
+                Object.keys(updated.items).forEach(k => {
+                    if (updated.items[k] === null) {
+                        delete mergedItems[k];
+                    } else {
+                        mergedItems[k] = updated.items[k];
+                    }
+                });
             }
             return {
                 items: mergedItems,

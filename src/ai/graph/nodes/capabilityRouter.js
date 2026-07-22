@@ -129,7 +129,17 @@ async function capabilityRouterNode(state) {
             const plannerParams = state.planner?.execution?.parameters || {};
             const newCartItems = extractCartItems(response, plannerParams);
             if (newCartItems) {
-                cartUpdate = { items: newCartItems, calculatedAt: new Date().toISOString() };
+                cartUpdate = { items: { ...newCartItems }, calculatedAt: new Date().toISOString() };
+                
+                // PRICING TOOL evaluates ALL current requestedServices.
+                // Any item in the persistent cart that was NOT just priced 
+                // is obsolete (e.g. user changed mind) and MUST be removed.
+                const currentCartKeys = Object.keys(state.cart?.items || {});
+                currentCartKeys.forEach(key => {
+                    if (!newCartItems[key]) {
+                        cartUpdate.items[key] = null; // Mark for deletion by state reducer
+                    }
+                });
             }
         }
 

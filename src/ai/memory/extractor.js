@@ -72,7 +72,7 @@ ATURAN UPDATE STATE: HANYA ekstrak dan output field yang SECARA EKSPLISIT dibaha
 Jika suatu informasi TIDAK DIBAHAS, JANGAN masukkan field tersebut ke dalam output JSON.${contextStr}
 ATURAN KETAT:
 - BAHASA GAUL/SLANG: Kata "kura2" atau "kura-kura" dalam konteks tanya harga berarti "kira-kira" (estimasi), BUKAN hewan atau warna kura-kura!
-- ASUMSI DEFAULT (IKLAN META): Saat ini sedang berjalan Iklan Meta untuk Repaint. Jika user masuk dan bertanya harga secara ambigu/tidak spesifik (misal: "pcx berapa?", "kalo full berapa?", "full body brpan"), asumsikan layanan yang dituju adalah "Repaint Full Bodi" dan WAJIB MASUKKAN ke array \`services\`.
+- ASUMSI DEFAULT (IKLAN META): Saat ini sedang berjalan Iklan Meta untuk Repaint. Jika user masuk dan bertanya harga secara ambigu/tidak spesifik (misal: "pcx berapa?", "kalo full berapa?"), asumsikan layanan yang dituju adalah "Repaint Full Bodi" dan WAJIB MASUKKAN ke array \`services\`. NAMUN, jika user menyebut "full bodi halus" atau "full halus", masukkan "Repaint Bodi Halus", BUKAN "Repaint Full Bodi". Sama halnya untuk "kasar".
 
 Format JSON output yang diharapkan:
 {
@@ -155,7 +155,7 @@ Field yang bernilai string (kecuali visualSummary, services, hasDamage, targetSe
                 if (partLower.includes('halus')) specificServices.push('Repaint Bodi Halus');
                 if (partLower.includes('kasar')) specificServices.push('Repaint Bodi Kasar');
                 if (partLower.includes('velg') || partLower.includes('pelg')) specificServices.push('Repaint Velg');
-                if (partLower.includes('full')) specificServices.push('Repaint Full Bodi');
+                if (partLower.includes('full') && !partLower.includes('halus') && !partLower.includes('kasar')) specificServices.push('Repaint Full Bodi');
 
                 if (specificServices.length > 0) {
                     extraction.services = extraction.services || [];
@@ -173,7 +173,7 @@ Field yang bernilai string (kecuali visualSummary, services, hasDamage, targetSe
                 if (targetLower.includes('halus')) specificServices.push('Repaint Bodi Halus');
                 if (targetLower.includes('kasar')) specificServices.push('Repaint Bodi Kasar');
                 if (targetLower.includes('velg') || targetLower.includes('pelg')) specificServices.push('Repaint Velg');
-                if (targetLower.includes('full')) specificServices.push('Repaint Full Bodi');
+                if (targetLower.includes('full') && !targetLower.includes('halus') && !targetLower.includes('kasar')) specificServices.push('Repaint Full Bodi');
                 if (targetLower.includes('detailing')) specificServices.push('Detailing');
                 if (targetLower.includes('cuci')) specificServices.push('Cuci Komplit');
 
@@ -186,12 +186,42 @@ Field yang bernilai string (kecuali visualSummary, services, hasDamage, targetSe
                     });
                 }
             }
+        } // End of if (extraction.targetService...) block
+        
+        // Ultimate fallback: ALWAYS regex the raw user message for service names just in case the LLM misses it
+        const rawTextLower = lastUserContent.toLowerCase();
+        const rawSpecificServices = [];
+        if (rawTextLower.includes('halus')) rawSpecificServices.push('Repaint Bodi Halus');
+        if (rawTextLower.includes('kasar')) rawSpecificServices.push('Repaint Bodi Kasar');
+        if (rawTextLower.includes('velg') || rawTextLower.includes('pelg')) rawSpecificServices.push('Repaint Velg');
+        if (rawTextLower.includes('full') && !rawTextLower.includes('halus') && !rawTextLower.includes('kasar')) rawSpecificServices.push('Repaint Full Bodi');
+        if (rawTextLower.includes('detailing')) rawSpecificServices.push('Detailing');
+        if (rawTextLower.includes('cuci')) rawSpecificServices.push('Cuci Komplit');
+
+        if (rawSpecificServices.length > 0) {
+            extraction.services = extraction.services || [];
+            rawSpecificServices.forEach(srv => {
+                if (!extraction.services.includes(srv)) {
+                    extraction.services.push(srv);
+                }
+            });
+        }
+        
+        if (extraction.services && extraction.services.length > 0) {
+            updates.consultation = updates.consultation || { ...state.consultation };
+            const existingServices = state.consultation?.requestedServices || [];
+            let newServices = [...new Set([...existingServices, ...extraction.services])];
             
-            if (extraction.services && extraction.services.length > 0) {
-                const existingServices = state.consultation?.requestedServices || [];
-                const newServices = [...new Set([...existingServices, ...extraction.services])];
-                updates.consultation.requestedServices = newServices;
+            // Conflict Resolution: If user explicitly clarifies 'Bodi Halus' or 'Bodi Kasar',
+            // we should remove 'Repaint Full Bodi' if it was assumed previously.
+            if (extraction.services.includes('Repaint Bodi Halus') && !extraction.services.includes('Repaint Full Bodi')) {
+                newServices = newServices.filter(s => s !== 'Repaint Full Bodi');
             }
+            if (extraction.services.includes('Repaint Bodi Kasar') && !extraction.services.includes('Repaint Full Bodi')) {
+                newServices = newServices.filter(s => s !== 'Repaint Full Bodi');
+            }
+            
+            updates.consultation.requestedServices = newServices;
         }
 
         if (extraction.bookingDate || extraction.bookingTime) {
