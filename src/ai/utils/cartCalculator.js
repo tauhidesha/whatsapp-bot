@@ -79,7 +79,7 @@ function calculateCartTotal(cartItems = {}, comboDiscountPct = 0.10) {
                 totalFormatted: formatRp(total),
                 hasDiscount: applyDiscount
             };
-        });
+        }).sort((a, b) => b.basePrice - a.basePrice); // Urutkan dari MAHAL ke MURAH (Premium -> Standar -> Basic -> Ekonomis)
 
         const fixedLineItems = fixedEntries.map(([name, itm]) => ({
             name,

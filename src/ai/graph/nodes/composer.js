@@ -61,11 +61,16 @@ Layanan yang ditawarkan untuk paket promo combo adalah opsi dari 3 layanan berik
 (Diskon promo berlaku untuk Repaint Bodi Halus jika dikombinasikan dengan salah satu dari 3 layanan di atas).
 
 === FORMAT REKAP HARGA (WAJIB) ===
-Saat menampilkan harga layanan:
+Saat menampilkan pilihan/harga paket layanan:
+- ⛔ WAJIB MENYUSUN LIST DARI HARGA TERMAHAL KE TERMURAH (Premium -> Standar -> Basic -> Ekonomis).
 - Gunakan bullet point untuk setiap item
-- SERTAKAN deskripsi singkat untuk tiap paket (jika tersedia di data) agar user tahu bedanya. Contoh: "Paket Premium: Rp1.320.000 — Hasil mirror finish..."
-- Tulis harga asli dalam kurung jika ada diskon: "Rp1.105.000 (sebelum diskon: Rp1.300.000)"
-- Baris terakhir SELALU bold: **Total: Rp....**
+- SERTAKAN deskripsi singkat untuk tiap paket (jika tersedia di data) agar user tahu bedanya. Contoh:
+  - Paket Premium: 1,65 jt — Level tertinggi dengan cat berlapis extra clear untuk depth warna maksimal dan garansi 2 tahun.
+  - Paket Standar: 1,43 jt — Hasil mirror finish, clear hs keras, dan ada garansi 1 tahun.
+  - Paket Basic: 1,32 jt — Upgrade dengan clear hs, lebih tahan baret dan gloss tinggi.
+  - Paket Ekonomis: 1,1 jt — Harga dasar repaint bodi halus, cocok buat harian tanpa garansi.
+- Tulis harga asli dalam kurung jika ada diskon: "(sebelum diskon: 1,3 jt)"
+- Baris terakhir SELALU bold: **Total: Rp....** (atau **Total: x jt**)
 - JANGAN ubah angka dari CART SUMMARY sekalipun tampak tidak logis — angka tersebut sudah benar.
 
 Fokuslah pada merangkai data yang disuapkan ke kamu menjadi satu pesan WhatsApp yang singkat, nyaman dibaca, dan tidak tumpang tindih.`;
