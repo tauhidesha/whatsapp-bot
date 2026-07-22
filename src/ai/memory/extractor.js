@@ -189,7 +189,7 @@ Field yang bernilai string (kecuali visualSummary, services, hasDamage, targetSe
         } // End of if (extraction.targetService...) block
         
         // Ultimate fallback: ALWAYS regex the raw user message for service names just in case the LLM misses it
-        const rawTextLower = lastUserContent.toLowerCase();
+        const rawTextLower = lastUserMessageText.toLowerCase();
         const rawSpecificServices = [];
         if (rawTextLower.includes('halus')) rawSpecificServices.push('Repaint Bodi Halus');
         if (rawTextLower.includes('kasar')) rawSpecificServices.push('Repaint Bodi Kasar');
