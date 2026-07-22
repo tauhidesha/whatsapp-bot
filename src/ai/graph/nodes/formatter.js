@@ -97,11 +97,11 @@ async function formatterNode(state) {
             if (primarySvc.includes('halus')) {
                 upsellSuggestion = 'Cuci Komplit, Repaint Velg, atau Repaint Bodi Kasar';
                 benefitText = 'biar tampilan motor makin maksimal secara keseluruhan';
-                packageExplanation = `(Tawarkan 3 opsi pilihan: cuci komplit, repaint velg, atau repaint bodi kasar. Jelaskan singkat: Ambil salah satu dari opsi itu aja, Repaint Bodi Halus-nya udah otomatis dapet diskon ${comboDiscountPercent}%. Info juga kalau cat baru belum bisa dicoating, harus nunggu 1 bulan biar cat matang.)`;
+                packageExplanation = `(Tawarkan 3 opsi pilihan: cuci komplit, repaint velg, atau repaint bodi kasar. Jelaskan singkat: Ambil salah satu dari 3 opsi itu aja, Repaint Bodi Halus-nya udah otomatis dapet diskon ${comboDiscountPercent}%. Info juga kalau cat baru belum bisa dicoating, harus nunggu 1 bulan biar cat matang.)`;
             } else if (primarySvc.includes('kasar') || primarySvc.includes('velg')) {
                 upsellSuggestion = 'Repaint Bodi Halus';
                 benefitText = `karena kalau ambil paket Repaint Bodi Halus sekalian, paket bodi halusnya otomatis dapet diskon ${comboDiscountPercent}%`;
-                packageExplanation = `(Infoin santai: Kalau mau sekalian Repaint Bodi Halus juga mumpung lagi ada promo diskon ${comboDiscountPercent}% untuk paket bodi halusnya, jadi motornya bisa fresh kayak baru lagi.)`;
+                packageExplanation = `(Infoin santai: Kalau mau sekalian Repaint Bodi Halus juga mumpung lagi ada promo diskon ${comboDiscountPercent}% untuk paket bodi halusnya, dikombinasikan dengan cuci komplit, repaint velg, atau repaint bodi kasar.)`;
             }
         }
 
