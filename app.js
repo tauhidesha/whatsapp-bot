@@ -1419,7 +1419,9 @@ function start(client) {
                 };
             }
 
-            const contextInfo = rawMsg.message?.extendedTextMessage?.contextInfo || rawMsg.message?.imageMessage?.contextInfo || rawMsg.message?.videoMessage?.contextInfo;
+            const contextInfo = rawMsg.message?.extendedTextMessage?.contextInfo || rawMsg.message?.imageMessage?.contextInfo || rawMsg.message?.videoMessage?.contextInfo || rawMsg.message?.contextInfo;
+            const externalAdReply = contextInfo?.externalAdReply;
+            const ctwaClid = externalAdReply?.ctwaClid || contextInfo?.ctwaClid;
 
             const msg = {
                 from: senderJid,
@@ -1439,9 +1441,10 @@ function start(client) {
                     pnJid: senderJid
                 },
                 quotedMsgObj: quotedMsgObj,
-                ctwaContext: contextInfo?.externalAdReply ? {
-                    sourceUrl: contextInfo.externalAdReply.sourceUrl,
-                    displayText: contextInfo.externalAdReply.title || contextInfo.externalAdReply.body
+                ctwaClid: ctwaClid || null,
+                ctwaContext: externalAdReply ? {
+                    sourceUrl: externalAdReply.sourceUrl,
+                    displayText: externalAdReply.title || externalAdReply.body
                 } : null,
                 _raw: rawMsg // Save raw message for media decryption
             };
@@ -1535,7 +1538,7 @@ function start(client) {
             }
 
             // Save sender metadata
-            await saveSenderMeta(senderNumber, senderName, client);
+            await saveSenderMeta(senderNumber, senderName, client, msg.ctwaClid);
 
             // Mark coating reminders as replied
             const { markCoatingReminderAsReplied } = require('./src/ai/utils/coatingReminders');
@@ -1830,7 +1833,7 @@ async function saveMessageToFirestore(senderNumber, message, senderType) {
 
 const fetchedProfilePics = new Set(); // Keep track of numbers we already fetched DP for
 
-async function saveSenderMeta(senderNumber, displayName, client = null) {
+async function saveSenderMeta(senderNumber, displayName, client = null, ctwaClid = null) {
     const prisma = require('./src/lib/prisma');
 
     const { docId, channel, isLid, originalId } = parseSenderIdentity(senderNumber);
@@ -1848,6 +1851,7 @@ async function saveSenderMeta(senderNumber, displayName, client = null) {
                 data: {
                     name: displayName || existingByLid.name,
                     lastMessageAt: new Date(),
+                    ...(ctwaClid ? { ctwaClid } : {}),
                 }
             });
             console.log(`[saveSenderMeta] LID ${senderNumber} matched existing customer ${existingByLid.phone}`);
@@ -1880,6 +1884,7 @@ async function saveSenderMeta(senderNumber, displayName, client = null) {
             aiPaused: snoozeInfo.active || false,
             aiPausedUntil: snoozeInfo.expiresAt ? new Date(snoozeInfo.expiresAt) : null,
             aiPauseReason: snoozeInfo.reason,
+            ...(ctwaClid ? { ctwaClid } : {}),
         };
 
         if (isLid) {
@@ -1893,13 +1898,14 @@ async function saveSenderMeta(senderNumber, displayName, client = null) {
                 name: displayName,
                 profilePicUrl: profilePicUrl || undefined,
                 whatsappLid: isLid ? originalId : undefined,
+                ...(ctwaClid ? { ctwaClid } : {}),
                 aiPaused: snoozeInfo.active || false,
                 aiPausedUntil: snoozeInfo.expiresAt ? new Date(snoozeInfo.expiresAt) : null,
                 aiPauseReason: snoozeInfo.reason,
             }
         });
 
-        console.log(`[Prisma] Sender meta saved for ${docId}:`, customer.id);
+        console.log(`[Prisma] Sender meta saved for ${docId}:`, customer.id, ctwaClid ? `(CTWA: ${ctwaClid})` : '');
     } catch (error) {
         console.error('Error saving sender meta:', error);
     }

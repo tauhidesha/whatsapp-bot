@@ -12,6 +12,7 @@ model Customer {
   id              String           @id @default(uuid())
   phone           String           @unique
   whatsappLid     String?          @unique
+  ctwaClid        String?
   name            String?
   totalSpending   Float            @default(0)
   lastService     DateTime?
