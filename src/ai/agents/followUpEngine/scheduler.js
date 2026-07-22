@@ -360,8 +360,8 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
         return { sent: 0, skipped: 0, errors: 0, downgrades: downgradeCount };
     }
 
-    // Apply limit to prevent bans (max 20 per day)
-    const MAX_DAILY_FOLLOW_UPS = 20;
+    // Apply limit to prevent bans (unlimited as requested)
+    const MAX_DAILY_FOLLOW_UPS = 99999;
     const finalLimit = limit ? Math.min(limit, MAX_DAILY_FOLLOW_UPS) : MAX_DAILY_FOLLOW_UPS;
     if (queue.length > finalLimit) {
         // Sort by newest lastMessageAt first before slicing
@@ -624,8 +624,8 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
         }
     }
 
-    // Apply limit to prevent bans (max 20 per day)
-    const MAX_DAILY_FOLLOW_UPS = 20;
+    // Apply limit to prevent bans (unlimited as requested)
+    const MAX_DAILY_FOLLOW_UPS = 99999;
     const finalLimit = limit ? Math.min(limit, MAX_DAILY_FOLLOW_UPS) : MAX_DAILY_FOLLOW_UPS;
     if (queue.length > finalLimit) {
         // Sort by newest lastMessageAt first before slicing
@@ -637,7 +637,7 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
         queue.splice(finalLimit);
     }
 
-    console.log(`[Scheduler][DryRun] Preview queue built: ${queue.length} items (Max 20/day)`);
+    console.log(`[Scheduler][DryRun] Preview queue built: ${queue.length} items (Unlimited/day)`);
     
     // Now generate messages ONLY for the final sliced queue to save API limits
     for (let i = 0; i < queue.length; i++) {
