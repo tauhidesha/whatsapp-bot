@@ -139,7 +139,7 @@ async function generateFollowUpMessage(customerData, strategy, promoData = null)
         const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
         const modelName = process.env.AI_MODEL || 'gemini-flash-latest';
         const model = new ChatGoogleGenerativeAI({
-            modelName: modelName,
+            model: modelName,
             apiKey: apiKey,
             temperature: 0.7,
         });
