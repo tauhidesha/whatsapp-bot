@@ -1376,6 +1376,44 @@ function start(client) {
     });
     client.__debounceQueue = debounceQueue;
 
+    // WhatsApp Business Label mapping
+    const waLabelMap = new Map();
+
+    client.ev.on('labels.edit', (label) => {
+        if (label && label.id && label.name) {
+            waLabelMap.set(label.id, label.name);
+            console.log(`[Labels] Synced label: ID ${label.id} = ${label.name}`);
+        }
+    });
+
+    client.ev.on('labels.association', async ({ association, type }) => {
+        try {
+            if (!association || !association.labelId || !association.chatId) return;
+            const labelName = waLabelMap.get(association.labelId);
+            const senderNumber = association.chatId;
+
+            if (labelName) {
+                console.log(`[Labels] Association ${type}: Chat ${senderNumber} <- Label "${labelName}"`);
+
+                if (labelName.trim().toUpperCase() === 'AI OFF') {
+                    if (type === 'add') {
+                        console.log(`[Labels] Triggering SNOOZE for ${senderNumber} due to AI OFF label.`);
+                        // Snooze 365 days for manual label
+                        await setSnoozeMode(senderNumber, 365 * 24 * 60, { manual: true, reason: 'label_ai_off' });
+                    } else if (type === 'remove') {
+                        console.log(`[Labels] Waking up AI for ${senderNumber} due to AI OFF label removal.`);
+                        await clearSnoozeMode(senderNumber);
+                    }
+                }
+            } else {
+                // If label name is not in memory yet, it might be an un-synced label.
+                console.log(`[Labels] Ignored association for unknown label ID: ${association.labelId}`);
+            }
+        } catch (error) {
+            console.error('[Labels] Error processing label association:', error);
+        }
+    });
+
     // Baileys Message Event
     client.ev.on('messages.upsert', async ({ messages, type }) => {
         if (type !== 'notify') return;
