@@ -1394,14 +1394,21 @@ function start(client) {
 
             if (labelName) {
                 console.log(`[Labels] Association ${type}: Chat ${senderNumber} <- Label "${labelName}"`);
+                
+                const normalizedLabelName = labelName.trim().toUpperCase();
 
-                if (labelName.trim().toUpperCase() === 'AI OFF') {
+                if (normalizedLabelName === 'AI OFF') {
                     if (type === 'add') {
                         console.log(`[Labels] Triggering SNOOZE for ${senderNumber} due to AI OFF label.`);
                         // Snooze 365 days for manual label
                         await setSnoozeMode(senderNumber, 365 * 24 * 60, { manual: true, reason: 'label_ai_off' });
                     } else if (type === 'remove') {
                         console.log(`[Labels] Waking up AI for ${senderNumber} due to AI OFF label removal.`);
+                        await clearSnoozeMode(senderNumber);
+                    }
+                } else if (normalizedLabelName === 'AI ON') {
+                    if (type === 'add') {
+                        console.log(`[Labels] Waking up AI for ${senderNumber} due to AI ON label.`);
                         await clearSnoozeMode(senderNumber);
                     }
                 }
