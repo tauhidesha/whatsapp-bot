@@ -1747,21 +1747,6 @@ function start(client) {
         } // End of for (const rawMsg of messages)
     }); // End of client.ev.on('messages.upsert')
 
-    // --- Handle Incoming Calls ---
-    client.ev.on('call', async (calls) => {
-        for (const call of calls) {
-            if (call.status === 'offer') {
-                console.log(`[CALL] Panggilan masuk dari ${call.from}`);
-                try {
-                    const message = "Waduh, maaf ya Mas, Zoya nggak bisa angkat telepon 😅.\n\nKetik aja pertanyaannya di sini, nanti Zoya bantu jawab kok! 👇";
-                    markBotMessage(call.from, message);
-                    await client.sendMessage(call.from, { text: message });
-                } catch (e) {
-                    console.error('[CALL] Error handling incoming call:', e);
-                }
-            }
-        }
-    });
 }
 
 // --- Prisma Message Saving ---
