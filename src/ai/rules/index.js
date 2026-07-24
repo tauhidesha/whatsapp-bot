@@ -65,6 +65,8 @@ async function executeRules(state) {
         if (repaintRules.upsells) flags.upsells.push(...repaintRules.upsells);
         if (repaintRules.promotions) flags.promotions.push(...repaintRules.promotions);
         if (repaintRules.guidelines) flags.guidelines.push(...repaintRules.guidelines);
+        if (repaintRules.restrictions) flags.restrictions.push(...repaintRules.restrictions);
+        if (repaintRules.disabledServices) flags.disabledServices.push(...repaintRules.disabledServices);
     }
 
     return flags;

@@ -16,19 +16,35 @@ async function evaluateRepaintRules(state) {
         requiredFacts: [],
         optionalFacts: [],
         upsells: [],
-        guidelines: []
+        guidelines: [],
+        restrictions: [],
+        disabledServices: []
     };
     
+    const { vehicle, consultation } = state;
+    const knownFacts = consultation?.knownFacts || {};
+    const knownMotor = (knownFacts.motor?.value || vehicle?.model?.value || vehicle?.model || '').toString().toLowerCase();
+    const motorBrand = (vehicle?.brand?.value || vehicle?.brand || '').toString().toLowerCase();
+    const isVespa = knownMotor.includes('vespa') || motorBrand.includes('vespa');
+
+    if (isVespa) {
+        rules.restrictions.push({
+            type: 'RESTRICTION',
+            service: 'Repaint Vespa',
+            status: 'DISABLED',
+            reason: 'Untuk sementara studio belum menerima pengerjaan repaint khusus motor Vespa Matic.',
+            suggestedAction: 'Sampaikan permohonan maaf secara sopan dan ramah bahwa saat ini studio belum bisa melayani repaint Vespa Matic. Tanyakan apakah ada unit motor tipe lain yang ingin di-repaint.'
+        });
+        rules.disabledServices.push('Repaint Vespa');
+    }
+
     const requested = state.consultation?.requestedServices || [];
     const isRepaintRequested = requested.some(s => s.toLowerCase().includes('repaint'));
     
-    if (!isRepaintRequested) {
+    if (!isRepaintRequested && !isVespa) {
         return rules;
     }
 
-    const { vehicle, consultation } = state;
-    const knownFacts = consultation?.knownFacts || {};
-    const knownMotor = knownFacts.motor?.value || vehicle?.model?.value;
     const knownRepaintTarget = knownFacts.partToRepaint?.value || knownFacts.scope?.value;
 
     // Filter SOP based on context (knownFacts and remainingFacts)
