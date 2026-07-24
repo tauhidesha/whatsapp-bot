@@ -1464,18 +1464,42 @@ function start(client) {
                 };
             }
 
-            const contextInfo = rawMsg.message?.extendedTextMessage?.contextInfo || rawMsg.message?.imageMessage?.contextInfo || rawMsg.message?.videoMessage?.contextInfo || rawMsg.message?.contextInfo;
-            const externalAdReply = contextInfo?.externalAdReply;
-            let ctwaClid = externalAdReply?.ctwaClid || contextInfo?.ctwaClid || externalAdReply?.sourceId;
+            const findContextInfo = (m) => m?.extendedTextMessage?.contextInfo || m?.imageMessage?.contextInfo || m?.videoMessage?.contextInfo || m?.audioMessage?.contextInfo || m?.documentMessage?.contextInfo || m?.buttonsResponseMessage?.contextInfo || m?.listResponseMessage?.contextInfo || m?.templateButtonReplyMessage?.contextInfo || m?.interactiveResponseMessage?.contextInfo || m?.contextInfo || null;
 
-            if (!ctwaClid && contextInfo?.conversionData) {
-                try {
-                    ctwaClid = Buffer.isBuffer(contextInfo.conversionData) 
-                        ? contextInfo.conversionData.toString('utf-8') 
-                        : String(contextInfo.conversionData);
-                } catch (e) {
-                    console.error('[CTWA] Failed to parse conversionData', e);
+            const extractCtwaClid = (c) => {
+                if (!c) return null;
+                const ext = c.externalAdReply;
+                let candidate = ext?.ctwaClid || c?.ctwaClid || ext?.ref || ext?.sourceId || c?.ctwaPayload;
+
+                if (!candidate && c.conversionData) {
+                    try {
+                        candidate = Buffer.isBuffer(c.conversionData) ? c.conversionData.toString('utf-8') : String(c.conversionData);
+                    } catch (e) {}
                 }
+
+                const targetUrl = ext?.sourceUrl || ext?.adContextUrl;
+                if (!candidate && targetUrl) {
+                    try {
+                        const parsedUrl = new URL(targetUrl);
+                        candidate = parsedUrl.searchParams.get('ctwa_clid') || parsedUrl.searchParams.get('fbclid') || parsedUrl.searchParams.get('clid') || parsedUrl.searchParams.get('ad_id');
+                    } catch (e) {}
+                }
+
+                return candidate ? String(candidate).trim() : null;
+            };
+
+            const contextInfo = findContextInfo(rawMsg.message);
+            const externalAdReply = contextInfo?.externalAdReply;
+            const ctwaClid = extractCtwaClid(contextInfo);
+
+            if (externalAdReply || contextInfo?.conversionData || contextInfo?.ctwaPayload) {
+                console.log('[CTWA DEBUG] Incoming Ad message detected:', JSON.stringify({
+                    hasExternalAdReply: !!externalAdReply,
+                    sourceUrl: externalAdReply?.sourceUrl,
+                    title: externalAdReply?.title,
+                    extractedCtwaClid: ctwaClid,
+                    contextKeys: contextInfo ? Object.keys(contextInfo) : []
+                }));
             }
 
             const msg = {
