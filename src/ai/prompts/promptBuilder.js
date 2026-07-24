@@ -325,19 +325,14 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
             const sortedSimulations = [...cartCalc.simulations].sort((a, b) => a.basePrice - b.basePrice);
             
             sortedSimulations.forEach(sim => {
+                // If there's a discount, use the totalBaseFormatted as original price
                 const discInfo = sim.hasDiscount
-                    ? `~${sim.basePriceFormatted}~ -> *${sim.discountedPriceFormatted}*`
-                    : `*${sim.basePriceFormatted}*`;
-                prompt += `🔹 ${sim.packageName} — ${discInfo}`;
-                if (cartCalc.fixedLineItems?.length > 0) {
-                    const fixedSummary = cartCalc.fixedLineItems.map(f => `${f.name} ${f.priceFormatted}`).join(' + ');
-                    prompt += ` -> sama ${fixedSummary} = *${sim.totalFormatted}*`;
-                }
-                // Don't append descriptions dynamically here to enforce short format
-                prompt += `\n`;
+                    ? `~${sim.totalBaseFormatted}~ -> *${sim.totalFormatted}*`
+                    : `*${sim.totalFormatted}*`;
+                prompt += `🔹 ${sim.packageName} — ${discInfo}\n`;
             });
             if (cartCalc.fixedLineItems?.length > 0) {
-                prompt += `\nLayanan fixed di cart:\n`;
+                prompt += `\nLayanan tambahan sudah termasuk:\n`;
                 cartCalc.fixedLineItems.forEach(f => prompt += `- ${f.name}: ${f.priceFormatted}\n`);
             }
         } else if (cartCalc.type === 'fixed-cart') {

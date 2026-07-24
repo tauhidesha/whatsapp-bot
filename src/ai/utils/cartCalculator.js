@@ -82,15 +82,18 @@ function calculateCartTotal(cartItems = {}, comboDiscountPct = 0.10) {
             const shouldDiscountThisPackage = applyDiscount && !isEkonomis;
             const discountedPrice = shouldDiscountThisPackage ? Math.round(basePrice * (1 - comboDiscountPct)) : basePrice;
             const total = discountedPrice + fixedTotal + selectedMultiTotal;
+            const totalBase = basePrice + fixedTotal + selectedMultiTotal;
             return {
                 packageName: c.name,
                 description: c.description,
                 basePrice,
                 discountedPrice,
                 total,
+                totalBase,
                 basePriceFormatted: formatRp(basePrice),
                 discountedPriceFormatted: formatRp(discountedPrice),
                 totalFormatted: formatRp(total),
+                totalBaseFormatted: formatRp(totalBase),
                 hasDiscount: shouldDiscountThisPackage
             };
         }).sort((a, b) => b.basePrice - a.basePrice); // Urutkan dari MAHAL ke MURAH (Premium -> Standar -> Basic -> Ekonomis)
