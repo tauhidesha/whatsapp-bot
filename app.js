@@ -44,7 +44,7 @@ const { getSystemPromptTool } = require('./src/ai/tools/getSystemPromptTool.js')
 const { updatePromoOfTheMonthTool } = require('./src/ai/tools/updatePromoOfTheMonthTool.js');
 // updateCustomerContextTool REMOVED — digantikan oleh background context extractor agent
 const { startFollowUpScheduler, updateSignalsOnIncomingMessage } = require('./src/ai/agents/followUpEngine/index.js');
-const { isSnoozeActive, setSnoozeMode, clearSnoozeMode, getSnoozeInfo } = require('./src/ai/utils/humanHandover.js');
+const { isSnoozeActive, setSnoozeMode, clearSnoozeMode, getSnoozeInfo, disableFollowUp, enableFollowUp } = require('./src/ai/utils/humanHandover.js');
 const { handleAdminHpMessage, markBotMessage } = require('./src/ai/utils/adminMessageSync.js');
 const { backfillAdminMessages } = require('./scripts/backfillAdminMessages.js');
 const { backfillProfilePics } = require('./scripts/backfillProfilePics.js');
@@ -1410,6 +1410,19 @@ function start(client) {
                     if (type === 'add') {
                         console.log(`[Labels] Waking up AI for ${senderNumber} due to AI ON label.`);
                         await clearSnoozeMode(senderNumber);
+                    }
+                } else if (['FOLLOW UP OFF', 'FOLLOWUP OFF', 'NO FOLLOWUP', 'NO FOLLOW UP', 'STOP FOLLOWUP'].includes(normalizedLabelName)) {
+                    if (type === 'add') {
+                        console.log(`[Labels] Disabling Follow-Up for ${senderNumber} due to ${normalizedLabelName} label.`);
+                        await disableFollowUp(senderNumber);
+                    } else if (type === 'remove') {
+                        console.log(`[Labels] Enabling Follow-Up for ${senderNumber} due to ${normalizedLabelName} label removal.`);
+                        await enableFollowUp(senderNumber);
+                    }
+                } else if (['FOLLOW UP ON', 'FOLLOWUP ON'].includes(normalizedLabelName)) {
+                    if (type === 'add') {
+                        console.log(`[Labels] Enabling Follow-Up for ${senderNumber} due to ${normalizedLabelName} label.`);
+                        await enableFollowUp(senderNumber);
                     }
                 }
             } else {

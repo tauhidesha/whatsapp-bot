@@ -345,6 +345,70 @@ async function isSnoozeActive(senderNumber) {
   return info.active;
 }
 
+async function disableFollowUp(senderNumber) {
+  const identifier = getIdentifier(senderNumber) || senderNumber;
+  const phone = identifier.replace(/@c\.us$|@lid$/, '');
+  
+  try {
+    let customer = await prisma.customer.findUnique({ where: { phone } });
+    if (!customer && identifier.endsWith('@lid')) {
+      customer = await prisma.customer.findFirst({ where: { whatsappLid: identifier } });
+    }
+    if (customer) {
+      await prisma.customerContext.upsert({
+        where: { id: customer.id },
+        update: {
+          followUpStrategy: 'stop',
+          labelReason: 'manual_followup_off',
+          updatedAt: new Date(),
+        },
+        create: {
+          id: customer.id,
+          phone: customer.phone,
+          followUpStrategy: 'stop',
+          labelReason: 'manual_followup_off',
+        }
+      });
+      console.log('[humanHandover] Follow-up DISABLED untuk', identifier);
+    }
+  } catch (err) {
+    console.warn('[humanHandover] Gagal disable follow-up:', err.message);
+  }
+}
+
+async function enableFollowUp(senderNumber) {
+  const identifier = getIdentifier(senderNumber) || senderNumber;
+  const phone = identifier.replace(/@c\.us$|@lid$/, '');
+  
+  try {
+    let customer = await prisma.customer.findUnique({ where: { phone } });
+    if (!customer && identifier.endsWith('@lid')) {
+      customer = await prisma.customer.findFirst({ where: { whatsappLid: identifier } });
+    }
+    if (customer) {
+      await prisma.customerContext.upsert({
+        where: { id: customer.id },
+        update: {
+          followUpStrategy: null,
+          followUpCount: 0,
+          labelReason: 'manual_followup_on',
+          updatedAt: new Date(),
+        },
+        create: {
+          id: customer.id,
+          phone: customer.phone,
+          followUpStrategy: null,
+          followUpCount: 0,
+          labelReason: 'manual_followup_on',
+        }
+      });
+      console.log('[humanHandover] Follow-up ENABLED untuk', identifier);
+    }
+  } catch (err) {
+    console.warn('[humanHandover] Gagal enable follow-up:', err.message);
+  }
+}
+
 module.exports = {
   notifyBosMat,
   notifyVisitIntent,
@@ -354,4 +418,6 @@ module.exports = {
   getSnoozeInfo,
   getIdentifier,
   isSnoozeActive,
+  disableFollowUp,
+  enableFollowUp,
 };
