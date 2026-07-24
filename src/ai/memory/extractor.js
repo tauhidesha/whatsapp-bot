@@ -210,7 +210,19 @@ Field yang bernilai string (kecuali visualSummary, services, hasDamage, targetSe
         if (extraction.services && extraction.services.length > 0) {
             updates.consultation = updates.consultation || { ...state.consultation };
             const existingServices = state.consultation?.requestedServices || [];
-            let newServices = [...new Set([...existingServices, ...extraction.services])];
+            
+            // Check if user's message contains additive keywords (e.g. "kalau sama velg", "tambah bodi kasar")
+            const textLower = lastUserMessageText.toLowerCase();
+            const isAdditive = ['tambah', 'sama', 'sekalian', 'plus', 'juga', 'gabung', 'dengan'].some(w => textLower.includes(w));
+            
+            let newServices;
+            if (isAdditive || existingServices.length === 0) {
+                // Accumulate/add to existing services
+                newServices = [...new Set([...existingServices, ...extraction.services])];
+            } else {
+                // User is stating/replacing their desired service (e.g. "bodi halus kak", "velg aja")
+                newServices = [...new Set(extraction.services)];
+            }
             
             // Conflict Resolution: If user explicitly clarifies 'Bodi Halus' or 'Bodi Kasar',
             // we should remove 'Repaint Full Bodi' if it was assumed previously.
