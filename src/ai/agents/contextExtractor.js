@@ -62,7 +62,7 @@ Aturan ketat:
 - Hanya isi field fakta yang BENAR-BENAR ada di percakapan ini
 - Jangan inferensi atau mengarang fakta
 - BAHASA GAUL/SLANG: Kata "kura2" atau "kura-kura" dalam konteks tanya harga berarti "kira-kira" (estimasi), BUKAN hewan atau warna kura-kura!
-- DILARANG BERASUMSI LAYANAN: JIKA kustomer HANYA menyebutkan tipe/merek/warna motor (misal: "Yamaha Xeon GT 2015 warna Hitam"), DILARANG KERAS memasukkan layanan apapun (seperti 'Repaint Full Bodi' atau 'Detailing') ke array `services`! HANYA isi array `services` jika kustomer SECARA EKSPLISIT menyebutkan layanan di pesannya.
+- DILARANG BERASUMSI LAYANAN: JIKA kustomer HANYA menyebutkan tipe/merek/warna motor (misal: "Yamaha Xeon GT 2015 warna Hitam"), DILARANG KERAS memasukkan layanan apapun (seperti 'Repaint Full Bodi' atau 'Detailing') ke array 'target_services'! HANYA isi array 'target_services' jika kustomer SECARA EKSPLISIT menyebutkan layanan di pesannya.
 
 PENTING (ANTI-HALUSINASI): 
 - Hanya ekstrak motor_model, motor_plate, motor_color, dan target_services jika itu adalah kendaraan MILIK USER yang akan dikerjakan.
