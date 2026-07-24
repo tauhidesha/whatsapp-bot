@@ -26,19 +26,12 @@ async function composerNode(state) {
     });
 
     try {
-        const { getDisplayName, getSalutation } = require('../../utils/salutationHelper');
         const isFollowUpTurn = state.messages && state.messages.length > 1;
         const rawName = state.customer?.name || state.metadata?.senderName || '';
-        const salutation = getSalutation(rawName);
-        const displayName = getDisplayName(rawName);
-
-        const salutationRule = salutation === 'mas'
-            ? `Customer ini berjenis kelamin LAKI-LAKI (Nama: ${rawName}). DILARANG KERAS memanggil "kak"! WAJIB gunakan panggilan "mas" (atau "${displayName}").`
-            : `Customer ini dipanggil "kak" (Nama: ${rawName || 'Customer'}).`;
 
         const greetingDirective = isFollowUpTurn
-            ? `\n⛔ ATURAN SAPAAN (STRICT & MUTLAK - TURN KE-${state.messages.length}): Percakapan ini SUDAH BERJALAN. DILARANG KERAS MENGUCAPKAN "halo", "halo kak", "halo mas", "selamat pagi/siang/malam", ATAU "salam kenal"! Mengulang sapaan di setiap balasan adalah KESALAHAN FATAL. LANGSUNG jawab poin obrolan atau pertanyaan user secara natural. ${salutationRule}`
-            : `\n=== ATURAN SAPAAN (PESAN PERTAMA) ===\n${salutationRule}\nSapa dengan ramah dan natural (misal: "halo ${displayName}!").`;
+            ? `\n⛔ ATURAN SAPAAN (STRICT - TURN KE-${state.messages.length}): Percakapan SUDAH BERJALAN. DILARANG MENGUCAPKAN "halo", "halo kak", "halo mas", "selamat pagi/siang/malam", ATAU "salam kenal"! Analisis nama "${rawName}": jika pria/cowok panggil "mas", jika cewek/ragu panggil "kak" secara opsional.`
+            : `\n=== ATURAN SAPAAN (PESAN PERTAMA) ===\nAnalisis nama "${rawName}": jika secara budaya/bahasa terindikasi LAKI-LAKI / PRIA, WAJIB sapa dengan "mas" (misal: "halo mas ${rawName.split(' ')[0]}!"). Jika PEREMPUAN, anonim, atau RAGU, sapa dengan "kak".`;
 
         const systemInstruction = `Kamu adalah Zoya, Customer Service Bosmat Repaint & Detailing Studio. Bukan chatbot korporat — kamu adalah "temen bengkel" yang ngerti banget soal repaint dan detailing motor.
 

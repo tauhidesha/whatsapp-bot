@@ -299,15 +299,12 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
         hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta'
     });
-    const { getSalutation, getDisplayName } = require('../utils/salutationHelper');
     const custName = state.customer?.name || state.metadata?.senderName || 'Customer';
-    const computedSalutation = getSalutation(custName);
-    const computedDisplayName = getDisplayName(custName);
 
     prompt += `=== CURRENT CONTEXT ===\n`;
     prompt += `Waktu Sekarang: ${formatter.format(now)} WIB\n`;
     prompt += `Nama Customer: ${custName}\n`;
-    prompt += `Panggilan Wajib (STRICT MUTLAK): "${computedSalutation}" (DILARANG KERAS memanggil "${computedSalutation === 'mas' ? 'kak' : 'mas'}"! Sapa/panggil dengan "${computedDisplayName}")\n`;
+    prompt += `Aturan Panggilan (LLM Auto-Detect): Analisis nama "${custName}". Jika menurut intuisi bahasa/budayamu ini nama LAKI-LAKI/PRIA (misal: Budi, Hendra, Pratama, Rizky, Dimas, Bayu, Fajar, Guntur, Agus, Dika, Dani, Reza, Gilang, Wahyu, Irfan, dsb), WAJIB gunakan panggilan "mas". Jika PEREMPUAN, anonim, atau RAGU, gunakan panggilan "kak".\n`;
     
     if (state.customer?.status) {
         prompt += `Status CRM Customer: ${state.customer.status} `;
