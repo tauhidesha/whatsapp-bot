@@ -72,7 +72,7 @@ ATURAN UPDATE STATE: HANYA ekstrak dan output field yang SECARA EKSPLISIT dibaha
 Jika suatu informasi TIDAK DIBAHAS, JANGAN masukkan field tersebut ke dalam output JSON.${contextStr}
 ATURAN KETAT:
 - BAHASA GAUL/SLANG: Kata "kura2" atau "kura-kura" dalam konteks tanya harga berarti "kira-kira" (estimasi), BUKAN hewan atau warna kura-kura!
-- ASUMSI DEFAULT (IKLAN META): Saat ini sedang berjalan Iklan Meta untuk Repaint. Jika user masuk dan bertanya harga secara ambigu/tidak spesifik (misal: "pcx berapa?", "kalo full berapa?"), asumsikan layanan yang dituju adalah "Repaint Full Bodi" dan WAJIB MASUKKAN ke array \`services\`. NAMUN, jika user menyebut "full bodi halus" atau "full halus", masukkan "Repaint Bodi Halus", BUKAN "Repaint Full Bodi". Sama halnya untuk "kasar".
+- DILARANG BERASUMSI LAYANAN: JIKA kustomer HANYA menyebutkan tipe/merek/warna motor (misal: "Yamaha Xeon GT 2015 warna Hitam", "PCX 2020"), DILARANG KERAS memasukkan layanan apapun (seperti 'Repaint Full Bodi' atau 'Detailing') ke array \`services\`! Kosongkan array \`services\` agar sistem dapat bertanya bagian mana yang ingin dikerjakan. HANYA isi array \`services\` jika kustomer SECARA EKSPLISIT menyebutkan bagian/layanan yang mau dikerjakan (misal: "bodi halus", "velg", "full bodi").
 
 Format JSON output yang diharapkan:
 {
