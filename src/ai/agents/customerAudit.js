@@ -130,6 +130,10 @@ async function scanUnlabeledCustomers() {
  * Auto-label customers yang jelas (from scanUnlabeledCustomers)
  */
 async function autoLabelCustomers(customers) {
+    if (!customers || !Array.isArray(customers)) {
+        const audit = await scanUnlabeledCustomers();
+        customers = audit.autoLabeled || [];
+    }
     const results = [];
 
     for (const c of customers) {
