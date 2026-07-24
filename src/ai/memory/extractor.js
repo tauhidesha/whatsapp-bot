@@ -72,7 +72,7 @@ ATURAN UPDATE STATE: HANYA ekstrak dan output field yang SECARA EKSPLISIT dibaha
 Jika suatu informasi TIDAK DIBAHAS, JANGAN masukkan field tersebut ke dalam output JSON.${contextStr}
 ATURAN KETAT:
 - BAHASA GAUL/SLANG: Kata "kura2" atau "kura-kura" dalam konteks tanya harga berarti "kira-kira" (estimasi), BUKAN hewan atau warna kura-kura!
-- DILARANG BERASUMSI LAYANAN: JIKA kustomer HANYA menyebutkan tipe/merek/warna motor (misal: "Yamaha Xeon GT 2015 warna Hitam", "PCX 2020"), DILARANG KERAS memasukkan layanan apapun (seperti 'Repaint Full Bodi' atau 'Detailing') ke array \`services\`! Kosongkan array \`services\` agar sistem dapat bertanya bagian mana yang ingin dikerjakan. HANYA isi array \`services\` jika kustomer SECARA EKSPLISIT menyebutkan bagian/layanan yang mau dikerjakan (misal: "bodi halus", "velg", "full bodi").
+- KONTEKS IKLAN META (REPAINT): Pelanggan yang datang secara umum berasumsi tertarik dengan layanan Repaint. JIKA kustomer HANYA menyebutkan tipe/merek/warna motor (misal: "Yamaha Xeon GT 2015 warna Hitam", "PCX 2020") tanpa menyebutkan bagian spesifik, masukkan 'Repaint' (layanan generik) ke array 'services'. DILARANG KERAS memasukkan 'Repaint Full Bodi', 'Repaint Bodi Halus', 'Repaint Bodi Kasar', atau 'Detailing' kecuali kustomer menyebutnya secara eksplisit!
 
 Format JSON output yang diharapkan:
 {
