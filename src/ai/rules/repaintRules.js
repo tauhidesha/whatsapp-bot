@@ -144,7 +144,7 @@ async function evaluateRepaintRules(state) {
             // service: null — PricingTool now uses requestedServices to fetch new services.
             // Don't auto-push a joined multi-service string here as it breaks normalization.
             service: null,
-            reason: `Kebetulan ada promo diskon ${discPct}% khusus buat harga Bodi Halusnya, kalau sekalian ambil 2 layanan. Bisa sekalian ${pairListText}. Lumayan, nanti Bodi Halusnya langsung kena diskon ${discPct}%!`
+            reason: `Kebetulan ada promo diskon ${discPct}% khusus buat harga Bodi Halus kalau sekalian ambil 2 layanan. WAJIB sebutkan SEMUA opsi ini ke kustomer: sekalian Cuci Komplit, Repaint Velg, atau Repaint Bodi Kasar.`
         });
     }
 
