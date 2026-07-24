@@ -248,21 +248,16 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
 
 # ATURAN KALKULASI & FORMAT HARGA
 ⛔ KAMU DILARANG KERAS MELAKUKAN ARITMATIKA APAPUN (menjumlahkan/mengalikan). Semua angka total sudah dihitung oleh sistem.
-- **URUTAN PAKET HARGA (WAJIB DARI MAHAL KE MURAH)**: Saat menjabarkan pilihan paket (misal Paket Premium, Standar, Basic, Ekonomis), WAJIB menyusun urutannya dari harga TERMAHAL ke TERMURAH!
+- **URUTAN PAKET HARGA (WAJIB DARI MURAH KE MAHAL)**: Saat menjabarkan pilihan paket, WAJIB menyusun urutannya dari harga TERMURAH ke TERMAHAL (Ekonomis -> Basic -> Standar -> Premium)!
 - **Format Harga (Wajib)**:
-  - WAJIB gunakan format emoji diamond (🔹) untuk nama paket dan bullet point (•) untuk deskripsi.
-  - Harga setelah diskon ditulis di samping nama paket (tambahkan "Rp" atau sesuaikan dengan data), dan harga asli (sebelum diskon) dicoret menggunakan tilde (~) di bawahnya.
-  - Jangan satukan deskripsi dalam satu baris panjang! Pecah fitur-fitur paket menjadi bullet point (maksimal 3 poin).
-  Contoh:
-  🔹 Paket Premium – Rp1,73 juta
-  ~Rp1,88 juta~
-  • Cat berlapis + extra clear
-  • Depth warna maksimal
-  • Garansi 2 tahun
+  - Gunakan format emoji diamond (🔹) untuk nama paket.
+  - Jangan gunakan deskripsi panjang jika hanya memberikan pilihan paket awal. Buat se-simple mungkin. Contoh: "🔹 Standar ⭐ Paling Dipilih — Rp1,43 juta"
+  - Jika ada diskon, tampilkan harga coret.
+- **Transisi Konsep**: JANGAN PERNAH menanyakan warna bodi/kondisi velg secara acak. Jika kustomer sudah siap menentukan konsep (sudah memilih paket harga ATAU sudah dikonfirmasi part yang direpaint), WAJIB gunakan kalimat transisi ini terlebih dahulu: "Boleh sekalian saya catat konsep repaintnya ya kak." baru kemudian tanyakan warna atau detailnya.
 
 # TONE & STYLE (MUTLAK)
 - JANGAN PERNAH menggunakan bahasa kaku/robotik/korporat. Hindari frasa seperti "Senang sekali Anda tertarik", "Untuk memberikan estimasi yang akurat", atau "Kami perlu mengetahui".
-- JANGAN copy-paste kalimat mentah dari Planner (Information Priority / Missing Facts). Ubah poin-poin tersebut menjadi gaya bahasa Anda sendiri yang asik dan luwes.
+- Terapkan UX Flow: Jangan melompat-lompat! Kejar 1 keputusan kustomer per chat. Jangan ajukan pertanyaan teknis (warna) jika kustomer belum memilih budget/paket.
 - Gunakan bahasa obrolan sehari-hari yang natural ("Biar aku bisa bantu itungin", "Boleh tau...").
 - Anggap Anda sedang membalas WA teman tongkrongan yang nanya soal motor.\n\n`;
 
@@ -323,23 +318,22 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
         if (cartCalc.type === 'multi-package-simulation') {
             // Skenario A: user belum pilih paket, tampilkan simulasi per paket
             prompt += `MODE: SIMULASI PER PAKET (user belum pilih paket ${cartCalc.serviceName})\n`;
-            prompt += `Tampilkan SEMUA paket format: "- Paket [Nama]: ~[harga asli]~ -> *[harga diskon]*"\n`;
-            prompt += `Setelah list, tiap baris tambahkan total: "*[harga diskon]* + [fixed] = *[total]*"\n\n`;
-            if (cartCalc.hasComboDiscount) {
-                prompt += `Diskon ${cartCalc.comboDiscountPct}% sudah diterapkan ke ${cartCalc.serviceName} di setiap baris.\n\n`;
-            }
-            cartCalc.simulations.forEach(sim => {
+            prompt += `Tampilkan SEMUA paket format: "🔹 [Nama] — *[harga diskon]*"\n`;
+            prompt += `Jika ada diskon, tampilkan harga asli dicoret sebelum harga diskon.\n\n`;
+            
+            // Sort simulations by price ascending (Cheapest to Most Expensive)
+            const sortedSimulations = [...cartCalc.simulations].sort((a, b) => a.basePrice - b.basePrice);
+            
+            sortedSimulations.forEach(sim => {
                 const discInfo = sim.hasDiscount
                     ? `~${sim.basePriceFormatted}~ -> *${sim.discountedPriceFormatted}*`
                     : `*${sim.basePriceFormatted}*`;
-                prompt += `- Paket ${sim.packageName}: ${discInfo}`;
+                prompt += `🔹 ${sim.packageName} — ${discInfo}`;
                 if (cartCalc.fixedLineItems?.length > 0) {
                     const fixedSummary = cartCalc.fixedLineItems.map(f => `${f.name} ${f.priceFormatted}`).join(' + ');
                     prompt += ` -> sama ${fixedSummary} = *${sim.totalFormatted}*`;
                 }
-                if (sim.description) {
-                    prompt += ` — ${sim.description}`;
-                }
+                // Don't append descriptions dynamically here to enforce short format
                 prompt += `\n`;
             });
             if (cartCalc.fixedLineItems?.length > 0) {

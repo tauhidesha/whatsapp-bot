@@ -153,7 +153,7 @@ async function evaluateRepaintRules(state) {
     if (isShowingPrice) {
         rules.guidelines.push({
             type: 'CONVERSATION_GUIDELINE',
-            directive: 'Pastikan untuk merangkum total harga sebagai range (misal: "estimasi total sekitar 2.2 - 2.5 juta") jika ada banyak layanan. JANGAN tanya "masuk budget nggak?". Tanyakan saja "Bagaimana mas, mau lanjut booking atau ada yang mau ditanyakan soal paketnya?".'
+            directive: 'UX FLOW V3: Saat mengestimasi/menampilkan daftar harga, JANGAN langsung bertanya mau booking atau belum. Tanyakan DULU apakah ada rencana repaint bagian lain (misal velg/bodi kasar) untuk memberikan penawaran bundling secara natural.'
         });
     }
 
