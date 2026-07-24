@@ -224,15 +224,29 @@ Field yang bernilai string (kecuali visualSummary, services, hasDamage, targetSe
                 newServices = [...new Set(extraction.services)];
             }
             
-            // Conflict Resolution: If user explicitly clarifies 'Bodi Halus' or 'Bodi Kasar',
-            // we should remove 'Repaint Full Bodi' if it was assumed previously.
-            if (extraction.services.includes('Repaint Bodi Halus') && !extraction.services.includes('Repaint Full Bodi')) {
+            // Conflict Resolution & Stale Services Cleanup:
+            const mentionsKasar = textLower.includes('kasar');
+            const mentionsFull = textLower.includes('full');
+            const mentionsCuci = textLower.includes('cuci');
+            const mentionsDetailing = textLower.includes('detailing');
+
+            // If user specifies Bodi Halus or Velg without mentioning Kasar/Full/Cuci/Detailing,
+            // remove stale services accumulated from previous turns.
+            if (newServices.includes('Repaint Bodi Halus') || extraction.services.includes('Repaint Bodi Halus')) {
+                if (!mentionsKasar && !mentionsFull) {
+                    newServices = newServices.filter(s => s !== 'Repaint Bodi Kasar' && s !== 'Repaint Full Bodi');
+                }
+            }
+            if (!mentionsCuci) {
+                newServices = newServices.filter(s => s !== 'Cuci Komplit');
+            }
+            if (!mentionsDetailing) {
+                newServices = newServices.filter(s => s !== 'Detailing');
+            }
+            if (newServices.includes('Repaint Bodi Kasar') && !newServices.includes('Repaint Full Bodi') && !mentionsFull) {
                 newServices = newServices.filter(s => s !== 'Repaint Full Bodi');
             }
-            if (extraction.services.includes('Repaint Bodi Kasar') && !extraction.services.includes('Repaint Full Bodi')) {
-                newServices = newServices.filter(s => s !== 'Repaint Full Bodi');
-            }
-            
+
             updates.consultation.requestedServices = newServices;
         }
 
