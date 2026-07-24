@@ -211,16 +211,16 @@ Field yang bernilai string (kecuali visualSummary, services, hasDamage, targetSe
             updates.consultation = updates.consultation || { ...state.consultation };
             const existingServices = state.consultation?.requestedServices || [];
             
-            // Check if user's message contains additive keywords (e.g. "kalau sama velg", "tambah bodi kasar")
+            // Check if user explicitly wants ONLY a single service (e.g. "velg aja", "cuma bodi halus", "ganti")
             const textLower = lastUserMessageText.toLowerCase();
-            const isAdditive = ['tambah', 'sama', 'sekalian', 'plus', 'juga', 'gabung', 'dengan'].some(w => textLower.includes(w));
+            const isExplicitOnly = ['cuma', 'hanya', 'aja', 'saja', 'ganti', 'batal', 'ga jadi', 'gak jadi'].some(w => textLower.includes(w));
             
             let newServices;
-            if (isAdditive || existingServices.length === 0) {
-                // Accumulate/add to existing services
+            if (!isExplicitOnly && existingServices.length > 0) {
+                // Keep existing services and merge with newly mentioned service
                 newServices = [...new Set([...existingServices, ...extraction.services])];
             } else {
-                // User is stating/replacing their desired service (e.g. "bodi halus kak", "velg aja")
+                // User explicitly wants only the mentioned service (e.g. "velg aja") or initial service
                 newServices = [...new Set(extraction.services)];
             }
             
