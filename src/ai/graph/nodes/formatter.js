@@ -38,8 +38,9 @@ async function formatterNode(state) {
     const replyMode = metadata?.replyMode || 'inform';
     const missingQ = (context.missingQuestions || [])[0] || '';
 
-    // Detect gender dari nama customer
-    const customerName = customer.name || 'Kak';
+    // Detect gender & salutation dari nama customer
+    const { getDisplayName, getSalutation } = require('../../utils/salutationHelper');
+    const customerName = customer.name ? getDisplayName(customer.name) : 'Kak';
 
     // Detailing & Repaint Package Suggester (Decision Tree)
     let upsellSuggestion = '';
