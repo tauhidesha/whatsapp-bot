@@ -152,7 +152,11 @@ async function evaluateRepaintRules(state) {
     // ── Price Phase: Inject package recommendation ─────────────────────────────
     // Inject WHENEVER motor + bagian are known (color is no longer a blocker).
     const motorKnown = !!knownMotor || knownFacts.motorModel?.state === 'KNOWN';
-    const partKnown  = !!knownRepaintTarget || knownFacts.partToRepaint?.state === 'KNOWN';
+    // partKnown: extractor often stores part info in requestedServices, not knownFacts.partToRepaint.
+    // Use flow detection flags as proxy — if a specific flow is active, part is effectively known.
+    const partKnown = !!knownRepaintTarget
+        || knownFacts.partToRepaint?.state === 'KNOWN'
+        || isFullBody || isBodiHalus || isBodiKasar || isVelg;
     const isAllBlockingFactsKnown = motorKnown && partKnown;
 
     // isPricePhase still used for upsell guard (must be after pricing tool ran)
