@@ -19,18 +19,19 @@ const REPAINT_FLOWS = {
         // Full Bodi = Bodi Halus + Bodi Kasar
         blockingFacts: [
             'motorModel',    // Step 1: wajib tahu motor
-            'partToRepaint', // Step 2: sudah jelas (full bodi)
-            'paintColor'     // Step 3: WAJIB tanya warna sebelum bisa GET_PRICE
+            'partToRepaint'  // Step 2: sudah jelas (full bodi)
+            // paintColor BUKAN blocking — tampilkan harga dulu, tanya warna sesudahnya
         ],
-        requiredFacts: [],   // Semua sudah masuk blockingFacts
+        requiredFacts: [],
         optionalFacts: [
+            'paintColor',    // Ditanyakan SETELAH harga & rekomendasi paket ditampilkan
             'upsell_velg'
         ],
         blockedFacts: [],
         conversationStages: [
             'ASK_MOTOR',
-            'ASK_COLOR',
-            'SHOW_PRICE_WITH_PACKAGE_RECOMMENDATION',
+            'SHOW_PRICE_WITH_PACKAGE_RECOMMENDATION',  // Tampilkan harga base + rekomendasikan Standar
+            'ASK_COLOR_AFTER_PRICE',                   // Tanya warna sesudah harga
             'UPSELL_VELG_COMBO',
             'BOOKING'
         ]
@@ -39,19 +40,20 @@ const REPAINT_FLOWS = {
     BODY_HALUS: {
         blockingFacts: [
             'motorModel',    // Step 1: wajib tahu motor
-            'partToRepaint', // Step 2: sudah jelas (bodi halus)
-            'paintColor'     // Step 3: WAJIB tanya warna sebelum bisa GET_PRICE
+            'partToRepaint'  // Step 2: sudah jelas (bodi halus)
+            // paintColor BUKAN blocking — tampilkan harga dulu, tanya warna sesudahnya
         ],
-        requiredFacts: [],   // Semua sudah masuk blockingFacts
+        requiredFacts: [],
         optionalFacts: [
+            'paintColor',    // Ditanyakan SETELAH harga & rekomendasi paket ditampilkan
             'upsell_bodi_kasar',
             'upsell_velg'
         ],
         blockedFacts: [],
         conversationStages: [
             'ASK_MOTOR',
-            'ASK_COLOR',
-            'SHOW_PRICE_WITH_PACKAGE_RECOMMENDATION',
+            'SHOW_PRICE_WITH_PACKAGE_RECOMMENDATION',  // Tampilkan harga base + rekomendasikan Standar
+            'ASK_COLOR_AFTER_PRICE',                   // Tanya warna sesudah harga
             'UPSELL_COMBO',
             'BOOKING'
         ]

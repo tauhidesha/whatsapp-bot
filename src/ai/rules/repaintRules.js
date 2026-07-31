@@ -150,15 +150,10 @@ async function evaluateRepaintRules(state) {
     const discPct = promoInfo?.comboDiscount ? Math.round(promoInfo.comboDiscount * 100) : 10;
 
     // ── Price Phase: Inject package recommendation ─────────────────────────────
-    // Inject WHENEVER blocking facts are all known (motor + bagian + warna).
-    // Do NOT gate on isPricePhase — that evaluates BEFORE planner runs and is always
-    // one turn late. Instead, inject early so Composer has the guideline ready the
-    // moment price is shown.
+    // Inject WHENEVER motor + bagian are known (color is no longer a blocker).
     const motorKnown = !!knownMotor || knownFacts.motorModel?.state === 'KNOWN';
     const partKnown  = !!knownRepaintTarget || knownFacts.partToRepaint?.state === 'KNOWN';
-    const colorKnownOrSkipped = isColorKnown || isColorUndecided;
-    const isAllBlockingFactsKnown = motorKnown && partKnown && (colorKnownOrSkipped || isBodiKasar);
-    // (Bodi Kasar doesn't need color, so it skips the color check)
+    const isAllBlockingFactsKnown = motorKnown && partKnown;
 
     // isPricePhase still used for upsell guard (must be after pricing tool ran)
     const isPricePhase = (
@@ -173,6 +168,15 @@ async function evaluateRepaintRules(state) {
         });
     }
 
+    // Guideline: untuk flow yang butuh warna (Bodi Halus / Full Bodi / Velg),
+    // tanyakan warna SETELAH harga + rekomendasi paket ditampilkan — bukan sebelumnya.
+    const colorNeeded = (isBodiHalus || isFullBody || isVelg) && !isColorKnown && !isColorUndecided;
+    if (isAllBlockingFactsKnown && colorNeeded) {
+        rules.guidelines.push({
+            type: 'COLOR_AFTER_PRICE',
+            directive: `URUTAN WAJIB saat menampilkan harga untuk layanan ini: (1) tampilkan daftar paket harga, (2) rekomendasikan paket Standar, (3) BARU tanyakan mau warna apa. JANGAN tanya warna sebelum harga ditampilkan. Contoh penutup setelah harga: "oh iya, mau warna apa nih? kalau mau candy atau metallic ada surcharge kecil, tapi hasilnya beda banget."`
+        });
+    }
     // Full Bodi: harga yang tampil sudah include combo discount — wajib transparan ke customer
     if (isAllBlockingFactsKnown && isFullBody) {
         rules.guidelines.push({
