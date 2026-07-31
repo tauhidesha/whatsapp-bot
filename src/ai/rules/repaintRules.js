@@ -145,6 +145,10 @@ async function evaluateRepaintRules(state) {
         });
     }
 
+    // ── Promo Config (fetch early — needed for price phase guidelines & upsells) ──
+    const promoInfo = await getActivePromo();
+    const discPct = promoInfo?.comboDiscount ? Math.round(promoInfo.comboDiscount * 100) : 10;
+
     // ── Price Phase: Inject package recommendation ────────────────────────
     const isPricePhase = (
         isColorKnown ||
@@ -159,8 +163,15 @@ async function evaluateRepaintRules(state) {
         });
     }
 
-    // 3. Promo/Combo Logic
-    const promoInfo = await getActivePromo();
+    // Full Bodi = Bodi Halus + Bodi Kasar = already a combo → harga yang tampil sudah kena diskon
+    if (isPricePhase && isFullBody) {
+        rules.guidelines.push({
+            type: 'COMBO_PRICE_TRANSPARENCY',
+            directive: `PENTING: Customer memilih Full Bodi (Bodi Halus + Bodi Kasar). Harga yang tampil di estimasi SUDAH TERMASUK diskon combo ${discPct || 10}% untuk Bodi Halus karena mengambil 2 layanan sekaligus. WAJIB sampaikan ke customer bahwa harga yang ditampilkan SUDAH harga diskon combo — jangan biarkan mereka bingung kenapa ada dua angka. Contoh kalimat: "harga di atas udah termasuk diskon combo ${discPct || 10}% buat bodi halusnya ya, karena sekalian sama bodi kasar."`
+        });
+    }
+
+    // 3. Promo/Combo Logic — push to promotions if active
     if (promoInfo && promoInfo.promoText) {
         rules.promotions = rules.promotions || [];
         rules.promotions.push({
@@ -175,28 +186,38 @@ async function evaluateRepaintRules(state) {
     // 4. Upsells — Combo discount offer (AFTER price is shown, not before)
     // Only offer upsell if we're at or past the price phase
     const hasShownPrice = state.tool?.lastCapability === 'pricing' || !!state.cart?.calculatedAt;
-    const discPct = promoInfo?.comboDiscount ? Math.round(promoInfo.comboDiscount * 100) : 15;
 
-    if ((isBodiHalus || isFullBody) && hasShownPrice) {
+    if (isFullBody && hasShownPrice) {
+        // Full Bodi = already a combo (Bodi Halus + Bodi Kasar) → discount already applied.
+        // DO NOT offer another combo discount. Only upsell Velg as a natural add-on, no discount framing.
         rules.upsells.push({
             type: 'UPSELL',
             service: null,
             timing: 'AFTER_PRICE',
-            reason: `Ada promo diskon ${discPct}% untuk Bodi Halus kalau sekalian ambil 1 layanan lagi. Tawarkan 3 opsi secara natural: (1) tambah Repaint Bodi Kasar, (2) tambah Repaint Velg. Sampaikan setelah harga sudah diberikan, jangan sebelum.`
+            reason: `Customer sudah ambil Full Bodi — harga combo SUDAH diterapkan. JANGAN tawarkan diskon combo lagi. Satu-satunya upsell yang boleh ditawarkan: tambah Repaint Velg supaya hasilnya lebih complete. Framing: natural, bukan "dapet diskon", tapi "biar makin sempurna sekalian velgnya".`
         });
-    } else if (isBodiKasar && hasShownPrice) {
+    } else if (isBodiHalus && hasShownPrice) {
+        // Single Bodi Halus → eligible for combo discount with another service
         rules.upsells.push({
             type: 'UPSELL',
             service: null,
             timing: 'AFTER_PRICE',
-            reason: `Ada promo combo — tawarkan sekalian Repaint Bodi Halus untuk dapat diskon ${discPct}%. Sampaikan setelah harga Bodi Kasar sudah ditampilkan.`
+            reason: `Ada promo diskon ${discPct}% untuk Bodi Halus kalau sekalian ambil 1 layanan lagi. Tawarkan 2 opsi: (1) tambah Repaint Bodi Kasar, (2) tambah Repaint Velg. Sampaikan setelah harga sudah diberikan, jangan sebelum.`
+        });
+    } else if (isBodiKasar && !isFullBody && hasShownPrice) {
+        // Single Bodi Kasar only
+        rules.upsells.push({
+            type: 'UPSELL',
+            service: null,
+            timing: 'AFTER_PRICE',
+            reason: `Ada promo combo — tawarkan sekalian Repaint Bodi Halus untuk dapat diskon ${discPct}% di Bodi Halusnya. Sampaikan setelah harga Bodi Kasar sudah ditampilkan.`
         });
     } else if (isVelg && hasShownPrice) {
         rules.upsells.push({
             type: 'UPSELL',
             service: null,
             timing: 'AFTER_PRICE',
-            reason: `Setelah kasih harga velg, tawarkan combo dengan Repaint Bodi Halus untuk dapat promo diskon ${discPct}%.`
+            reason: `Setelah kasih harga velg, tawarkan combo dengan Repaint Bodi Halus untuk dapat promo diskon ${discPct}% di Bodi Halusnya.`
         });
     }
 
