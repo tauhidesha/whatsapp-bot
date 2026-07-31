@@ -174,7 +174,7 @@ async function evaluateRepaintRules(state) {
     if (isAllBlockingFactsKnown && colorNeeded) {
         rules.guidelines.push({
             type: 'COLOR_AFTER_PRICE',
-            directive: `URUTAN WAJIB saat menampilkan harga untuk layanan ini: (1) tampilkan daftar paket harga, (2) rekomendasikan paket Standar, (3) BARU tanyakan mau warna apa. JANGAN tanya warna sebelum harga ditampilkan. Contoh penutup setelah harga: "oh iya, mau warna apa nih? kalau mau candy atau metallic ada surcharge kecil, tapi hasilnya beda banget."`
+            directive: `URUTAN WAJIB saat menampilkan harga untuk layanan ini: (1) tampilkan daftar paket harga, (2) rekomendasikan paket Standar, (3) BARU tanyakan mau warna apa. JANGAN tanya warna sebelum harga ditampilkan. Contoh penutup setelah harga: "oh iya, mau warna apa nih? kalau mau candy atau bunglon ada surcharge kecil, tapi hasilnya beda banget."`
         });
     }
     // Full Bodi: harga yang tampil sudah include combo discount — wajib transparan ke customer
