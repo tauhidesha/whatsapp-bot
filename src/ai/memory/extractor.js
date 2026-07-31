@@ -1,299 +1,335 @@
-const { z } = require('zod');
 const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
+const { DateTime } = require('luxon');
 const { extractTextFromContent, getMessageType } = require('../graph/utils/sanitizeMessages');
+
 /**
- * Memory Extractor for Zoya V2
- * Uses Gemini to extract Identity, Relationship, and Sales memory from messages.
+ * Memory Extractor for Zoya V2 — LLM-as-State-Manager
+ *
+ * Philosophy: LLM receives the FULL current state + new message, and outputs
+ * the CANONICAL FINAL state. No regex fallbacks, no manual conflict resolution.
+ * The LLM understands context — trust it.
+ *
+ * Booking date/time is verified post-LLM with luxon (not regex) for accuracy.
  */
 
-const FactState = z.enum(['KNOWN', 'UNDECIDED', 'NOT_APPLICABLE']);
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
-const FactSchema = (description) => z.object({
-    value: z.string().optional().describe("Nilai fakta (jika diketahui), atau hilangkan field ini jika null/tidak tahu."),
-    state: FactState.describe("Status: KNOWN jika nilai eksplisit, UNDECIDED jika kustomer bilang belum tau/bingung, NOT_APPLICABLE jika tidak relevan.")
-}).optional().describe(description);
+/**
+ * Resolve a relative date string from LLM (e.g. "besok", "senin", "2026-08-01")
+ * into an absolute YYYY-MM-DD date using luxon.
+ * Returns null if the value cannot be resolved.
+ */
+function resolveBookingDate(rawValue) {
+    if (!rawValue) return null;
+    const now = DateTime.now().setZone('Asia/Jakarta').setLocale('id');
+    const val = String(rawValue).toLowerCase().trim();
 
-const MemorySchema = z.object({
-    motor: FactSchema("Merek/model motor (misal: NMax, Beat)."),
-    color: FactSchema("Warna cat (misal: merah candy). JIKA bilang 'asli', isi value 'Standar Pabrik/Original' (KNOWN)."),
-    part: FactSchema("Bagian motor yang dikerjakan (misal: full bodi, bodi halus, velg)."),
-    objection: FactSchema("Keberatan/komplain kustomer (misal: 'mahal', 'jauh')."),
-    services: z.array(z.string()).optional().describe("Daftar layanan (misal: 'Repaint Bodi Halus')."),
-    velgCondition: FactSchema("Kondisi cat velg sebelumnya (misal: 'masih ori pabrik', 'udah pernah dicat/repaint', 'belum pernah'). JANGAN isi ini dengan baret/lecet, fokus HANYA pada status cat asli/repaint."),
-    hasDamage: z.boolean().nullable().optional().describe("Apakah customer menyebutkan ada kerusakan (retak, patah, baret dalam)? Pengecualian disengaja: tidak menggunakan format {value, status} karena fact yes/no tidak memiliki state UNDECIDED."),
-    bookingDate: FactSchema("Tanggal atau hari yang diinginkan customer untuk booking (misal: 'besok', 'hari senin', 'tanggal 25')."),
-    bookingTime: FactSchema("Jam yang diinginkan customer untuk booking (misal: 'jam 10 pagi', 'sore')."),
-    visualSummary: z.string().optional().describe("Ringkasan visual 1-2 kalimat mengenai apa yang terlihat di gambar/foto yang dikirim user. HANYA isi jika user mengirim foto.")
-});
+    // Already an ISO date
+    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
+
+    // Relative day keywords
+    const relativeMap = {
+        'hari ini': 0, 'sekarang': 0, 'today': 0,
+        'besok': 1, 'tomorrow': 1,
+        'lusa': 2, 'day after tomorrow': 2,
+        'senin': 1, 'monday': 1,
+        'selasa': 2, 'tuesday': 2,
+        'rabu': 3, 'wednesday': 3,
+        'kamis': 4, 'thursday': 4,
+        'jumat': 5, 'friday': 5,
+        'sabtu': 6, 'saturday': 6,
+    };
+
+    if (val in relativeMap && relativeMap[val] <= 2) {
+        return now.plus({ days: relativeMap[val] }).toFormat('yyyy-MM-dd');
+    }
+
+    // Day-of-week: find next occurrence
+    const dayOfWeekMap = { senin: 1, selasa: 2, rabu: 3, kamis: 4, jumat: 5, sabtu: 6, minggu: 7 };
+    for (const [day, iso] of Object.entries(dayOfWeekMap)) {
+        if (val.includes(day)) {
+            let target = now;
+            while (target.weekday !== iso) target = target.plus({ days: 1 });
+            return target.toFormat('yyyy-MM-dd');
+        }
+    }
+
+    // "tanggal N" or "tgl N"
+    const tglMatch = val.match(/(?:tanggal|tgl)\s*(\d{1,2})/);
+    if (tglMatch) {
+        const day = parseInt(tglMatch[1], 10);
+        let candidate = now.set({ day });
+        if (candidate < now) candidate = candidate.plus({ months: 1 });
+        return candidate.toFormat('yyyy-MM-dd');
+    }
+
+    // Fallback: return as-is if it looks like a date
+    return null;
+}
+
+/**
+ * Normalize a time string like "jam 10", "10:30", "pagi", "sore" → "HH:mm"
+ */
+function resolveBookingTime(rawValue) {
+    if (!rawValue) return null;
+    const val = String(rawValue).toLowerCase().trim();
+
+    const hmMatch = val.match(/(\d{1,2})[.:](\d{2})/);
+    if (hmMatch) return `${hmMatch[1].padStart(2, '0')}:${hmMatch[2]}`;
+
+    const hMatch = val.match(/(?:jam\s*)?(\d{1,2})/);
+    if (hMatch) return `${hMatch[1].padStart(2, '0')}:00`;
+
+    const keywords = { pagi: '09:00', siang: '12:00', sore: '15:00', malam: '19:00' };
+    for (const [k, v] of Object.entries(keywords)) {
+        if (val.includes(k)) return v;
+    }
+
+    return null;
+}
+
+// ---------------------------------------------------------------------------
+// Main extractor
+// ---------------------------------------------------------------------------
 
 async function extractMemory(state) {
-    console.log('[Memory Extractor] Extracting memory features with LLM...');
-    
+    console.log('[Memory Extractor] Running LLM-as-State-Manager...');
+
     const messages = state.messages || [];
     const lastUserMessageObj = [...messages].reverse().find(m => {
         const type = getMessageType(m) || 'user';
         return type === 'human' || type === 'user';
     });
-    const lastUserContent = lastUserMessageObj ? (lastUserMessageObj.kwargs?.content || lastUserMessageObj.content) : null;
-    const lastUserMessageText = lastUserContent ? extractTextFromContent(lastUserContent) : '';
 
-    if (!lastUserContent) {
-        return {};
-    }
+    const lastUserContent = lastUserMessageObj
+        ? (lastUserMessageObj.kwargs?.content || lastUserMessageObj.content)
+        : null;
 
-    // LangChain JS has a bug where it checks if the modelName includes "1.5" or "vision" to allow images.
-    // User requested to use .env
+    if (!lastUserContent) return {};
+
+    const lastUserMessageText = extractTextFromContent(lastUserContent);
+
+    // Build a short transcript (last 6 messages) for context
+    const recentMessages = messages.slice(-6);
+    const transcript = recentMessages.map(m => {
+        const type = getMessageType(m);
+        const text = extractTextFromContent(m.kwargs?.content || m.content || '');
+        if (!text.trim()) return null;
+        return `[${type === 'human' || type === 'user' ? 'USER' : 'AI'}]: ${text.trim()}`;
+    }).filter(Boolean).join('\n');
+
+    // Current state snapshot for LLM to reason about
+    const currentMotor = typeof state.vehicle?.model === 'string'
+        ? state.vehicle.model
+        : (state.vehicle?.model?.value || null);
+    const currentServices = state.consultation?.requestedServices || [];
+    const currentColor = typeof state.vehicle?.paintType === 'string'
+        ? state.vehicle.paintType
+        : (state.vehicle?.paintType?.value || null);
+    const currentColorChoice = state.consultation?.knownFacts?.paintColor?.value
+        || state.consultation?.knownFacts?.paintColor
+        || null;
+    const lastOffered = state.last_offered_services || [];
+
+    const now = DateTime.now().setZone('Asia/Jakarta').setLocale('id');
+    const currentDateTime = now.toFormat("cccc, dd MMMM yyyy HH:mm 'WIB'");
+
     const llm = new ChatGoogleGenerativeAI({
         model: process.env.VISION_MODEL || process.env.AI_MODEL || 'gemini-1.5-flash-latest',
         temperature: 0,
-        maxOutputTokens: 512,
+        maxOutputTokens: 768,
         apiKey: process.env.GOOGLE_API_KEY,
-        responseMimeType: "application/json"
+        responseMimeType: 'application/json',
     });
+
+    const systemPrompt = `Kamu adalah State Manager untuk chatbot Bosmat Repaint Studio.
+Tugasmu: Baca STATE SAAT INI + PERCAKAPAN TERAKHIR, lalu tentukan STATE FINAL yang benar.
+
+WAKTU SEKARANG: ${currentDateTime}
+
+STATE SAAT INI:
+- Motor: ${currentMotor || 'belum diketahui'}
+- Layanan yang sudah dipilih: ${currentServices.length > 0 ? currentServices.join(', ') : 'belum ada'}
+- Warna cat motor: ${currentColor || currentColorChoice || 'belum diketahui'}
+- Layanan terakhir yang AI tawarkan (untuk resolve pronoun): ${lastOffered.length > 0 ? lastOffered.join(', ') : 'tidak ada'}
+
+PERCAKAPAN TERAKHIR:
+${transcript}
+
+ATURAN KEPUTUSAN (PENTING — baca semua sebelum output):
+
+1. MOTOR:
+   - Hanya ganti motor jika user secara jelas menyebut motor yang BERBEDA dan BARU.
+   - Jika user hanya membalas pertanyaan AI (misal: AI tanya warna, user jawab "merah"), JANGAN ubah motor.
+   - Jika user sebut nama motor yang sama dengan variasi ejaan (nmax/n-max), anggap sama.
+   - Jika tidak ada perubahan motor → kembalikan nilai saat ini.
+
+2. LAYANAN (requestedServices):
+   - Kembalikan DAFTAR LENGKAP layanan yang masih diinginkan user setelah pesan ini.
+   - Jika user hanya menjawab pertanyaan detail (warna, jadwal, dll) → PERTAHANKAN semua layanan yang sudah ada.
+   - Jika user menyebut "aja" / "saja" dalam konteks menjawab pertanyaan → JANGAN hapus layanan lain.
+   - Hanya hapus layanan jika user secara tegas membatalkan/mengganti (contoh: "batal yang kasar", "gak jadi kasar", "cancel kasar").
+   - Jika user menjawab pronoun ("itu aja", "yang itu", "mau") → resolve ke layanan terakhir yang AI tawarkan (last_offered_services).
+   - Layanan yang valid: "Repaint Bodi Halus", "Repaint Bodi Kasar", "Repaint Velg", "Repaint CVT", "Repaint Full Bodi", "Detailing Mesin", "Cuci Komplit", "Coating Motor Glossy", "Coating Motor Doff", "Poles Bodi Glossy", "Full Detailing Glossy", "Complete Service Glossy", "Complete Service Doff"
+
+3. WARNA:
+   - color_choice: warna bodi yang diinginkan untuk repaint (cat baru)
+   - paint_type_current: tipe cat motor SAAT INI (glossy/doff) — hanya update jika user menyebutnya
+   - Bedakan keduanya dengan teliti.
+
+4. BOOKING:
+   - Untuk bookingDate, kembalikan nilai string apa adanya (misal: "besok", "senin", "tanggal 5"). Sistem akan resolve ke tanggal absolut.
+   - Untuk bookingTime, kembalikan jam apa adanya (misal: "jam 10", "10:30", "sore").
+
+5. FOTO/VISUAL:
+   - Jika pesan terakhir mengandung gambar, isi visualSummary dengan deskripsi singkat 1-2 kalimat.
+
+Output format JSON:
+{
+  "motor": "nama motor final (null jika tidak ada perubahan dan belum diketahui)",
+  "requestedServices": ["daftar layanan FINAL yang diinginkan user"],
+  "color_choice": "warna bodi baru yang diinginkan (null jika belum disebutkan)",
+  "paint_type_current": "glossy/doff/matte (null jika tidak disebutkan)",
+  "velg_color_choice": "warna velg (null jika belum disebutkan)",
+  "velg_condition": "ori/sudah repaint/null",
+  "has_damage": true/false/null,
+  "objection": "keberatan user jika ada (null jika tidak ada)",
+  "booking_date_raw": "string tanggal apa adanya dari user (null jika tidak sebut)",
+  "booking_time_raw": "string jam apa adanya dari user (null jika tidak sebut)",
+  "target_service": "layanan yang ditanya/diclarify (null jika tidak relevan)",
+  "needs_clarification": true/false,
+  "visual_summary": "ringkasan foto jika ada (null jika tidak ada foto)",
+  "reasoning": "penjelasan singkat kenapa kamu membuat keputusan ini"
+}`;
 
     try {
         const { SystemMessage, HumanMessage } = require('@langchain/core/messages');
-        let contextStr = '';
-        const lastOffered = state.last_offered_services || [];
-        if (lastOffered.length > 0) {
-            contextStr = `\nKONTEKS: Layanan terakhir yang ditawarkan ke kustomer adalah: [${lastOffered.join(', ')}]. Jika kustomer merespon dengan kata ganti (misal: "itu aja", "boleh deh", "mau"), anggap mereka meminta layanan tersebut dan outputkan di field "services".`;
+
+        // Build vision-aware content (support image messages)
+        const visionContent = [{ type: 'text', text: `Pesan terakhir user:` }];
+        if (Array.isArray(lastUserContent)) {
+            const filtered = lastUserContent.filter(c => c.type !== 'thinking');
+            visionContent.push(...filtered);
+        } else {
+            visionContent.push({ type: 'text', text: lastUserContent || '[Tanpa Teks]' });
         }
-
-        const now = new Date();
-        const formatter = new Intl.DateTimeFormat('id-ID', {
-            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-            hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta'
-        });
-        const currentDateTime = formatter.format(now);
-
-        const systemPrompt = `Anda adalah sistem ekstraksi memori. Ekstrak data relevan dari pesan (dan gambar/foto jika ada) kustomer terakhir.
-WAKTU SEKARANG: ${currentDateTime} WIB. Gunakan ini sebagai referensi jika kustomer menyebut waktu seperti "besok" atau "hari ini".
-ATURAN UPDATE STATE: HANYA ekstrak dan output field yang SECARA EKSPLISIT dibahas di pesan atau terlihat jelas di gambar terakhir kustomer. JIKA ada foto, WAJIB isi visualSummary.
-Jika suatu informasi TIDAK DIBAHAS, JANGAN masukkan field tersebut ke dalam output JSON.${contextStr}
-ATURAN KETAT:
-- BAHASA GAUL/SLANG: Kata "kura2" atau "kura-kura" dalam konteks tanya harga berarti "kira-kira" (estimasi), BUKAN hewan atau warna kura-kura!
-- KONTEKS IKLAN META (REPAINT): Pelanggan yang datang secara umum berasumsi tertarik dengan layanan Repaint. JIKA kustomer HANYA menyebutkan tipe/merek/warna motor (misal: "Yamaha Xeon GT 2015 warna Hitam", "PCX 2020") tanpa menyebutkan bagian spesifik, masukkan 'Repaint' (layanan generik) ke array 'services'. DILARANG KERAS memasukkan 'Repaint Full Bodi', 'Repaint Bodi Halus', 'Repaint Bodi Kasar', atau 'Detailing' kecuali kustomer menyebutnya secara eksplisit!
-
-Format JSON output yang diharapkan:
-{
-  "motor": "Merek/model motor",
-  "color": "Warna cat",
-  "part": "Bagian motor",
-  "objection": "Keberatan kustomer",
-  "services": ["layanan 1"],
-  "velgCondition": "Kondisi velg",
-  "hasDamage": true/false,
-  "bookingDate": "Tanggal booking absolut dalam format YYYY-MM-DD (Evaluasi berdasar WAKTU SEKARANG, misal jika besok, hitung tanggalnya jadi '2026-07-25')",
-  "bookingTime": "Jam booking dalam format HH:mm (misal: '10:00')",
-  "visualSummary": "Ringkasan visual 1-2 kalimat (jika ada gambar)",
-  "targetService": "Nama layanan yang ditanyakan (isi HANYA jika kustomer bertanya tentang layanan spesifik atau menyebut pronoun seperti 'apaan tuh', 'gimana itu')",
-  "needsClarification": true/false (isi HANYA jika pronoun ambigu dan lastOffered berisi >1 layanan)
-}
-Field yang bernilai string (kecuali visualSummary, services, hasDamage, targetService, needsClarification) bisa berupa objek: { "value": "...", "state": "KNOWN|UNDECIDED|NOT_APPLICABLE" }.`;
 
         const response = await llm.invoke([
             new SystemMessage(systemPrompt),
-            new HumanMessage({ content: lastUserContent })
+            new HumanMessage({ content: visionContent }),
         ]);
-        
-        const rawResponseText = response.content;
-        const cleanedJson = rawResponseText.replace(/```json\n?|```/g, '').trim();
-        const extraction = JSON.parse(cleanedJson);
-        console.log('[Memory Extractor] Extracted Data:', JSON.stringify(extraction));
-        
+
+        const rawText = typeof response.content === 'string'
+            ? response.content
+            : extractTextFromContent(response.content);
+
+        const cleaned = rawText.replace(/```json\n?|```/g, '').trim();
+        const ex = JSON.parse(cleaned);
+
+        console.log('[Memory Extractor] LLM Decision:', ex.reasoning || '(no reasoning)');
+        console.log('[Memory Extractor] Final services:', ex.requestedServices);
+
         const updates = {};
 
-        if (extraction.motor || extraction.color) {
+        // --- Vehicle ---
+        const newMotor = ex.motor || currentMotor;
+        const newPaintType = ex.paint_type_current;
+        if (newMotor || newPaintType) {
             updates.vehicle = { ...state.vehicle };
-            if (extraction.motor) {
-                const currentMotor = state.vehicle?.model;
-                if (extraction.motor.state === 'KNOWN' || currentMotor?.state !== 'KNOWN') {
-                    updates.vehicle.model = extraction.motor;
-                }
+            if (newMotor) updates.vehicle.model = { value: newMotor, state: 'KNOWN' };
+            if (newPaintType) updates.vehicle.paintType = { value: newPaintType, state: 'KNOWN' };
+        }
+
+        // --- Consultation ---
+        const needsConsultationUpdate =
+            ex.requestedServices?.length >= 0 ||
+            ex.color_choice ||
+            ex.velg_color_choice ||
+            ex.velg_condition ||
+            ex.has_damage !== undefined ||
+            ex.objection ||
+            ex.target_service ||
+            ex.needs_clarification !== undefined;
+
+        if (needsConsultationUpdate) {
+            updates.consultation = { ...state.consultation };
+            updates.consultation.knownFacts = { ...(state.consultation?.knownFacts || {}) };
+
+            // Services: LLM is the authority
+            if (Array.isArray(ex.requestedServices)) {
+                updates.consultation.requestedServices = ex.requestedServices;
             }
-            if (extraction.color) {
-                const currentColor = state.vehicle?.paintType;
-                if (extraction.color.state === 'KNOWN' || currentColor?.state !== 'KNOWN') {
-                    updates.vehicle.paintType = extraction.color;
-                    // Also save to knownFacts so rules and planner can detect special colors
-                    updates.consultation = updates.consultation || { ...state.consultation };
-                    updates.consultation.knownFacts = updates.consultation.knownFacts || { ...(state.consultation?.knownFacts || {}) };
-                    updates.consultation.knownFacts.paintColor = extraction.color;
-                }
+
+            // Color choice for repaint
+            if (ex.color_choice) {
+                updates.consultation.knownFacts.paintColor = { value: ex.color_choice, state: 'KNOWN' };
+            }
+
+            // Velg color
+            if (ex.velg_color_choice) {
+                updates.consultation.knownFacts.velgColor = { value: ex.velg_color_choice, state: 'KNOWN' };
+            }
+
+            // Velg condition (previously painted or original)
+            if (ex.velg_condition) {
+                updates.consultation.knownFacts.velgCondition = { value: ex.velg_condition, state: 'KNOWN' };
+            }
+
+            // Damage flag
+            if (ex.has_damage !== undefined && ex.has_damage !== null) {
+                updates.consultation.knownFacts.hasDamage = ex.has_damage;
+            }
+
+            // Objection
+            if (ex.objection) {
+                updates.consultation.knownFacts.commonObjection = { value: ex.objection, state: 'KNOWN' };
+            }
+
+            // Coreference resolution fields
+            if (ex.target_service) {
+                updates.consultation.knownFacts.targetService = ex.target_service;
+            }
+            if (ex.needs_clarification !== undefined) {
+                updates.consultation.knownFacts.needsClarification = ex.needs_clarification;
             }
         }
 
-        if (extraction.targetService || extraction.objection || extraction.part || (extraction.services && extraction.services.length > 0) || extraction.velgCondition || extraction.hasDamage !== undefined) {
+        // --- Booking date/time (luxon-verified) ---
+        if (ex.booking_date_raw || ex.booking_time_raw) {
             updates.consultation = updates.consultation || { ...state.consultation };
             updates.consultation.knownFacts = updates.consultation.knownFacts || { ...(state.consultation?.knownFacts || {}) };
 
-            
-            if (extraction.objection) {
-                const currentObj = state.consultation?.knownFacts?.commonObjection;
-                if (extraction.objection.state === 'KNOWN' || currentObj?.state !== 'KNOWN') {
-                    updates.consultation.knownFacts.commonObjection = extraction.objection;
-                }
-            }
-            if (extraction.velgCondition) {
-                const currentVelg = state.consultation?.knownFacts?.velgCondition;
-                if (extraction.velgCondition.state === 'KNOWN' || currentVelg?.state !== 'KNOWN') {
-                    updates.consultation.knownFacts.velgCondition = extraction.velgCondition;
-                }
-            }
-            if (extraction.hasDamage !== undefined && extraction.hasDamage !== null) {
-                updates.consultation.knownFacts.hasDamage = extraction.hasDamage;
-            }
-            if (extraction.part) {
-                const currentPart = state.consultation?.knownFacts?.partToRepaint;
-                if (extraction.part.state === 'KNOWN' || currentPart?.state !== 'KNOWN') {
-                    updates.consultation.knownFacts.partToRepaint = extraction.part;
-                }
-                
-                // Regex fallback to ensure requestedServices captures all specific repaint flows
-                const partLower = extraction.part.value ? extraction.part.value.toLowerCase() : '';
-                const specificServices = [];
-                if (partLower.includes('halus')) specificServices.push('Repaint Bodi Halus');
-                if (partLower.includes('kasar')) specificServices.push('Repaint Bodi Kasar');
-                if (partLower.includes('velg') || partLower.includes('pelg')) specificServices.push('Repaint Velg');
-                if (partLower.includes('full') && !partLower.includes('halus') && !partLower.includes('kasar')) specificServices.push('Repaint Full Bodi');
+            const resolvedDate = resolveBookingDate(ex.booking_date_raw);
+            const resolvedTime = resolveBookingTime(ex.booking_time_raw);
 
-                if (specificServices.length > 0) {
-                    extraction.services = extraction.services || [];
-                    specificServices.forEach(srv => {
-                        if (!extraction.services.includes(srv)) {
-                            extraction.services.push(srv);
-                        }
-                    });
-                }
-            }
-
-            if (extraction.targetService) {
-                const targetLower = typeof extraction.targetService === 'string' ? extraction.targetService.toLowerCase() : '';
-                const specificServices = [];
-                if (targetLower.includes('halus')) specificServices.push('Repaint Bodi Halus');
-                if (targetLower.includes('kasar')) specificServices.push('Repaint Bodi Kasar');
-                if (targetLower.includes('velg') || targetLower.includes('pelg')) specificServices.push('Repaint Velg');
-                if (targetLower.includes('full') && !targetLower.includes('halus') && !targetLower.includes('kasar')) specificServices.push('Repaint Full Bodi');
-                if (targetLower.includes('detailing')) specificServices.push('Detailing');
-                if (targetLower.includes('cuci')) specificServices.push('Cuci Komplit');
-
-                if (specificServices.length > 0) {
-                    extraction.services = extraction.services || [];
-                    specificServices.forEach(srv => {
-                        if (!extraction.services.includes(srv)) {
-                            extraction.services.push(srv);
-                        }
-                    });
-                }
-            }
-        } // End of if (extraction.targetService...) block
-        
-        // Ultimate fallback: ALWAYS regex the raw user message for service names just in case the LLM misses it
-        const rawTextLower = lastUserMessageText.toLowerCase();
-        const rawSpecificServices = [];
-        if (rawTextLower.includes('halus')) rawSpecificServices.push('Repaint Bodi Halus');
-        if (rawTextLower.includes('kasar')) rawSpecificServices.push('Repaint Bodi Kasar');
-        if (rawTextLower.includes('velg') || rawTextLower.includes('pelg')) rawSpecificServices.push('Repaint Velg');
-        if (rawTextLower.includes('full') && !rawTextLower.includes('halus') && !rawTextLower.includes('kasar')) rawSpecificServices.push('Repaint Full Bodi');
-        if (rawTextLower.includes('detailing')) rawSpecificServices.push('Detailing');
-        if (rawTextLower.includes('cuci')) rawSpecificServices.push('Cuci Komplit');
-
-        if (rawSpecificServices.length > 0) {
-            extraction.services = extraction.services || [];
-            rawSpecificServices.forEach(srv => {
-                if (!extraction.services.includes(srv)) {
-                    extraction.services.push(srv);
-                }
-            });
-        }
-        
-        if (extraction.services && extraction.services.length > 0) {
-            updates.consultation = updates.consultation || { ...state.consultation };
-            const existingServices = state.consultation?.requestedServices || [];
-            
-            // Check if user explicitly wants ONLY a single service (e.g. "velg aja", "cuma bodi halus", "ganti")
-            const textLower = lastUserMessageText.toLowerCase();
-            const isExplicitOnly = ['cuma', 'hanya', 'aja', 'saja', 'ganti', 'batal', 'ga jadi', 'gak jadi'].some(w => textLower.includes(w));
-            
-            let newServices;
-            if (!isExplicitOnly && existingServices.length > 0) {
-                // Keep existing services and merge with newly mentioned service
-                newServices = [...new Set([...existingServices, ...extraction.services])];
-            } else {
-                // User explicitly wants only the mentioned service (e.g. "velg aja") or initial service
-                newServices = [...new Set(extraction.services)];
-            }
-            
-            // Conflict Resolution & Stale Services Cleanup:
-            const mentionsKasar = textLower.includes('kasar');
-            const mentionsFull = textLower.includes('full');
-            const mentionsCuci = textLower.includes('cuci');
-            const mentionsDetailing = textLower.includes('detailing');
-
-            // If user specifies Bodi Halus or Velg without mentioning Kasar/Full/Cuci/Detailing,
-            // remove stale services accumulated from previous turns.
-            if (newServices.includes('Repaint Bodi Halus') || extraction.services.includes('Repaint Bodi Halus')) {
-                if (!mentionsKasar && !mentionsFull) {
-                    newServices = newServices.filter(s => s !== 'Repaint Bodi Kasar' && s !== 'Repaint Full Bodi');
-                }
-            }
-            if (!mentionsCuci) {
-                newServices = newServices.filter(s => s !== 'Cuci Komplit');
-            }
-            if (!mentionsDetailing) {
-                newServices = newServices.filter(s => s !== 'Detailing');
-            }
-            if (newServices.includes('Repaint Bodi Kasar') && !newServices.includes('Repaint Full Bodi') && !mentionsFull) {
-                newServices = newServices.filter(s => s !== 'Repaint Full Bodi');
-            }
-
-            updates.consultation.requestedServices = newServices;
-        }
-
-        if (extraction.bookingDate || extraction.bookingTime) {
-            updates.consultation = updates.consultation || { ...state.consultation };
-            updates.consultation.knownFacts = updates.consultation.knownFacts || { ...(state.consultation?.knownFacts || {}) };
-            
-            if (extraction.bookingDate) {
+            if (resolvedDate) {
                 const currentBD = state.consultation?.knownFacts?.bookingDate;
-                if (extraction.bookingDate.state === 'KNOWN' || currentBD?.state !== 'KNOWN') {
-                    updates.consultation.knownFacts.bookingDate = { state: 'KNOWN', value: extraction.bookingDate };
+                if (!currentBD || currentBD.state !== 'KNOWN') {
+                    updates.consultation.knownFacts.bookingDate = { state: 'KNOWN', value: resolvedDate };
                 }
             }
-            if (extraction.bookingTime) {
+            if (resolvedTime) {
                 const currentBT = state.consultation?.knownFacts?.bookingTime;
-                if (extraction.bookingTime.state === 'KNOWN' || currentBT?.state !== 'KNOWN') {
-                    updates.consultation.knownFacts.bookingTime = { state: 'KNOWN', value: extraction.bookingTime };
+                if (!currentBT || currentBT.state !== 'KNOWN') {
+                    updates.consultation.knownFacts.bookingTime = { state: 'KNOWN', value: resolvedTime };
                 }
             }
         }
 
-        // Persist coreference fields to V2 knownFacts so plannerNode can read them
-        if (extraction.targetService || extraction.needsClarification !== undefined) {
-            if (!updates.consultation) {
-                updates.consultation = { ...state.consultation };
-                updates.consultation.knownFacts = { ...(updates.consultation.knownFacts || {}) };
-            }
-            if (extraction.targetService) {
-                updates.consultation.knownFacts.targetService = extraction.targetService;
-            }
-            if (extraction.needsClarification !== undefined) {
-                updates.consultation.knownFacts.needsClarification = extraction.needsClarification;
-            }
-        }
-
-        if (extraction.visualSummary) {
-            updates.metadata = { ...(state.metadata || {}) };
-            updates.metadata.visualSummary = extraction.visualSummary;
+        // --- Visual summary ---
+        if (ex.visual_summary) {
+            updates.metadata = { ...(state.metadata || {}), visualSummary: ex.visual_summary };
         }
 
         return updates;
+
     } catch (error) {
-        console.error('[Memory Extractor] LLM Error:', error);
+        console.error('[Memory Extractor] LLM Error — returning empty update (state preserved):', error.message);
+        // Return empty: LangGraph will keep existing state untouched
         return {};
     }
 }
 
-module.exports = {
-    extractMemory
-};
+module.exports = { extractMemory };

@@ -1,4 +1,4 @@
-const { REPAINT_FLOWS } = require('../knowledge/repaintFlow');
+const { REPAINT_FLOWS, COLOR_TREND_ADVISORY, PACKAGE_RECOMMENDATION } = require('../knowledge/repaintFlow');
 
 /**
  * Repaint Flow Rules
@@ -122,14 +122,41 @@ async function evaluateRepaintRules(state) {
         rules.blockingFacts.push("motorModel", "partToRepaint");
     }
 
-    // Bypass logic for UNDECIDED paintColor to prevent Infinite Loop
+    // ── Color Phase: Inject trend advisory when color is still unknown ──────
     const colorState = vehicle?.paintType?.state || knownFacts.paintColor?.state;
     const isColorUndecided = colorState === 'UNDECIDED' || vehicle?.paintType?.value === 'Belum Menentukan';
-    
+    const isColorKnown = knownFacts.paintColor?.state === 'KNOWN' || vehicle?.paintType?.state === 'KNOWN';
+    const isColorPhaseFlow = isBodiHalus || isVelg || isFullBody;
+
     if (isColorUndecided) {
+        // User explicitly said they don't know yet — skip to price
         rules.blockingFacts = rules.blockingFacts.filter(fact => fact !== 'paintColor');
         rules.requiredFacts = rules.requiredFacts.filter(fact => fact !== 'paintColor');
-        rules.constraints.push("Customer belum tahu warna. WAJIB ubah Goal menjadi PRICE_ESTIMATION dan panggil tool GET_PRICE untuk memberikan estimasi/range harga dasar.");
+        rules.constraints.push('Customer belum tahu warna. WAJIB ubah Goal menjadi PRICE_ESTIMATION dan panggil tool GET_PRICE untuk memberikan estimasi/range harga dasar.');
+    } else if (isColorPhaseFlow && !isColorKnown && COLOR_TREND_ADVISORY.enabled) {
+        // Color not yet known — user is in the color discussion phase
+        // Inject trend advisory so Composer can share tips if user asks
+        const trendList = COLOR_TREND_ADVISORY.trends
+            .map(t => `- ${t.name}: ${t.description}`)
+            .join('\n');
+        rules.guidelines.push({
+            type: 'COLOR_TREND_ADVISORY',
+            directive: `Saat menanyakan atau mendiskusikan warna, kamu boleh berbagi info tren warna repaint secara singkat dan natural (jangan panjang):\n${trendList}\n\nCatatan: ${COLOR_TREND_ADVISORY.consultNote}\nSampaikan hanya jika user meminta saran atau masih bingung pilih warna — jangan langsung pamer tanpa diminta.`
+        });
+    }
+
+    // ── Price Phase: Inject package recommendation ────────────────────────
+    const isPricePhase = (
+        isColorKnown ||
+        isColorUndecided ||
+        state.planner?.execution?.toolIntent === 'GET_PRICE' ||
+        state.tool?.lastCapability === 'pricing'
+    );
+    if (isPricePhase && (isBodiHalus || isBodiKasar || isVelg || isFullBody)) {
+        rules.guidelines.push({
+            type: 'PACKAGE_RECOMMENDATION',
+            directive: `Setelah menampilkan daftar paket harga, WAJIB rekomendasikan paket "${PACKAGE_RECOMMENDATION.preferredPackage}" sebagai pilihan utama. Alasan: ${PACKAGE_RECOMMENDATION.reason}. Cara penyampaian: ${PACKAGE_RECOMMENDATION.note}`
+        });
     }
 
     // 3. Promo/Combo Logic
@@ -145,22 +172,31 @@ async function evaluateRepaintRules(state) {
         });
     }
 
-    // 4. Upsells
-    if (isBodiHalus || isFullBody) {
-        // Collect eligible pair services for Bodi Halus from promo config
-        const bodiHalusCombo = promoInfo?.eligibleCombos?.find(
-            c => c.anchor === 'Repaint Bodi Halus'
-        );
-        const eligiblePairs = bodiHalusCombo?.pairWith || ['Cuci Komplit'];
-        const pairListText = eligiblePairs.join(', atau ');
-        const discPct = promoInfo?.comboDiscount ? Math.round(promoInfo.comboDiscount * 100) : 15;
-        
+    // 4. Upsells — Combo discount offer (AFTER price is shown, not before)
+    // Only offer upsell if we're at or past the price phase
+    const hasShownPrice = state.tool?.lastCapability === 'pricing' || !!state.cart?.calculatedAt;
+    const discPct = promoInfo?.comboDiscount ? Math.round(promoInfo.comboDiscount * 100) : 15;
+
+    if ((isBodiHalus || isFullBody) && hasShownPrice) {
         rules.upsells.push({
             type: 'UPSELL',
-            // service: null — PricingTool now uses requestedServices to fetch new services.
-            // Don't auto-push a joined multi-service string here as it breaks normalization.
             service: null,
-            reason: `Kebetulan ada promo diskon ${discPct}% khusus buat harga Bodi Halus kalau sekalian ambil 2 layanan. WAJIB sebutkan SEMUA opsi ini ke kustomer: sekalian Cuci Komplit, Repaint Velg, atau Repaint Bodi Kasar.`
+            timing: 'AFTER_PRICE',
+            reason: `Ada promo diskon ${discPct}% untuk Bodi Halus kalau sekalian ambil 1 layanan lagi. Tawarkan 3 opsi secara natural: (1) tambah Repaint Bodi Kasar, (2) tambah Repaint Velg. Sampaikan setelah harga sudah diberikan, jangan sebelum.`
+        });
+    } else if (isBodiKasar && hasShownPrice) {
+        rules.upsells.push({
+            type: 'UPSELL',
+            service: null,
+            timing: 'AFTER_PRICE',
+            reason: `Ada promo combo — tawarkan sekalian Repaint Bodi Halus untuk dapat diskon ${discPct}%. Sampaikan setelah harga Bodi Kasar sudah ditampilkan.`
+        });
+    } else if (isVelg && hasShownPrice) {
+        rules.upsells.push({
+            type: 'UPSELL',
+            service: null,
+            timing: 'AFTER_PRICE',
+            reason: `Setelah kasih harga velg, tawarkan combo dengan Repaint Bodi Halus untuk dapat promo diskon ${discPct}%.`
         });
     }
 

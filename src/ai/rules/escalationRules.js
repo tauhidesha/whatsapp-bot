@@ -3,6 +3,8 @@
  * Rules for handing over the conversation to Admin (Bosmat).
  */
 
+const { extractTextFromContent, getMessageType } = require('../graph/utils/sanitizeMessages');
+
 function evaluateEscalation(state) {
     const { messages, consultation } = state;
     
@@ -40,6 +42,39 @@ function evaluateEscalation(state) {
             type: 'ESCALATION',
             reason: 'Harga layanan di sistem/tools kosong.',
             action: 'HANDOVER'
+        });
+    }
+
+    // Rule: Customer minta contoh warna / foto referensi
+    // Trigger: knownFacts (set by memory extractor) OR keyword fallback on last user message
+    const wantsColorExample = knownFacts.wantsColorExample === true;
+    let keywordMatch = false;
+    if (!wantsColorExample && Array.isArray(messages)) {
+        const lastUserMsg = [...messages].reverse().find(m => {
+            const t = getMessageType(m) || 'user';
+            return t === 'human' || t === 'user';
+        });
+        if (lastUserMsg) {
+            const text = extractTextFromContent(
+                lastUserMsg.kwargs?.content || lastUserMsg.content || ''
+            ).toLowerCase();
+            const colorPhotoKeywords = [
+                'contoh warna', 'foto warna', 'foto contoh', 'contoh foto',
+                'gambar warna', 'referensi warna', 'referensi foto',
+                'kirim foto', 'kirim gambar', 'ada fotonya', 'ada gambarnya',
+                'liat contoh', 'lihat contoh', 'mau liat', 'mau lihat',
+                'bisa kirim', 'kasih contoh'
+            ];
+            keywordMatch = colorPhotoKeywords.some(kw => text.includes(kw));
+        }
+    }
+
+    if (wantsColorExample || keywordMatch) {
+        escalations.push({
+            type: 'ESCALATION',
+            reason: 'Customer minta contoh warna atau foto referensi hasil pengerjaan.',
+            action: 'HANDOVER',
+            message: 'Customer minta contoh warna / foto referensi. Tolong kirimkan foto contoh hasil repaint ke customer ini ya boss 🙏'
         });
     }
 

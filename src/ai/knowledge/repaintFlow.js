@@ -1,69 +1,140 @@
 /**
  * Repaint Service Flows
- * 
- * This file defines the required facts and optional facts for different repaint flows.
- * This is used by the Rule Engine to supply constraints to the Planner, ensuring
- * the Planner knows exactly what information is missing before transitioning goals.
+ *
+ * Defines blocking facts, required facts, optional facts, and conversation stages
+ * for each repaint sub-flow. Used by the Rule Engine to supply constraints to the
+ * Planner, ensuring the conversation follows the intended SOP step-by-step.
+ *
+ * SOP Repaint (per owner):
+ *   1. Tanya motor apa
+ *   2. Tanya bagian mana (bodi halus / kasar / velg / full)
+ *   3a. [Bodi Halus] Tanya warna → kasih harga paket → rekomendasikan Standar → tawarkan combo
+ *   3b. [Velg] Tanya warna + kondisi velg → kasih harga → tawarkan combo
+ *   3c. [Bodi Kasar] Langsung harga (tidak tanya warna) → tawarkan combo
+ *   4. Booking
  */
 
 const REPAINT_FLOWS = {
     FULL_BODY: {
+        // Full Bodi = Bodi Halus + Bodi Kasar
         blockingFacts: [
-            "motorModel",
-            "partToRepaint"
+            'motorModel',    // Step 1: wajib tahu motor
+            'partToRepaint'  // Step 2: sudah jelas (full bodi)
         ],
         requiredFacts: [
-            "paintColor"
+            'paintColor'     // Step 3: tanya warna (untuk Bodi Halus bagiannya)
         ],
         optionalFacts: [
-            "upsell_cuci_komplit"
+            'upsell_velg'    // Step 4: tawarkan combo + velg setelah harga
         ],
-        blockedFacts: []
+        blockedFacts: [],
+        conversationStages: [
+            'ASK_MOTOR',
+            'ASK_COLOR',
+            'SHOW_PRICE_WITH_PACKAGE_RECOMMENDATION',
+            'UPSELL_VELG_COMBO',
+            'BOOKING'
+        ]
     },
+
     BODY_HALUS: {
         blockingFacts: [
-            "motorModel",
-            "partToRepaint"
+            'motorModel',    // Step 1: wajib tahu motor
+            'partToRepaint'  // Step 2: sudah jelas (bodi halus)
         ],
         requiredFacts: [
-            "paintColor"
+            'paintColor'     // Step 3: tanya warna — boleh kasih saran trend tipis-tipis
         ],
         optionalFacts: [
-            "upsell_cuci_komplit"
+            'upsell_bodi_kasar',  // Step 4a: tawarkan combo Bodi Kasar setelah harga
+            'upsell_velg'         // Step 4b: atau combo Velg
         ],
-        blockedFacts: []
+        blockedFacts: [],
+        conversationStages: [
+            'ASK_MOTOR',
+            'ASK_COLOR',             // Saat ini: kasih saran trend warna jika user minta
+            'SHOW_PRICE_WITH_PACKAGE_RECOMMENDATION',  // Rekomendasikan paket Standar
+            'UPSELL_COMBO',          // Tawarkan tambah Bodi Kasar atau Velg untuk dapat diskon
+            'BOOKING'
+        ]
     },
+
     BODY_KASAR: {
         blockingFacts: [
-            "motorModel",
-            "partToRepaint"
+            'motorModel',    // Step 1: wajib tahu motor
+            'partToRepaint'  // Step 2: sudah jelas (bodi kasar)
+            // Tidak perlu tanya warna — bodi kasar menggunakan cat hitam/standard
         ],
         requiredFacts: [],
         optionalFacts: [
-            "upsell_cuci_komplit"
+            'upsell_bodi_halus',  // Tawarkan combo Bodi Halus setelah harga
+            'upsell_velg'
         ],
         blockedFacts: [
-            "paintType",
-            "paintColor",
-            "color"
+            'paintType',
+            'paintColor',
+            'color'
+        ],
+        conversationStages: [
+            'ASK_MOTOR',
+            'SHOW_PRICE_WITH_PACKAGE_RECOMMENDATION',
+            'UPSELL_COMBO',
+            'BOOKING'
         ]
     },
+
     VELG: {
         blockingFacts: [
-            "motorModel",
-            "partToRepaint"
+            'motorModel',     // Step 1: wajib tahu motor
+            'partToRepaint'   // Step 2: sudah jelas (velg)
         ],
         requiredFacts: [
-            "paintColor",
-            "velgCondition"
+            'paintColor',     // Step 3a: tanya warna velg
+            'velgCondition'   // Step 3b: kondisi velg (ori/sudah pernah dicat) → pengaruh surcharge
         ],
         optionalFacts: [
-            "upsell_cuci_komplit"
+            'upsell_bodi_halus'  // Setelah harga, tawarkan combo Bodi Halus
         ],
-        blockedFacts: []
+        blockedFacts: [],
+        conversationStages: [
+            'ASK_MOTOR',
+            'ASK_VELG_COLOR_AND_CONDITION',
+            'SHOW_PRICE_WITH_SURCHARGE_INFO',
+            'UPSELL_COMBO',
+            'BOOKING'
+        ]
     }
 };
 
+// ---------------------------------------------------------------------------
+// Color Trend Advisory
+// Knowledge tentang tren warna yang bisa dibagikan saat user diskusi warna.
+// Dipakai oleh rule engine untuk inject ke guidelines Planner/Composer.
+// ---------------------------------------------------------------------------
+const COLOR_TREND_ADVISORY = {
+    enabled: true,
+    headline: 'Tren warna repaint 2024-2025',
+    trends: [
+        { name: 'Candy Colors', description: 'warna solid semi-transparan yang kelihatan dalam dan glossy — populer banget sekarang, terutama candy red, candy blue, candy orange' },
+        { name: 'Warna Berpartikel / Metallic Flake', description: 'ada efek glitter/sparkle halus yang keliatan waktu kena sinar — efeknya premium banget, lagi banyak diminati' },
+        { name: 'Matte / Doff Custom', description: 'warna solid tapi tanpa kilap — kesan elegan dan beda dari yang lain, cocok untuk Bodi Halus' },
+        { name: 'Two-tone / Dual Color', description: 'kombinasi dua warna di bagian berbeda — butuh skill lebih, tapi hasilnya sangat eye-catching' }
+    ],
+    consultNote: 'Kalau mau yang lebih custom atau masih bingung mau warna apa, bisa langsung diskusi sama Bosmat untuk dapat saran sesuai karakter motornya.'
+};
+
+// ---------------------------------------------------------------------------
+// Package Recommendation
+// Panduan untuk merekomendasikan paket Standar sebagai default suggestion.
+// ---------------------------------------------------------------------------
+const PACKAGE_RECOMMENDATION = {
+    preferredPackage: 'Standar',
+    reason: 'Paket Standar adalah pilihan paling value — harga beda tipis dengan Basic tapi kualitas cat dan proses pengerjaan jauh lebih baik. Paling banyak dipilih customer kami.',
+    note: 'Sampaikan rekomendasi ini secara natural, bukan seperti hard sell. Bisa bilang: "kebanyakan customer pilih yang Standar karena..."'
+};
+
 module.exports = {
-    REPAINT_FLOWS
+    REPAINT_FLOWS,
+    COLOR_TREND_ADVISORY,
+    PACKAGE_RECOMMENDATION
 };

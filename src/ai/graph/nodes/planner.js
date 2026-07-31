@@ -18,7 +18,7 @@ const PlannerSchema = z.object({
             type: z.enum(['ASK_MISSING_FACTS', 'EXECUTE_TOOL', 'PROVIDE_INFO', 'CLOSING', 'UPSELL']),
             priority: z.number().optional()
         }).describe("Aksi berikutnya yang harus diambil."),
-        toolIntent: z.enum(['NONE', 'GET_PRICE', 'CREATE_BOOKING', 'CHECK_AVAILABILITY', 'SEND_NOTIFICATION', 'ANSWER_FAQ', 'ESCALATE_HUMAN']).describe("Intent untuk memanggil external tools. Gunakan NONE jika tidak butuh tool. GET_PRICE untuk estimasi harga. CREATE_BOOKING untuk membuat booking. CHECK_AVAILABILITY untuk cek slot. ANSWER_FAQ untuk info studio. ESCALATE_HUMAN untuk alihkan ke admin."),
+        toolIntent: z.enum(['NONE', 'GET_PRICE', 'CREATE_BOOKING', 'CHECK_AVAILABILITY', 'SEND_NOTIFICATION', 'ANSWER_FAQ', 'ESCALATE_HUMAN']).describe("Intent untuk memanggil external tools. Gunakan NONE jika tidak butuh tool. GET_PRICE untuk estimasi harga. CREATE_BOOKING untuk membuat booking. CHECK_AVAILABILITY untuk cek slot. SEND_NOTIFICATION untuk kirim notif ke admin tanpa mengalihkan percakapan. ANSWER_FAQ untuk info studio. ESCALATE_HUMAN untuk handover ke admin (termasuk minta foto, konsultasi custom, harga tidak ditemukan)."),
         parameters: z.record(z.any()).optional().describe("Parameter untuk tool (jika toolIntent != NONE). Misalnya motor, scope, paintColor, dll.")
     }),
     conversation: z.object({
