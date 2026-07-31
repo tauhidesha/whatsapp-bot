@@ -149,25 +149,35 @@ async function evaluateRepaintRules(state) {
     const promoInfo = await getActivePromo();
     const discPct = promoInfo?.comboDiscount ? Math.round(promoInfo.comboDiscount * 100) : 10;
 
-    // ── Price Phase: Inject package recommendation ────────────────────────
+    // ── Price Phase: Inject package recommendation ─────────────────────────────
+    // Inject WHENEVER blocking facts are all known (motor + bagian + warna).
+    // Do NOT gate on isPricePhase — that evaluates BEFORE planner runs and is always
+    // one turn late. Instead, inject early so Composer has the guideline ready the
+    // moment price is shown.
+    const motorKnown = !!knownMotor || knownFacts.motorModel?.state === 'KNOWN';
+    const partKnown  = !!knownRepaintTarget || knownFacts.partToRepaint?.state === 'KNOWN';
+    const colorKnownOrSkipped = isColorKnown || isColorUndecided;
+    const isAllBlockingFactsKnown = motorKnown && partKnown && (colorKnownOrSkipped || isBodiKasar);
+    // (Bodi Kasar doesn't need color, so it skips the color check)
+
+    // isPricePhase still used for upsell guard (must be after pricing tool ran)
     const isPricePhase = (
-        isColorKnown ||
-        isColorUndecided ||
         state.planner?.execution?.toolIntent === 'GET_PRICE' ||
         state.tool?.lastCapability === 'pricing'
     );
-    if (isPricePhase && (isBodiHalus || isBodiKasar || isVelg || isFullBody)) {
+
+    if (isAllBlockingFactsKnown && (isBodiHalus || isBodiKasar || isVelg || isFullBody)) {
         rules.guidelines.push({
             type: 'PACKAGE_RECOMMENDATION',
             directive: `Setelah menampilkan daftar paket harga, WAJIB rekomendasikan paket "${PACKAGE_RECOMMENDATION.preferredPackage}" sebagai pilihan utama. Alasan: ${PACKAGE_RECOMMENDATION.reason}. Cara penyampaian: ${PACKAGE_RECOMMENDATION.note}`
         });
     }
 
-    // Full Bodi = Bodi Halus + Bodi Kasar = already a combo → harga yang tampil sudah kena diskon
-    if (isPricePhase && isFullBody) {
+    // Full Bodi: harga yang tampil sudah include combo discount — wajib transparan ke customer
+    if (isAllBlockingFactsKnown && isFullBody) {
         rules.guidelines.push({
             type: 'COMBO_PRICE_TRANSPARENCY',
-            directive: `PENTING: Customer memilih Full Bodi (Bodi Halus + Bodi Kasar). Harga yang tampil di estimasi SUDAH TERMASUK diskon combo ${discPct || 10}% untuk Bodi Halus karena mengambil 2 layanan sekaligus. WAJIB sampaikan ke customer bahwa harga yang ditampilkan SUDAH harga diskon combo — jangan biarkan mereka bingung kenapa ada dua angka. Contoh kalimat: "harga di atas udah termasuk diskon combo ${discPct || 10}% buat bodi halusnya ya, karena sekalian sama bodi kasar."`
+            directive: `PENTING: Customer memilih Full Bodi (Bodi Halus + Bodi Kasar). Harga yang tampil di estimasi SUDAH TERMASUK diskon combo ${discPct}% untuk Bodi Halus karena mengambil 2 layanan sekaligus. WAJIB sampaikan ke customer bahwa harga yang ditampilkan SUDAH harga diskon combo — jangan biarkan mereka bingung kenapa ada dua angka. Contoh kalimat: "harga di atas udah termasuk diskon combo ${discPct}% buat bodi halusnya ya, karena sekalian sama bodi kasar."`
         });
     }
 

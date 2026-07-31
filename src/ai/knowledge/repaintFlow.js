@@ -19,13 +19,12 @@ const REPAINT_FLOWS = {
         // Full Bodi = Bodi Halus + Bodi Kasar
         blockingFacts: [
             'motorModel',    // Step 1: wajib tahu motor
-            'partToRepaint'  // Step 2: sudah jelas (full bodi)
+            'partToRepaint', // Step 2: sudah jelas (full bodi)
+            'paintColor'     // Step 3: WAJIB tanya warna sebelum bisa GET_PRICE
         ],
-        requiredFacts: [
-            'paintColor'     // Step 3: tanya warna (untuk Bodi Halus bagiannya)
-        ],
+        requiredFacts: [],   // Semua sudah masuk blockingFacts
         optionalFacts: [
-            'upsell_velg'    // Step 4: tawarkan combo + velg setelah harga
+            'upsell_velg'
         ],
         blockedFacts: [],
         conversationStages: [
@@ -40,21 +39,20 @@ const REPAINT_FLOWS = {
     BODY_HALUS: {
         blockingFacts: [
             'motorModel',    // Step 1: wajib tahu motor
-            'partToRepaint'  // Step 2: sudah jelas (bodi halus)
+            'partToRepaint', // Step 2: sudah jelas (bodi halus)
+            'paintColor'     // Step 3: WAJIB tanya warna sebelum bisa GET_PRICE
         ],
-        requiredFacts: [
-            'paintColor'     // Step 3: tanya warna — boleh kasih saran trend tipis-tipis
-        ],
+        requiredFacts: [],   // Semua sudah masuk blockingFacts
         optionalFacts: [
-            'upsell_bodi_kasar',  // Step 4a: tawarkan combo Bodi Kasar setelah harga
-            'upsell_velg'         // Step 4b: atau combo Velg
+            'upsell_bodi_kasar',
+            'upsell_velg'
         ],
         blockedFacts: [],
         conversationStages: [
             'ASK_MOTOR',
-            'ASK_COLOR',             // Saat ini: kasih saran trend warna jika user minta
-            'SHOW_PRICE_WITH_PACKAGE_RECOMMENDATION',  // Rekomendasikan paket Standar
-            'UPSELL_COMBO',          // Tawarkan tambah Bodi Kasar atau Velg untuk dapat diskon
+            'ASK_COLOR',
+            'SHOW_PRICE_WITH_PACKAGE_RECOMMENDATION',
+            'UPSELL_COMBO',
             'BOOKING'
         ]
     },
