@@ -13,65 +13,65 @@ const prisma = new PrismaClient();
 const descriptions = {
     'Repaint Bodi Halus - Paket Premium': {
         summary: 'Hasil tebel, basah, dan dalam — seperti motor baru keluar pabrik premium.',
-        description: `Paket paling top di studio ini. Cocok kalau kamu mau hasil yang beneran beda dari biasanya.
+        description: `Paket paling top. Clear Flowcoat (lapisan paling tebal & keras) + poles, hasilnya beneran beda.
 
-Kenapa beda?
-- Catnya dilapis lebih banyak, jadi warnanya keliatan *dalam* dan bersinar — bukan cuma mengkilap biasa
-- Hasilnya kayak "basah" alias wet look — keliatan glossy tebal, bukan tipis
-- Tahan lama banget dan nggak gampang pudar
+Spesifikasi:
+- Clear: Flowcoat (di-clear 2x — lapisan paling tebal yang ada)
+- Finishing: Dipoles setelah curing → wet look, keliatan "basah" dan dalam
+- Warna terasa punya depth — bukan cuma kinclong biasa, tapi ada efek "dalem"
+- Garansi 2 Tahun
 
-Cocok untuk: Kolektor motor, motor yang mau dikonteskan, atau yang pengen tampilan paling wah
-Garansi: 2 tahun
-Estimasi pengerjaan: 3–4 hari kerja`
+Cocok untuk: Kolektor, motor kontes, atau yang pengen tampilan paling wah.
+Estimasi pengerjaan: 3–4 hari kerja tergantung kondisi dan antrian.
+Harga bervariasi per model motor.`
     },
 
     'Repaint Bodi Halus - Paket Standar': {
-        summary: 'Hasil mirror, tahan baret — pilihan paling worth it.',
-        description: `Paket favorit customer di sini — dan memang worth it banget.
+        summary: 'Mirror finish, tahan baret — pilihan paling worth it.',
+        description: `Sweet spot antara kualitas dan harga. Clear HS + poles — hasilnya mengkilap tajam dan tahan.
 
-Kenapa banyak yang pilih ini?
-- Hasilnya mengkilap kayak cermin (mirror finish) — beneran kinclong
-- Lapisannya keras, jadi lebih tahan dari baret-baret kecil sehari-hari
-- Setelah cat kering, dipoles lagi supaya hasilnya makin sempurna
-- Garansi 1 tahun — tenang kalau ada apa-apa
+Spesifikasi:
+- Clear: HS (Hard Strength — lebih keras dan tahan gores dari MS)
+- Finishing: Dipoles setelah curing → mirror finish, mengkilap kayak cermin
+- Lebih tahan baret dibanding cat standar pabrik
+- Garansi 1 Tahun
 
-Cocok untuk: Motor harian yang mau tampilannya tetap kece, atau motor yang suka diajak ngumpul
-Garansi: 1 tahun
-Estimasi pengerjaan: 3–4 hari kerja`
+Cocok untuk: Motor harian yang mau tetap kece, atau yang suka ngumpul bareng teman.
+Estimasi pengerjaan: 3–4 hari kerja tergantung kondisi dan antrian.
+Harga bervariasi per model motor.`
     },
 
     'Repaint Bodi Halus - Paket Basic': {
-        summary: 'Lebih kinclong dari cat pabrik, harga lebih terjangkau.',
-        description: `Satu level di atas paket Ekonomis — hasilnya sudah lumayan kinclong dan lebih tahan.
+        summary: 'Lebih kinclong dari cat pabrik, harga terjangkau.',
+        description: `Satu level di atas Ekonomis. Pakai Clear HS tapi tanpa poles — hasilnya sudah lebih kinclong dari cat pabrik.
 
-Apa yang didapat?
-- Lebih mengkilap dibanding cat standar pabrik
-- Lapisannya sudah pakai clear yang lebih keras dari paket Ekonomis
-- Cocok kalau mau upgrade tampilan tapi tetap jaga budget
+Spesifikasi:
+- Clear: HS (Hard Strength — lebih keras dari MS, lebih tahan gores)
+- Finishing: Tanpa poles — hasilnya rapi dan glossy, ada efek kulit jeruk ringan seperti cat pabrikan
+- Lebih tahan dibanding paket Ekonomis
+- Garansi 6 Bulan
 
-Cocok untuk: Motor harian, yang mau ganti warna tapi nggak perlu hasil maksimal
-Garansi: 1 tahun
-Estimasi pengerjaan: 3–4 hari kerja`
+Cocok untuk: Daily premium, yang mau upgrade dari cat standar tapi jaga budget.
+Estimasi pengerjaan: 3–4 hari kerja tergantung kondisi dan antrian.
+Harga bervariasi per model motor.`
     },
 
     'Repaint Bodi Halus - Paket Ekonomis': {
-        summary: 'Pilihan paling hemat — warna solid, rapi, dan bersih.',
-        description: `Paket paling basic — cocok kalau yang penting ganti warna dulu dengan budget terbatas.
+        summary: 'Pilihan paling hemat — warna solid, rapi, bersih.',
+        description: `Paket paling basic. Pakai Clear MS — cukup untuk yang prioritaskan budget atau sering ganti warna.
 
-Yang didapat:
-- Cat baru yang rapi dan bersih
-- Warna solid — nggak ada efek khusus, tapi hasilnya tetap lumayan
-- Cocok banget buat motor harian atau yang sering ganti warna
+Spesifikasi:
+- Clear: MS (Medium Strength — standar dasar, lebih tipis dari HS)
+- Finishing: Rapi dan bersih, efek kulit jeruk ringan seperti cat bawaan pabrik
+- Tanpa poles
+- Tanpa Garansi
 
-Perlu tahu:
-- Tidak ada garansi untuk paket ini
-- Finishing-nya mirip cat bawaan pabrik — nggak terlalu glossy tapi tetap rapi
-
-Cocok untuk: Pelajar, motor harian, yang sering ganti warna atau budget terbatas
-Garansi: Tidak ada
-Estimasi pengerjaan: 3–4 hari kerja`
+Cocok untuk: Pelajar, motor harian, yang sering ganti warna, atau budget terbatas.
+Estimasi pengerjaan: 3–4 hari kerja tergantung kondisi dan antrian.
+Harga bervariasi per model motor.`
     }
 };
+
 
 async function main() {
     console.log('Updating package descriptions...\n');
