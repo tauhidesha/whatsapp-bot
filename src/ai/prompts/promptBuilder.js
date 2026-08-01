@@ -412,7 +412,7 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
                                   (state.tool?.lastResult?.results?.some(r => r.candidates?.length > 0));
             
             if (hasCandidates) {
-                prompt += `ATURAN PENYAJIAN PAKET: Karena ada beberapa pilihan paket layanan, JANGAN copas deskripsi panjang. Gunakan format ringkas satu baris untuk tiap paket seperti ini:\n🔹 Nama Paket {isi dari field summary} - Harga\nContoh: 🔹 Paket Basic (Clear HS) - Rp1,58 juta\nPastikan format ini diikuti persis agar rapi.\n`;
+                prompt += `ATURAN PENYAJIAN PAKET: Karena ada beberapa pilihan paket layanan, JANGAN copas deskripsi panjang. Gunakan format ringkas satu baris untuk tiap paket seperti ini:\n🔹 Nama Paket {isi dari field summary} - Harga\nContoh: 🔹 Paket Basic (Clear HS) - Rp1,58 juta\nPastikan format ini diikuti persis agar rapi. KECUALI jika user secara eksplisit meminta penjelasan detail atau menanyakan perbedaan paket, barulah kamu boleh menggunakan field 'description' untuk menjelaskannya.\n`;
             }
             prompt += `\n`;
         }
