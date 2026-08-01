@@ -412,7 +412,7 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
                                   (state.tool?.lastResult?.results?.some(r => r.candidates?.length > 0));
             
             if (hasCandidates) {
-                prompt += `ATURAN PENYAJIAN PAKET: Karena ada beberapa pilihan paket layanan, JANGAN copas semua deksripsi panjangnya! Sebutkan perbedaannya SECARA RINGKAS dengan menyorot point penting saja (misal: jenis clear, estimasi hasil/garansi). Gunakan format bullet points pendek agar nyaman dibaca di chat WA.\n`;
+                prompt += `ATURAN PENYAJIAN PAKET: Karena ada beberapa pilihan paket layanan, JANGAN copas semua deksripsi panjangnya! CUKUP cantumkan nama paket, harga, dan field 'summary' sebagai deskripsi singkat (one-liner) untuk masing-masing paket. Jangan menambah-nambahkan deskripsi teknis panjang. Gunakan format yang rapi dan nyaman dibaca di WA.\n`;
             }
             prompt += `\n`;
         }
