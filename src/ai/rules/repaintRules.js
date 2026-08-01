@@ -185,7 +185,7 @@ async function evaluateRepaintRules(state) {
     if (isAllBlockingFactsKnown && isFullBody) {
         rules.guidelines.push({
             type: 'COMBO_PRICE_TRANSPARENCY',
-            directive: `PENTING: Customer memilih Full Bodi (Bodi Halus + Bodi Kasar). Harga yang tampil di estimasi SUDAH TERMASUK diskon combo ${discPct}% untuk Bodi Halus karena mengambil 2 layanan sekaligus. WAJIB sampaikan ke customer bahwa harga yang ditampilkan SUDAH harga diskon combo — jangan biarkan mereka bingung kenapa ada dua angka. Contoh kalimat: "harga di atas udah termasuk diskon combo ${discPct}% buat bodi halusnya ya, karena sekalian sama bodi kasar."`
+            directive: `PENTING: Customer memilih Full Bodi (Bodi Halus + Bodi Kasar). Harga yang tampil di estimasi SUDAH TERMASUK diskon combo ${discPct}% untuk Bodi Halus karena mengambil 2 layanan sekaligus. WAJIB sampaikan ke customer bahwa harga yang ditampilkan SUDAH harga diskon combo. Gabungkan info ini dengan rincian layanan tambahan dalam satu kalimat. Contoh kalimat: "harga di atas sudah termasuk repaint bodi kasar Rp... , repaint velg Rp... , dan diskon combo ${discPct}% untuk bodi halusnya ya."`
         });
     }
 

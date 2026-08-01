@@ -365,8 +365,9 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
                 prompt += `🔹 ${cleanPkgName} — ${discInfo}\n`;
             });
             if (cartCalc.fixedLineItems?.length > 0) {
-                prompt += `\nLayanan tambahan sudah termasuk:\n`;
-                cartCalc.fixedLineItems.forEach(f => prompt += `- ${f.name}: ${f.priceFormatted}\n`);
+                const addOns = cartCalc.fixedLineItems.map(f => `${f.name} ${f.priceFormatted}`).join(', ');
+                prompt += `\nDATA LAYANAN TAMBAHAN (SUDAH TERMASUK DALAM TOTAL HARGA PAKET): ${addOns}\n`;
+                prompt += `ATURAN PENYAJIAN TAMBAHAN: Sebutkan layanan tambahan ini HANYA DALAM SATU KALIMAT yang digabung dengan info diskon combo. DILARANG membuat bullet point/list ke bawah untuk layanan tambahan. Contoh: "harga di atas sudah termasuk ${addOns}, dan diskon combo..."\n`;
             }
         } else if (cartCalc.type === 'fixed-cart') {
             // Skenario B/C: semua harga sudah fix, tampilkan rekap
