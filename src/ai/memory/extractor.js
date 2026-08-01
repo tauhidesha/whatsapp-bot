@@ -167,6 +167,8 @@ ATURAN KEPUTUSAN (PENTING — baca semua sebelum output):
    - Jika tidak ada perubahan motor → kembalikan nilai saat ini.
 
 2. LAYANAN (requestedServices):
+   - HANYA masukkan layanan jika user secara tegas MEMINTA, TERTARIK, atau BERTANYA HARGA/DETAIL untuk layanan tersebut.
+   - PENTING: Jika user hanya bercerita kasual, berbagi info, atau membicarakan orang lain (misal: "kata teman saya bagus kalau repaint velg", "saya direkomendasikan repaint velg"), JANGAN masukkan ke daftar layanan.
    - Kembalikan DAFTAR LENGKAP layanan yang masih diinginkan user setelah pesan ini.
    - Jika user hanya menjawab pertanyaan detail (warna, jadwal, dll) → PERTAHANKAN semua layanan yang sudah ada.
    - Jika user menyebut "aja" / "saja" dalam konteks menjawab pertanyaan → JANGAN hapus layanan lain.
