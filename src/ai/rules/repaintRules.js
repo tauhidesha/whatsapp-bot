@@ -136,9 +136,15 @@ async function evaluateRepaintRules(state) {
     } else if (isColorKnown) {
         const colorValue = (vehicle?.paintType?.value || knownFacts.paintColor?.value || '').toString().toLowerCase();
         if (colorValue.includes('doff') || colorValue.includes('matte')) {
-            rules.constraints.push('ATURAN FINISHING DOFF: Warna yang dipilih adalah Doff/Matte. WAJIB sampaikan bahwa untuk finishing Doff otomatis masuk ke Paket Ekonomis. Paket Standar, Premium, dan Basic HANYA untuk finishing Glossy. Jangan tawarkan atau rekomendasikan paket Glossy jika user meminta Doff.');
+            rules.constraints.push('ATURAN FINISHING DOFF: Warna yang dipilih adalah Doff/Matte. WAJIB sampaikan bahwa untuk finishing Doff otomatis masuk ke Paket Ekonomis. Paket Standar, Premium, dan Basic HANYA untuk finishing Glossy. JANGAN tawarkan atau rekomendasikan paket Glossy jika user meminta Doff.');
+            rules.constraints.push('ALASAN DOFF HANYA DI EKONOMIS: Jika ditanya kenapa Doff hanya ada di paket ekonomis, jelaskan bahwa "clear doff atau semi doff tidak ada gradenya, jadi harganya ya segitu aja (masuk ke ekonomis)".');
         }
-    } else if (isColorPhaseFlow && !isColorKnown && COLOR_TREND_ADVISORY.enabled) {
+    } 
+    
+    // Penjelasan tambahan tentang Paket Ekonomis
+    rules.constraints.push('ATURAN PAKET EKONOMIS: Paket Ekonomis BISA untuk Glossy maupun Doff. Jika user bertanya apakah Ekonomis bisa Glossy, jawab "Bisa, namun untuk glossy di paket ekonomis menggunakan Clear MS (kasta terendah) di mana ketahanan UV dan baretnya kurang dibandingkan Clear HS di paket atasnya."');
+    
+    if (isColorPhaseFlow && !isColorKnown && COLOR_TREND_ADVISORY.enabled) {
         // Color not yet known — user is in the color discussion phase
         // Inject trend advisory so Composer can share tips if user asks
         const trendList = COLOR_TREND_ADVISORY.trends
