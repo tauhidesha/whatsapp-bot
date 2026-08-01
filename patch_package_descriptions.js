@@ -12,7 +12,7 @@ const prisma = new PrismaClient();
 
 const descriptions = {
     'Repaint Bodi Halus - Paket Premium': {
-        summary: 'Hasil tebel, basah, dan dalam — seperti motor baru keluar pabrik premium.',
+        summary: '(Clear HS + Flowcoat + Poles)',
         description: `Paket paling top. Clear Flowcoat (lapisan paling tebal & keras) + poles, hasilnya beneran beda.
 
 Spesifikasi:
@@ -27,7 +27,7 @@ Harga bervariasi per model motor.`
     },
 
     'Repaint Bodi Halus - Paket Standar': {
-        summary: 'Mirror finish, tahan baret — pilihan paling worth it.',
+        summary: '(Clear HS + Poles)',
         description: `Sweet spot antara kualitas dan harga. Clear HS + poles — hasilnya mengkilap tajam dan tahan.
 
 Spesifikasi:
@@ -42,7 +42,7 @@ Harga bervariasi per model motor.`
     },
 
     'Repaint Bodi Halus - Paket Basic': {
-        summary: 'Lebih kinclong dari cat pabrik, harga terjangkau.',
+        summary: '(Clear HS)',
         description: `Satu level di atas Ekonomis. Pakai Clear HS tapi tanpa poles — hasilnya sudah lebih kinclong dari cat pabrik.
 
 Spesifikasi:
@@ -57,7 +57,7 @@ Harga bervariasi per model motor.`
     },
 
     'Repaint Bodi Halus - Paket Ekonomis': {
-        summary: 'Pilihan paling hemat — warna solid, rapi, bersih.',
+        summary: '(Glossy Clear MS / Doff)',
         description: `Paket paling basic. Pakai Clear MS — cukup untuk yang prioritaskan budget atau sering ganti warna.
 
 Spesifikasi:
