@@ -133,6 +133,11 @@ async function evaluateRepaintRules(state) {
         rules.blockingFacts = rules.blockingFacts.filter(fact => fact !== 'paintColor');
         rules.requiredFacts = rules.requiredFacts.filter(fact => fact !== 'paintColor');
         rules.constraints.push('Customer belum tahu warna. WAJIB ubah Goal menjadi PRICE_ESTIMATION dan panggil tool GET_PRICE untuk memberikan estimasi/range harga dasar.');
+    } else if (isColorKnown) {
+        const colorValue = (vehicle?.paintType?.value || knownFacts.paintColor?.value || '').toString().toLowerCase();
+        if (colorValue.includes('doff') || colorValue.includes('matte')) {
+            rules.constraints.push('ATURAN FINISHING DOFF: Warna yang dipilih adalah Doff/Matte. WAJIB sampaikan bahwa untuk finishing Doff otomatis masuk ke Paket Ekonomis. Paket Standar, Premium, dan Basic HANYA untuk finishing Glossy. Jangan tawarkan atau rekomendasikan paket Glossy jika user meminta Doff.');
+        }
     } else if (isColorPhaseFlow && !isColorKnown && COLOR_TREND_ADVISORY.enabled) {
         // Color not yet known — user is in the color discussion phase
         // Inject trend advisory so Composer can share tips if user asks
@@ -165,11 +170,16 @@ async function evaluateRepaintRules(state) {
         state.tool?.lastCapability === 'pricing'
     );
 
+    const colorValueForRec = (vehicle?.paintType?.value || knownFacts.paintColor?.value || '').toString().toLowerCase();
+    const isAlreadyDoff = colorValueForRec.includes('doff') || colorValueForRec.includes('matte');
+
     if (isAllBlockingFactsKnown && (isBodiHalus || isBodiKasar || isVelg || isFullBody)) {
-        rules.guidelines.push({
-            type: 'PACKAGE_RECOMMENDATION',
-            directive: `Setelah menampilkan daftar paket harga, WAJIB rekomendasikan paket "${PACKAGE_RECOMMENDATION.preferredPackage}" sebagai pilihan utama. Alasan: ${PACKAGE_RECOMMENDATION.reason}. Cara penyampaian: ${PACKAGE_RECOMMENDATION.note}`
-        });
+        if (!isAlreadyDoff) {
+            rules.guidelines.push({
+                type: 'PACKAGE_RECOMMENDATION',
+                directive: `Setelah menampilkan daftar paket harga, WAJIB rekomendasikan paket "${PACKAGE_RECOMMENDATION.preferredPackage}" sebagai pilihan utama. Alasan: ${PACKAGE_RECOMMENDATION.reason}. Cara penyampaian: ${PACKAGE_RECOMMENDATION.note}`
+            });
+        }
     }
 
     // Guideline: untuk flow yang butuh warna (Bodi Halus / Full Bodi / Velg),
