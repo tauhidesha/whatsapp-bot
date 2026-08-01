@@ -350,8 +350,9 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
         if (cartCalc.type === 'multi-package-simulation') {
             // Skenario A: user belum pilih paket, tampilkan simulasi per paket
             prompt += `MODE: SIMULASI PER PAKET (user belum pilih paket ${cartCalc.serviceName})\n`;
-            prompt += `Tampilkan SEMUA paket format: "🔹 [Nama] — *[harga diskon]*"\n`;
-            prompt += `Jika ada diskon, tampilkan harga asli dicoret sebelum harga diskon.\n\n`;
+            prompt += `Tampilkan SEMUA paket format: "🔹 [Nama] [Summary] — *[harga diskon]*"\n`;
+            prompt += `Jika ada diskon, tampilkan harga asli dicoret sebelum harga diskon.\n`;
+            prompt += `DILARANG KERAS membuat bullet point untuk deskripsi paket. GUNAKAN PERSIS FORMAT YANG DIBERIKAN DI BAWAH INI.\n\n`;
             
             // Sort simulations by price ascending (Cheapest to Most Expensive)
             const sortedSimulations = [...cartCalc.simulations].sort((a, b) => a.basePrice - b.basePrice);
@@ -362,7 +363,8 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
                 const discInfo = sim.hasDiscount
                     ? `~${sim.totalBaseFormatted}~ -> *${sim.totalFormatted}*`
                     : `*${sim.totalFormatted}*`;
-                prompt += `🔹 ${cleanPkgName} — ${discInfo}\n`;
+                const summaryInfo = sim.summary ? ` ${sim.summary}` : '';
+                prompt += `🔹 ${cleanPkgName}${summaryInfo} — ${discInfo}\n`;
             });
             if (cartCalc.fixedLineItems?.length > 0) {
                 const addOns = cartCalc.fixedLineItems.map(f => `${f.name} ${f.priceFormatted}`).join(', ');
