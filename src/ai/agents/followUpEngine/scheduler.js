@@ -2,7 +2,7 @@
 // Daily cron job: label downgrade, eligibility check, generate & send follow-up messages.
 
 const prisma = require('../../../lib/prisma');
-const { generateFollowUpMessage, getDaysSince } = require('./messageGenerator.js');
+const { generateFollowUpMessage, getDaysSince, resolveAngle } = require('./messageGenerator.js');
 const { shouldStop, handleStopAction } = require('./stopCondition.js');
 const { markBotMessage } = require('../../utils/adminMessageSync.js');
 const { getActivePromo } = require('../../utils/promoConfig');
@@ -19,63 +19,6 @@ function resolveWhatsappId(customer) {
     return customer.phone ? customer.phone + '@c.us' : null;
 }
 
-/**
- * Clean AI response from common reasoning, preambles, or thought blocks.
- * @param {string} text 
- * @returns {string}
- */
-function cleanAiResponse(text) {
-    if (!text) return '';
-    if (typeof text !== 'string') return String(text);
-    
-    // 1. Remove <thought>...</thought> blocks (Gemini 2.0 Thinking/CoT)
-    let cleaned = text.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
-
-    // 2. Remove common AI preambles
-    const preambles = [
-        /^Certainly!.*$/gim,
-        /^Here is a.*$/gim,
-        /^Based on the customer data.*$/gim,
-        /^Try this message:.*$/gim,
-        /^Pesan follow-up:.*$/gim,
-        /^Draft pesan:.*$/gim
-    ];
-
-    preambles.forEach(p => {
-        cleaned = cleaned.replace(p, '');
-    });
-
-    // 3. Extract final message if AI still provides instructions/options
-    const paragraphs = cleaned.split(/\n\s*\n/).filter(p => p.trim().length > 0);
-    if (paragraphs.length > 1) {
-        const lastParagraph = paragraphs[paragraphs.length - 1].trim();
-        if (!lastParagraph.includes(':') && !lastParagraph.startsWith('*')) {
-            cleaned = lastParagraph;
-        }
-    }
-
-    // 4. Deduplication Logic (Special case for Gemini repeat)
-    const len = cleaned.length;
-    if (len > 20) {
-        const half = Math.floor(len / 2);
-        const p1 = cleaned.substring(0, half).trim();
-        const p2 = cleaned.substring(len - p1.length).trim();
-        
-        // Exact half repeat
-        if (p1 === p2) {
-            cleaned = p1;
-        } else {
-            // Check for "Message" "Message" or Message + " + Message
-            const parts = cleaned.split('"').filter(p => p.trim().length > 10);
-            if (parts.length > 1 && parts[0].trim() === parts[1].trim()) {
-                cleaned = parts[0].trim();
-            }
-        }
-    }
-
-    return cleaned.trim();
-}
-
 // ─── Helper: Save message to Prisma ────────────────────────────────────────
 
 async function saveMessageToPrisma(senderNumber, message, senderType) {
@@ -83,7 +26,7 @@ async function saveMessageToPrisma(senderNumber, message, senderType) {
 
     // Use unified identity parser to handle @lid and @c.us correctly
     const { parseSenderIdentity } = require('../../../lib/utils');
-    const { docId, normalizedPhone, isLid } = parseSenderIdentity(senderNumber);
+    const { docId, normalizedPhone } = parseSenderIdentity(senderNumber);
     if (!docId) return;
 
     const customer = await prisma.customer.findFirst({
@@ -102,7 +45,7 @@ async function saveMessageToPrisma(senderNumber, message, senderType) {
         return;
     }
 
-    const messageText = cleanAiResponse(message);
+    const messageText = message.trim();
 
     await prisma.directMessage.create({
         data: {
@@ -173,8 +116,6 @@ function isEligible(context, metadata) {
 
     if (!lastMessage) return false;
 
-    const now = new Date();
-
     if (lastFollowUp) {
         // Already followed up before — use secondIntervalDays for FU3, intervalDays for FU2
         const followUpCount = context.followUpCount || 0;
@@ -206,39 +147,9 @@ function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// ─── Main Daily Run ──────────────────────────────────────────────────────────
+// ─── Unified Queue Builder ───────────────────────────────────────────────────
 
-async function runDailyFollowUp(dryRun = false, limit = null) {
-    const now = new Date(); // Definisi di paling atas scope function
-    console.log(`[Scheduler] Running daily follow-up check... (dryRun=${dryRun})`);
-
-    // ── DRY RUN: return preview queue without sending ─────────────────────────
-    // NOTE: reminders (coating/booking) are NOT included here; they are fetched
-    // separately by the queue-review endpoint via their own dryRun=true calls.
-    if (dryRun) {
-        return await _buildDryRunQueue(now, limit);
-    }
-    // ─────────────────────────────────────────────────────────────────────────
-
-    // 1. Scan semua customerContext dari Prisma
-    const contexts = await prisma.customerContext.findMany({
-        where: {
-            customerLabel: { not: null }
-        },
-        include: {
-            customer: {
-                include: {
-                    bookings: {
-                        where: {
-                            status: { notIn: ['COMPLETED', 'PAID', 'DONE', 'CANCELLED'] }
-                        }
-                    }
-                }
-            }
-        }
-    });
-
-    // 2. Identify eligible customers
+async function buildEligibilityQueue(now, contexts, options = { dryRun: false }) {
     const queue = [];
     let downgradeCount = 0;
 
@@ -259,24 +170,27 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
             fullSenderId: resolveWhatsappId(customer)
         };
 
-        // 2. Label downgrade check
+        // 2. Label downgrade check (Only persisted on live run; dry run simulates
+        // in-memory only so the preview reflects what today's real run would do).
         for (const rule of DOWNGRADE_RULES) {
             if (context.customerLabel === rule.from && rule.condition(context, metadata)) {
-                await prisma.customerContext.update({
-                    where: { id: docId },
-                    data: {
-                        customerLabel: rule.to,
-                        labelReason: rule.reason,
-                        labelScores: {
-                            ...(context.labelScores || {}),
-                            previousLabel: rule.from,
-                            labeledBy: 'scheduler_downgrade'
+                if (!options.dryRun) {
+                    await prisma.customerContext.update({
+                        where: { id: docId },
+                        data: {
+                            customerLabel: rule.to,
+                            labelReason: rule.reason,
+                            labelScores: {
+                                ...(context.labelScores || {}),
+                                previousLabel: rule.from,
+                                labeledBy: 'scheduler_downgrade'
+                            }
                         }
-                    }
-                });
+                    });
+                    console.log(`[Scheduler] Downgrade ${docId}: ${rule.from} → ${rule.to}`);
+                }
                 context.customerLabel = rule.to;
                 downgradeCount++;
-                console.log(`[Scheduler] Downgrade ${docId}: ${rule.from} → ${rule.to}`);
                 break;
             }
         }
@@ -291,7 +205,7 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
         // 5. Review eligibility (Post-Service 3 Days)
         let isReviewEligible = false;
         const lastService = customer.lastService ? new Date(customer.lastService) : null;
-        
+
         if (lastService && !context.reviewFollowUpSent && !hasActiveBooking) {
             const daysSinceService = getDaysSince(lastService);
             if (daysSinceService >= 3 && daysSinceService <= 7) {
@@ -306,12 +220,9 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
             const daysSinceService = getDaysSince(lastService);
             const interval = REBOOKING_INTERVALS[context.lastServiceType];
 
-            // Trigger exactly on interval or within 3-day window after interval
             if (interval && daysSinceService >= interval && daysSinceService <= interval + 3) {
-                // Also check if we haven't sent a rebooking follow-up recently
                 const daysSinceLastFup = context.lastFollowUpAt ? getDaysSince(context.lastFollowUpAt) : 999;
-
-                if (daysSinceLastFup > 7 && !hasActiveBooking) { // Don't spam if they just got a different message
+                if (daysSinceLastFup > 7 && !hasActiveBooking) {
                     isRebookingEligible = true;
                     rebookingAngle = `rebooking_${context.lastServiceType}`;
                 }
@@ -319,39 +230,65 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
         }
 
         const senderNumber = resolveWhatsappId(customer);
+        const name = customer.name || 'Mas';
+        let itemStrategy = null;
+        let itemType = null;
+        let queueItem = null;
 
         if (isReviewEligible) {
             // Priority 1: Review
-            queue.unshift({
-                docId,
-                senderNumber,
-                name: customer.name || 'Mas',
-                context: { ...context, reviewMode: true },
-                metadata,
-                strategy: { ...STRATEGY_CONFIG[context.customerLabel], angle: 'review' },
-            });
+            itemStrategy = { ...STRATEGY_CONFIG[context.customerLabel], angle: 'review' };
+            itemType = 'review';
+            queueItem = { docId, senderNumber, name, context: { ...context, reviewMode: true }, metadata, strategy: itemStrategy };
+            queue.unshift(queueItem);
         } else if (isRebookingEligible) {
             // Priority 2: Rebooking
-            queue.splice(queue.findIndex(item => !item.context.reviewMode), 0, {
-                docId,
-                senderNumber,
-                name: customer.name || 'Mas',
-                context: { ...context, rebookingMode: true },
-                metadata,
-                strategy: { ...STRATEGY_CONFIG[context.customerLabel], angle: rebookingAngle },
-            });
+            itemStrategy = { ...STRATEGY_CONFIG[context.customerLabel], angle: rebookingAngle };
+            itemType = 'rebooking';
+            queueItem = { docId, senderNumber, name, context: { ...context, rebookingMode: true }, metadata, strategy: itemStrategy };
+            const idx = queue.findIndex(item => !item.context.reviewMode);
+            queue.splice(idx === -1 ? queue.length : idx, 0, queueItem);
         } else if (isNurtureEligible) {
             // Priority 3: Nurturing
-            queue.push({
-                docId,
-                senderNumber,
-                name: customer.name || 'Mas',
-                context,
-                metadata,
-                strategy: STRATEGY_CONFIG[context.customerLabel],
-            });
+            itemStrategy = STRATEGY_CONFIG[context.customerLabel];
+            itemType = 'nurturing';
+            queueItem = { docId, senderNumber, name, context, metadata, strategy: itemStrategy };
+            queue.push(queueItem);
+        }
+
+        if (queueItem && itemStrategy) {
+            queueItem.type = itemType;
+            queueItem.customerLabel = context.customerLabel;
         }
     }
+
+    return { queue, downgradeCount };
+}
+
+// ─── Main Daily Run ──────────────────────────────────────────────────────────
+
+async function runDailyFollowUp(dryRun = false, limit = null) {
+    const now = new Date();
+    console.log(`[Scheduler] Running daily follow-up check... (dryRun=${dryRun})`);
+
+    if (dryRun) {
+        return await _buildDryRunQueue(now, limit);
+    }
+
+    const contexts = await prisma.customerContext.findMany({
+        where: { customerLabel: { not: null } },
+        include: {
+            customer: {
+                include: {
+                    bookings: {
+                        where: { status: { notIn: ['COMPLETED', 'PAID', 'DONE', 'CANCELLED'] } }
+                    }
+                }
+            }
+        }
+    });
+
+    const { queue, downgradeCount } = await buildEligibilityQueue(now, contexts, { dryRun: false });
 
     console.log(`[Scheduler] Downgrades: ${downgradeCount}, Queue: ${queue.length} eligible`);
 
@@ -360,11 +297,9 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
         return { sent: 0, skipped: 0, errors: 0, downgrades: downgradeCount };
     }
 
-    // Apply limit to prevent bans (unlimited as requested)
-    const MAX_DAILY_FOLLOW_UPS = 99999;
+    const MAX_DAILY_FOLLOW_UPS = parseInt(process.env.MAX_DAILY_FOLLOW_UPS) || 50;
     const finalLimit = limit ? Math.min(limit, MAX_DAILY_FOLLOW_UPS) : MAX_DAILY_FOLLOW_UPS;
     if (queue.length > finalLimit) {
-        // Sort by newest lastMessageAt first before slicing
         queue.sort((a, b) => {
             const dateA = a.metadata?.lastMessageAt ? new Date(a.metadata.lastMessageAt) : new Date(0);
             const dateB = b.metadata?.lastMessageAt ? new Date(b.metadata.lastMessageAt) : new Date(0);
@@ -374,22 +309,19 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
         queue.splice(finalLimit);
     }
 
-    // Fetch active promo once per daily run
     const promoData = await getActivePromo();
 
-    // Prioritize Reminders FIRST so they run immediately at 9 AM
     const { processCoatingReminders } = require('../../utils/coatingReminders.js');
     const { sendBookingReminders } = require('../../utils/bookingReminders.js');
     if (global.whatsappClient) {
         try {
             await processCoatingReminders(global.whatsappClient);
-            await sendBookingReminders(true); // Always check today's bookings
+            await sendBookingReminders(true);
         } catch (err) {
             console.error('[Scheduler] Reminders hit an error:', err.message);
         }
     }
 
-    // Process follow-up queue
     let sent = 0;
     let skipped = 0;
     let errors = 0;
@@ -404,7 +336,6 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
             errors++;
         }
 
-        // Jeda random 7-10 menit di antara pengiriman agar terhindar dari spam/restrict
         if (i < queue.length - 1 && !dryRun) {
             const minMs = 7 * 60 * 1000;
             const maxMs = 10 * 60 * 1000;
@@ -458,7 +389,7 @@ async function processFollowUp(customer, promoData = null, dryRun = false) {
                         { phone: cleanPhone }
                     ]
                 },
-                select: { phone: true, whatsappLid: true }
+                select: { id: true, phone: true, whatsappLid: true }
             });
 
             let fallbackTarget = null;
@@ -483,6 +414,18 @@ async function processFollowUp(customer, promoData = null, dryRun = false) {
                 console.log(`[Scheduler] Retrying with fallback: ${fallbackTarget}`);
                 markBotMessage(fallbackTarget, message);
                 await withRetry(() => sendTextDirect(global.whatsappClient, fallbackTarget, message), { maxRetries: 3, baseDelayMs: 2000 });
+
+                // Cache the newly discovered fallback ID so future runs don't need
+                // to re-guess. Must key off the Customer record's own id — docId
+                // here is the CustomerContext id, not the Customer's identifier,
+                // so using it directly (as before) made this update silently no-op.
+                if (customerFallback?.id) {
+                    await prisma.customer.update({
+                        where: { id: customerFallback.id },
+                        data: { whatsappLid: fallbackTarget }
+                    }).catch(e => console.warn(`[Scheduler] Failed to cache fallback LID: ${e.message}`));
+                }
+
                 senderNumber = fallbackTarget;
             } else {
                 throw initialError;
@@ -496,7 +439,10 @@ async function processFollowUp(customer, promoData = null, dryRun = false) {
     const updateData = {
         followUpCount: (context.followUpCount || 0) + 1,
         lastFollowUpAt: new Date(),
-        lastFollowUpStrategy: strategy.angle,
+        // Use the same angle-resolution logic as messageGenerator so this stays
+        // accurate for nurture-flow customers (strategy.angles[]), not just the
+        // review/rebooking cases where strategy.angle is set explicitly.
+        lastFollowUpStrategy: resolveAngle(strategy, context.followUpCount || 0),
     };
 
     if (context.reviewMode) {
@@ -533,102 +479,12 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
         }
     });
 
-    const queue = [];
     const promoData = await getActivePromo();
+    const { queue } = await buildEligibilityQueue(now, contexts, { dryRun: true });
 
-    for (const context of contexts) {
-
-        const customer = context.customer;
-        if (!customer) continue;
-
-        const metadata = {
-            lastMessageAt: customer.lastMessageAt,
-            name: customer.name,
-            fullSenderId: resolveWhatsappId(customer)
-        };
-
-        const isNurtureEligible = isEligible(context, metadata);
-
-        // [DEBUG] Log why customer is or isn't eligible
-        const label = context.customerLabel;
-        const strategy = STRATEGY_CONFIG[label];
-        const lastFollowUp = context.lastFollowUpAt ? new Date(context.lastFollowUpAt) : null;
-        const lastMsg = metadata.lastMessageAt ? new Date(metadata.lastMessageAt) : null;
-        const daysSince = lastMsg ? getDaysSince(lastMsg) : 'N/A';
-        const followUpCount = context.followUpCount || 0;
-        if (!strategy) {
-            // console.log(`[DryRun][Skip] ${customer.name} (${label}) → no strategy config`);
-        } else if (!lastMsg && !context.updatedAt) {
-            // console.log(`[DryRun][Skip] ${customer.name} (${label}) → no lastMessageAt, no fallback`);
-        } else if (!isNurtureEligible) {
-            // console.log(`[DryRun][Skip] ${customer.name} (${label}) → daysSince=${daysSince} waitDays=${strategy.waitDays} followUps=${followUpCount}/${strategy.maxFollowUps}`);
-        }
-
-        let isReviewEligible = false;
-        const lastService = customer.lastService ? new Date(customer.lastService) : null;
-        const hasActiveBooking = (customer.bookings || []).length > 0;
-        if (lastService && !context.reviewFollowUpSent && !hasActiveBooking) {
-            const daysSinceService = getDaysSince(lastService);
-            if (daysSinceService >= 3 && daysSinceService <= 7) isReviewEligible = true;
-        }
-
-        let isRebookingEligible = false;
-        let rebookingAngle = null;
-        if (lastService && context.lastServiceType) {
-            const daysSinceService = getDaysSince(lastService);
-            const interval = REBOOKING_INTERVALS[context.lastServiceType];
-            if (interval && daysSinceService >= interval && daysSinceService <= interval + 3) {
-                const daysSinceLastFup = context.lastFollowUpAt ? getDaysSince(context.lastFollowUpAt) : 999;
-                if (daysSinceLastFup > 7) {
-                    isRebookingEligible = true;
-                    rebookingAngle = `rebooking_${context.lastServiceType}`;
-                }
-            }
-        }
-
-        const senderNumber = resolveWhatsappId(customer);
-        const name = customer.name || 'Mas';
-
-
-        let itemStrategy = null;
-        let itemType = null;
-        let queueItem = null;
-
-        if (isReviewEligible) {
-            itemStrategy = { ...STRATEGY_CONFIG[context.customerLabel], angle: 'review' };
-            itemType = 'review';
-            queueItem = { docId: context.id, senderNumber, name, context: { ...context, reviewMode: true }, metadata, strategy: itemStrategy };
-        } else if (isRebookingEligible) {
-            itemStrategy = { ...STRATEGY_CONFIG[context.customerLabel], angle: rebookingAngle };
-            itemType = 'rebooking';
-            queueItem = { docId: context.id, senderNumber, name, context: { ...context, rebookingMode: true }, metadata, strategy: itemStrategy };
-        } else if (isNurtureEligible) {
-            itemStrategy = STRATEGY_CONFIG[context.customerLabel];
-            itemType = 'nurturing';
-            queueItem = { docId: context.id, senderNumber, name, context, metadata, strategy: itemStrategy };
-        }
-
-        if (queueItem && itemStrategy) {
-            queue.push({
-                docId: context.id,
-                senderNumber,
-                name,
-                customerLabel: context.customerLabel || null,
-                type: itemType,
-                strategy: itemStrategy,
-                metadata, // Added metadata for sorting
-                queueItem // temporary reference for generation later
-            });
-        } else if (!isReviewEligible && !isRebookingEligible && !isNurtureEligible) {
-            // Already logged above via debug
-        }
-    }
-
-    // Apply limit to prevent bans (unlimited as requested)
-    const MAX_DAILY_FOLLOW_UPS = 99999;
+    const MAX_DAILY_FOLLOW_UPS = parseInt(process.env.MAX_DAILY_FOLLOW_UPS) || 50;
     const finalLimit = limit ? Math.min(limit, MAX_DAILY_FOLLOW_UPS) : MAX_DAILY_FOLLOW_UPS;
     if (queue.length > finalLimit) {
-        // Sort by newest lastMessageAt first before slicing
         queue.sort((a, b) => {
             const dateA = a.metadata?.lastMessageAt ? new Date(a.metadata.lastMessageAt) : new Date(0);
             const dateB = b.metadata?.lastMessageAt ? new Date(b.metadata.lastMessageAt) : new Date(0);
@@ -637,26 +493,22 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
         queue.splice(finalLimit);
     }
 
-    console.log(`[Scheduler][DryRun] Preview queue built: ${queue.length} items (Unlimited/day)`);
-    
-    // Now generate messages ONLY for the final sliced queue to save API limits
+    console.log(`[Scheduler][DryRun] Preview queue built: ${queue.length} items (Limit: ${finalLimit}/day)`);
+
     for (let i = 0; i < queue.length; i++) {
         const q = queue[i];
         try {
-            const generatedMessage = await generateFollowUpMessage(q.queueItem, q.strategy, promoData);
+            const generatedMessage = await generateFollowUpMessage(q, q.strategy, promoData);
             q.generatedMessage = generatedMessage || `[No message generated]`;
         } catch (err) {
             console.warn(`[Scheduler][DryRun] Failed to generate preview for ${q.docId}:`, err.message);
             q.generatedMessage = `[Error generating message: ${err.message}]`;
         }
-        
-        // Clean up temporary object before returning
-        delete q.queueItem;
-        
+
         const dSince = q.metadata?.lastMessageAt ? Math.floor((now - new Date(q.metadata.lastMessageAt)) / (1000 * 60 * 60 * 24)) : 'N/A';
-        console.log(`  ${i+1}. ${q.name} (${q.customerLabel}) → type: ${q.type}, daysSinceMsg: ${dSince}`);
+        console.log(`  ${i + 1}. ${q.name} (${q.customerLabel}) → type: ${q.type}, daysSinceMsg: ${dSince}`);
     }
-    
+
     return queue;
 }
 
@@ -700,7 +552,7 @@ function startFollowUpScheduler() {
                     console.log('[Scheduler] Running mandatory Booking and Coating reminders...');
                     const { processCoatingReminders } = require('../../utils/coatingReminders.js');
                     const { sendBookingReminders } = require('../../utils/bookingReminders.js');
-                    
+
                     await Promise.all([
                         processCoatingReminders(global.whatsappClient).catch(e => console.error('[Scheduler] Coating reminders error:', e)),
                         sendBookingReminders(true).catch(e => console.error('[Scheduler] Booking reminders error:', e))
@@ -715,7 +567,7 @@ function startFollowUpScheduler() {
                 }).catch(() => null);
 
                 // Check if saved queue exists AND has at least one approved item
-                const hasApprovedItems = savedRecord?.value?.queue 
+                const hasApprovedItems = savedRecord?.value?.queue
                     ? savedRecord.value.queue.some(item => item.approved === true)
                     : false;
 
@@ -730,9 +582,8 @@ function startFollowUpScheduler() {
                     for (const item of savedQueue) {
                         const { senderNumber, type, message, docId } = item;
                         if (!item.approved) continue;
-                        
-                        // Sanitize message from potential reasoning/thinking blocks
-                        const cleanMsg = cleanAiResponse(message);
+
+                        const cleanMsg = message;
                         if (!cleanMsg) {
                             console.warn(`[Scheduler][Saved] Skip empty message for ${senderNumber}`);
                             continue;
@@ -753,16 +604,19 @@ function startFollowUpScheduler() {
                             if (type === 'coating_reminder') {
                                 const record = await prisma.coatingMaintenance.findUnique({ where: { id: docId } }).catch(() => null);
                                 const nextStatus = record?.status === 'pending' ? 'reminded_h7' : record?.status === 'reminded_h7' ? 'reminded_h3' : 'reminded_h1';
-                                await prisma.coatingMaintenance.update({ where: { id: docId }, data: { status: nextStatus, reminderSent: true, reminderSentAt: new Date() } }).catch(() => {});
+                                await prisma.coatingMaintenance.update({ where: { id: docId }, data: { status: nextStatus, reminderSent: true, reminderSentAt: new Date() } })
+                                    .catch(err => console.error(`[Scheduler] CRITICAL: coatingMaintenance status update failed for ${docId}:`, err.message));
                             } else if (type === 'booking_reminder') {
-                                await prisma.booking.update({ where: { id: docId }, data: { reminderSent: true, reminderSentAt: new Date() } }).catch(() => {});
+                                await prisma.booking.update({ where: { id: docId }, data: { reminderSent: true, reminderSentAt: new Date() } })
+                                    .catch(err => console.error(`[Scheduler] CRITICAL: booking reminderSent update failed for ${docId}:`, err.message));
                             } else {
                                 const ctx = await prisma.customerContext.findUnique({ where: { id: docId } }).catch(() => null);
                                 if (ctx) {
                                     const updateData = { followUpCount: (ctx.followUpCount || 0) + 1, lastFollowUpAt: new Date(), lastFollowUpStrategy: type };
                                     if (type === 'review') updateData.reviewFollowUpSent = true;
-                                    await prisma.customerContext.update({ where: { id: docId }, data: updateData }).catch(err => console.warn(`[Scheduler] Context update failed for ${docId}:`, err.message));
-                                    console.log(`[Scheduler] Context updated for ${docId} (followUpCount => ${updateData.followUpCount})`);
+                                    await withRetry(() => prisma.customerContext.update({ where: { id: docId }, data: updateData }), { maxRetries: 3, baseDelayMs: 1000 })
+                                        .then(() => console.log(`[Scheduler] Context updated for ${docId} (followUpCount => ${updateData.followUpCount})`))
+                                        .catch(err => console.error(`[Scheduler] CRITICAL: Context update failed for ${docId}:`, err.message));
                                 } else {
                                     console.warn(`[Scheduler] Warning: Context not found for ${docId}, followUpCount not updated.`);
                                 }
@@ -776,7 +630,7 @@ function startFollowUpScheduler() {
                     }
 
                     // Clear saved queue after execute
-                    await prisma.keyValueStore.deleteMany({ where: { collection: 'follow_up_queue', key: 'saved' } }).catch(() => {});
+                    await prisma.keyValueStore.deleteMany({ where: { collection: 'follow_up_queue', key: 'saved' } }).catch(() => { });
                     console.log(`[Scheduler][Saved] Done — sent: ${sent}, errors: ${errors}`);
                 } else {
                     // No approved items or no record — execute fresh daily run

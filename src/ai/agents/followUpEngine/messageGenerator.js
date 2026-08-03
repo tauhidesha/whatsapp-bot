@@ -2,23 +2,61 @@
 // Logic for generating follow-up messages based on customer context and AI personality.
 
 const prisma = require('../../../lib/prisma');
+const { DateTime } = require('luxon');
+
+// Same timezone the cron scheduler uses (scheduler.js: DateTime.now().setZone(TIMEZONE)).
+// getDaysSince is the single place all day-based eligibility math goes through
+// (isEligible, review window, rebooking, downgrade rules) — keeping it aligned
+// to APP_TIMEZONE instead of the server's OS timezone avoids off-by-one-day
+// eligibility flips if the server ever runs in a different TZ than the business.
+const TIMEZONE = process.env.APP_TIMEZONE || 'Asia/Jakarta';
 
 /**
- * Calculate days passed since a given date.
+ * Calculate days passed since a given date, using APP_TIMEZONE calendar days
+ * (not the server's OS timezone).
  * @param {Date|string} date 
  * @returns {number|null}
  */
 function getDaysSince(date) {
     if (!date) return null;
-    const now = new Date();
-    const past = new Date(date);
-    
-    // Normalize to midnight local time to ensure accurate calendar day calculation
-    const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const pastMidnight = new Date(past.getFullYear(), past.getMonth(), past.getDate());
-    
-    const diffTime = Math.abs(nowMidnight - pastMidnight);
-    return Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+    const now = DateTime.now().setZone(TIMEZONE).startOf('day');
+    const past = DateTime.fromJSDate(new Date(date)).setZone(TIMEZONE).startOf('day');
+
+    if (!past.isValid) return null;
+
+    return Math.round(Math.abs(now.diff(past, 'days').days));
+}
+
+/**
+ * Resolve which angle key to use for this message.
+ * Priority:
+ *   1. strategy.angle (singular) — explicit override set by scheduler.js
+ *      for review / rebooking_* / reminder_* / booking_reminder cases.
+ *   2. strategy.angles[followUpCount] — per-FU rotation from STRATEGY_CONFIG
+ *      (nurture flow: hot_lead, warm_lead, window_shopper, etc). Falls back
+ *      to the last entry in the array if followUpCount exceeds its length.
+ *   3. 'standard' — safety net if neither is present.
+ */
+/**
+ * Minimal safety net for the JSON-parse-failure fallback path only.
+ * The normal path already gets clean text via strict JSON output
+ * ({"message": "..."}), so this isn't a general-purpose cleaner — it just
+ * strips stray <thought> blocks some models emit when they fail to follow
+ * the JSON instruction, so a rare malformed response doesn't leak reasoning
+ * straight to the customer.
+ */
+function stripThoughtBlocks(text) {
+    if (!text) return text;
+    return text.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
+}
+
+function resolveAngle(strategy, followUpCount) {
+    if (strategy.angle) return strategy.angle;
+    if (Array.isArray(strategy.angles) && strategy.angles.length > 0) {
+        return strategy.angles[followUpCount] || strategy.angles[strategy.angles.length - 1];
+    }
+    return 'standard';
 }
 
 // Strategy definitions (Angle instructions)
@@ -36,6 +74,25 @@ const ANGLE_INSTRUCTIONS = {
     followup_ghost: `Tanya kabar santai karena udah lama gak muncul. Boleh bercanda dikit apakah chat sebelumnya tenggelam atau lagi sibuk banget touring.`,
 
     soft_closure: `Ucapkan terima kasih dan info kalau Zoya pamit dulu buat sekarang, tapi ingetin kalau butuh bantuan/tanya-tanya soal motor kedepannya Zoya selalu stand by.`,
+
+    // ── Angles baru, dipakai oleh STRATEGY_CONFIG.angles[] di config.js ──────
+    value: `Highlight manfaat konkret dari layanan yang mereka minati (hasil visual, ketahanan, dsb) tanpa kesan promo. Ajak diskusi santai soal itu.`,
+
+    clarify: `Tanya hal spesifik yang bikin mereka belum lanjut (masih mikir warna, budget, atau waktu) dengan nada penasaran-santai, bukan interogasi.`,
+
+    social_proof: `Ceritain hasil kerjaan customer lain yang mirip (before-after, testimoni singkat) biar mereka makin yakin sama hasil yang bisa didapat.`,
+
+    urgency: `Sampein ada slot terbatas atau alasan kenapa sebaiknya jangan ditunda (musim hujan, antrian mulai penuh, dsb) — nada halus, bukan maksa.`,
+
+    light_promo: `Selipin info promo/benefit secara halus di akhir obrolan, tapi fokus utama tetap ngobrol santai bukan jualan.`,
+
+    maintenance: `Ingetin waktunya rawat/servis ulang biar kondisi tetap optimal (motor/hasil coating/cat). Tone-nya caring kayak temen yang concern, bukan jualan.`,
+
+    checkin: `Sapa santai karena udah lama ga ngobrol, tanya kabar motor atau aktivitas riding-nya. Ringan aja, ga perlu langsung ke topik servis.`,
+
+    exclusive: `Kasih kesan mereka dapet perlakuan/prioritas khusus sebagai pelanggan lama (info duluan, slot prioritas, dsb). Bikin ngerasa dihargai.`,
+
+    winback: `Sampein kangen karena udah lama ga mampir, tawarin insentif yang lumayan besar biar mereka tertarik balik. Boleh sedikit kasual/bercanda biar ga kaku.`,
 
     review: `
         Angle: Follow up sehabis kunjungan atau service (DIBACA: 3 hari lalu).
@@ -75,62 +132,9 @@ const ANGLE_INSTRUCTIONS = {
     `
 };
 
-/**
- * Clean AI response from common reasoning, preambles, or thought blocks.
- * @param {string} text 
- * @returns {string}
- */
-function cleanAiResponse(text) {
-    if (!text) return '';
-    
-    // 1. Remove <thought>...</thought> blocks (Gemini 2.0 Thinking/CoT)
-    let cleaned = text.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
+// Alias: config.js pakai 'education', instruksi aslinya di 'educational'.
+ANGLE_INSTRUCTIONS.education = ANGLE_INSTRUCTIONS.educational;
 
-    // 2. Remove common AI preambles (e.g., "Certainly!", "Here is a draft:")
-    const preambles = [
-        /^Certainly!.*$/gim,
-        /^Here is a.*$/gim,
-        /^Based on the customer data.*$/gim,
-        /^Try this message:.*$/gim,
-        /^Pesan follow-up:.*$/gim,
-        /^Draft pesan:.*$/gim
-    ];
-
-    preambles.forEach(p => {
-        cleaned = cleaned.replace(p, '');
-    });
-
-    // 3. Extract final message if AI still provides instructions/options
-    const paragraphs = cleaned.split(/\n\s*\n/).filter(p => p.trim().length > 0);
-    if (paragraphs.length > 1) {
-        const lastParagraph = paragraphs[paragraphs.length - 1].trim();
-        // If last paragraph is short and doesn't look like instructions, it's likely the message
-        if (!lastParagraph.includes(':') && !lastParagraph.startsWith('*')) {
-            cleaned = lastParagraph;
-        }
-    }
-
-    // 4. Deduplication Logic (Special case for Gemini repeat)
-    const len = cleaned.length;
-    if (len > 20) {
-        const half = Math.floor(len / 2);
-        const p1 = cleaned.substring(0, half).trim();
-        const p2 = cleaned.substring(len - p1.length).trim();
-        
-        // Exact half repeat
-        if (p1 === p2) {
-            cleaned = p1;
-        } else {
-            // Check for "Message" "Message" or Message + " + Message
-            const parts = cleaned.split('"').filter(p => p.trim().length > 10);
-            if (parts.length > 1 && parts[0].trim() === parts[1].trim()) {
-                cleaned = parts[0].trim();
-            }
-        }
-    }
-
-    return cleaned.trim();
-}
 async function generateFollowUpMessage(customerData, strategy, promoData = null) {
     try {
         const { name, context, metadata } = customerData;
@@ -146,15 +150,16 @@ async function generateFollowUpMessage(customerData, strategy, promoData = null)
 
         const followUpCount = context.followUpCount || 0;
         const lastFollowUpStrategy = context.lastFollowUpStrategy || 'tidak ada';
+        const angleKey = resolveAngle(strategy, followUpCount);
 
-        const promoSection = promoData && promoData.promoText 
+        const promoSection = promoData && promoData.promoText
             ? `# PROMO AKTIF SAAT INI\n- Info Promo: ${promoData.promoText}\n`
             : '';
 
         let chatHistorySection = '';
         const rawPhone = customerData.senderNumber || context.phone || customerData.docId;
         const phoneStripped = rawPhone ? rawPhone.replace(/@c\.us$|@lid$/, '') : null;
-        
+
         if (rawPhone) {
             try {
                 const customerRecord = await prisma.customer.findFirst({
@@ -182,7 +187,7 @@ async function generateFollowUpMessage(customerData, strategy, promoData = null)
                         const role = m.role === 'user' ? 'Customer' : 'Zoya';
                         return `[${role}]: ${m.content}`;
                     }).join('\n');
-                    
+
                     chatHistorySection = `
 # RIWAYAT CHAT TERAKHIR (PENTING)
 Berikut adalah riwayat chat terakhir dengan pelanggan ini. Gunakan konteks ini AGAR sapaan follow-up terasa sangat personal dan melanjutkan obrolan sebelumnya secara natural. JANGAN mengulang chat Zoya sebelumnya mentah-mentah, jadikan sebagai background context.
@@ -233,24 +238,40 @@ ${followUpCount > 0 ? '- INSTRUKSI: Ini bukan follow up pertama. JANGAN gunakan 
 - Boleh mulai dengan pertanyaan ringan atau mention sesuatu yang relevan dengan hobi motor.
 
 # INSTRUKSI ANGLE
-${ANGLE_INSTRUCTIONS[strategy.angle] || ANGLE_INSTRUCTIONS.standard}
+${ANGLE_INSTRUCTIONS[angleKey] || ANGLE_INSTRUCTIONS.standard}
 
 # TUGAS & OUTPUT (PENTING!)
 1. Buat 1 pesan chat personal sesuai karakter Zoya.
 2. Pesan harus sangat natural, seolah diketik manual, tanpa kesan template.
 3. Maksimal 2-3 kalimat pendek.
-4. RESPOND HANYA DENGAN TEKS PESAN FINAL. JANGAN ADA PENJELASAN ATAU DRAFT.
+4. RESPOND STRICTLY HANYA DENGAN JSON VALID TANPA MARKDOWN ATAU TEKS LAIN.
+   Format JSON yang wajib digunakan:
+   {
+     "message": "isi pesan final di sini"
+   }
 `;
 
         const response = await model.invoke(prompt, {
             runName: "FollowUpMessageGenerator",
-            tags: ["follow_up_engine", `angle_${strategy.angle}`]
+            tags: ["follow_up_engine", `angle_${angleKey}`]
         });
-        
-        const rawText = response.content;
-        
-        // Clean the response before returning
-        return cleanAiResponse(rawText);
+
+        let rawText = response.content.trim();
+
+        // Strip markdown backticks if LLM still outputs them
+        if (rawText.startsWith('```json')) {
+            rawText = rawText.replace(/^```json/i, '').replace(/```$/, '').trim();
+        } else if (rawText.startsWith('```')) {
+            rawText = rawText.replace(/^```/i, '').replace(/```$/, '').trim();
+        }
+
+        try {
+            const parsed = JSON.parse(rawText);
+            return parsed.message || parsed.Message || rawText;
+        } catch (e) {
+            console.warn('[MessageGenerator] Failed to parse JSON, falling back to raw text:', e.message);
+            return stripThoughtBlocks(rawText);
+        }
 
     } catch (error) {
         console.error('[MessageGenerator] Error:', error);
@@ -261,6 +282,7 @@ ${ANGLE_INSTRUCTIONS[strategy.angle] || ANGLE_INSTRUCTIONS.standard}
 module.exports = {
     generateFollowUpMessage,
     getDaysSince,
+    resolveAngle,
     STRATEGY_CONFIG: {
         // This is moved to config.js, but kept here for backward compatibility if needed
     }
