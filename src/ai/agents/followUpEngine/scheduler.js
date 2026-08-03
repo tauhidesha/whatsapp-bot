@@ -281,17 +281,17 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
             }
         }
 
-        // 3. Eligibility checks
-        const isNurtureEligible = isEligible(context, metadata);
-
-        // 4. Review eligibility (Post-Service 3 Days)
-        let isReviewEligible = false;
-        const lastService = customer.lastService ? new Date(customer.lastService) : null;
-        
-        // Skip review if customer has active/pending bookings
+        // 3. Check Active Bookings (Skip follow-ups if currently in service)
         const activeBookings = customer.bookings || [];
         const hasActiveBooking = activeBookings.length > 0;
 
+        // 4. Eligibility checks
+        const isNurtureEligible = !hasActiveBooking && isEligible(context, metadata);
+
+        // 5. Review eligibility (Post-Service 3 Days)
+        let isReviewEligible = false;
+        const lastService = customer.lastService ? new Date(customer.lastService) : null;
+        
         if (lastService && !context.reviewFollowUpSent && !hasActiveBooking) {
             const daysSinceService = getDaysSince(lastService);
             if (daysSinceService >= 3 && daysSinceService <= 7) {
@@ -299,7 +299,7 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
             }
         }
 
-        // 5. Rebooking eligibility (Maintenance Reminders)
+        // 6. Rebooking eligibility (Maintenance Reminders)
         let isRebookingEligible = false;
         let rebookingAngle = null;
         if (lastService && context.lastServiceType) {
@@ -311,7 +311,7 @@ async function runDailyFollowUp(dryRun = false, limit = null) {
                 // Also check if we haven't sent a rebooking follow-up recently
                 const daysSinceLastFup = context.lastFollowUpAt ? getDaysSince(context.lastFollowUpAt) : 999;
 
-                if (daysSinceLastFup > 7) { // Don't spam if they just got a different message
+                if (daysSinceLastFup > 7 && !hasActiveBooking) { // Don't spam if they just got a different message
                     isRebookingEligible = true;
                     rebookingAngle = `rebooking_${context.lastServiceType}`;
                 }
