@@ -101,7 +101,7 @@ async function updateGhostedCount(docId, currentContext, metadata) {
     return newCount;
 }
 
-function scoreCustomer(context, metadata, transactions) {
+function scoreCustomer(context, metadata, transactions, bookings = []) {
     const scores = {
         lead: 0,
         window_shopper: 0,
@@ -139,13 +139,25 @@ function scoreCustomer(context, metadata, transactions) {
     const ghosted = metadata.lastMessageSender === 'ai' && daysSinceLastChat > 2;
     const ghostedTimes = context.ghostedTimes || context.ghosted_times || (ghosted ? 1 : 0);
 
-    if (txCount >= 2) {
+    const activeBookings = bookings.filter(b => !['COMPLETED', 'PAID', 'DONE', 'CANCELLED'].includes(b.status));
+    const completedBookings = bookings.filter(b => ['COMPLETED', 'PAID', 'DONE'].includes(b.status));
+    
+    // If they have an active booking, they are definitely a hot lead (or existing if they have past tx)
+    if (activeBookings.length > 0) {
+        if (txCount > 0 || completedBookings.length > 0) {
+            scores.loyal += 100;
+        } else {
+            scores.hot_lead += 200; // Overwhelmingly hot if currently in progress
+        }
+    }
+
+    if (txCount >= 2 || completedBookings.length >= 2) {
         if (daysSinceLastTx > 90) {
             scores.churned += 100;
         } else {
             scores.loyal += 100;
         }
-    } else if (txCount === 1) {
+    } else if (txCount === 1 || completedBookings.length === 1) {
         if (daysSinceLastTx > 90) {
             scores.churned += 80;
         } else {
@@ -153,7 +165,7 @@ function scoreCustomer(context, metadata, transactions) {
         }
     }
 
-    if (txCount === 0) {
+    if (txCount === 0 && completedBookings.length === 0 && activeBookings.length === 0) {
         const intents = context.detectedIntents || context.detected_intents || [];
         const stage = context.conversationStage || context.conversation_stage || '';
 
@@ -229,6 +241,9 @@ function scoreCustomer(context, metadata, transactions) {
     
     const stage = context.conversationStage || context.conversation_stage;
     if (stage) activeSignals.push(`stage=${stage}`);
+    
+    if (activeBookings.length > 0) activeSignals.push(`active_bookings=${activeBookings.length}`);
+    if (completedBookings.length > 0) activeSignals.push(`completed_bookings=${completedBookings.length}`);
 
     return {
         label: topLabel,
@@ -259,7 +274,8 @@ async function classifyAndSaveCustomer(senderNumber) {
                 name: true,
                 lastMessage: true,
                 lastMessageAt: true,
-                whatsappLid: true
+                whatsappLid: true,
+                bookings: true
             }
         });
 
@@ -275,7 +291,7 @@ async function classifyAndSaveCustomer(senderNumber) {
             ghostedTimes,
         };
 
-        const result = scoreCustomer(mappedContext, metadata, transactions);
+        const result = scoreCustomer(mappedContext, metadata, transactions, metadata.bookings || []);
 
         // Ensure customer exists before creating context (FK constraint)
         await prisma.customer.upsert({
