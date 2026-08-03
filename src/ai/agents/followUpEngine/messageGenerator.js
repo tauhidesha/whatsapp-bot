@@ -138,6 +138,18 @@ ANGLE_INSTRUCTIONS.education = ANGLE_INSTRUCTIONS.educational;
 async function generateFollowUpMessage(customerData, strategy, promoData = null) {
     try {
         const { name, context, metadata } = customerData;
+
+        // CRM sometimes stores a placeholder like "New Customer" / "Customer Baru"
+        // before a real name is captured. Treat those as "no name known" instead
+        // of forcing the bot to address the customer literally as "mas new customer".
+        const PLACEHOLDER_NAME_PATTERN = /^(new customer|customer baru|pelanggan baru|walk[\s-]?in|unknown|tidak diketahui|n\/a|-|mas|kak)$/i;
+        const hasKnownName = !!(name && !PLACEHOLDER_NAME_PATTERN.test(name.trim()));
+        const displayName = hasKnownName ? name.trim() : null;
+
+        const namingInstruction = hasKnownName
+            ? `- PANGGILAN: WAJIB panggil nama customer dengan sapaan "mas" atau "kak" (contoh: "mas dani", "kak budi"). Ambil nama depan/panggilan dari Nama Customer. JANGAN hanya memanggil "mas" atau "kak" saja tanpa nama! Sebisa mungkin selipkan panggilan nama ini di awal, tengah, atau akhir kalimat secara natural agar terasa akrab.`
+            : `- PANGGILAN: Nama customer belum diketahui — JANGAN mengarang atau memakai nilai placeholder ("new customer" dsb) sebagai nama. Panggil pakai "mas" atau "kak" saja tanpa embel-embel nama.`;
+
         const daysSinceChat = getDaysSince(metadata.lastMessageAt);
         const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
         const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
@@ -204,7 +216,7 @@ ${historyText}
 - Nama: Zoya (Customer Relations @ Bosmat Repaint Detailing Studio)
 - Gaya Chat: Casual, huruf kecil semua (lowercase) kecuali singkatan, pakai emoji secukupnya, tidak kaku, tanpa "Halo" atau "Selamat Pagi".
 - Kata Ganti Diri: WAJIB sebut dirimu sebagai "aku", JANGAN PERNAH menyebut nama "Zoya" saat merujuk pada dirimu sendiri di dalam kalimat (contoh salah: "zoya mau nanya...", contoh benar: "aku mau nanya...").
-- PANGGILAN: WAJIB panggil nama customer dengan sapaan "mas" atau "kak" (contoh: "mas dani", "kak budi"). Ambil nama depan/panggilan dari Nama Customer. JANGAN hanya memanggil "mas" atau "kak" saja tanpa nama! Sebisa mungkin selipkan panggilan nama ini di awal, tengah, atau akhir kalimat secara natural agar terasa akrab.
+${namingInstruction}
 - Batasan: Jangan hanya panggil nama saja tanpa Mas/Kak. Chat pendek saja, jangan jadi sales yang haus closing.
 
 # ROLE & CONSTRAINTS
@@ -217,7 +229,7 @@ ${historyText}
 ${promoSection}
 
 # DATA CUSTOMER
-- Nama: ${name}
+- Nama: ${displayName || 'belum diketahui'}
 - Motor: ${context.motorModel || 'tidak diketahui'}
 - Kondisi motor: ${context.motorCondition || 'tidak diketahui'}
 - Warna motor: ${context.motorColor || 'tidak diketahui'}

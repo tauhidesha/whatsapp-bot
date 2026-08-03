@@ -230,7 +230,10 @@ async function buildEligibilityQueue(now, contexts, options = { dryRun: false })
         }
 
         const senderNumber = resolveWhatsappId(customer);
-        const name = customer.name || 'Mas';
+        // Don't fake "Mas" as a name here — messageGenerator.js detects an
+        // unknown/placeholder name and adjusts the sapaan instruction instead
+        // of forcing a fake name into the greeting.
+        const name = customer.name || null;
         let itemStrategy = null;
         let itemType = null;
         let queueItem = null;
@@ -506,7 +509,7 @@ async function _buildDryRunQueue(now = new Date(), limit = null) {
         }
 
         const dSince = q.metadata?.lastMessageAt ? Math.floor((now - new Date(q.metadata.lastMessageAt)) / (1000 * 60 * 60 * 24)) : 'N/A';
-        console.log(`  ${i + 1}. ${q.name} (${q.customerLabel}) → type: ${q.type}, daysSinceMsg: ${dSince}`);
+        console.log(`  ${i + 1}. ${q.name || '(no name)'} (${q.customerLabel}) → type: ${q.type}, daysSinceMsg: ${dSince}`);
     }
 
     return queue;
