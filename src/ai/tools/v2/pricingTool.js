@@ -30,6 +30,23 @@ class PricingTool extends BaseTool {
         // Business Rule Expansion BEFORE normalization:
         // "full bodi" = Repaint Bodi Halus + Repaint Bodi Kasar
         // "full bodi halus" = Repaint Bodi Halus only
+        // ⚠️ CONFLICT RESOLUTION: If both "Full Bodi" AND specific parts coexist
+        //    (e.g. ["Repaint Full Bodi", "Repaint Bodi Halus"]), the specific parts WIN.
+        //    This happens when Memory extractor accumulates instead of replaces.
+        const hasSpecificBodiHalus = serviceNameArray.some(s => typeof s === 'string' && s.toLowerCase().includes('bodi halus'));
+        const hasSpecificBodiKasar = serviceNameArray.some(s => typeof s === 'string' && s.toLowerCase().includes('bodi kasar'));
+        const hasFullBodi = serviceNameArray.some(s => typeof s === 'string' && (s.toLowerCase().includes('full bodi') || s.toLowerCase().includes('full body')) && !s.toLowerCase().includes('halus'));
+
+        // If user has explicitly named specific parts, remove the ambiguous "Full Bodi" umbrella.
+        // Exception: keep Full Bodi expansion only if NEITHER Bodi Halus nor Bodi Kasar is explicit.
+        if (hasFullBodi && (hasSpecificBodiHalus || hasSpecificBodiKasar)) {
+            serviceNameArray = serviceNameArray.filter(s => {
+                const sLower = (s || '').toLowerCase();
+                return !(sLower.includes('full bodi') || sLower.includes('full body')) || sLower.includes('halus');
+            });
+            console.log('[PricingTool] Conflict resolved: Full Bodi removed in favour of specific parts:', serviceNameArray);
+        }
+
         const expandedServices = [];
         for (const s of serviceNameArray) {
             if (typeof s === 'string') {

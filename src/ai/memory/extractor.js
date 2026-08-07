@@ -175,6 +175,8 @@ ATURAN KEPUTUSAN (PENTING — baca semua sebelum output):
    - Hanya hapus layanan jika user secara tegas membatalkan/mengganti (contoh: "batal yang kasar", "gak jadi kasar", "cancel kasar").
    - Jika user menjawab pronoun ("itu aja", "yang itu", "mau") → resolve ke layanan terakhir yang AI tawarkan (last_offered_services).
    - Layanan yang valid: "Repaint Bodi Halus", "Repaint Bodi Kasar", "Repaint Velg", "Repaint CVT", "Repaint Full Bodi", "Detailing Mesin", "Cuci Komplit", "Coating Motor Glossy", "Coating Motor Doff", "Poles Bodi Glossy", "Full Detailing Glossy", "Complete Service Glossy", "Complete Service Doff"
+   - ⚠️ ATURAN KLARIFIKASI SCOPE (KRITIS): Jika user sebelumnya menyebut layanan yang LUAS (misal "Full Bodi") tapi kemudian menjawab dengan cakupan yang LEBIH SEMPIT (misal "bodi halus", "bodi halus aja", "yang halus"), ini adalah KOREKSI/KLARIFIKASI bukan tambahan. GANTI layanan lama yang lebih luas dengan yang lebih spesifik. Contoh: state sebelumnya ["Repaint Full Bodi"] + user bilang "bodi halus aja" → output ["Repaint Bodi Halus"], BUKAN ["Repaint Full Bodi", "Repaint Bodi Halus"].
+   - ⚠️ ATURAN KONFLIK SCOPE: Jika state saat ini mengandung KEDUANYA "Repaint Full Bodi" DAN "Repaint Bodi Halus" (tanpa "Repaint Bodi Kasar" yang eksplisit), kemungkinan besar ini adalah bug akumulasi. Dalam konteks percakapan, tentukan mana yang benar berdasarkan pesan terakhir user dan KELUARKAN HANYA SATU.
 
 3. WARNA:
    - color_choice: warna bodi yang diinginkan untuk repaint (cat baru)
