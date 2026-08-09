@@ -30,7 +30,8 @@ const upload = multer({
 // ─── GET /api/progress/bookings/active ────────────────────────────────────────
 router.get('/bookings/active', requireAuth, async (req, res) => {
     try {
-        const STATUS_ACTIVE = ['PENDING', 'CONFIRMED', 'IN_QUEUE', 'IN_PROGRESS'];
+        // Status values must match exactly what's stored in DB (lowercase)
+        const STATUS_ACTIVE = ['pending', 'waiting', 'confirmed', 'in_queue', 'in_progress'];
         const bookings = await prisma.booking.findMany({
             where: { status: { in: STATUS_ACTIVE } },
             orderBy: { bookingDate: 'desc' },

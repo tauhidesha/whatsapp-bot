@@ -115,12 +115,12 @@ async function initNode(state) {
         // Detect customer type so Zoya knows from turn 1 whether the motor is
         // currently being worked on, has an upcoming booking, or is a returning customer.
         try {
-            const STATUS_ACTIVE  = ['PENDING', 'CONFIRMED', 'IN_QUEUE', 'IN_PROGRESS'];
-            const STATUS_ONGOING = ['IN_PROGRESS', 'IN_QUEUE'];
+            const STATUS_ACTIVE  = ['pending', 'waiting', 'confirmed', 'in_queue', 'in_progress'];
+            const STATUS_ONGOING = ['in_progress', 'in_queue'];
             const STATUS_LABEL   = {
-                PENDING: 'Menunggu Konfirmasi', CONFIRMED: 'Sudah Dikonfirmasi',
-                IN_QUEUE: 'Dalam Antrian', IN_PROGRESS: 'Sedang Dikerjakan',
-                COMPLETED: 'Selesai', CANCELLED: 'Dibatalkan',
+                pending: 'Menunggu', waiting: 'Menunggu', confirmed: 'Sudah Dikonfirmasi',
+                in_queue: 'Dalam Antrian', in_progress: 'Sedang Dikerjakan',
+                done: 'Selesai', completed: 'Selesai', cancelled: 'Dibatalkan',
             };
 
             const activeBookings = await prisma.booking.findMany({
