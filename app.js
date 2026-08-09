@@ -119,6 +119,9 @@ app.use(cors({
 app.use(morgan('combined'));
 app.use(express.json({ limit: '50mb' }));
 
+const progressRoutes = require('./src/server/routes/progressRoutes');
+app.use('/api/progress', progressRoutes);
+
 // Trust proxy: app runs behind a reverse proxy (nginx/GCP LB).
 // Required for express-rate-limit to correctly read X-Forwarded-For.
 // '1' = trust exactly one hop upstream (the direct proxy).

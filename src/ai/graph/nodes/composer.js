@@ -168,8 +168,33 @@ Fokuslah pada merangkai data yang disuapkan ke kamu menjadi satu pesan WhatsApp 
                 responseCount: (state.analytics?.responseCount || 0) + 1
             }
         };
+
+        // ── Progress Media Auto-Send (Pull Mode) ─────────────────────────────
+        // If the planner instructed SEND_PROGRESS (customer asked about motor status),
+        // fire the progress sender in the background after composing the text reply.
+        const plannerAction = state.planner?.execution?.action || state.planner?.decision?.action;
+        const progressId    = state.planner?.execution?.progressId || state.planner?.decision?.progressId;
+
+        if ((plannerAction === 'SEND_PROGRESS' || responseText.includes('"action": "SEND_PROGRESS"')) && progressId) {
+            // Fire-and-forget — don't block the text reply
+            setImmediate(async () => {
+                try {
+                    const phone = state.metadata?.phoneReal || state.customer?.phone;
+                    if (phone) {
+                        const { sendProgressUpdate } = require('../../utils/progressSender');
+                        const sendRes = await sendProgressUpdate(progressId, phone);
+                        console.log(`[Composer Node] Progress media sent:`, sendRes);
+                    }
+                } catch (sendErr) {
+                    console.error('[Composer Node] Progress send failed:', sendErr.message);
+                }
+            });
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
         console.log('[Composer Node] Output:', JSON.stringify(result, null, 2));
         return result;
+
     } catch (error) {
         console.error('[Composer Node] LLM Error:', error);
         

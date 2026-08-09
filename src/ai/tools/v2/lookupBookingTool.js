@@ -111,6 +111,42 @@ class LookupBookingTool extends BaseTool {
                 adminNotes: b.adminNotes || null,
             }));
 
+            // Cek apakah ada progress update terbaru untuk booking aktif
+            let latestProgress = null;
+            if (activeBookings.length > 0) {
+                try {
+                    const progressRecord = await prisma.progressUpdate.findFirst({
+                        where: { bookingId: { in: activeBookings.map(b => b.id) } },
+                        orderBy: { createdAt: 'desc' },
+                        select: {
+                            id: true,
+                            mediaUrls: true,
+                            mediaTypes: true,
+                            caption: true,
+                            sentAt: true,
+                            createdAt: true,
+                            bookingId: true,
+                        }
+                    });
+
+                    if (progressRecord) {
+                        latestProgress = {
+                            progressId: progressRecord.id,
+                            bookingId:  progressRecord.bookingId,
+                            mediaCount: progressRecord.mediaUrls.length,
+                            caption:    progressRecord.caption,
+                            sentAt:     progressRecord.sentAt,
+                            updatedAt:  new Date(progressRecord.createdAt).toLocaleDateString('id-ID', {
+                                day: 'numeric', month: 'long', year: 'numeric',
+                                hour: '2-digit', minute: '2-digit'
+                            }),
+                        };
+                    }
+                } catch (progErr) {
+                    console.warn('[LookupBookingTool] Progress lookup failed:', progErr.message);
+                }
+            }
+
             const customerType = isMotorBeingWorkedOn
                 ? 'in_service'
                 : activeBookings.length > 0
@@ -126,10 +162,12 @@ class LookupBookingTool extends BaseTool {
                     customerName: customer.name || null,
                     isMotorBeingWorkedOn,
                     activeBookings: activeFormatted,
+                    latestProgress,        // null jika belum ada update progress
                     totalPastBookings: lastBooking ? 1 : 0, // minimal proxy
                 },
                 success: true
             };
+
 
         } catch (err) {
             console.error('[LookupBookingTool] Error:', err.message);

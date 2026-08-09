@@ -95,6 +95,7 @@ model Booking {
   vehicle            Vehicle?            @relation(fields: [vehicleId], references: [id])
   coatingMaintenance CoatingMaintenance?
   transaction        Transaction?
+  progressUpdates    ProgressUpdate[]
 }
 
 model Transaction {
@@ -270,4 +271,15 @@ model Surcharge {
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model ProgressUpdate {
+  id         String    @id @default(uuid())
+  bookingId  String
+  mediaUrls  String[]  // Multiple Cloudinary URLs
+  mediaTypes String[]  // "image" | "video" per URL
+  caption    String?   // Admin's raw caption
+  sentAt     DateTime? // null = not yet sent to customer
+  createdAt  DateTime  @default(now())
+  booking    Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 }

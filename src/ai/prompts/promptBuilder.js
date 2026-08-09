@@ -451,9 +451,27 @@ Anda TIDAK MENGAMBIL KEPUTUSAN, melainkan mengkomunikasikan keputusan Planner de
             if (hasCandidates) {
                 prompt += `ATURAN PENYAJIAN PAKET: Karena ada beberapa pilihan paket layanan, JANGAN copas deskripsi panjang. Gunakan format ringkas satu baris untuk tiap paket seperti ini:\n🔹 Nama Paket {isi dari field summary} - Harga\nContoh: 🔹 Paket Basic (Clear HS) - Rp1,58 juta\nPastikan format ini diikuti persis agar rapi. KECUALI jika user secara eksplisit meminta penjelasan detail atau menanyakan perbedaan paket, barulah kamu boleh menggunakan field 'description' untuk menjelaskannya.\n`;
             }
+
+            // ── Progress Media Instruction ────────────────────────────────────
+            // If the lookup tool returned a latestProgress, Composer can forward it.
+            const toolRes = state.tool?.lastResult?.rawText || state.tool?.lastResult;
+            if (state.tool?.lastCapability === 'lookup_booking' && toolRes?.latestProgress) {
+                const prog = toolRes.latestProgress;
+                prompt += `\n=== UPDATE PROGRESS MOTOR TERSEDIA ===\n`;
+                prompt += `Ada ${prog.mediaCount} foto/video progress motor customer tertanggal ${prog.updatedAt}.\n`;
+                if (prog.caption) prompt += `Caption admin: "${prog.caption}"\n`;
+                prompt += `INSTRUKSI: Jika customer tanya soal progress motornya, kirim foto/video tersebut ke mereka.\n`;
+                prompt += `Caranya: sebutkan dalam teks bahwa kamu akan kirim foto/video progressnya, lalu set action: SEND_PROGRESS dengan progressId: "${prog.progressId}".\n`;
+                prompt += `Format action di JSON output: { "action": "SEND_PROGRESS", "progressId": "${prog.progressId}" }\n`;
+                prompt += `Tulis caption-nya dalam gaya Zoya yang casual dan warm ya.\n`;
+                prompt += `\n`;
+            }
+            // ─────────────────────────────────────────────────────────────────
+
             prompt += `\n`;
         }
     }
+
 
     if (prioritizedData && prioritizedData.injected_knowledge) {
         prompt += `=== INJECTED KNOWLEDGE ===\n`;
