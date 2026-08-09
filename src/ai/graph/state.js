@@ -237,6 +237,13 @@ const ZoyaState = Annotation.Root({
     metadata: Annotation({
         reducer: (old, next) => ({ ...old, ...next }),
         default: () => ({})
+    }),
+
+    // Customer Booking Context (loaded by initNode from DB)
+    // Tells Zoya whether the customer has an active booking, is in-service, returning, or new.
+    customerBookingContext: Annotation({
+        reducer: (old, next) => next ?? old,
+        default: () => null
     })
 });
 

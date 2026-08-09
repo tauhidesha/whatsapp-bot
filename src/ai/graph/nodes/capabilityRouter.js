@@ -89,12 +89,13 @@ async function capabilityRouterNode(state) {
     }
 
     const intentToToolMap = {
-        'GET_PRICE': 'pricing',
-        'CREATE_BOOKING': 'create_booking',
+        'GET_PRICE':          'pricing',
+        'CREATE_BOOKING':     'create_booking',
         'CHECK_AVAILABILITY': 'booking_availability',
-        'SEND_NOTIFICATION': 'notification',
-        'ANSWER_FAQ': 'studio_info',
-        'ESCALATE_HUMAN': 'escalate_human'
+        'SEND_NOTIFICATION':  'notification',
+        'ANSWER_FAQ':         'studio_info',
+        'ESCALATE_HUMAN':     'escalate_human',
+        'CHECK_ORDER':        'lookup_booking',
     };
 
     const capability = intentToToolMap[toolIntent];

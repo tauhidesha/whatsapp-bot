@@ -95,7 +95,41 @@ function buildPlannerPrompt(state) {
 
     prompt += `=== CURRENT STATE ===\n`;
     prompt += `Customer: ${customer?.name} (Status: ${customer?.status})\n`;
-    
+
+    // ── Booking Context (from initNode auto-lookup) ───────────────────────────
+    const bookingCtx = state.customerBookingContext;
+    if (bookingCtx) {
+        const ctxTypeLabel = {
+            'in_service':         '🔴 MOTOR SEDANG DIKERJAKAN',
+            'has_active_booking': '🟡 PUNYA BOOKING AKTIF',
+            'returning':          '🟢 CUSTOMER LAMA (pernah booking sebelumnya)',
+            'new':                '⚪ CUSTOMER BARU',
+            'unknown':            '❓ STATUS TIDAK DIKETAHUI',
+        }[bookingCtx.customerType] || '❓ STATUS TIDAK DIKETAHUI';
+
+        prompt += `Status Booking Customer: ${ctxTypeLabel}\n`;
+
+        if (bookingCtx.activeBookings?.length > 0) {
+            prompt += `Booking Aktif:\n`;
+            bookingCtx.activeBookings.forEach(b => {
+                prompt += `  - [${b.bookingId}] ${b.service} | ${b.statusLabel} | ${b.date} | Motor: ${b.motor}${b.plate !== '-' ? ` (${b.plate})` : ''}\n`;
+                if (b.adminNotes) prompt += `    Catatan Admin: ${b.adminNotes}\n`;
+            });
+        }
+
+        if (bookingCtx.customerType === 'in_service' || bookingCtx.customerType === 'has_active_booking') {
+            prompt += `INSTRUKSI KONTEKS BOOKING:\n`;
+            prompt += `- Customer ini MUNGKIN menghubungi untuk nanya status pengerjaan motornya.\n`;
+            prompt += `- Jika customer tanya tentang status/progress pengerjaan, JANGAN jawab sendiri. Sampaikan bahwa kamu akan menghubungkan ke Bosmat untuk info lebih detail, lalu gunakan toolIntent ESCALATE_HUMAN.\n`;
+            prompt += `- Jika customer datang untuk layanan BARU (bukan nanya status), lanjutkan alur konsultasi biasa.\n`;
+        } else if (bookingCtx.customerType === 'returning') {
+            prompt += `INSTRUKSI KONTEKS RETURNING: Ini customer lama. Sambut hangat, bisa sebut motor/layanan terakhirnya jika relevan.\n`;
+        }
+        prompt += `\n`;
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
+
     // Combine explicit knownFacts with vehicle data so Planner sees them as a single truth
     const allKnownFacts = {
         ...(consultation?.knownFacts || {}),
