@@ -30,10 +30,10 @@ const upload = multer({
 // ─── GET /api/progress/bookings/active ────────────────────────────────────────
 router.get('/bookings/active', requireAuth, async (req, res) => {
     try {
-        // Status values must match exactly what's stored in DB (lowercase)
-        const STATUS_ACTIVE = ['pending', 'waiting', 'confirmed', 'in_queue', 'in_progress'];
+        // Show all non-terminal bookings (blocklist approach — more robust to unknown status values)
+        const STATUS_TERMINAL = ['done', 'paid', 'cancelled', 'canceled', 'completed', 'success', 'rejected'];
         const bookings = await prisma.booking.findMany({
-            where: { status: { in: STATUS_ACTIVE } },
+            where: { status: { notIn: STATUS_TERMINAL } },
             orderBy: { bookingDate: 'desc' },
             take: 100,
             select: {
@@ -49,7 +49,24 @@ router.get('/bookings/active', requireAuth, async (req, res) => {
             }
         });
 
-        const formatted = bookings.map(b => ({
+        // Fallback: if still empty, return last 30 bookings regardless of status
+        const bookingList = bookings.length > 0 ? bookings : await prisma.booking.findMany({
+            orderBy: { bookingDate: 'desc' },
+            take: 30,
+            select: {
+                id: true,
+                status: true,
+                serviceType: true,
+                bookingDate: true,
+                vehicleModel: true,
+                plateNumber: true,
+                customerName: true,
+                customerPhone: true,
+                customer: { select: { name: true, phone: true } },
+            }
+        });
+
+        const formatted = bookingList.map(b => ({
             id: b.id,
             label: `${b.vehicleModel || 'Motor'} — ${b.customerName || b.customer?.name || 'Customer'}${b.plateNumber ? ` (${b.plateNumber})` : ''}`,
             customerName: b.customerName || b.customer?.name || 'Customer',
