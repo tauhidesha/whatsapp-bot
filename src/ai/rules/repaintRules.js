@@ -121,6 +121,9 @@ async function evaluateRepaintRules(state) {
         // Generic repaint, needs clarification
         rules.blockingFacts.push("motorModel", "partToRepaint");
     }
+    
+    // Explicit Question Priority Constraint
+    rules.constraints.push("PRIORITAS BERTANYA (MUTLAK): Jika 'motorModel' belum diketahui, Anda WAJIB bertanya tentang tipe/model motor terlebih dahulu SEBELUM bertanya tentang bagian yang mau di-repaint (partToRepaint) atau hal lainnya. Jadikan 'motorModel' prioritas 1.");
 
     // ── Color Phase: Inject trend advisory when color is still unknown ──────
     const colorState = vehicle?.paintType?.state || knownFacts.paintColor?.state;
