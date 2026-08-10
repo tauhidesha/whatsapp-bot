@@ -50,6 +50,7 @@ async function adminNode(state) {
         maxOutputTokens: 2048,
         temperature: 0
     };
+    console.log(`[ADMIN_NODE] Initializing model: ${modelConfig.model} with ${toolDefinitions.length} tools`);
 
     let model = new ChatGoogleGenerativeAI(modelConfig);
 
@@ -97,13 +98,22 @@ Langsung jawab pertanyaan bisnis/teknis secara to the point.
 
     let response;
     try {
-        response = await model.invoke([
+        console.log(`[ADMIN_NODE] Invoking model (${modelConfig.model})...`);
+        const invokePromise = model.invoke([
             new SystemMessage(systemPrompt),
             ...safeHistory
         ]);
+        
+        // Timeout to prevent hanging indefinitely
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Model invocation timed out after 30 seconds')), 30000)
+        );
+
+        response = await Promise.race([invokePromise, timeoutPromise]);
+        console.log(`[ADMIN_NODE] Model invocation successful! Tool calls received:`, response.tool_calls?.length || 0);
     } catch (err) {
         console.error('[ADMIN_NODE] Error invoking model:', err);
-        return { messages: [new AIMessage('Maaf, terjadi kesalahan saat memproses perintah Admin.')] };
+        return { messages: [new AIMessage(`Maaf, terjadi kesalahan pada Admin Node: ${err.message}`)] };
     }
 
     // Check if tool calls exist
