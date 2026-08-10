@@ -1364,7 +1364,11 @@ function start(client) {
             msgPayload.document = buffer;
             if (caption) msgPayload.caption = caption;
         }
-        return await client.sendMessage(to, msgPayload);
+        
+        console.log(`[Baileys Wrapper] Sending file to ${to}, type: ${isImage ? 'image' : isVideo ? 'video' : 'document'}, size: ${buffer.length} bytes`);
+        const result = await client.sendMessage(to, msgPayload);
+        console.log(`[Baileys Wrapper] Send file to ${to} completed successfully.`);
+        return result;
     });
     client.close = () => {
         if (client.ws) client.ws.close();

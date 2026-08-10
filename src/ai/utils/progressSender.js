@@ -119,8 +119,39 @@ async function sendProgressUpdate(progressId, phone) {
     const zoyaCaption = await composeZoyaCaption(update.caption, serviceLabel);
     console.log(`[progressSender] Composed caption: "${zoyaCaption}"`);
 
-    // Normalize phone (add @s.whatsapp.net if needed)
-    const toJid = phone.includes('@') ? phone : `${phone}@s.whatsapp.net`;
+    // Attempt to find the real WhatsApp LID or format the phone correctly
+    let targetNumber = phone;
+    
+    // Clean up the phone number just in case
+    let cleanNumber = phone.replace(/\D/g, '');
+    if (cleanNumber.startsWith('0')) {
+        cleanNumber = '62' + cleanNumber.substring(1);
+    }
+    
+    const customer = await prisma.customer.findFirst({
+        where: {
+            OR: [
+                { phone: cleanNumber },
+                { phone },
+                { whatsappLid: phone },
+                { whatsappLid: { endsWith: cleanNumber } }
+            ]
+        },
+        select: { whatsappLid: true }
+    });
+
+    if (customer && customer.whatsappLid) {
+        targetNumber = customer.whatsappLid;
+    } else {
+        // Fallback formatting
+        targetNumber = phone.includes('@') 
+            ? phone 
+            : (cleanNumber.length >= 14 && ['1', '2'].includes(cleanNumber[0])) 
+                ? `${cleanNumber}@lid` 
+                : `${cleanNumber}@s.whatsapp.net`;
+    }
+
+    const toJid = targetNumber;
 
     let sentCount = 0;
     const errors = [];
@@ -140,6 +171,7 @@ async function sendProgressUpdate(progressId, phone) {
             const captionForThis = (i === update.mediaUrls.length - 1) ? zoyaCaption : '';
             const filename = isVideo ? `progress_${i + 1}.mp4` : `progress_${i + 1}.jpg`;
 
+            console.log(`[progressSender] 🟢 Executing Baileys sendFile to: ${toJid} | filename: ${filename} | caption length: ${captionForThis.length}`);
             await global.whatsappClient.sendFile(toJid, dataUri, filename, captionForThis);
             sentCount++;
 
