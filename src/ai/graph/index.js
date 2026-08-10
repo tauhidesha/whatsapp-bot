@@ -51,7 +51,10 @@ workflow.addConditionalEdges(
 // Admin Flow:
 workflow.addConditionalEdges(
     'admin',
-    (state) => (state.context?.isReadyForTools ? 'adminExecutor' : END),
+    (state) => {
+        const lastMsg = state.messages[state.messages.length - 1];
+        return (lastMsg?.tool_calls?.length > 0) ? 'adminExecutor' : END;
+    },
     {
         'adminExecutor': 'adminExecutor',
         [END]: END
