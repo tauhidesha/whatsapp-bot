@@ -208,7 +208,7 @@ async function buildEligibilityQueue(now, contexts, options = { dryRun: false })
 
         if (lastService && !context.reviewFollowUpSent && !hasActiveBooking) {
             const daysSinceService = getDaysSince(lastService);
-            if (daysSinceService >= 3 && daysSinceService <= 7) {
+            if (daysSinceService >= 3 && daysSinceService <= 14) {
                 isReviewEligible = true;
             }
         }
