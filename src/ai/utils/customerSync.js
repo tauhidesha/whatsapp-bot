@@ -27,7 +27,7 @@ async function syncCustomer(customerId) {
     // Includes both Bookings and Standalone Income Transactions
     const [lastBooking, lastIncomeTx] = await Promise.all([
       prisma.booking.findFirst({
-        where: { customerId, status: 'COMPLETED' },
+        where: { customerId, status: { in: ['COMPLETED', 'PAID', 'DONE'] } },
         orderBy: { bookingDate: 'desc' }
       }),
       prisma.transaction.findFirst({
@@ -93,19 +93,26 @@ async function syncCustomer(customerId) {
 
       const isNewService = !oldServiceDate || (lastServiceDate && lastServiceDate.getTime() > oldServiceDate.getTime());
 
+      // Check if CustomerContext already has a label (walk-in customers won't)
+      const existingCtx = await prisma.customerContext.findUnique({ where: { phone: oldCustomer.phone } });
+      const needsLabel = !existingCtx?.customerLabel;
+
       await prisma.customerContext.upsert({
         where: { phone: oldCustomer.phone },
         update: {
           lastServiceAt: lastServiceDate,
           lastServiceType: serviceType,
-          ...(isNewService ? { reviewFollowUpSent: false } : {})
+          ...(isNewService ? { reviewFollowUpSent: false } : {}),
+          // Auto-assign label if missing — walk-in customers skip bot onboarding
+          ...(needsLabel ? { customerLabel: 'existing' } : {})
         },
         create: {
           id: oldCustomer.phone,
           phone: oldCustomer.phone,
           lastServiceAt: lastServiceDate,
           lastServiceType: serviceType,
-          reviewFollowUpSent: false
+          reviewFollowUpSent: false,
+          customerLabel: 'existing' // Walk-in default
         }
       });
 
