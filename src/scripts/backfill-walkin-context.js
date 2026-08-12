@@ -19,11 +19,11 @@ async function main() {
     // Find customers with completed bookings but no CustomerContext
     const customers = await prisma.customer.findMany({
         where: {
-            phone: { not: null },
+            NOT: { phone: null },
             bookings: {
                 some: { status: { in: ['PAID', 'COMPLETED', 'DONE'] } }
             },
-            customerContext: null
+            customerContext: { is: null }
         },
         include: {
             bookings: {
